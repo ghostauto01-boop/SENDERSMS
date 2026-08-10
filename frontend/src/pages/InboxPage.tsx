@@ -57,9 +57,9 @@ export default function InboxPage() {
     try {
       const { data } = await api.post("/inbox/poll-now");
       setPollDebug(data);
-      if (data.inbound > 0) { toast.success(`${data.inbound} replies found!`); loadConvs(); }
+      if (data.new_messages > 0) { toast.success(`${data.new_messages} new messages synced!`); loadConvs(); }
       else if (data.status_updates > 0) { toast.success(`${data.status_updates} statuses updated`); loadConvs(); }
-      else if (data.total_checked > 0) { toast(`${data.total_checked} messages checked — no new replies`, {icon: "ℹ️"}); }
+      else if (data.total > 0) { toast(`${data.total} messages checked`, {icon: "ℹ️"}); }
       else { toast(data.error || "Could not fetch", {icon: "⚠️"}); }
     } catch(err:any) { toast.error("Poll failed — check connection"); setPollDebug({error:err.message}); }
     finally { setPolling(false); }
@@ -114,12 +114,13 @@ export default function InboxPage() {
           <details className="text-xs bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
             <summary className="font-medium cursor-pointer">📊 Poll Result</summary>
             <div className="mt-2 space-y-1">
-              <p><strong>Total checked:</strong> {pollDebug.total_checked || 0}</p>
-              <p><strong>Status updates:</strong> {pollDebug.status_updates || 0}</p>
-              <p><strong>Inbound replies:</strong> <span className={pollDebug.inbound>0?"text-green-600 font-bold":""}>{pollDebug.inbound || 0}</span></p>
+              <p><strong>Messages from API:</strong> {pollDebug.total || pollDebug.raw_count || 0}</p>
+              <p><strong>Status updated:</strong> {pollDebug.status_updates || 0}</p>
+              <p><strong>New conversations:</strong> {pollDebug.new_conversations || 0}</p>
+              <p><strong>New messages:</strong> <span className={pollDebug.new_messages>0?"text-green-600 font-bold":""}>{pollDebug.new_messages || 0}</span></p>
               <p className="mt-2 text-gray-500">Webhook URL: <code className="text-[10px] bg-gray-200 dark:bg-gray-700 px-1 rounded">{pollDebug.debug?.webhook_url || "/api/v1/webhooks/smsgateway"}</code></p>
               {pollDebug.details && pollDebug.details.length > 0 && (
-                <div className="mt-1"><p className="font-medium">New replies:</p>
+                <div className="mt-1"><p className="font-medium">Recent activity:</p>
                   {pollDebug.details.map((d:any,i:number) => (
                     <div key={i} className="text-green-600 ml-2">📱 {d.from}: {d.text}</div>
                   ))}
