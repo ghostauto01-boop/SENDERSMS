@@ -100,15 +100,29 @@ async def sync_full_inbox(db:AsyncSession=Depends(get_db),cu:User=Depends(get_cu
     base="https://api.sms-gate.app/3rdparty/v1"
 
     # Step 1: Fetch ALL messages from SMS-Gate.app
-    try:
-        async with httpx.AsyncClient(timeout=httpx.Timeout(60)) as client:
-            r=await client.get(f"{base}/messages?limit=200",headers=headers)
-            if r.status_code!=200:
-                return{"success":False,"error":f"HTTP {r.status_code}","debug":{"http":r.status_code,"body":r.text[:300]}}
-            raw=r.json()
-            all_msgs=raw if isinstance(raw,list) else raw.get("messages",raw.get("data",[]))
-    except Exception as e:
-        return{"success":False,"error":str(e)[:300]}
+    # Fetch messages with proper pagination and fallback
+    all_msgs = []
+    max_limit = 50  # API max limit
+    for attempt in [max_limit, 25, 10]:  # try smaller limits if max fails
+        try:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(60)) as client:
+                r=await client.get(f"{base}/messages?limit={attempt}",headers=headers)
+                if r.status_code==200:
+                    raw=r.json()
+                    batch=raw if isinstance(raw,list) else raw.get("messages",raw.get("data",[]))
+                    all_msgs=batch
+                    break
+                elif r.status_code==400:
+                    if attempt==10:  # last attempt failed
+                        return{"success":False,"error":f"HTTP 400 — may need smaller limit","debug":{"tried_limit":attempt,"body":r.text[:200]}}
+                    continue  # try smaller limit
+                else:
+                    return{"success":False,"error":f"HTTP {r.status_code}","debug":{"http":r.status_code,"body":r.text[:300]}}
+        except Exception as e:
+            if attempt==10:
+                return{"success":False,"error":str(e)[:300]}
+    if not all_msgs:
+        return{"success":True,"total_api_messages":0,"note":"No messages returned from API"}
 
     # Step 2: Build a set of phone numbers WE sent to (outgoing recipients)
     outgoing_phones=set()
