@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import api from "../api/client";
 import toast from "react-hot-toast";
-import { Send, Star, ThumbsDown, Archive, ChevronLeft, CheckCheck, MessageCircle } from "lucide-react";
+import { Send, Star, ThumbsDown, Archive, ChevronLeft, CheckCheck, MessageCircle, Bug } from "lucide-react";
 
 export default function InboxPage() {
   const [convs, setConvs] = useState<any[]>([]);
@@ -14,6 +14,8 @@ export default function InboxPage() {
   const [showInfo, setShowInfo] = useState(false);
   const [polling, setPolling] = useState(false);
   const [pollDebug, setPollDebug] = useState<any>(null);
+  const [debugData, setDebugData] = useState<any>(null);
+  const [debugLoading, setDebugLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<any>(null);
 
@@ -46,7 +48,7 @@ export default function InboxPage() {
   };
 
   const doPoll = async () => {
-    setPolling(true); setPollDebug(null);
+    setPolling(true); setPollDebug(null); setDebugData(null);
     try {
       const { data } = await api.post("/inbox/poll-now");
       setPollDebug(data);
@@ -58,6 +60,16 @@ export default function InboxPage() {
     finally { setPolling(false); }
   };
 
+  const doPollDebug = async () => {
+    setDebugLoading(true); setDebugData(null);
+    try {
+      const { data } = await api.post("/inbox/poll-debug");
+      setDebugData(data);
+      toast.success("Debug data loaded");
+    } catch(err:any) { toast.error("Debug failed"); setDebugData({error:err.message}); }
+    finally { setDebugLoading(false); }
+  };
+
   const filters = [{v:"all",l:"All"},{v:"unread",l:"Unread"},{v:"interested",l:"Interested"},{v:"closed",l:"Closed"}];
 
   return (
@@ -66,7 +78,10 @@ export default function InboxPage() {
       <div className={`${selected ? "hidden md:flex" : "flex"} w-full md:w-80 flex-shrink-0 flex-col`}>
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-2xl font-bold">Inbox</h1>
-          <button onClick={doPoll} disabled={polling} className="btn-secondary btn-sm">{polling ? "Syncing..." : "📥 Sync Inbox"}</button>
+          <div className="flex gap-1">
+            <button onClick={doPoll} disabled={polling} className="btn-secondary btn-sm">{polling ? "Syncing..." : "📥 Sync"}</button>
+            <button onClick={doPollDebug} disabled={debugLoading} className="btn-ghost btn-sm" title="Debug: show raw API response"><Bug size={14}/></button>
+          </div>
         </div>
         <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-2 mb-2 text-xs text-blue-700 dark:text-blue-300">
           <p>Syncs ALL SMS from your phone. Webhook: <code className="text-xs bg-blue-100 dark:bg-blue-800 px-1 rounded">/api/v1/webhooks/smsgateway</code></p>
@@ -81,7 +96,62 @@ export default function InboxPage() {
 
       {/* RIGHT */}
       <div className="flex-1 flex flex-col card overflow-hidden">
-      {pollDebug && !selected ? (
+      {/* DEBUG VIEW */}
+      {debugData ? (
+        <div className="flex-1 p-4 overflow-y-auto">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="font-bold text-lg">🔍 Poll Debug</h2>
+            <button onClick={()=>setDebugData(null)} className="btn-ghost btn-sm">Close</button>
+          </div>
+          {debugData.error ? (
+            <p className="text-red-600">Error: {debugData.error}</p>
+          ) : (
+            <div className="space-y-4 text-xs">
+              <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
+                <p className="font-medium mb-1">Message Count: <strong>{debugData.total_api_messages}</strong></p>
+                <p>Known outgoing IDs: <strong>{debugData.known_outgoing_ids_count}</strong></p>
+                {debugData.known_outgoing_ids_sample?.length > 0 && (
+                  <p className="text-gray-500">Sample: {debugData.known_outgoing_ids_sample.join(", ").slice(0,80)}</p>
+                )}
+              </div>
+
+              {/* Processing Trace */}
+              {debugData.processing_trace?.length > 0 && (
+                <div>
+                  <p className="font-medium mb-1">Processing Trace (first 5 messages):</p>
+                  {debugData.processing_trace.map((t:any,i:number)=>(
+                    <div key={i} className={`mb-2 p-2 rounded ${t.would_match==="NONE_all_zero"||t.would_match?.startsWith("CASE3_but") ? "bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800" : "bg-green-50 dark:bg-green-900/20"}`}>
+                      <p><strong>Msg {t.index}:</strong> would_match=<code className="font-bold">{t.would_match}</code></p>
+                      <p>ID: {t.id?.slice(0,30)} | State: {t.state} | In known IDs: {String(t.in_known_ids)}</p>
+                      <p>Has sender: {String(t.has_sender)} | Has text: {String(t.has_text)} | Recipients: {t.recipients_count}</p>
+                      {t.first_recipient_type && <p>1st recipient type: {t.first_recipient_type} | keys: {JSON.stringify(t.first_recipient_keys)}</p>}
+                      {t.phone_sample && <p>Phone sample: {t.phone_sample} → normalizes: {String(t.normalizes)} → {t.normalized || "NULL"}</p>}
+                      {t.first_recipient_value && <p>1st recipient value: {t.first_recipient_value}</p>}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Raw API Response */}
+              {debugData.raw_responses && (
+                <details open><summary className="cursor-pointer font-medium text-orange-600">Raw API Responses</summary>
+                  <pre className="text-[10px] mt-1 bg-gray-100 dark:bg-gray-900 p-2 rounded max-h-60 overflow-y-auto whitespace-pre-wrap">{JSON.stringify(debugData.raw_responses, null, 2)}</pre>
+                </details>
+              )}
+
+              {/* Sample messages */}
+              {debugData.sample_messages?.length > 0 && (
+                <details open><summary className="cursor-pointer font-medium">Sample Messages (full keys)</summary>
+                  <pre className="text-[10px] mt-1 bg-gray-100 dark:bg-gray-900 p-2 rounded max-h-60 overflow-y-auto whitespace-pre-wrap">{JSON.stringify(debugData.sample_messages, null, 2)}</pre>
+                </details>
+              )}
+            </div>
+          )}
+          {!debugData?.processing_trace?.length && !debugData?.error && (
+            <p className="text-gray-500 mt-4">No messages found in API response.</p>
+          )}
+        </div>
+      ) : pollDebug && !selected ? (
         <div className="flex-1 p-4 overflow-y-auto">
           <div className="text-xs bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
             <p className="font-medium mb-2">📊 Sync Result</p>
@@ -91,6 +161,9 @@ export default function InboxPage() {
               <p>Statuses updated: <strong>{pollDebug.outgoing_updated || 0}</strong></p>
               <p>New contacts: {pollDebug.new_contacts || 0} · Conversations: {pollDebug.new_conversations || 0}</p>
               <p>Dupes skipped: {pollDebug.skipped || 0}</p>
+              {pollDebug.unhandled && pollDebug.unhandled > 0 && (
+                <p className="text-orange-600 font-medium">⚠️ {pollDebug.unhandled} messages could not be processed!</p>
+              )}
               {pollDebug.webhook_url && <p className="mt-1 text-gray-500">Webhook: <code className="text-[10px] bg-gray-200 dark:bg-gray-700 px-1 rounded">{pollDebug.webhook_url}</code></p>}
               {pollDebug.error && <p className="text-red-600 mt-1">Error: {pollDebug.error}</p>}
               {pollDebug.note && <p className="text-blue-600 mt-1">{pollDebug.note}</p>}
@@ -101,9 +174,17 @@ export default function InboxPage() {
                   </div>
                 </details>
               )}
+              {pollDebug.debug && (
+                <details className="mt-2"><summary className="cursor-pointer font-medium text-orange-600">🔍 Raw API Debug</summary>
+                  <pre className="text-[10px] mt-1 bg-gray-100 dark:bg-gray-900 p-2 rounded max-h-40 overflow-y-auto whitespace-pre-wrap">{JSON.stringify(pollDebug.debug, null, 2)}</pre>
+                </details>
+              )}
             </div>
           </div>
-          <div className="mt-4 text-center text-gray-400"><p className="text-sm">Select a conversation on the left to view</p></div>
+          <div className="mt-4 text-center text-gray-400">
+            <button onClick={doPollDebug} className="text-xs text-blue-500 hover:underline">🔍 Full Poll Debug (raw API inspection)</button>
+            <p className="text-sm mt-2">Select a conversation on the left to view</p>
+          </div>
         </div>
       ) : selected ? (<>
           <div className="p-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
