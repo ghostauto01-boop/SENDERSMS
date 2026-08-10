@@ -1,4 +1,4 @@
-"""FastAPI — webhook auto-register, poll messages, scheduled, PWA, SPA."""
+"""FastAPI — webhook auto-register, status poll, scheduled, PWA, SPA."""
 import os, logging, time
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, BackgroundTasks
@@ -20,12 +20,11 @@ async def _startup_webhook():
         r = await register_webhook_direct("https://sendsms-api.onrender.com/api/v1/webhooks/smsgateway")
         if r.get("success"):
             with open(WEBHOOK_DONE, "w") as f: f.write("ok")
-            logger.info("Webhook registered")
-        else:
-            logger.warning(f"Webhook failed: {r}")
+            logger.info("Webhook auto-registered")
     except Exception as e: logger.warning(f"Webhook: {e}")
 
 async def _poll():
+    """Update delivery statuses for pending messages."""
     try:
         now = time.time()
         try:
@@ -34,53 +33,34 @@ async def _poll():
         except: pass
         with open(LAST_POLL, "w") as f: f.write(str(now))
 
-        from app.providers.smsgate import poll_messages_direct
-        result = await poll_messages_direct()
-        msgs = result.get("messages", [])
-        if not msgs: return
-
-        from app.utils.phone import normalize_nigerian_number
         from sqlalchemy import select
-        from app.models.conversation import Conversation, Message
-        from app.models.contact import Contact
-        from app.services.sms_service import SMSService
+        from app.models.conversation import Message
+        from app.providers.smsgate import poll_status_for_ids
 
         async with async_session_factory() as db:
-            svc = SMSService(db)
+            msgs = await db.execute(
+                select(Message).where(
+                    Message.provider_message_id.isnot(None),
+                    Message.status.in_(("sent","sending","queued"))
+                ).limit(100))
+            ids = [m.provider_message_id for m in msgs.scalars().all()]
+            if not ids: return
+
+            results = await poll_status_for_ids(ids)
             count = 0
-            for msg in msgs:
-                direction = msg.get("direction", "")
-                snd = msg.get("sender") or msg.get("from") or msg.get("phoneNumber", "")
-                txt = msg.get("text") or msg.get("body") or msg.get("message", "")
-                mid = msg.get("id") or msg.get("messageId", "")
-                status = msg.get("status", "")
-
-                # Update delivery status for outgoing
-                if mid and status and direction == "outgoing":
-                    mr = await db.execute(select(Message).where(Message.provider_message_id == mid))
-                    em = mr.scalar_one_or_none()
-                    if em and em.status != status:
-                        em.status = status
-                        if status == "delivered":
-                            from datetime import datetime as dt, timezone as tz
-                            em.delivered_at = dt.now(tz.utc)
-                        count += 1
-                    continue
-
-                # Incoming
-                if snd and txt and txt.strip():
-                    norm = normalize_nigerian_number(snd)
-                    if not norm: continue
-                    idem = f"inbound-{mid}" if mid else f"inbound-{norm}-{abs(hash(txt))}"
-                    ex = await db.execute(select(Message).where(Message.idempotency_key == idem))
-                    if not ex.scalar_one_or_none():
-                        await svc.process_inbound_message(snd, txt, {"messageId": mid} if mid else {})
-                        count += 1
+            for r in results:
+                mr = await db.execute(select(Message).where(Message.provider_message_id == r["provider_message_id"]))
+                m = mr.scalar_one_or_none()
+                if m and m.status != r["status"]:
+                    m.status = r["status"]
+                    if r["status"] == "delivered":
+                        from datetime import datetime as dt, timezone as tz
+                        m.delivered_at = dt.now(tz.utc)
+                    count += 1
             if count:
                 await db.commit()
-                logger.info(f"POLL: {count} new messages")
+                logger.info(f"STATUS: updated {count} messages")
 
-        # Scheduled
         await _process_scheduled()
     except Exception as e:
         logger.warning(f"Poll: {e}")
@@ -92,13 +72,18 @@ async def _process_scheduled():
         from sqlalchemy import select
         from datetime import datetime as dt, timezone as tz
         async with async_session_factory() as db:
-            due = await db.execute(select(ScheduledMessage).where(ScheduledMessage.status=="pending", ScheduledMessage.schedule_at<=dt.now(tz.utc)).limit(5))
-            for sm in due.scalars().all():
+            due = await db.execute(select(ScheduledMessage).where(
+                ScheduledMessage.status == "pending",
+                ScheduledMessage.schedule_at <= dt.now(tz.utc)).limit(5))
+            scheduled = due.scalars().all()
+            if not scheduled: return
+            for sm in scheduled:
                 r = await send_sms_direct(sm.phone_number, sm.body, sm.sim_number)
                 sm.status = "sent" if r["success"] else "failed"
                 sm.error = r.get("error","")[:500] if not r["success"] else None
                 sm.executed_at = dt.now(tz.utc)
-            if due.rowcount: await db.commit()
+            await db.commit()
+            logger.info(f"SCHEDULED: {len(scheduled)} messages")
     except Exception as e: logger.warning(f"Scheduled: {e}")
 
 @asynccontextmanager

@@ -55,8 +55,8 @@ export default function InboxPage() {
     setPolling(true);
     try {
       const { data } = await api.post("/inbox/poll-now");
-      if (data.success && data.processed > 0) { toast.success(`${data.processed} new messages!`); loadConvs(); }
-      else toast(data.error || "No new messages", {icon: "ℹ️"});
+      if (data.processed > 0) { toast.success(`${data.processed} statuses updated`); loadConvs(); }
+      else toast("All up to date", {icon: "ℹ️"});
     } catch { toast.error("Poll failed"); }
     finally { setPolling(false); }
   };
@@ -72,11 +72,11 @@ export default function InboxPage() {
       <div className={`${selected ? "hidden md:flex" : "flex"} w-full md:w-80 flex-shrink-0 flex-col`}>
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-2xl font-bold">Inbox</h1>
-          <button onClick={doPoll} disabled={polling} className="btn-secondary btn-sm">{polling ? "Polling..." : "📥 Poll Now"}</button>
+          <button onClick={doPoll} disabled={polling} className="btn-secondary btn-sm">{polling ? "Syncing..." : "🔄 Sync Status"}</button>
         </div>
 
         <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-2 mb-2 text-xs text-blue-700 dark:text-blue-300">
-          <p>Webhook URL: <code className="text-xs bg-blue-100 dark:bg-blue-800 px-1 rounded">/api/v1/webhooks/smsgateway</code></p>
+          <p>ℹ️ Inbound SMS arrives via webhook. This button syncs delivery statuses. Webhook: <code className="text-xs bg-blue-100 dark:bg-blue-800 px-1 rounded">/api/v1/webhooks/smsgateway</code></p>
         </div>
 
         <div className="flex flex-wrap gap-1 mb-2">
