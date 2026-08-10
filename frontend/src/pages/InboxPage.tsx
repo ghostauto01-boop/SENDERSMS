@@ -11,6 +11,7 @@ export default function InboxPage() {
   const [messages, setMessages] = useState<any[]>([]);
   const [replyText, setReplyText] = useState("");
   const [sending, setSending] = useState(false);
+  const [pollDebug, setPollDebug] = useState<any>(null);
   const [filter, setFilter] = useState("all");
   const [showContactInfo, setShowContactInfo] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -75,7 +76,24 @@ export default function InboxPage() {
       <div className={`${selected ? "hidden md:flex" : "flex"} w-full md:w-80 flex-shrink-0 flex-col`}>
         <div className="flex items-center justify-between mb-3">
         <h1 className="text-2xl font-bold">Inbox</h1>
-        <button onClick={async () => { try { const {data} = await api.post("/inbox/poll-now"); toast.success(data.processed > 0 ? `${data.processed} new messages found!` : "No new messages. Phone must be online with SMS Gateway app open."); loadConvs(); } catch { toast.error("Poll failed"); } }} className="btn-secondary btn-sm">
+        <button onClick={async () => { 
+          try { 
+            const {data} = await api.post("/inbox/poll-now"); 
+            if (data.processed > 0) {
+              toast.success(`${data.processed} new messages found!`); 
+              loadConvs();
+            } else if (data.error) {
+              toast.error(`Poll failed: ${data.error}`);
+            } else {
+              toast("No new messages. Phone must be online with SMS Gateway app open.", {icon:"ℹ️"});
+            }
+            // Show debug expandable
+            setPollDebug(data);
+          } catch(err:any) { 
+            toast.error("Poll request failed — check connection"); 
+            setPollDebug({error: err.message});
+          } 
+        }} className="btn-secondary btn-sm">
           📥 Poll Now
         </button>
       </div>
@@ -85,6 +103,12 @@ export default function InboxPage() {
               className={`text-xs px-2 py-1 rounded-full ${filter===f.v ? "bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300" : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400"}`}>{f.l}</button>
           ))}
         </div>
+        {pollDebug && (
+          <details className="text-xs bg-yellow-50 dark:bg-yellow-900/20 rounded p-2 mx-2 mb-2">
+            <summary className="cursor-pointer font-medium">Poll Debug</summary>
+            <pre className="mt-1 whitespace-pre-wrap text-[10px]">{JSON.stringify(pollDebug,null,2)}</pre>
+          </details>
+        )}
         <div className="flex-1 overflow-y-auto space-y-1">
           {loading ? [...Array(5)].map((_,i)=>(<div key={i} className="card p-3"><div className="skeleton h-4 w-32 mb-1"/><div className="skeleton h-3 w-48"/></div>))
           : convs.length===0 ? <div className="text-center py-12 text-gray-500"><MessageCircle size={48} className="mx-auto mb-2 opacity-30"/><p>No conversations</p></div>

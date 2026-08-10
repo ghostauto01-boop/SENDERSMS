@@ -1,7 +1,7 @@
-"""Inbox API — conversations, messages, manual inbox poll."""
+"""Inbox API — conversations, messages, manual inbox poll with debug."""
 import json, logging
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
@@ -81,11 +81,9 @@ async def send_reply(conversation_id: int, body: str = Query(..., min_length=1),
     conv = r.scalar_one_or_none()
     if not conv: raise HTTPException(404, "Not found")
     from app.services.sms_service import SMSService
-    from app.tasks.sms_tasks import send_sms as celery_send
     svc = SMSService(db)
     msg = await svc.send_message(contact_id=conv.contact_id, body=body, campaign_id=conv.campaign_id)
     if not msg: raise HTTPException(500, "Gateway not configured")
-    if msg.status == "queued": celery_send.delay(msg.id)
     await db.flush()
     return {"success": True, "message_id": msg.id, "status": msg.status}
 
@@ -140,32 +138,96 @@ async def resume_sequence(conversation_id: int, db: AsyncSession = Depends(get_d
     conv.sequence_paused = False
     await db.flush(); return {"success": True}
 
-# MANUAL POLL — works without Celery
+# MANUAL POLL — EXACT same pattern as send_sms for reliability
 @router.post("/poll-now")
 async def poll_inbox_now(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    """Manually poll SMS-Gate.app inbox for new messages. Works instantly."""
-    from app.providers.smsgate import SMSGateProvider
+    """Manually poll SMS-Gate.app inbox. Uses EXACT same auth pattern as SMS sending."""
+    import base64, httpx
     from app.config import settings
-    p = SMSGateProvider(
-        base_url=settings.SMSGATE_BASE_URL or "https://api.sms-gate.app/3rdparty/v1",
-        username=settings.SMSGATE_USERNAME or "",
-        password=settings.SMSGATE_PASSWORD or "",
-        timeout=45)
-    messages = await p.poll_inbox()
-    logger.info(f"MANUAL POLL: got {len(messages)} raw messages")
-    from app.services.sms_service import SMSService
-    svc = SMSService(db)
-    processed = []
-    for msg in messages[:20]:
-        snd = msg.get("sender") or msg.get("from") or msg.get("phoneNumber") or msg.get("number","")
-        txt = msg.get("text") or msg.get("message") or msg.get("body","")
-        mid = msg.get("messageId") or msg.get("id","")
-        logger.info(f"Manual poll msg: from={snd}, text={txt[:50]}, id={mid}")
-        if snd and txt and txt.strip() and mid:
-            existing = await db.execute(select(Message).where(Message.idempotency_key == f"inbound-{mid}"))
-            if not existing.scalar_one_or_none():
-                result = await svc.process_inbound_message(snd, txt, {"messageId": mid})
-                processed.append({"from": snd, "text": txt[:50], "id": mid, "processed": result is not None})
-    await p.close()
-    await db.flush()
-    return {"success": True, "total_found": len(messages), "processed": len(processed), "details": processed}
+
+    u = settings.SMSGATE_USERNAME or ""
+    p = settings.SMSGATE_PASSWORD or ""
+    if not u or not p:
+        return {"success": False, "error": "Gateway credentials not set", "total_found": 0, "processed": 0}
+
+    auth = base64.b64encode(f"{u}:{p}".encode()).decode()
+    headers = {"Content-Type": "application/json", "Authorization": f"Basic {auth}"}
+    url = "https://api.sms-gate.app/3rdparty/v1/inbox"
+
+    debug_info = {"url": url, "auth_user": u[:4] + "..."}
+
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(30)) as client:
+            resp = await client.get(url, headers=headers)
+            status = resp.status_code
+            raw_text = resp.text
+
+            logger.info(f"INBOX POLL: HTTP {status}, body_len={len(raw_text)}")
+
+            if status != 200:
+                return {"success": False, "error": f"HTTP {status}", "total_found": 0, "processed": 0,
+                        "debug": {"http_status": status, "response": raw_text[:500], "url": url}}
+
+            try:
+                data = resp.json()
+            except:
+                return {"success": False, "error": "Could not parse JSON response", "total_found": 0, "processed": 0,
+                        "debug": {"http_status": status, "response": raw_text[:500]}}
+
+            # Handle various response formats
+            messages = []
+            if isinstance(data, list):
+                messages = data
+            elif isinstance(data, dict):
+                messages = data.get("messages") or data.get("data") or data.get("inbox") or []
+                if not messages and "id" in data:
+                    messages = [data]  # single message object
+
+            logger.info(f"INBOX POLL: parsed {len(messages)} messages")
+            debug_info["raw_count"] = len(messages)
+
+            from app.services.sms_service import SMSService
+            svc = SMSService(db)
+            processed = []
+            errors = []
+
+            for msg in messages[:20]:
+                snd = (msg.get("sender") or msg.get("from") or msg.get("phoneNumber")
+                       or msg.get("number") or msg.get("address") or "")
+                txt = (msg.get("text") or msg.get("message") or msg.get("body")
+                       or msg.get("content") or "")
+                mid = msg.get("messageId") or msg.get("id") or msg.get("_id") or ""
+
+                if snd and txt and txt.strip() and mid:
+                    try:
+                        existing = await db.execute(
+                            select(Message).where(Message.idempotency_key == f"inbound-{mid}"))
+                        if not existing.scalar_one_or_none():
+                            result = await svc.process_inbound_message(snd, txt, {"messageId": mid})
+                            processed.append({"from": snd, "text": txt[:80], "id": mid, "ok": result is not None})
+                            if result:
+                                logger.info(f"INBOX: processed message from {snd}")
+                    except Exception as e2:
+                        errors.append({"from": snd, "error": str(e2)[:100]})
+                elif snd and txt and txt.strip() and not mid:
+                    # No message ID — still process but use a synthetic key
+                    try:
+                        result = await svc.process_inbound_message(snd, txt)
+                        if result:
+                            processed.append({"from": snd, "text": txt[:80], "id": "synthetic", "ok": True})
+                    except Exception as e2:
+                        errors.append({"from": snd, "error": str(e2)[:100]})
+
+            await db.flush()
+            debug_info["processed"] = len(processed)
+            debug_info["errors"] = errors
+
+            return {"success": True, "total_found": len(messages), "processed": len(processed),
+                    "details": processed, "debug": debug_info}
+
+    except httpx.ConnectError:
+        return {"success": False, "error": "Cannot connect to api.sms-gate.app — check internet", "total_found": 0}
+    except httpx.TimeoutException:
+        return {"success": False, "error": "Timed out — phone may be offline", "total_found": 0}
+    except Exception as e:
+        return {"success": False, "error": str(e)[:500], "total_found": 0, "debug": debug_info}
