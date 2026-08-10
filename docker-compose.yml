@@ -1,0 +1,100 @@
+# ============================================================
+# SendSMS - Docker Compose (Local Development)
+# ============================================================
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: sendsms
+      POSTGRES_USER: sendsms
+      POSTGRES_PASSWORD: sendsms
+    restart: unless-stopped
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sendsms"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: backend
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://sendsms:sendsms@postgres:5432/sendsms
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: dev-secret-key-change-in-production-32chars
+      CREDENTIAL_ENCRYPTION_KEY: dev-encryption-key-change-in-production-32chars
+      ADMIN_USERNAME: admin
+      ADMIN_PASSWORD: admin123
+      APP_ENV: development
+      LOG_LEVEL: DEBUG
+      CORS_ORIGINS: http://localhost:5173,http://localhost:3000
+      DEFAULT_TIMEZONE: Africa/Lagos
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    volumes:
+      - ./backend:/app/backend
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: worker
+    environment:
+      DATABASE_URL: postgresql+asyncpg://sendsms:sendsms@postgres:5432/sendsms
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: dev-secret-key-change-in-production-32chars
+      CREDENTIAL_ENCRYPTION_KEY: dev-encryption-key-change-in-production-32chars
+      ADMIN_USERNAME: admin
+      ADMIN_PASSWORD: admin123
+      APP_ENV: development
+      LOG_LEVEL: DEBUG
+      DEFAULT_TIMEZONE: Africa/Lagos
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    volumes:
+      - ./backend:/app/backend
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redis_data:

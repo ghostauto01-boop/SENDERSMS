@@ -1,0 +1,15 @@
+{
+  "name": "SMS SENDER",
+  "short_name": "SMS SENDER",
+  "description": "Nigerian SMS Outreach CRM — Send & receive SMS via your Android phone",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#111827",
+  "theme_color": "#2563eb",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

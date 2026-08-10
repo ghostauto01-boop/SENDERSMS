@@ -1,0 +1,73 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+.venv/
+venv/
+env/
+
+# Node
+node_modules/
+frontend/dist/
+frontend/build/
+.next/
+.npm/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Database
+*.db
+*.sqlite3
+pgdata/
+
+# Logs
+*.log
+logs/
+
+# Uploads / media
+uploads/
+media/
+
+# Coverage
+coverage/
+htmlcov/
+.coverage
+.coverage.*
+
+# Testing
+.pytest_cache/
+.tox/
+
+# Docker
+.docker/
+
+# Redis dump
+dump.rdb
+
+# Celery
+celerybeat-schedule/
+
+# TypeScript build info
+tsconfig.tsbuildinfo
+
+# Arena sandbox
+.arena/
