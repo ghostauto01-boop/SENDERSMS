@@ -76,13 +76,14 @@ export default function InboxPage() {
         <div className="flex items-center justify-between mb-3">
         <h1 className="text-2xl font-bold">Inbox</h1>
       </div>
-        <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 mb-3 text-sm">
-        <p className="font-medium text-blue-800 dark:text-blue-200">📱 To receive SMS in your inbox:</p>
-        <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
-          Open <strong>SMS Gateway</strong> app on your Android phone → <strong>Settings</strong> → <strong>Webhooks</strong> → <strong>Add Webhook</strong>
-        </p>
-        <code className="text-xs bg-blue-100 dark:bg-blue-800 px-2 py-1 rounded mt-1 block break-all">https://sendsms-api.onrender.com/api/v1/webhooks/smsgateway</code>
-        <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">Select all events: <strong>sms:received, sms:sent, sms:delivered, sms:failed</strong></p>
+        <div className="flex items-center justify-between mb-3">
+        <h1 className="text-2xl font-bold">Inbox</h1>
+        <button onClick={async () => { try { const {data} = await api.post("/inbox/poll-now"); if (data.success) { toast.success(`${data.processed || 0} new messages found!`); loadConvs(); } else { toast(data.error || "No new messages"); } } catch { toast.error("Poll failed"); } }} className="btn-secondary btn-sm">
+          📥 Poll Now
+        </button>
+      </div>
+      <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-2 mb-3 text-xs text-blue-700 dark:text-blue-300">
+        Webhook auto-registered on startup. If not receiving, add manually: <code className="text-xs bg-blue-100 dark:bg-blue-800 px-1 rounded">https://sendsms-api.onrender.com/api/v1/webhooks/smsgateway</code>
       </div>
       <div className="flex flex-wrap gap-1 mb-3">
           {filters.map(f => (

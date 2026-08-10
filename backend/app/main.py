@@ -1,5 +1,5 @@
-"""FastAPI — DB init, PWA, API, SPA."""
-import os, logging
+"""FastAPI — auto-register webhook + poll messages + PWA + API + SPA."""
+import os, logging, time
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,21 +11,102 @@ from app.database import init_db, async_session_factory
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-async def _process_scheduled():
-    """Send due scheduled messages via SMS-Gate.app."""
+LAST_POLL_FILE = os.path.join(os.path.dirname(__file__), "..", "..", ".last_poll")
+LAST_WEBHOOK_FILE = os.path.join(os.path.dirname(__file__), "..", "..", ".webhook_registered")
+
+async def _startup_webhook():
+    """Auto-register webhook on first startup."""
     try:
-        import base64, httpx
+        if os.path.exists(LAST_WEBHOOK_FILE): return
+        from app.providers.smsgate import register_webhook_direct
+        webhook_url = "https://sendsms-api.onrender.com/api/v1/webhooks/smsgateway"
+        result = await register_webhook_direct(webhook_url)
+        if result.get("success"):
+            with open(LAST_WEBHOOK_FILE, "w") as f: f.write("ok")
+            logger.info("Webhook auto-registered successfully")
+        else:
+            logger.warning(f"Webhook registration failed: {result.get('error')} — will retry on restart")
+    except Exception as e:
+        logger.warning(f"Webhook startup: {e}")
+
+async def _poll_and_process():
+    """Background: poll GET /messages for inbound SMS + process scheduled."""
+    try:
+        now = time.time()
+        try:
+            with open(LAST_POLL_FILE) as f: last = float(f.read().strip())
+            if now - last < 15: return
+        except: pass
+        with open(LAST_POLL_FILE, "w") as f: f.write(str(now))
+
+        import asyncio
+
+        # Poll messages
+        from app.providers.smsgate import poll_messages_direct
+        result = await poll_messages_direct()
+        messages = result.get("messages", [])
+        
+        if messages:
+            from app.services.sms_service import SMSService
+            from sqlalchemy import select
+            from app.models.conversation import Message
+            from app.utils.phone import normalize_nigerian_number
+
+            async with async_session_factory() as db:
+                svc = SMSService(db)
+                count = 0
+                for msg in messages:
+                    # Check if this is an INCOMING message
+                    direction = msg.get("direction", "")
+                    snd = msg.get("sender") or msg.get("from") or msg.get("phoneNumber", "")
+                    txt = msg.get("text") or msg.get("body") or msg.get("message", "")
+                    mid = msg.get("id") or msg.get("messageId", "")
+                    status = msg.get("status", "")
+                    
+                    # Skip outgoing messages
+                    if direction == "outgoing":
+                        # Still update status if needed
+                        if mid and status:
+                            mr = await db.execute(
+                                select(Message).where(Message.provider_message_id == mid))
+                            existing_msg = mr.scalar_one_or_none()
+                            if existing_msg and existing_msg.status != status:
+                                existing_msg.status = status
+                                if status == "delivered":
+                                    from datetime import datetime as dt, timezone as tz
+                                    existing_msg.delivered_at = dt.now(tz.utc)
+                                count += 1
+                        continue
+
+                    # This is incoming or unknown direction
+                    if snd and txt and txt.strip():
+                        norm = normalize_nigerian_number(snd)
+                        if not norm: continue
+                        
+                        idem = f"inbound-{mid}" if mid else f"inbound-poll-{norm}-{norm}"
+                        ex = await db.execute(
+                            select(Message).where(Message.idempotency_key == idem))
+                        if not ex.scalar_one_or_none():
+                            await svc.process_inbound_message(snd, txt, {"messageId": mid} if mid else {})
+                            count += 1
+
+                if count:
+                    await db.commit()
+                    logger.info(f"POLL: {count} new message(s) processed")
+
+        # Process scheduled
+        await _process_scheduled()
+
+    except Exception as e:
+        logger.warning(f"Poll error: {e}")
+
+async def _process_scheduled():
+    """Send due scheduled messages."""
+    try:
+        from app.providers.smsgate import send_sms_direct
+        from app.models.scheduled import ScheduledMessage
         from sqlalchemy import select
         from datetime import datetime as dt, timezone as tz
-        from app.models.scheduled import ScheduledMessage
-
-        u = settings.SMSGATE_USERNAME or ""
-        p = settings.SMSGATE_PASSWORD or ""
-        if not u or not p: return
-
-        auth = base64.b64encode(f"{u}:{p}".encode()).decode()
-        headers = {"Content-Type": "application/json", "Authorization": f"Basic {auth}"}
-        url = "https://api.sms-gate.app/3rdparty/v1/messages?skipPhoneValidation=true"
 
         async with async_session_factory() as db:
             due = await db.execute(
@@ -36,31 +117,24 @@ async def _process_scheduled():
             scheduled = due.scalars().all()
             if not scheduled: return
 
-            async with httpx.AsyncClient(timeout=httpx.Timeout(30)) as client:
-                for sm in scheduled:
-                    try:
-                        resp = await client.post(url, headers=headers, json={
-                            "textMessage": {"text": sm.body}, "phoneNumbers": [sm.phone_number],
-                            "simNumber": sm.sim_number, "ttl": 3600})
-                        if resp.status_code < 400:
-                            sm.status = "sent"
-                        else:
-                            sm.status = "failed"
-                            try: sm.error = resp.json().get("message", f"HTTP {resp.status_code}")
-                            except: sm.error = f"HTTP {resp.status_code}"
-                        sm.executed_at = dt.now(tz.utc)
-                    except Exception as e2:
-                        sm.status = "failed"; sm.error = str(e2)[:500]
+            for sm in scheduled:
+                r = await send_sms_direct(sm.phone_number, sm.body, sm.sim_number)
+                if r["success"]: sm.status = "sent"
+                else: sm.status = "failed"; sm.error = r.get("error", "Unknown")[:500]
+                sm.executed_at = dt.now(tz.utc)
+
             await db.commit()
             logger.info(f"SCHEDULED: processed {len(scheduled)} messages")
     except Exception as e:
-        logger.warning(f"SCHEDULED: {e}")
+        logger.warning(f"Scheduled error: {e}")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     try: await init_db(); logger.info("DB ready")
     except Exception as e: logger.warning("init_db: %s", e)
+    try: await _startup_webhook()
+    except Exception as e: logger.warning("webhook: %s", e)
     yield
 
 app = FastAPI(title=settings.APP_NAME, version="1.0.0", lifespan=lifespan)
@@ -69,7 +143,7 @@ app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins_list,
 
 @app.get("/api/v1/health")
 async def health(bg: BackgroundTasks):
-    bg.add_task(_process_scheduled)
+    bg.add_task(_poll_and_process)
     return JSONResponse({"status":"ok","app":settings.APP_NAME,"version":"1.0.0"})
 
 from app.api.v1 import auth, contacts, lists, campaigns, sequences, followups, inbox, templates, analytics, settings as settings_api, webhooks, dashboard, send
@@ -95,24 +169,13 @@ async def manifest():
     return JSONResponse({"name":"SMS SENDER","short_name":"SMS SENDER","start_url":"/","display":"standalone","orientation":"portrait-primary","background_color":"#111827","theme_color":"#2563eb","icons":[{"src":"/icon-192.png","sizes":"192x192","type":"image/png","purpose":"any maskable"},{"src":"/icon-512.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}]})
 
 @app.get("/sw.js")
-async def swjs():
-    p = os.path.join(PUBLIC_DIR, "sw.js")
-    return FileResponse(p, media_type="application/javascript") if os.path.isfile(p) else Response("", 404)
-
+async def swjs(): p = os.path.join(PUBLIC_DIR, "sw.js"); return FileResponse(p, media_type="application/javascript") if os.path.isfile(p) else Response("",404)
 @app.get("/icon-192.png")
-async def i192():
-    p = os.path.join(PUBLIC_DIR, "icon-192.png")
-    return FileResponse(p, media_type="image/png") if os.path.isfile(p) else Response("", 404)
-
+async def i192(): p = os.path.join(PUBLIC_DIR, "icon-192.png"); return FileResponse(p, media_type="image/png") if os.path.isfile(p) else Response("",404)
 @app.get("/icon-512.png")
-async def i512():
-    p = os.path.join(PUBLIC_DIR, "icon-512.png")
-    return FileResponse(p, media_type="image/png") if os.path.isfile(p) else Response("", 404)
-
+async def i512(): p = os.path.join(PUBLIC_DIR, "icon-512.png"); return FileResponse(p, media_type="image/png") if os.path.isfile(p) else Response("",404)
 @app.get("/favicon.svg")
-async def fav():
-    p = os.path.join(PUBLIC_DIR, "favicon.svg")
-    return FileResponse(p, media_type="image/svg+xml") if os.path.isfile(p) else Response("", 404)
+async def fav(): p = os.path.join(PUBLIC_DIR, "favicon.svg"); return FileResponse(p, media_type="image/svg+xml") if os.path.isfile(p) else Response("",404)
 
 if os.path.isdir(FRONTEND_DIR):
     ad = os.path.join(FRONTEND_DIR, "assets")
@@ -120,9 +183,9 @@ if os.path.isdir(FRONTEND_DIR):
     app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
     @app.get("/{fp:path}", response_class=HTMLResponse)
     async def spa(fp: str = ""):
-        if fp.startswith(("api/","assets/","docs","manifest","sw.js","icon-","favicon")): return JSONResponse({"detail":"Not Found"}, 404)
+        if fp.startswith(("api/","assets/","docs","manifest","sw.js","icon-","favicon")): return JSONResponse({"detail":"Not Found"},404)
         i = os.path.join(FRONTEND_DIR, "index.html")
-        return HTMLResponse(content=open(i).read()) if os.path.isfile(i) else JSONResponse({"detail":"No frontend"}, 404)
+        return HTMLResponse(content=open(i).read()) if os.path.isfile(i) else JSONResponse({"detail":"No frontend"},404)
 else:
     @app.get("/{fp:path}", response_class=HTMLResponse)
     async def spa(fp: str = ""): return HTMLResponse("<h1>SMS SENDER API</h1>")
