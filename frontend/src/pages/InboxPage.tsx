@@ -10,6 +10,7 @@ export default function InboxPage() {
   const [messages, setMessages] = useState<any[]>([]);
   const [replyText, setReplyText] = useState("");
   const [sending, setSending] = useState(false);
+  const [pollDebug, setPollDebug] = useState<any>(null);
   const [filter, setFilter] = useState("all");
   const [showInfo, setShowInfo] = useState(false);
   const [polling, setPolling] = useState(false);
@@ -52,12 +53,15 @@ export default function InboxPage() {
   };
 
   const doPoll = async () => {
-    setPolling(true);
+    setPolling(true); setPollDebug(null);
     try {
       const { data } = await api.post("/inbox/poll-now");
-      if (data.processed > 0) { toast.success(`${data.processed} statuses updated`); loadConvs(); }
-      else toast("All up to date", {icon: "ℹ️"});
-    } catch { toast.error("Poll failed"); }
+      setPollDebug(data);
+      if (data.inbound > 0) { toast.success(`${data.inbound} replies found!`); loadConvs(); }
+      else if (data.status_updates > 0) { toast.success(`${data.status_updates} statuses updated`); loadConvs(); }
+      else if (data.total_checked > 0) { toast(`${data.total_checked} messages checked — no new replies`, {icon: "ℹ️"}); }
+      else { toast(data.error || "Could not fetch", {icon: "⚠️"}); }
+    } catch(err:any) { toast.error("Poll failed — check connection"); setPollDebug({error:err.message}); }
     finally { setPolling(false); }
   };
 
@@ -72,7 +76,7 @@ export default function InboxPage() {
       <div className={`${selected ? "hidden md:flex" : "flex"} w-full md:w-80 flex-shrink-0 flex-col`}>
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-2xl font-bold">Inbox</h1>
-          <button onClick={doPoll} disabled={polling} className="btn-secondary btn-sm">{polling ? "Syncing..." : "🔄 Sync Status"}</button>
+          <button onClick={doPoll} disabled={polling} className="btn-secondary btn-sm">{polling ? "Checking..." : "📥 Poll Now"}</button>
         </div>
 
         <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-2 mb-2 text-xs text-blue-700 dark:text-blue-300">
@@ -105,6 +109,36 @@ export default function InboxPage() {
 
       {/* RIGHT PANEL — CHAT */}
       <div className="flex-1 flex flex-col card overflow-hidden">
+      {pollDebug && !selected && (
+        <div className="flex-1 p-4 overflow-y-auto">
+          <details className="text-xs bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
+            <summary className="font-medium cursor-pointer">📊 Poll Result</summary>
+            <div className="mt-2 space-y-1">
+              <p><strong>Total checked:</strong> {pollDebug.total_checked || 0}</p>
+              <p><strong>Status updates:</strong> {pollDebug.status_updates || 0}</p>
+              <p><strong>Inbound replies:</strong> <span className={pollDebug.inbound>0?"text-green-600 font-bold":""}>{pollDebug.inbound || 0}</span></p>
+              <p className="mt-2 text-gray-500">Webhook URL: <code className="text-[10px] bg-gray-200 dark:bg-gray-700 px-1 rounded">{pollDebug.debug?.webhook_url || "/api/v1/webhooks/smsgateway"}</code></p>
+              {pollDebug.details && pollDebug.details.length > 0 && (
+                <div className="mt-1"><p className="font-medium">New replies:</p>
+                  {pollDebug.details.map((d:any,i:number) => (
+                    <div key={i} className="text-green-600 ml-2">📱 {d.from}: {d.text}</div>
+                  ))}
+                </div>
+              )}
+              {pollDebug.debug && (
+                <details className="mt-2"><summary className="cursor-pointer">Raw debug</summary>
+                  <pre className="text-[10px] mt-1 whitespace-pre-wrap">{JSON.stringify(pollDebug.debug,null,2)}</pre>
+                </details>
+              )}
+              {pollDebug.error && <p className="text-red-600 mt-1">Error: {pollDebug.error}</p>}
+              {pollDebug.note && <p className="text-blue-600 mt-2">{pollDebug.note}</p>}
+            </div>
+          </details>
+          <div className="mt-4 text-center text-gray-400">
+            <p className="text-sm">Select a conversation to view messages</p>
+          </div>
+        </div>
+      )}
       {selected ? (
         <>
           <div className="p-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
