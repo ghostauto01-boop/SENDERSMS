@@ -91,6 +91,51 @@ async def list_webhooks_direct():
             return{"webhooks":r.json() if r.status_code==200 else[]}
     except: return{"webhooks":[]}
 
+async def get_devices_direct():
+    """Get list of connected devices. Returns [{"id":"...", "name":"...", ...}]."""
+    u,p=_creds()
+    if not u or not p: return[]
+    auth=base64.b64encode(f"{u}:{p}".encode()).decode()
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(15)) as c:
+            r=await c.get("https://api.sms-gate.app/3rdparty/v1/devices",
+                headers={"Content-Type":"application/json","Authorization":f"Basic {auth}"})
+            if r.status_code==200:
+                data=r.json()
+                return data if isinstance(data,list) else data.get("devices",data.get("data",[]))
+            logger.warning(f"get_devices: HTTP {r.status_code} {r.text[:200]}")
+            return[]
+    except Exception as e:
+        logger.warning(f"get_devices error: {e}")
+        return[]
+
+async def export_inbox_direct(device_id:str, since:str=None, until:str=None):
+    """
+    Trigger inbox export. Device will push messages as webhooks.
+    This is THE way to receive historical SMS content from SMS-Gate.app.
+    
+    POST /3rdparty/v1/messages/inbox/export
+    Body: {"deviceId": "...", "since": "2024-01-01T00:00:00Z", "until": "2024-12-31T23:59:59Z"}
+    """
+    u,p=_creds()
+    if not u or not p: return{"success":False,"error":"No credentials"}
+    auth=base64.b64encode(f"{u}:{p}".encode()).decode()
+    payload={"deviceId":device_id}
+    if since: payload["since"]=since
+    if until: payload["until"]=until
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(30)) as c:
+            r=await c.post("https://api.sms-gate.app/3rdparty/v1/messages/inbox/export",
+                headers={"Content-Type":"application/json","Authorization":f"Basic {auth}"},
+                json=payload)
+            logger.info(f"inbox_export: HTTP {r.status_code} {r.text[:300]}")
+            if r.status_code<400:
+                return{"success":True,"http":r.status_code,"body":r.text[:500]}
+            return{"success":False,"http":r.status_code,"error":r.text[:500]}
+    except Exception as e:
+        logger.warning(f"inbox_export error: {e}")
+        return{"success":False,"error":str(e)[:500]}
+
 class SMSGateProvider(SMSProvider):
     def __init__(self,base_url=None,username=None,password=None,sim_number=1,timeout=45):
         self.base_url=(base_url or settings.SMSGATE_BASE_URL or "https://api.sms-gate.app/3rdparty/v1").rstrip("/")
