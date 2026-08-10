@@ -1,0 +1,76 @@
+# ============================================================
+# SendSMS - Render Blueprint (Free Tier - No Card)
+# ============================================================
+#
+# PREREQUISITE before applying this Blueprint:
+#   1. Create a free Neon PostgreSQL database (neon.tech)
+#   2. Create a free Upstash Redis database (upstash.com)
+#   3. Copy both connection URLs
+#   4. Apply this Blueprint and fill in the env vars
+#
+# ============================================================
+
+services:
+  - type: web
+    name: sendsms-api
+    runtime: python
+    region: frankfurt
+    plan: free
+    buildCommand: |
+      pip install --upgrade pip && pip install -r requirements.txt
+      npm ci && npm run build
+    startCommand: cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.0"
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: CREDENTIAL_ENCRYPTION_KEY
+        generateValue: true
+      - key: ADMIN_USERNAME
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: APP_ENV
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+      - key: CORS_ORIGINS
+        sync: false
+      - key: DEFAULT_TIMEZONE
+        value: Africa/Lagos
+    healthCheckPath: /api/v1/health
+
+  - type: web
+    name: sendsms-worker
+    runtime: python
+    region: frankfurt
+    plan: free
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    startCommand: cd backend && python app/worker_web.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.0"
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: CREDENTIAL_ENCRYPTION_KEY
+        sync: false
+      - key: ADMIN_USERNAME
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: APP_ENV
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+      - key: DEFAULT_TIMEZONE
+        value: Africa/Lagos
+    healthCheckPath: /health
