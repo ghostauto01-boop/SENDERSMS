@@ -42,265 +42,384 @@ async def get_conversation(conversation_id:int,db:AsyncSession=Depends(get_db),c
 
 @router.post("/conversations/{conversation_id}/reply")
 async def send_reply(conversation_id:int,body:str=Query(...,min_length=1),db:AsyncSession=Depends(get_db),cu:User=Depends(get_current_user)):
-    r=await db.execute(select(Conversation).where(Conversation.id==conversation_id));conv=r.scalar_one_or_none()
-    if not conv: raise HTTPException(404)
+    """Send an outbound reply in a conversation via SMS-Gate.
+
+    Reports the true outcome: `send_message` returns None when the contact is
+    opted out or suppressed, and returns a *failed* message when the gateway
+    rejected it. Previously both cases looked like a success to the UI.
+    """
+    conv=await _get_conv(db,conversation_id)
     from app.services.sms_service import SMSService
     msg=await SMSService(db).send_message(contact_id=conv.contact_id,body=body)
-    if not msg: raise HTTPException(500,"Gateway not configured")
-    await db.flush();return{"success":True,"message_id":msg.id,"status":msg.status}
+    if not msg:
+        raise HTTPException(409,"Cannot send: the contact has opted out or is on the suppression list.")
+    await db.flush()
+    if msg.status=="failed":
+        return {"success":False,"message_id":msg.id,"status":msg.status,
+                "error":msg.last_error or "The SMS gateway rejected the message."}
+    return {"success":True,"message_id":msg.id,"status":msg.status,
+            "provider_message_id":msg.provider_message_id}
+
+async def _get_conv(db, conversation_id: int) -> Conversation:
+    conv = (await db.execute(
+        select(Conversation).where(Conversation.id == conversation_id)
+    )).scalar_one_or_none()
+    if not conv:
+        raise HTTPException(404, "Conversation not found")
+    return conv
+
+
+async def _set_status(db, conversation_id: int, conv_status: str, lead_status: str):
+    """Update a conversation and mirror the outcome onto the contact."""
+    conv = await _get_conv(db, conversation_id)
+    conv.status = conv_status
+    contact = (await db.execute(
+        select(Contact).where(Contact.id == conv.contact_id)
+    )).scalar_one_or_none()
+    if contact:
+        contact.lead_status = lead_status
+    await db.flush()
+    return {"success": True, "status": conv.status}
+
 
 @router.post("/conversations/{conversation_id}/mark-interested")
 async def mark_interested(conversation_id:int,db:AsyncSession=Depends(get_db),cu:User=Depends(get_current_user)):
-    r=await db.execute(select(Conversation).where(Conversation.id==conversation_id));conv=r.scalar_one_or_none()
-    if not conv: raise HTTPException(404);conv.status="interested"
-    cr=await db.execute(select(Contact).where(Contact.id==conv.contact_id));c=cr.scalar_one_or_none()
-    if c:c.lead_status="interested";await db.flush();return{"success":True}
+    return await _set_status(db, conversation_id, "interested", "interested")
 
 @router.post("/conversations/{conversation_id}/mark-not-interested")
 async def mark_not_interested(conversation_id:int,db:AsyncSession=Depends(get_db),cu:User=Depends(get_current_user)):
-    r=await db.execute(select(Conversation).where(Conversation.id==conversation_id));conv=r.scalar_one_or_none()
-    if not conv: raise HTTPException(404);conv.status="not_interested"
-    cr=await db.execute(select(Contact).where(Contact.id==conv.contact_id));c=cr.scalar_one_or_none()
-    if c:c.lead_status="not_interested";await db.flush();return{"success":True}
+    return await _set_status(db, conversation_id, "not_interested", "not_interested")
 
 @router.post("/conversations/{conversation_id}/mark-close")
 async def close_conversation(conversation_id:int,db:AsyncSession=Depends(get_db),cu:User=Depends(get_current_user)):
-    r=await db.execute(select(Conversation).where(Conversation.id==conversation_id));conv=r.scalar_one_or_none()
-    if not conv: raise HTTPException(404);conv.status="closed"
-    cr=await db.execute(select(Contact).where(Contact.id==conv.contact_id));c=cr.scalar_one_or_none()
-    if c:c.lead_status="closed";await db.flush();return{"success":True}
+    return await _set_status(db, conversation_id, "closed", "closed")
+
+@router.post("/conversations/{conversation_id}/mark-unread")
+async def mark_unread(conversation_id:int,db:AsyncSession=Depends(get_db),cu:User=Depends(get_current_user)):
+    conv = await _get_conv(db, conversation_id)
+    conv.status = "unread"
+    if not conv.unread_count:
+        conv.unread_count = 1
+    await db.flush()
+    return {"success": True, "status": conv.status}
 
 @router.post("/conversations/{conversation_id}/stop-sequence")
 async def stop_seq(conversation_id:int,db:AsyncSession=Depends(get_db),cu:User=Depends(get_current_user)):
-    r=await db.execute(select(Conversation).where(Conversation.id==conversation_id));conv=r.scalar_one_or_none()
-    if not conv: raise HTTPException(404);conv.sequence_paused=True
-    from app.services.sms_service import SMSService;await SMSService(db)._stop_contact_sequences(conv.contact_id)
-    await db.flush();return{"success":True}
+    conv = await _get_conv(db, conversation_id)
+    conv.sequence_paused = True
+    from app.services.sms_service import SMSService
+    await SMSService(db)._stop_seq(conv.contact_id)
+    await db.flush()
+    return {"success": True, "sequence_paused": True}
 
 @router.post("/conversations/{conversation_id}/resume-sequence")
 async def resume_seq(conversation_id:int,db:AsyncSession=Depends(get_db),cu:User=Depends(get_current_user)):
-    r=await db.execute(select(Conversation).where(Conversation.id==conversation_id));conv=r.scalar_one_or_none()
-    if not conv: raise HTTPException(404);conv.sequence_paused=False;await db.flush();return{"success":True}
+    conv = await _get_conv(db, conversation_id)
+    conv.sequence_paused = False
+    await db.flush()
+    return {"success": True, "sequence_paused": False}
 
-# ======================== REAL SYNC: INBOX EXPORT + WEBHOOKS ========================
-# SMS-Gate.app's GET /messages does NOT return text/sender for received SMS.
-# The correct receive path is:
-#   1. Register webhook for "sms:received"
-#   2. Call POST /messages/inbox/export with deviceId + time range
-#   3. The device pushes ALL messages as webhooks to your registered URL
-#   4. Each webhook has FULL content: {payload: {messageId, message, sender, ...}}
+# ======================== RECEIVE PATH ========================
+# How receiving actually works on SMS-Gate.app (per their documentation):
+#
+#   Cloud mode has NO endpoint that returns the text of received SMS.
+#   GET /messages only reports messages *you* sent. The only ways in are:
+#     1. Register a webhook per event: POST /webhooks {"url", "event"}   <- singular!
+#     2. Live SMS then arrive as POST {event, payload:{sender, message, ...}}
+#     3. History is replayed by POST /messages/inbox/export {deviceId, since, until},
+#        which makes the device re-fire sms:received webhooks for that window.
+#
+# So the webhook endpoint is not an optimisation, it is the entire receive path.
+# https://docs.sms-gate.app/features/webhooks/
+# https://docs.sms-gate.app/features/reading-messages/
 
-import os
-DEVICE_ID_FILE = os.path.join(os.path.dirname(__file__), "..", "..", "..", ".device_id")
+DEVICE_ID_KEY = "gateway.device_id"
+LAST_EXPORT_KEY = "gateway.last_inbox_export"
 
-def _get_cached_device_id():
-    try:
-        with open(DEVICE_ID_FILE) as f:
-            return f.read().strip()
-    except Exception: return ""
 
-def _cache_device_id(device_id: str):
-    try:
-        with open(DEVICE_ID_FILE, "w") as f:
-            f.write(device_id)
-    except Exception: pass
+async def _resolve_device_id(db) -> tuple[str, bool]:
+    """Return (device_id, is_live). Falls back to the last known id from the DB.
+
+    Previously this was cached in a `.device_id` file next to the source, which
+    is wiped on every redeploy and diverges between instances.
+    """
+    from app.providers.smsgate import get_devices_direct
+    from app.services.system_settings import get_setting, set_setting
+
+    devices = await get_devices_direct()
+    for d in devices:
+        if isinstance(d, dict):
+            did = d.get("id") or d.get("deviceId") or ""
+            if did:
+                await set_setting(db, DEVICE_ID_KEY, did, description="Last seen SMS-Gate device")
+                return did, True
+    return (await get_setting(db, DEVICE_ID_KEY, "") or ""), False
+
 
 @router.get("/device-info")
-async def get_device_info():
-    """Get connected devices from SMS-Gate.app."""
-    from app.providers.smsgate import get_devices_direct
+async def get_device_info(db:AsyncSession=Depends(get_db),cu:User=Depends(get_current_user)):
+    """Connected devices plus the currently registered webhooks."""
+    from app.providers.smsgate import get_devices_direct, list_webhooks_direct
+    from app.services.system_settings import get_setting
+    from app.utils.urls import webhook_url
+
     devices = await get_devices_direct()
-    cached = _get_cached_device_id()
+    wh = await list_webhooks_direct()
+    target = webhook_url()
+    hooks = wh.get("webhooks", [])
     return {
         "success": True,
         "devices": devices,
-        "cached_device_id": cached,
         "device_count": len(devices),
+        "cached_device_id": await get_setting(db, DEVICE_ID_KEY, "") or "",
+        "webhook_url": target,
+        "registered_webhooks": hooks,
+        "webhook_ok": bool(target) and any(
+            isinstance(h, dict) and h.get("url") == target for h in hooks
+        ),
     }
+
+
+@router.post("/register-webhook")
+async def register_webhook(db:AsyncSession=Depends(get_db),cu:User=Depends(get_current_user)):
+    """(Re)register this deployment's webhook URL for every event we consume."""
+    from app.providers.smsgate import register_webhook_direct
+    from app.services.system_settings import WEBHOOK_REGISTERED, set_setting
+    from app.utils.urls import webhook_url
+
+    url = webhook_url()
+    if not url:
+        raise HTTPException(400, "PUBLIC_BASE_URL is not set, so the gateway has no address to deliver to. Set it to this deployment's public https URL.")
+    result = await register_webhook_direct(url)
+    if result.get("success"):
+        await set_setting(db, WEBHOOK_REGISTERED, url, description="Webhook URL registered with the SMS gateway")
+        await db.flush()
+    return result
+
 
 @router.post("/sync-full")
 async def sync_full_inbox(db:AsyncSession=Depends(get_db),cu:User=Depends(get_current_user)):
-    """
-    SMART sync using the CORRECT SMS-Gate.app receive mechanism:
-    
-    1. Get device ID from GET /devices (cache it to .device_id file)
-    2. Register webhook for sms:received event
-    3. Call POST /messages/inbox/export to trigger device to push all messages as webhooks
-    4. Also poll GET /messages for outgoing status updates
-    
-    Inbound messages arrive via webhook at /api/v1/webhooks/smsgateway
-    with FULL content: sender, message text, timestamp, simNumber.
-    """
-    import httpx
-    from app.providers.smsgate import get_devices_direct, export_inbox_direct, poll_status_for_ids, register_webhook_direct
+    """Reconcile with the gateway: ensure webhooks exist, replay recent history,
+    and refresh delivery statuses for anything still in flight.
 
+    Inbound text never comes back through this call. It arrives asynchronously
+    at /api/v1/webhooks/smsgateway, which is why the response reports what was
+    *triggered* rather than what was fetched.
+    """
+    from datetime import timedelta as _td
+    from app.providers.smsgate import (
+        export_inbox_direct, poll_status_for_ids, register_webhook_direct,
+    )
+    from app.services.system_settings import WEBHOOK_REGISTERED, get_setting, set_setting
+    from app.utils.urls import webhook_url
+
+    target = webhook_url()
     stats = {
         "success": True,
+        "webhook_url": target,
         "device": None,
-        "export_triggered": False,
-        "export_error": None,
+        "device_online": False,
         "webhook_registered": False,
+        "registered_events": [],
+        "export_triggered": False,
         "outgoing_updated": 0,
+        "new_inbound": 0,
+        "total_api_messages": 0,
+        "problems": [],
         "note": "",
         "details": [],
     }
 
-    # Step 1: Get device ID
-    devices = await get_devices_direct()
-    device_id = None
-
-    if devices:
-        device_id = devices[0].get("id") or devices[0].get("deviceId", "")
-        if device_id:
-            _cache_device_id(device_id)
-    else:
-        device_id = _get_cached_device_id()
-
-    if not device_id:
+    if not target:
         stats["success"] = False
-        stats["error"] = "No device found. Make sure your Android phone is connected to SMS-Gate.app cloud."
-        stats["note"] = "Check the SMS-Gate.app app on your phone — it must be online and connected."
+        stats["problems"].append(
+            "PUBLIC_BASE_URL is not set. Without a public URL the gateway cannot "
+            "deliver inbound SMS, so the inbox will always stay empty."
+        )
+        stats["note"] = "Set PUBLIC_BASE_URL to this deployment's https URL, then sync again."
         return stats
 
-    stats["device"] = device_id[:16] + "..."
-
-    # Step 2: Register webhook
-    wh_result = await register_webhook_direct("https://sendsms-api.onrender.com/api/v1/webhooks/smsgateway")
-    stats["webhook_registered"] = wh_result.get("success", False)
-
-    # Step 3: Trigger inbox export — this makes the device push ALL messages as webhooks
-    from datetime import datetime as _dt, timezone as _tz, timedelta as _td
-    since = (_dt.now(_tz.utc) - _td(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
-    until = _dt.now(_tz.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-    export_result = await export_inbox_direct(device_id, since=since, until=until)
-    stats["export_triggered"] = export_result.get("success", False)
-    stats["export_http"] = export_result.get("http")
-    stats["export_response"] = export_result.get("body", export_result.get("error", ""))[:300]
-
-    if export_result.get("success"):
-        stats["note"] = (
-            "✅ Inbox export triggered! Your Android device is now pushing all SMS messages "
-            "to the webhook. Messages will appear in your inbox within seconds. "
-            "Send a test SMS to your phone to verify."
-        )
-    else:
-        stats["note"] = (
-            f"⚠️ Inbox export returned HTTP {stats['export_http']}. "
-            "The webhook is registered — new incoming SMS will arrive automatically. "
-            "Try sending an SMS to your phone now to test."
+    if not settings.SMSGATE_WEBHOOK_SECRET and not settings.SMSGATE_WEBHOOK_ALLOW_UNSIGNED:
+        stats["problems"].append(
+            "SMSGATE_WEBHOOK_SECRET is not set, so every inbound webhook is rejected "
+            "with 503 before it reaches the inbox. Copy the signing key from the app: "
+            "Settings -> Webhooks -> Signing Key."
         )
 
-    # Step 4: Also poll outgoing statuses as a bonus
+    # 1. Device
+    device_id, live = await _resolve_device_id(db)
+    stats["device_online"] = live
+    if device_id:
+        stats["device"] = device_id[:16] + "..."
+    if not live:
+        stats["problems"].append(
+            "No device is currently reporting to SMS-Gate. Open the app on the phone "
+            "and confirm it shows as online."
+        )
+
+    # 2. Webhooks — one registration per event.
+    reg = await register_webhook_direct(target)
+    stats["webhook_registered"] = reg.get("success", False)
+    stats["registered_events"] = reg.get("registered", [])
+    if reg.get("errors"):
+        stats["problems"].extend(reg["errors"])
+    if reg.get("success"):
+        await set_setting(db, WEBHOOK_REGISTERED, target,
+                          description="Webhook URL registered with the SMS gateway")
+
+    # 3. Replay history so the chat backfills. Only from the last successful
+    #    export (minus overlap) to avoid re-pushing the same month every click.
+    if device_id:
+        last = await get_setting(db, LAST_EXPORT_KEY, "")
+        now = dt.now(tz.utc)
+        since_dt = None
+        if last:
+            parsed = _parse_iso(last)
+            if parsed:
+                since_dt = parsed - _td(minutes=10)
+        if since_dt is None:
+            since_dt = now - _td(days=7)
+        since_dt = max(since_dt, now - _td(days=30))
+
+        export = await export_inbox_direct(
+            device_id,
+            since=since_dt.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            until=now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        )
+        stats["export_triggered"] = export.get("success", False)
+        stats["export_http"] = export.get("http")
+        stats["export_window"] = {"since": since_dt.isoformat(), "until": now.isoformat()}
+        if export.get("success"):
+            await set_setting(db, LAST_EXPORT_KEY, now.isoformat(),
+                              description="Last inbox export watermark")
+        else:
+            stats["problems"].append(
+                f"Inbox export failed (HTTP {export.get('http')}): {export.get('error','')[:200]}"
+            )
+
+    # 4. Refresh delivery statuses for outgoing messages still in flight.
     try:
-        from app.models.conversation import Message
-        sent_msgs = await db.execute(
+        from app.services.sms_service import SMSService
+        svc = SMSService(db)
+        pending = await db.execute(
             select(Message).where(
                 Message.direction == "outgoing",
                 Message.provider_message_id.isnot(None),
-                Message.status.in_(("sent", "sending", "queued"))
+                Message.status.in_(("sent", "sending", "queued")),
             ).limit(100)
         )
-        ids = [m.provider_message_id for m in sent_msgs.scalars().all()]
+        ids = [m.provider_message_id for m in pending.scalars().all()]
+        stats["total_api_messages"] = len(ids)
         if ids:
-            statuses = await poll_status_for_ids(ids)
-            for r in statuses:
-                mr = await db.execute(select(Message).where(Message.provider_message_id == r["provider_message_id"]))
-                m = mr.scalar_one_or_none()
-                if m and m.status != r["status"]:
-                    m.status = r["status"]
-                    if r["status"] == "delivered":
-                        m.delivered_at = dt.now(tz.utc)
+            for r in await poll_status_for_ids(ids):
+                before = (await db.execute(
+                    select(Message).where(Message.provider_message_id == r["provider_message_id"])
+                )).scalar_one_or_none()
+                prev = before.status if before else None
+                m = await svc.process_delivery_status(r["provider_message_id"], r["status"])
+                if m is not None and m.status != prev:
                     stats["outgoing_updated"] += 1
-                    stats["details"].append({"type": "status_update", "id": r["provider_message_id"][:20], "new_status": r["status"]})
+                    stats["details"].append({
+                        "type": "status_update",
+                        "id": r["provider_message_id"][:20],
+                        "state": f"{prev} -> {m.status}",
+                    })
     except Exception as e:
         logger.warning(f"Status poll error: {e}")
+        stats["problems"].append(f"Status poll failed: {str(e)[:200]}")
 
     await db.flush()
 
-    stats["webhook_url"] = "https://sendsms-api.onrender.com/api/v1/webhooks/smsgateway"
-    stats["total_api_messages"] = 0  # Inbound comes via webhooks, not this poll
-
+    if stats["problems"]:
+        stats["success"] = False
+        stats["note"] = "Sync completed with problems — see the list below."
+    elif stats["export_triggered"]:
+        stats["note"] = (
+            "Webhooks are registered and the phone is replaying recent messages. "
+            "They land in the chat within a few seconds — no need to keep clicking."
+        )
+    else:
+        stats["note"] = "Webhooks are registered. New incoming SMS will appear automatically."
     return stats
+
+
+def _parse_iso(raw: str):
+    try:
+        d = dt.fromisoformat(str(raw).strip().replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    return d.replace(tzinfo=tz.utc) if d.tzinfo is None else d.astimezone(tz.utc)
+
 
 @router.post("/poll-debug")
 async def poll_debug(db:AsyncSession=Depends(get_db),cu:User=Depends(get_current_user)):
-    """
-    DEBUG endpoint: tests device connectivity, webhook status, and shows raw API responses.
-    """
-    import httpx
-    from app.providers.smsgate import get_devices_direct, register_webhook_direct, list_webhooks_direct
+    """End-to-end diagnostic of the receive path."""
+    from app.providers.smsgate import get_devices_direct, list_webhooks_direct
+    from app.models.webhook import WebhookEvent
+    from app.utils.urls import webhook_url
+
+    target = webhook_url()
+    devices = await get_devices_direct()
+    wh = await list_webhooks_direct()
+    hooks = wh.get("webhooks", [])
+
+    recent = (await db.execute(
+        select(WebhookEvent).order_by(WebhookEvent.created_at.desc()).limit(10)
+    )).scalars().all()
+    inbound_count = (await db.execute(
+        select(func.count()).select_from(Message).where(Message.direction == "incoming")
+    )).scalar() or 0
 
     result = {
         "success": True,
-        "devices": None,
-        "webhooks": None,
-        "webhook_registration": None,
-        "inbox_export_test": None,
-        "messages_poll": None,
-        "note": "",
+        "webhook_url": target,
+        "devices": {"count": len(devices), "list": devices[:5]},
+        "registered_webhooks": hooks,
+        "matching_events": sorted(
+            h.get("event", "") for h in hooks
+            if isinstance(h, dict) and h.get("url") == target
+        ),
+        "stored_inbound_messages": inbound_count,
+        "recent_webhook_events": [
+            {
+                "event_type": e.event_type,
+                "status": e.status,
+                "error": e.error,
+                "at": e.created_at.isoformat(),
+            } for e in recent
+        ],
+        "config": {
+            "public_base_url_set": bool(target),
+            "signing_secret_set": bool(settings.SMSGATE_WEBHOOK_SECRET),
+            "allow_unsigned": settings.SMSGATE_WEBHOOK_ALLOW_UNSIGNED,
+            "credentials_set": settings.smsgate_configured,
+        },
     }
 
-    # Get devices
-    devices = await get_devices_direct()
-    result["devices"] = {
-        "count": len(devices),
-        "list": devices[:5] if devices else [],
-    }
-    if devices:
-        device_id = devices[0].get("id") or devices[0].get("deviceId", "")
-        result["device_id"] = device_id
-        _cache_device_id(device_id)
-    else:
-        result["device_id"] = _get_cached_device_id()
-
-    # Get webhooks
-    wh = await list_webhooks_direct()
-    result["webhooks"] = wh
-
-    # Register webhook
-    reg = await register_webhook_direct("https://sendsms-api.onrender.com/api/v1/webhooks/smsgateway")
-    result["webhook_registration"] = reg
-
-    # Test messages poll (for outgoing statuses)
-    u = (settings.SMSGATE_USERNAME or "").strip()
-    p = (settings.SMSGATE_PASSWORD or "").strip()
-    if u and p:
-        auth = base64.b64encode(f"{u}:{p}".encode()).decode()
-        headers = {"Content-Type": "application/json", "Authorization": f"Basic {auth}"}
-        base = "https://api.sms-gate.app/3rdparty/v1"
-        try:
-            async with httpx.AsyncClient(timeout=httpx.Timeout(30)) as client:
-                r = await client.get(f"{base}/messages?limit=10", headers=headers)
-                result["messages_poll"] = {
-                    "http": r.status_code,
-                    "body_preview": r.text[:1000],
-                    "body_length": len(r.text),
-                }
-                if r.status_code == 200:
-                    data = r.json()
-                    if isinstance(data, list):
-                        result["messages_poll"]["count"] = len(data)
-                        if data:
-                            result["messages_poll"]["first_keys"] = sorted(data[0].keys()) if isinstance(data[0], dict) else str(type(data[0]))
-                            result["messages_poll"]["first_message"] = {k: str(v)[:100] for k, v in (data[0].items() if isinstance(data[0], dict) else [])}
-        except Exception as e:
-            result["messages_poll"] = {"error": str(e)[:500]}
-
-    # Summary
     issues = []
+    if not target:
+        issues.append("PUBLIC_BASE_URL is not set — the gateway has nowhere to deliver to.")
+    if not settings.smsgate_configured:
+        issues.append("SMS-Gate credentials are missing.")
     if not devices:
-        issues.append("NO DEVICES: Your Android phone is not connected. Open SMS-Gate.app app → check it's online.")
-    if not reg.get("success"):
-        issues.append("WEBHOOK NOT REGISTERED: Check credentials.")
-    if issues:
-        result["note"] = " | ".join(issues)
-    else:
-        result["note"] = "Everything looks good. Webhook is registered and device is connected. Incoming SMS will arrive via webhook at /api/v1/webhooks/smsgateway"
-
+        issues.append("No device online — open SMS-Gate on the phone.")
+    if target and not result["matching_events"]:
+        issues.append("No webhook registered for this URL — click Sync to register.")
+    if not settings.SMSGATE_WEBHOOK_SECRET and not settings.SMSGATE_WEBHOOK_ALLOW_UNSIGNED:
+        issues.append(
+            "SMSGATE_WEBHOOK_SECRET is not set — inbound webhooks are rejected with 503."
+        )
+    if not recent:
+        issues.append("No webhook has ever reached this server.")
+    result["note"] = " | ".join(issues) if issues else (
+        f"Healthy. {inbound_count} inbound messages stored; "
+        f"{len(result['matching_events'])} events registered."
+    )
+    result["issues"] = issues
     return result
+
 
 @router.post("/poll-now")
 async def poll_now(db:AsyncSession=Depends(get_db),cu:User=Depends(get_current_user)):
-    """Sync inbox — triggers inbox export + status poll."""
+    """Sync inbox — re-register webhooks, replay history, refresh statuses."""
     return await sync_full_inbox(db, cu)

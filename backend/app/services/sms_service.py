@@ -9,7 +9,7 @@ from app.models.suppression import SuppressionEntry
 from app.models.campaign import CampaignContact
 from app.models.followup import FollowUp
 from app.models.notification import NotificationProvider
-from app.utils.phone import normalize_nigerian_number,detect_opt_out_keyword,count_sms_segments
+from app.utils.phone import normalize_nigerian_number,normalize_inbound_sender,detect_opt_out_keyword,count_sms_segments
 from app.security.encryption import decrypt_value
 from app.config import settings
 
@@ -41,22 +41,70 @@ class SMSService:
         cr.message_count=(cr.message_count or 0)+1;cr.last_message_preview=body[:100];cr.last_message_at=datetime.now(timezone.utc)
         await self.db.flush();return msg
 
+    @staticmethod
+    def _aware(d):
+        """Coerce a DB datetime to UTC-aware.
+
+        SQLite (and any column written before timezone support) hands back
+        naive datetimes, and comparing one to an aware timestamp raises
+        TypeError, which aborted the whole inbound message.
+        """
+        if d is None:
+            return None
+        return d.replace(tzinfo=timezone.utc) if d.tzinfo is None else d.astimezone(timezone.utc)
+
+    @staticmethod
+    def _parse_ts(raw):
+        """Parse an SMS-Gate ISO-8601 timestamp (e.g. 2024-06-22T15:46:11.000+07:00)."""
+        if not raw:
+            return None
+        try:
+            d=datetime.fromisoformat(str(raw).strip().replace("Z","+00:00"))
+        except (TypeError,ValueError):
+            return None
+        if d.tzinfo is None:
+            d=d.replace(tzinfo=timezone.utc)
+        return d.astimezone(timezone.utc)
+
     async def process_inbound_message(self,from_number,body,webhook_data=None):
-        n=normalize_nigerian_number(from_number)
-        if not n:logger.warning(f"INBOUND:bad number {from_number}");return None
-        ik=f"inbound-{webhook_data['messageId']}"if webhook_data and webhook_data.get("messageId")else f"inbound-{n}-{uuid.uuid4().hex[:12]}"
-        if(await self.db.execute(select(Message).where(Message.idempotency_key==ik))).scalar_one_or_none():return None
+        # Inbound senders are not always Nigerian mobiles: short codes, sender IDs
+        # and international numbers must land in the inbox too, not be discarded.
+        n=normalize_inbound_sender(from_number)
+        if not n:logger.warning(f"INBOUND: unusable sender {from_number!r}; dropping");return None
+        # SMS-Gate derives messageId from message CONTENT, so the same text from the
+        # same sender repeats the id. Scope the key by sender+timestamp as well, or
+        # a legitimate repeat reply ("YES", "STOP") is swallowed as a duplicate.
+        wd=webhook_data or {}
+        mid=wd.get("messageId") or ""
+        stamp=str(wd.get("receivedAt") or "")
+        if mid:
+            ik=f"inbound-{n}-{mid}-{stamp}" if stamp else f"inbound-{n}-{mid}"
+        else:
+            ik=f"inbound-{n}-{uuid.uuid4().hex[:12]}"
+        ik=ik[:255]
+        if(await self.db.execute(select(Message).where(Message.idempotency_key==ik))).scalar_one_or_none():
+            logger.info(f"INBOUND: duplicate {ik}; ignoring");return None
         c=(await self.db.execute(select(Contact).where(Contact.phone_number==n))).scalar_one_or_none()
         if not c:c=Contact(phone_number=n,country="Nigeria",lead_status="new",source="inbound_sms");self.db.add(c);await self.db.flush()
         kw=detect_opt_out_keyword(body)
         if kw:c.is_opted_out=True;c.opted_out_at=datetime.now(timezone.utc);c.opt_out_reason=f"Keyword:{kw}";self.db.add(SuppressionEntry(phone_number=n,contact_id=c.id,reason=f"Opt-out:{kw}",source="keyword",opt_out_keyword=kw));await self._stop_seq(c.id)
         cr=(await self.db.execute(select(Conversation).where(Conversation.contact_id==c.id))).scalar_one_or_none()
-        if not cr:cr=Conversation(contact_id=c.id,status="unread");self.db.add(cr);await self.db.flush()
+        if not cr:
+            # A brand-new conversation still has one unread message in it.
+            cr=Conversation(contact_id=c.id,status="unread",unread_count=1);self.db.add(cr);await self.db.flush()
         else:cr.status="unread";cr.unread_count=(cr.unread_count or 0)+1
         ch,sg=count_sms_segments(body)
-        m=Message(conversation_id=cr.id,contact_id=c.id,direction="incoming",body=body,segment_count=sg,char_count=ch,status="delivered",provider="smsgate",idempotency_key=ik)
+        # Preserve the real receive time. Inbox export replays historical SMS, and
+        # stamping them all with now() shuffles the chat into the wrong order.
+        received_at=self._parse_ts(stamp) or datetime.now(timezone.utc)
+        m=Message(conversation_id=cr.id,contact_id=c.id,direction="incoming",body=body,segment_count=sg,char_count=ch,status="delivered",provider="smsgate",provider_message_id=mid or None,idempotency_key=ik,created_at=received_at)
         self.db.add(m);await self.db.flush()
-        cr.message_count=(cr.message_count or 0)+1;cr.last_message_preview=body[:100];cr.last_message_at=datetime.now(timezone.utc)
+        cr.message_count=(cr.message_count or 0)+1
+        # Inbox export replays old SMS out of order; the preview and the sort
+        # timestamp must both track the NEWEST message, not the last one to arrive.
+        prev_at=self._aware(cr.last_message_at)
+        if not prev_at or received_at>=prev_at:
+            cr.last_message_at=received_at;cr.last_message_preview=body[:100]
         c.messages_received=(c.messages_received or 0)+1;c.last_reply_at=datetime.now(timezone.utc)
         if c.lead_status=="new":c.lead_status="replied"
         if not kw:await self._stop_seq(c.id)
@@ -86,6 +134,29 @@ class SMSService:
         await self.db.execute(update(CampaignContact).where(CampaignContact.contact_id==contact_id,CampaignContact.status.in_(["pending","queued","sent"])).values(status="replied",next_action_at=None))
 
     async def process_delivery_status(self,pid,status,delivered_at=None):
-        m=(await self.db.execute(select(Message).where(Message.provider_message_id==pid))).scalar_one_or_none()
-        if m:m.status=status;m.delivered_at=delivered_at or(datetime.now(timezone.utc)if status=="delivered"else None)
+        """Apply a delivery-status transition to the outgoing message `pid`.
+
+        Guards against regressions: a late `sms:sent` webhook must not knock an
+        already-delivered message back down, and multipart messages emit one
+        `sms:delivered` per part.
+        """
+        if not pid:return None
+        m=(await self.db.execute(select(Message).where(Message.provider_message_id==pid,Message.direction=="outgoing"))).scalar_one_or_none()
+        if not m:
+            logger.info(f"STATUS: no outgoing message for provider id {pid}")
+            return None
+        rank={"queued":0,"sending":1,"sent":2,"delivered":3,"failed":3,"cancelled":3}
+        if rank.get(status,0)<rank.get(m.status,0):
+            return m
+        m.status=status
+        now=datetime.now(timezone.utc)
+        # sms:delivered fires once per part of a multipart message; keep the
+        # first timestamp rather than letting each part bump it to now().
+        if status=="delivered":
+            if not m.delivered_at:m.delivered_at=delivered_at or now
+        elif status in("failed","cancelled"):
+            if not m.failed_at:m.failed_at=delivered_at or now
+        elif status=="sent":
+            if not m.sent_at:m.sent_at=delivered_at or now
         await self.db.flush()
+        return m

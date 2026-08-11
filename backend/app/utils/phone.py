@@ -157,3 +157,56 @@ def count_sms_segments(message: str) -> Tuple[int, int]:
         if char_count <= 70:
             return char_count, 1
         return char_count, (char_count + 66) // 67
+
+
+def normalize_inbound_sender(raw: str) -> Optional[str]:
+    """Normalize the sender of an INBOUND message.
+
+    ``normalize_nigerian_number`` returns None for anything that is not a valid
+    Nigerian mobile number, which is correct when we choose who to send to, but
+    wrong for inbound traffic: banks, delivery services and 2FA providers reply
+    from international numbers, short codes (``32665``) and alphanumeric sender
+    IDs (``MTN``, ``GTBank``). Dropping those made real replies disappear from
+    the inbox, so here we degrade gracefully instead of returning None.
+
+    Order of preference:
+      1. valid Nigerian mobile   -> +234...
+      2. any valid international -> E.164
+      3. numeric short code      -> digits as-is
+      4. alphanumeric sender ID  -> uppercased, trimmed to the column width
+    """
+    if not raw:
+        return None
+
+    raw = str(raw).strip()
+    if not raw:
+        return None
+
+    ng = normalize_nigerian_number(raw)
+    if ng:
+        return ng
+
+    cleaned = clean_phone_number(raw)
+
+    # Any other valid international number, e.g. +1..., +44...
+    if cleaned.startswith("+"):
+        try:
+            parsed = phonenumbers.parse(cleaned, None)
+            if phonenumbers.is_valid_number(parsed):
+                return phonenumbers.format_number(parsed, PhoneNumberFormat.E164)
+        except NumberParseException:
+            pass
+        # Keep it anyway if it looks like a plausible E.164 number.
+        if 8 <= len(cleaned) - 1 <= 15 and cleaned[1:].isdigit():
+            return cleaned
+
+    # Short codes: 3-8 digits, no country code.
+    if cleaned.isdigit() and 3 <= len(cleaned) <= 8:
+        return cleaned
+
+    # Alphanumeric sender ID (GSM 03.38 allows up to 11 chars).
+    alnum = re.sub(r"[^A-Za-z0-9 ._-]", "", raw).strip()
+    if alnum:
+        return alnum.upper()[:20]
+
+    return None
