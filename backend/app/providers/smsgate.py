@@ -102,6 +102,17 @@ INBOUND_EVENTS = ("sms:received", "sms:data-received", "mms:received", "mms:down
 STATUS_EVENTS = ("sms:sent", "sms:delivered", "sms:failed", "sms:cancelled")
 DEFAULT_EVENTS = INBOUND_EVENTS + STATUS_EVENTS
 
+# Not every gateway account, app version or device supports every event. MMS
+# and data-SMS in particular are rejected outright (HTTP 400 "unsupported
+# event") by older app builds and by devices without MMS capability.
+#
+# Registration used to be all-or-nothing: a single rejected optional event
+# made the whole call report failure, so the UI showed "the gateway rejected
+# the webhook registration" even though sms:received had registered fine and
+# inbound SMS was working. Only these events actually matter for the app to
+# function; anything else is best-effort.
+REQUIRED_EVENTS = ("sms:received",)
+
 
 async def register_webhook_direct(url, events=None):
     """Register `url` for each event, one registration per event.
@@ -162,14 +173,28 @@ async def register_webhook_direct(url, events=None):
                     errors.append(f"{event}: {str(e)[:120]}")
 
         registered = sorted(set(kept) | set(created))
+
+        # Succeed as long as every *required* event registered. Optional
+        # events that the gateway refuses are reported in `errors` (and in
+        # `unsupported`) for visibility, but they must not fail the call:
+        # inbound SMS works with sms:received alone.
+        required = [e for e in REQUIRED_EVENTS if e in events]
+        missing_required = [e for e in required if e not in registered]
+        unsupported = [
+            e for e in events
+            if e not in registered and e not in missing_required
+        ]
+
         return {
-            "success": not errors and bool(set(events) & set(registered)),
+            "success": not missing_required and bool(registered),
             "url": url,
             "registered": registered,
             "created": created,
             "kept": sorted(set(kept)),
             "deleted_stale": deleted,
             "errors": errors,
+            "missing_required": missing_required,
+            "unsupported": unsupported,
         }
     except Exception as e:
         logger.warning(f"register_webhook error: {e}")

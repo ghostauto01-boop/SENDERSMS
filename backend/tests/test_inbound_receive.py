@@ -673,3 +673,48 @@ class TestInboundNotifications:
         await asyncio.sleep(0.2)
 
         assert sent == []
+
+
+class TestOptOut:
+    """STOP must be recorded as a real consent revocation, not just a flag.
+
+    The opt-out flag was set, but consent_status stayed "unknown" and the
+    reason/timestamp were never exposed by the API - so opted-out contacts
+    were indistinguishable from never-asked ones in a compliance export.
+    """
+
+    async def _seed(self, db, phone="+2348044445555"):
+        c = Contact(phone_number=phone, country="Nigeria", lead_status="new")
+        db.add(c)
+        await db.commit()
+        await db.refresh(c)
+        return c
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("word", ["STOP", "stop", "Stop", "UNSUBSCRIBE"])
+    async def test_stop_revokes_consent(self, client, db, word):
+        c = await self._seed(db, f"+23480444455{len(word):02d}")
+        await post_webhook(client, envelope(
+            "sms:received",
+            {"messageId": f"m-{word}", "message": word,
+             "sender": c.phone_number, "receivedAt": "2025-01-01T10:00:00+00:00"},
+            f"e-{word}"))
+        await db.refresh(c)
+        assert c.is_opted_out is True
+        assert c.consent_status == "opted_out"
+        assert c.has_consented is False
+        assert c.opt_out_reason and word.upper() in c.opt_out_reason.upper()
+        assert c.opted_out_at is not None
+
+    @pytest.mark.asyncio
+    async def test_ordinary_reply_does_not_opt_out(self, client, db):
+        c = await self._seed(db, "+2348044446666")
+        await post_webhook(client, envelope(
+            "sms:received",
+            {"messageId": "m-ok", "message": "Yes please, tell me more",
+             "sender": c.phone_number, "receivedAt": "2025-01-01T10:00:00+00:00"},
+            "e-ok"))
+        await db.refresh(c)
+        assert c.is_opted_out is False
+        assert c.consent_status != "opted_out"
+        assert c.opt_out_reason is None

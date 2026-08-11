@@ -92,7 +92,14 @@ class SMSService:
         c=(await self.db.execute(select(Contact).where(Contact.phone_number==n))).scalar_one_or_none()
         if not c:c=Contact(phone_number=n,country="Nigeria",lead_status="new",source="inbound_sms");self.db.add(c);await self.db.flush()
         kw=detect_opt_out_keyword(body)
-        if kw:c.is_opted_out=True;c.opted_out_at=datetime.now(timezone.utc);c.opt_out_reason=f"Keyword:{kw}";self.db.add(SuppressionEntry(phone_number=n,contact_id=c.id,reason=f"Opt-out:{kw}",source="keyword",opt_out_keyword=kw));await self._stop_seq(c.id)
+        if kw:
+            c.is_opted_out=True;c.opted_out_at=datetime.now(timezone.utc);c.opt_out_reason=f"Keyword:{kw}"
+            # An explicit STOP is a consent revocation. Leaving consent_status
+            # at "unknown" made opted-out contacts indistinguishable from
+            # never-asked ones in compliance exports and audits.
+            c.consent_status="opted_out";c.has_consented=False
+            self.db.add(SuppressionEntry(phone_number=n,contact_id=c.id,reason=f"Opt-out:{kw}",source="keyword",opt_out_keyword=kw))
+            await self._stop_seq(c.id)
         cr=(await self.db.execute(select(Conversation).where(Conversation.contact_id==c.id).order_by(Conversation.id).limit(1))).scalars().first()
         if not cr:
             # A brand-new conversation still has one unread message in it.

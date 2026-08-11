@@ -55,7 +55,14 @@ async def reg_wh(url:Optional[str]=Query(None),cu:User=Depends(get_current_user)
         raise HTTPException(400,"PUBLIC_BASE_URL is not set. Set it to this deployment's public URL (e.g. https://your-app.onrender.com), or pass a URL explicitly, so the gateway knows where to deliver events.")
     r=await register_webhook_direct(url)
     if not r.get("success"):
-        raise HTTPException(502,r.get("error") or "The gateway rejected the webhook registration.")
+        # Only a missing *required* event is fatal. Report exactly which one
+        # failed and why, instead of a generic "rejected" message.
+        missing=r.get("missing_required") or []
+        detail=r.get("error")
+        if not detail and missing:
+            why="; ".join(e for e in (r.get("errors") or []) if e.split(":")[0]+":"+e.split(":")[1] in missing) or "; ".join(r.get("errors") or [])
+            detail=f"The gateway rejected the required event(s) {', '.join(missing)}. {why}".strip()
+        raise HTTPException(502,detail or "The gateway rejected the webhook registration.")
     return r
 
 @router.get("/gateway/webhooks")
