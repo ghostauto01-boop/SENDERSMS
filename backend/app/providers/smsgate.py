@@ -137,6 +137,27 @@ async def register_webhook_direct(url, events=None):
             existing = []
             try:
                 r = await c.get(_wh(), headers=headers)
+                if r.status_code in (401, 403):
+                    # Bad credentials: every subsequent POST would fail the
+                    # same way and produce eight identical 401s. Say so once,
+                    # in words the user can act on.
+                    return {
+                        "success": False,
+                        "url": url,
+                        "registered": [], "created": [], "kept": [],
+                        "deleted_stale": [], "errors": [],
+                        "missing_required": list(REQUIRED_EVENTS),
+                        "unsupported": [],
+                        "auth_failed": True,
+                        "http": r.status_code,
+                        "error": (
+                            f"The gateway refused the username/password (HTTP {r.status_code}). "
+                            "Check SMSGATE_USERNAME and SMSGATE_PASSWORD on the server: they must "
+                            "match the Cloud Server credentials shown in the SMS Gate app "
+                            "(Settings -> Cloud server). Note these are NOT your sms-gate.app "
+                            "website login."
+                        ),
+                    }
                 if r.status_code == 200:
                     data = r.json()
                     existing = data if isinstance(data, list) else data.get("webhooks", [])

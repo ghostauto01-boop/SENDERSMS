@@ -155,3 +155,47 @@ async def test_stale_url_is_removed(gate_env, monkeypatch):
 
     assert "old1" in mock.deleted
     assert r["success"] is True
+
+
+@pytest.mark.asyncio
+async def test_auth_failure_reports_credentials_not_missing_events(monkeypatch):
+    """A 401 from the gateway must be reported as a credentials problem.
+
+    Regression for the live deploy that showed eight identical
+    'HTTP 401 Unauthorized' lines and blamed the events instead of the
+    username/password that actually caused them.
+    """
+    calls = []
+
+    class R:
+        status_code = 401
+        text = '{"message":"Unauthorized"}'
+
+        def json(self):
+            return {"message": "Unauthorized"}
+
+    class C:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def get(self, *a, **k):
+            calls.append("get")
+            return R()
+
+        async def post(self, *a, **k):
+            calls.append("post")
+            return R()
+
+    monkeypatch.setattr(smsgate.httpx, "AsyncClient", lambda *a, **k: C())
+    monkeypatch.setattr(smsgate, "_creds", lambda: ("user", "badpass"))
+
+    r = await smsgate.register_webhook_direct("https://x.example.com/api/v1/webhooks/smsgateway")
+
+    assert r["success"] is False
+    assert r.get("auth_failed") is True
+    # Short-circuits: does not fire eight doomed POSTs.
+    assert "post" not in calls
+    assert "SMSGATE_USERNAME" in r["error"] and "SMSGATE_PASSWORD" in r["error"]
