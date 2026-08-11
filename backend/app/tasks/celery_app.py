@@ -62,10 +62,6 @@ celery_app.conf.beat_schedule = {
         "task": "app.tasks.sms_tasks.gateway_health_check",
         "schedule": timedelta(minutes=3),
     },
-    "poll-inbox": {
-        "task": "app.tasks.sms_tasks.poll_inbox",
-        "schedule": timedelta(seconds=45),
-    },
     "process-pending-notifications": {
         "task": "app.tasks.notification_tasks.process_pending_notifications",
         "schedule": timedelta(minutes=2),
