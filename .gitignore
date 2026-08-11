@@ -71,3 +71,7 @@ tsconfig.tsbuildinfo
 
 # Arena sandbox
 .arena/
+
+# Local backups (git bundles / source archives) - keep out of the repo
+backups/
+*.bundle
