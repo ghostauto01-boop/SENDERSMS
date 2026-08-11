@@ -1,5 +1,10 @@
 # SMS SENDER — App Audit
 
+> **STATUS: ALL FINDINGS FIXED** — see commit `649ce93`. Each item below is
+> annotated with how it was resolved and how the fix was verified against a
+> running server. One action remains for you: **rotate the SMS-Gate credentials**
+> (see finding 3) — that cannot be done from inside this environment.
+
 I installed both stacks, booted the FastAPI backend, built the React frontend, logged in, and
 exercised every endpoint the UI calls. Below is what I found, ordered by severity.
 
@@ -162,3 +167,34 @@ Note: I verified against SQLite locally since Postgres/Redis aren't available in
 (`create_async_engine` in `database.py` passes `pool_size`/`max_overflow`, which SQLite rejects —
 that only affects local SQLite runs, not your Postgres deployment). Findings 1, 3, 4, 5, 6, 7 are
 static/logic issues that are DB-independent; finding 2 reproduces whenever Redis is unreachable.
+
+
+---
+
+# Resolution summary
+
+| # | Finding | Status | Verified by |
+|---|---|---|---|
+| 1 | Campaigns can never be launched | **Fixed** | `POST /campaigns/1/validate` → `200 {"status":"scheduled"}` |
+| 2 | Redis outage → 500, campaign stuck `running` | **Fixed** | Returns `503` in 0.68s (was 19s); status rolls back to `scheduled` |
+| 3 | Hardcoded gateway credentials | **Fixed in code — rotation still required** | Defaults removed; env-only |
+| 4 | Unauthenticated webhook / inbox injection | **Fixed** | Forged payload → `401`; signed → `200`; stale timestamp → `401` |
+| 5 | Rate limiting configured but absent | **Fixed** | 6th login attempt → `429` |
+| 6 | State in files lost on redeploy | **Fixed** | SIM/last-poll/webhook flag now in DB |
+| 7 | Hardcoded onrender.com webhook URL | **Fixed** | `PUBLIC_BASE_URL`, warns when unset |
+| 8 | Lower-priority cleanup | **Fixed** | prod guard aborts on weak secrets; bundle 741 kB → 246 kB; 14 bare `except:` removed; 4 unused deps dropped |
+
+**Tests: 83 passing** (up from 60). The 23 new tests pin the two blockers and the
+webhook signature logic, which previously had no coverage at all.
+
+## The one thing you still have to do
+
+The credentials `SMSGATE_USERNAME=_O48UB` / `SMSGATE_PASSWORD=nw_e7wyhwjwubp` are
+in commit `74c9cc2` in git history. Removing them from the code does **not**
+remove them from history. Change the username/password on the SMS-Gate device,
+then set the new values as environment variables (`SMSGATE_USERNAME`,
+`SMSGATE_PASSWORD`) on your host rather than in the repo.
+
+While you are there, also set `SMSGATE_WEBHOOK_SECRET` (device →
+Settings → Webhooks → Signing Key) and `PUBLIC_BASE_URL`, or inbound replies
+will not arrive.
