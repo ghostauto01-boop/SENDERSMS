@@ -10,6 +10,7 @@ from app.models.campaign import CampaignContact
 from app.models.followup import FollowUp
 from app.models.notification import NotificationProvider
 from app.utils.phone import normalize_nigerian_number,normalize_inbound_sender,detect_opt_out_keyword,count_sms_segments
+from app.utils.naming import contact_display_name
 from app.security.encryption import decrypt_value
 from app.config import settings
 
@@ -131,7 +132,7 @@ class SMSService:
             if not prov:return
             cfg=json.loads(prov.config_json or"{}");uk=decrypt_value(cfg.get("user_key_encrypted",""));at=decrypt_value(cfg.get("app_token_encrypted",""))
             if not uk or not at:return
-            title=f"📱 New SMS from {contact.business_name or contact.first_name or contact.phone_number}"
+            title=f"📱 New SMS from {contact_display_name(contact, contact.phone_number)}"
             import asyncio
             async def _send():
                 try:

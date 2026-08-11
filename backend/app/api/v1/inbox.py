@@ -11,6 +11,7 @@ from app.models.user import User
 from app.security.auth import get_current_user
 from app.utils.phone import normalize_nigerian_number
 from app.config import settings
+from app.utils.naming import contact_display_name
 from datetime import datetime as dt, timezone as tz
 
 logger = logging.getLogger(__name__)
@@ -32,7 +33,7 @@ async def list_conversations(page:int=1,per_page:int=500,status:Optional[str]=No
     items = []
     for conv in (await db.execute(query)).scalars().all():
         cr = await db.execute(select(Contact).where(Contact.id == conv.contact_id)); contact = cr.scalar_one_or_none()
-        name = (f"{contact.first_name or ''} {contact.last_name or ''}".strip() or contact.business_name or contact.phone_number) if contact else "Unknown"
+        name = contact_display_name(contact)
         items.append({"id":conv.id,"contact_id":conv.contact_id,"contact_name":name,"contact_phone":contact.phone_number if contact else"","contact_lead_status":contact.lead_status if contact else"","status":conv.status,"message_count":conv.message_count,"unread_count":conv.unread_count,"last_message_preview":conv.last_message_preview,"last_message_at":conv.last_message_at.isoformat()if conv.last_message_at else None,"created_at":conv.created_at.isoformat(),"contact":{"phone_number":contact.phone_number if contact else"","lead_status":contact.lead_status if contact else"","business_name":contact.business_name if contact else"","first_name":contact.first_name if contact else"","last_name":contact.last_name if contact else"","city":contact.city if contact else"","state":contact.state if contact else""}if contact else None})
     return {"total":total,"items":items}
 
