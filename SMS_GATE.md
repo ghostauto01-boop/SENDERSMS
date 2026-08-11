@@ -179,10 +179,11 @@ Existing Postgres databases also need the `allow_weekends` column added — see
 
 ## 6. Verification
 
-`backend/tests/test_inbound_receive.py` (21 tests) covers the whole path;
-the full suite is **108 passing**. The receive tests were run against the
-pre-fix commit as a control and 6 of them failed there, confirming they catch
-the real regressions rather than merely describing current behaviour.
+`backend/tests/test_inbound_receive.py` (28 tests) covers the whole path;
+the full suite is **115 passing**. The tests were run against the pre-fix
+commits as a control: 6 of the receive tests and 5 of the inbox-list tests
+failed there, confirming they catch real regressions rather than merely
+describing current behaviour.
 
 Live run against a real database and real signed webhooks: 8 messages stored
 across 3 threads; an identical envelope deduped; a repeat `YES` with the same
@@ -192,3 +193,40 @@ message inserted in the right chronological position without disturbing the
 preview; `system:ping` and unknown events acknowledged; a forged signature
 rejected with 401; delivery receipts matched, with a late `sms:sent` and
 repeated per-part `sms:delivered` leaving both status and timestamp intact.
+
+### Verified against a simulated gateway
+
+A mock of the SMS-Gate cloud API plus a phone simulator was used to drive the
+app end to end without a handset. It reproduces the documented contract exactly,
+including the singular-`event` registration body, the `{deviceId, event, id,
+payload, webhookId}` envelope, and HMAC-SHA256 signing over `raw_body + timestamp`.
+
+Confirmed with the app pointed at it:
+
+* On boot the app registers all 8 events and reports `healthy` in Settings.
+* Deleting the `sms:received` webhook makes the Settings card show
+  `missing: sms:received`, and inbound SMS then reach nobody — which is exactly
+  the failure that was happening in production. One click on **Re-register**
+  restores it and recreates only the missing event.
+* A five-message two-way conversation renders in the correct order with
+  `sent` then `delivered` ticks arriving by webhook.
+* `sms:failed` shows the handset's reason in the bubble ("SIM has no credit").
+* Three per-part `sms:delivered` events leave one delivered timestamp.
+* A repeated envelope id is ignored; `system:ping` and unknown events are
+  acknowledged; a forged signature is rejected with 401.
+* Replying to a contact who texted STOP is refused with 409.
+
+## 7. Inbox list and label fixes
+
+Driving the live harness also exposed four chat-surface bugs unrelated to the
+gateway:
+
+| Bug | Effect | Fix |
+|---|---|---|
+| Opening a thread set `status = "read"` unconditionally | Interested / Not interested / Closed were wiped the moment the thread was clicked, and **Mark unread** was undone by the next 10-second poll | Opening now clears the unread badge but only promotes `unread` to `read`; deliberate labels are preserved |
+| The filter tabs sent no `status` parameter | All / Unread / Interested / Closed all returned the same list | The tab value is now sent, kept in a ref so the poller uses the current tab |
+| `status=all` was treated as a literal status | Matched nothing | `all` now means no filter |
+| Unread tab missed labelled threads with unread messages | Threads with a badge but a non-`unread` status were hidden | Unread now matches `status = "unread"` **or** `unread_count > 0` |
+
+The conversation detail endpoint also now returns `last_error`, `failed_at` and
+`segment_count`, and a search box was added over name, phone and message text.

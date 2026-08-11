@@ -7,8 +7,28 @@ from app.providers.base import DeliveryStatus, GatewayHealth, InboundMessage, SM
 from app.config import settings
 
 logger = logging.getLogger(__name__)
-GW_API = "https://api.sms-gate.app/3rdparty/v1/messages"
-GW_WH = "https://api.sms-gate.app/3rdparty/v1/webhooks"
+DEFAULT_BASE = "https://api.sms-gate.app/3rdparty/v1"
+
+
+def _base():
+    """Gateway API root, honouring SMSGATE_BASE_URL.
+
+    Read per call rather than captured at import so the setting can be pointed
+    at a local server (or a mock) without reimporting the module.
+    """
+    return (settings.SMSGATE_BASE_URL or DEFAULT_BASE).rstrip("/")
+
+
+def _api():
+    return f"{_base()}/messages"
+
+
+def _wh():
+    return f"{_base()}/webhooks"
+
+
+def _dev():
+    return f"{_base()}/devices"
 
 def _creds():
     u=(settings.SMSGATE_USERNAME or "").strip()
@@ -22,7 +42,7 @@ async def send_sms_direct(phone,body,sim=1):
     payload={"textMessage":{"text":body},"phoneNumbers":[phone],"simNumber":sim,"ttl":3600}
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(45)) as c:
-            r=await c.post(f"{GW_API}?skipPhoneValidation=true",
+            r=await c.post(f"{_api()}?skipPhoneValidation=true",
                 headers={"Content-Type":"application/json","Authorization":f"Basic {auth}"},json=payload)
             d=r.json() if r.text else {}
             logger.info(f"SMS: HTTP {r.status_code} {json.dumps(d)[:200]}")
@@ -39,7 +59,7 @@ async def test_connection_direct():
     auth=base64.b64encode(f"{u}:{p}".encode()).decode()
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(15)) as c:
-            r=await c.post(f"{GW_API}?skipPhoneValidation=true",
+            r=await c.post(f"{_api()}?skipPhoneValidation=true",
                 headers={"Content-Type":"application/json","Authorization":f"Basic {auth}"},
                 json={"textMessage":{"text":"test"},"phoneNumbers":["+2348000000000"],"simNumber":1,"ttl":60})
             return {"success":r.status_code<500,"online":r.status_code<500,"http":r.status_code}
@@ -56,7 +76,7 @@ async def poll_status_for_ids(ids:list):
             for mid in ids:
                 if not mid: continue
                 try:
-                    r=await c.get(f"{GW_API}/{mid}",headers={"Content-Type":"application/json","Authorization":f"Basic {auth}"})
+                    r=await c.get(f"{_api()}/{mid}",headers={"Content-Type":"application/json","Authorization":f"Basic {auth}"})
                     if r.status_code==200:
                         d=r.json()
                         state=(d.get("state")or"").lower()
@@ -105,7 +125,7 @@ async def register_webhook_direct(url, events=None):
         async with httpx.AsyncClient(timeout=httpx.Timeout(20)) as c:
             existing = []
             try:
-                r = await c.get(GW_WH, headers=headers)
+                r = await c.get(_wh(), headers=headers)
                 if r.status_code == 200:
                     data = r.json()
                     existing = data if isinstance(data, list) else data.get("webhooks", [])
@@ -123,7 +143,7 @@ async def register_webhook_direct(url, events=None):
                 elif w_id and w_url.endswith(WEBHOOK_PATH_SUFFIX) and w_event in events:
                     # Same integration, old deployment URL -> remove it.
                     try:
-                        d = await c.delete(f"{GW_WH}/{w_id}", headers=headers)
+                        d = await c.delete(f"{_wh()}/{w_id}", headers=headers)
                         if d.status_code < 400:
                             deleted.append(w_url)
                     except Exception:
@@ -133,7 +153,7 @@ async def register_webhook_direct(url, events=None):
                 if event in have:
                     continue
                 try:
-                    r = await c.post(GW_WH, headers=headers, json={"url": url, "event": event})
+                    r = await c.post(_wh(), headers=headers, json={"url": url, "event": event})
                     if r.status_code < 400:
                         created.append(event)
                     else:
@@ -162,7 +182,7 @@ async def list_webhooks_direct():
     auth=base64.b64encode(f"{u}:{p}".encode()).decode()
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(15)) as c:
-            r=await c.get(GW_WH,headers={"Content-Type":"application/json","Authorization":f"Basic {auth}"})
+            r=await c.get(_wh(),headers={"Content-Type":"application/json","Authorization":f"Basic {auth}"})
             if r.status_code!=200: return{"webhooks":[],"http":r.status_code,"error":r.text[:300]}
             data=r.json()
             return{"webhooks":data if isinstance(data,list) else data.get("webhooks",[]),"http":200}
@@ -175,7 +195,7 @@ async def delete_webhook_direct(webhook_id:str):
     auth=base64.b64encode(f"{u}:{p}".encode()).decode()
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(15)) as c:
-            r=await c.delete(f"{GW_WH}/{webhook_id}",
+            r=await c.delete(f"{_wh()}/{webhook_id}",
                 headers={"Content-Type":"application/json","Authorization":f"Basic {auth}"})
             return{"success":r.status_code<400,"http":r.status_code}
     except Exception as e: return{"success":False,"error":str(e)[:300]}
@@ -187,7 +207,7 @@ async def get_devices_direct():
     auth=base64.b64encode(f"{u}:{p}".encode()).decode()
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(15)) as c:
-            r=await c.get("https://api.sms-gate.app/3rdparty/v1/devices",
+            r=await c.get(_dev(),
                 headers={"Content-Type":"application/json","Authorization":f"Basic {auth}"})
             if r.status_code==200:
                 data=r.json()
@@ -225,7 +245,7 @@ async def export_inbox_direct(device_id:str, since:str=None, until:str=None):
     if until: payload["until"]=until
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(30)) as c:
-            r=await c.post("https://api.sms-gate.app/3rdparty/v1/messages/inbox/export",
+            r=await c.post(f"{_api()}/inbox/export",
                 headers={"Content-Type":"application/json","Authorization":f"Basic {auth}"},
                 json=payload)
             logger.info(f"inbox_export: HTTP {r.status_code} {r.text[:300]}")
@@ -238,7 +258,7 @@ async def export_inbox_direct(device_id:str, since:str=None, until:str=None):
 
 class SMSGateProvider(SMSProvider):
     def __init__(self,base_url=None,username=None,password=None,sim_number=1,timeout=45):
-        self.base_url=(base_url or settings.SMSGATE_BASE_URL or "https://api.sms-gate.app/3rdparty/v1").rstrip("/")
+        self.base_url=(base_url or settings.SMSGATE_BASE_URL or DEFAULT_BASE).rstrip("/")
         self.username=(username or settings.SMSGATE_USERNAME or"").strip()
         self.password=(password or settings.SMSGATE_PASSWORD or"").strip()
         self.sim_number=sim_number or 1

@@ -11,6 +11,7 @@ export default function InboxPage() {
   const [replyText, setReplyText] = useState("");
   const [sending, setSending] = useState(false);
   const [filter, setFilter] = useState("all");
+  const [search, setSearch] = useState("");
   const [showInfo, setShowInfo] = useState(false);
   const [polling, setPolling] = useState(false);
   const [pollDebug, setPollDebug] = useState<any>(null);
@@ -19,14 +20,25 @@ export default function InboxPage() {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<any>(null);
 
-  useEffect(() => { loadConvs(); return () => clearInterval(pollRef.current); }, [filter]);
+  useEffect(() => { loadConvs(); }, [filter]);
+  useEffect(() => { const t = setTimeout(loadConvs, 300); return () => clearTimeout(t); }, [search]);
   useEffect(() => { if (selected) loadMessages(selected.id); }, [selected]);
   useEffect(() => { chatEndRef.current?.scrollIntoView({behavior:"smooth"}); }, [messages]);
   useEffect(() => { pollRef.current = setInterval(() => { loadConvs(); if(selected) loadMessages(selected.id); }, 10000); return () => clearInterval(pollRef.current); }, [selected]);
 
+  // Kept in refs so the 10s poller always sends the CURRENT filter/search
+  // without having to tear down and recreate the interval.
+  const filterRef = useRef(filter);
+  const searchRef = useRef(search);
+  useEffect(() => { filterRef.current = filter; }, [filter]);
+  useEffect(() => { searchRef.current = search; }, [search]);
+
   const loadConvs = async () => {
     try {
-      const { data } = await api.get("/inbox/conversations", { params: { per_page: 500 } });
+      const params: any = { per_page: 500 };
+      if (filterRef.current && filterRef.current !== "all") params.status = filterRef.current;
+      if (searchRef.current.trim()) params.search = searchRef.current.trim();
+      const { data } = await api.get("/inbox/conversations", { params });
       setConvs(data.items || []);
     } catch {} finally { setLoading(false); }
   };
@@ -54,7 +66,12 @@ export default function InboxPage() {
 
   const markAs = async (status: string) => {
     if (!selected) return;
-    try { await api.post(`/inbox/conversations/${selected.id}/mark-${status}`); toast.success("Updated"); loadConvs(); } catch { toast.error("Failed"); }
+    try {
+      const { data } = await api.post(`/inbox/conversations/${selected.id}/mark-${status}`);
+      setSelected((s:any) => s ? { ...s, status: data.status ?? s.status } : s);
+      toast.success("Updated");
+      loadConvs();
+    } catch { toast.error("Failed"); }
   };
 
   const doPoll = async () => {
@@ -113,6 +130,8 @@ export default function InboxPage() {
         <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-2 mb-2 text-xs text-blue-700 dark:text-blue-300">
           <p>Syncs ALL SMS from your phone. Webhook: <code className="text-xs bg-blue-100 dark:bg-blue-800 px-1 rounded">/api/v1/webhooks/smsgateway</code></p>
         </div>
+        <input className="input w-full mb-2 text-sm" placeholder="Search name, phone or message..."
+               value={search} onChange={e=>setSearch(e.target.value)} />
         <div className="flex flex-wrap gap-1 mb-2">{filters.map(f=>(<button key={f.v} onClick={()=>{setFilter(f.v);setSelected(null)}} className={`text-xs px-2 py-1 rounded-full ${filter===f.v?"bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300":"bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400"}`}>{f.l}</button>))}</div>
         <div className="flex-1 overflow-y-auto space-y-1">
           {loading ? [...Array(5)].map((_,i)=>(<div key={i} className="card p-3"><div className="skeleton h-4 w-32 mb-1"/><div className="skeleton h-3 w-48"/></div>))
@@ -231,7 +250,7 @@ export default function InboxPage() {
           {showInfo && selected?.contact && (<div className="px-4 py-2 bg-gray-50 dark:bg-gray-700/50 text-xs space-y-1 border-b">{selected.contact.business_name&&<p><strong>Business:</strong> {selected.contact.business_name}</p>}{selected.contact.city&&<p><strong>Location:</strong> {selected.contact.city}{selected.contact.state?`, ${selected.contact.state}`:""}</p>}<p><strong>Phone:</strong> {selected.contact.phone_number}</p></div>)}
           <div className="flex-1 overflow-y-auto p-3 space-y-2 bg-gray-50 dark:bg-gray-900/50">
             {messages.length===0 ? <p className="text-center text-gray-400 text-sm py-12">No messages</p>
-            : messages.map(m => (<div key={m.id} className={`flex ${m.direction==="outgoing"?"justify-end":"justify-start"}`}><div className={`max-w-[80%] px-3 py-2 rounded-xl text-sm ${m.direction==="outgoing"?"bg-primary-600 text-white rounded-br-sm":"bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-bl-sm shadow-sm"}`}><p className="whitespace-pre-wrap">{m.body}</p><div className={`flex items-center gap-1 justify-end mt-1 text-[10px] ${m.direction==="outgoing"?"text-primary-200":"text-gray-400"}`}>{new Date(m.created_at).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}{m.direction==="outgoing"&&<span>· {m.status==="delivered"?"✓✓":m.status==="sent"?"✓":"·"}</span>}</div></div></div>))}
+            : messages.map(m => (<div key={m.id} className={`flex ${m.direction==="outgoing"?"justify-end":"justify-start"}`}><div className={`max-w-[80%] px-3 py-2 rounded-xl text-sm ${m.direction==="outgoing"?"bg-primary-600 text-white rounded-br-sm":"bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-bl-sm shadow-sm"}`}><p className="whitespace-pre-wrap">{m.body}</p>{m.direction==="outgoing"&&(m.status==="failed"||m.status==="cancelled")&&m.last_error&&<p className="text-[10px] mt-1 text-red-200">{m.last_error}</p>}<div className={`flex items-center gap-1 justify-end mt-1 text-[10px] ${m.direction==="outgoing"?"text-primary-200":"text-gray-400"}`}>{new Date(m.created_at).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}{m.direction==="outgoing"&&<span title={m.last_error||m.status}>· {m.status==="delivered"?"✓✓":m.status==="sent"?"✓":m.status==="failed"?"⚠ failed":m.status==="cancelled"?"⚠ cancelled":"·"}</span>}</div></div></div>))}
             <div ref={chatEndRef}/>
           </div>
           <div className="p-3 border-t border-gray-200 dark:border-gray-700 flex gap-2 bg-white dark:bg-gray-800">

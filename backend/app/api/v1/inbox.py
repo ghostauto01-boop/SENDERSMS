@@ -19,7 +19,13 @@ router = APIRouter()
 @router.get("/conversations")
 async def list_conversations(page:int=1,per_page:int=500,status:Optional[str]=None,search:Optional[str]=None,db:AsyncSession=Depends(get_db),cu:User=Depends(get_current_user)):
     query = select(Conversation)
-    if status: query = query.where(Conversation.status == status)
+    # "all" is what the UI sends for the default tab; treat it as no filter
+    # rather than as a literal status nothing will ever match.
+    if status and status != "all":
+        if status == "unread":
+            query = query.where(or_(Conversation.status == "unread", Conversation.unread_count > 0))
+        else:
+            query = query.where(Conversation.status == status)
     if search: query = query.join(Contact, Conversation.contact_id == Contact.id).where(or_(Contact.first_name.ilike(f"%{search}%"),Contact.last_name.ilike(f"%{search}%"),Contact.business_name.ilike(f"%{search}%"),Contact.phone_number.ilike(f"%{search}%"),Conversation.last_message_preview.ilike(f"%{search}%")))
     total = (await db.execute(select(func.count()).select_from(query.subquery()))).scalar() or 0
     query = query.order_by(Conversation.last_message_at.desc().nullslast()).offset((page-1)*per_page).limit(per_page)
@@ -34,11 +40,16 @@ async def list_conversations(page:int=1,per_page:int=500,status:Optional[str]=No
 async def get_conversation(conversation_id:int,db:AsyncSession=Depends(get_db),cu:User=Depends(get_current_user)):
     r=await db.execute(select(Conversation).where(Conversation.id==conversation_id));conv=r.scalar_one_or_none()
     if not conv: raise HTTPException(404)
-    conv.status="read";conv.unread_count=0
+    # Opening a thread clears the unread badge, but must NOT overwrite a
+    # deliberate label. Previously every read reset status to "read", so
+    # Interested/Not interested/Closed vanished the moment you clicked in,
+    # and Mark unread was undone by the very next poll.
+    conv.unread_count=0
+    if conv.status in(None,"","unread"):conv.status="read"
     cr=await db.execute(select(Contact).where(Contact.id==conv.contact_id));contact=cr.scalar_one_or_none()
     mr=await db.execute(select(Message).where(Message.conversation_id==conversation_id).order_by(Message.created_at.asc()))
     await db.flush()
-    return {"id":conv.id,"contact":{"id":contact.id if contact else None,"phone_number":contact.phone_number if contact else"","first_name":contact.first_name if contact else"","last_name":contact.last_name if contact else"","business_name":contact.business_name if contact else"","lead_status":contact.lead_status if contact else"","city":contact.city if contact else"","state":contact.state if contact else"","email":contact.email if contact else"","website":contact.website if contact else"","notes":contact.notes if contact else""}if contact else None,"status":conv.status,"sequence_paused":conv.sequence_paused,"messages":[{"id":m.id,"direction":m.direction,"body":m.body,"status":m.status,"created_at":m.created_at.isoformat(),"sent_at":m.sent_at.isoformat()if m.sent_at else None,"delivered_at":m.delivered_at.isoformat()if m.delivered_at else None,"provider_message_id":m.provider_message_id}for m in mr.scalars().all()]}
+    return {"id":conv.id,"contact":{"id":contact.id if contact else None,"phone_number":contact.phone_number if contact else"","first_name":contact.first_name if contact else"","last_name":contact.last_name if contact else"","business_name":contact.business_name if contact else"","lead_status":contact.lead_status if contact else"","city":contact.city if contact else"","state":contact.state if contact else"","email":contact.email if contact else"","website":contact.website if contact else"","notes":contact.notes if contact else""}if contact else None,"status":conv.status,"sequence_paused":conv.sequence_paused,"messages":[{"id":m.id,"direction":m.direction,"body":m.body,"status":m.status,"created_at":m.created_at.isoformat(),"sent_at":m.sent_at.isoformat()if m.sent_at else None,"delivered_at":m.delivered_at.isoformat()if m.delivered_at else None,"failed_at":m.failed_at.isoformat()if m.failed_at else None,"last_error":m.last_error,"segment_count":m.segment_count,"provider_message_id":m.provider_message_id}for m in mr.scalars().all()]}
 
 @router.post("/conversations/{conversation_id}/reply")
 async def send_reply(conversation_id:int,body:str=Query(...,min_length=1),db:AsyncSession=Depends(get_db),cu:User=Depends(get_current_user)):

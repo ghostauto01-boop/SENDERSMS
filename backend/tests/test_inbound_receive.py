@@ -434,3 +434,96 @@ class TestOutboundReply:
         r = await auth_client.post("/api/v1/inbox/conversations/99999/reply",
                               params={"body": "hi"})
         assert r.status_code == 404
+
+
+class TestChatListAndLabels:
+    """The inbox list/labels regressions found by driving the live harness.
+
+    1. Opening a thread reset conversation.status to "read" unconditionally,
+       so Interested / Not interested / Closed were destroyed the instant the
+       user clicked the thread, and Mark unread was undone by the next poll.
+    2. The UI's default tab sends status="all", which was treated as a literal
+       status and matched nothing.
+    3. The Unread tab missed threads that had unread_count > 0 but a status
+       left over from an earlier label.
+    """
+
+    async def _conv(self, db, phone, status="unread", unread=1, preview="hi"):
+        c = Contact(phone_number=phone, country="Nigeria", lead_status="new")
+        db.add(c)
+        await db.flush()
+        conv = Conversation(contact_id=c.id, status=status, unread_count=unread,
+                            last_message_preview=preview)
+        db.add(conv)
+        await db.flush()
+        return conv
+
+    @pytest.mark.asyncio
+    async def test_opening_thread_keeps_label_but_clears_badge(self, auth_client, db):
+        conv = await self._conv(db, "+2348011110001")
+        await auth_client.post(f"/api/v1/inbox/conversations/{conv.id}/mark-interested")
+
+        # Opening it twice must not degrade the label back to "read".
+        for _ in range(2):
+            r = await auth_client.get(f"/api/v1/inbox/conversations/{conv.id}")
+            assert r.status_code == 200
+            assert r.json()["status"] == "interested"
+
+        await db.refresh(conv)
+        assert conv.status == "interested"
+        assert conv.unread_count == 0  # badge still cleared
+
+    @pytest.mark.asyncio
+    async def test_plain_unread_thread_becomes_read_on_open(self, auth_client, db):
+        conv = await self._conv(db, "+2348011110002", status="unread")
+        r = await auth_client.get(f"/api/v1/inbox/conversations/{conv.id}")
+        assert r.json()["status"] == "read"
+
+    @pytest.mark.asyncio
+    async def test_mark_unread_survives_and_shows_in_unread_tab(self, auth_client, db):
+        conv = await self._conv(db, "+2348011110003", status="read", unread=0)
+        await auth_client.post(f"/api/v1/inbox/conversations/{conv.id}/mark-unread")
+
+        r = await auth_client.get("/api/v1/inbox/conversations", params={"status": "unread"})
+        assert [i["id"] for i in r.json()["items"]] == [conv.id]
+
+    @pytest.mark.asyncio
+    async def test_status_all_is_not_a_literal_filter(self, auth_client, db):
+        await self._conv(db, "+2348011110004", status="interested")
+        await self._conv(db, "+2348011110005", status="closed")
+
+        r = await auth_client.get("/api/v1/inbox/conversations", params={"status": "all"})
+        assert r.json()["total"] == 2
+
+    @pytest.mark.asyncio
+    async def test_unread_tab_catches_badge_without_unread_status(self, auth_client, db):
+        # Labelled "interested" but still carrying unread messages.
+        conv = await self._conv(db, "+2348011110006", status="interested", unread=3)
+        r = await auth_client.get("/api/v1/inbox/conversations", params={"status": "unread"})
+        assert conv.id in [i["id"] for i in r.json()["items"]]
+
+    @pytest.mark.asyncio
+    async def test_search_matches_phone_and_preview(self, auth_client, db):
+        await self._conv(db, "+2348011119999", preview="iPhone in Wuse")
+        await self._conv(db, "+2349087776666", preview="Samsung price?")
+
+        for term, expected in [("Wuse", 1), ("Samsung", 1), ("801111", 1), ("nomatch", 0)]:
+            r = await auth_client.get("/api/v1/inbox/conversations",
+                                      params={"status": "all", "search": term})
+            assert r.json()["total"] == expected, term
+
+    @pytest.mark.asyncio
+    async def test_thread_exposes_failure_reason(self, auth_client, db):
+        """A failed send must tell the chat WHY, not just show a dot."""
+        conv = await self._conv(db, "+2348011110007")
+        db.add(Message(conversation_id=conv.id, contact_id=conv.contact_id,
+                       direction="outgoing", body="x", segment_count=1, char_count=1,
+                       status="failed", last_error="SIM has no credit",
+                       idempotency_key="k-fail-1", retry_count=0))
+        await db.flush()
+
+        r = await auth_client.get(f"/api/v1/inbox/conversations/{conv.id}")
+        m = r.json()["messages"][-1]
+        assert m["status"] == "failed"
+        assert m["last_error"] == "SIM has no credit"
+        assert m["segment_count"] == 1
