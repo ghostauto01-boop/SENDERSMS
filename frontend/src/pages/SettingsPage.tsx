@@ -32,7 +32,7 @@ export default function SettingsPage() {
   ];
 
   return (
-    <div className="space-y-4"><h1 className="text-2xl font-bold">Settings</h1>
+    <div className="space-y-4"><h1 className="text-xl sm:text-2xl font-bold">Settings</h1>
       <div className="flex gap-2 flex-wrap">{tabs.map(t => (<button key={t.id} onClick={() => setTab(t.id)}
         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium ${tab===t.id?"bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300":"text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"}`}><t.icon size={14}/>{t.label}</button>))}</div>
       {loading ? (<div className="card p-6"><div className="skeleton h-8 w-48 mb-4"/><div className="space-y-3">{[...Array(3)].map((_,i)=>(<div key={i} className="skeleton h-10 w-full"/>))}</div></div>)
@@ -294,6 +294,6 @@ function RulesTab({ s, onUpdate }: { s: Record<string, string>; onUpdate: () => 
       <div className="space-y-2"><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.dl} onChange={e=>setF({...f,dl:e.target.checked})}/>Daily limit</label>{f.dl&&<input type="number" className="input" value={f.dm} onChange={e=>setF({...f,dm:parseInt(e.target.value)||0})}/>}</div>
       <div className="space-y-2"><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.hl} onChange={e=>setF({...f,hl:e.target.checked})}/>Hourly limit</label>{f.hl&&<input type="number" className="input" value={f.hm} onChange={e=>setF({...f,hm:parseInt(e.target.value)||0})}/>}</div>
       <div className="space-y-2"><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.ml} onChange={e=>setF({...f,ml:e.target.checked})}/>Per-minute limit</label>{f.ml&&<input type="number" className="input" value={f.mm} onChange={e=>setF({...f,mm:parseInt(e.target.value)||0})}/>}</div></div>
-    <div className="grid grid-cols-2 gap-4"><div><label className="label">Start</label><input type="time" className="input" value={f.ss} onChange={e=>setF({...f,ss:e.target.value})}/></div><div><label className="label">End</label><input type="time" className="input" value={f.se} onChange={e=>setF({...f,se:e.target.value})}/></div></div>
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><div><label className="label">Start</label><input type="time" className="input" value={f.ss} onChange={e=>setF({...f,ss:e.target.value})}/></div><div><label className="label">End</label><input type="time" className="input" value={f.se} onChange={e=>setF({...f,se:e.target.value})}/></div></div>
     <div className="flex gap-4"><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.aw==="true"} onChange={e=>setF({...f,aw:String(e.target.checked)})}/>Weekends</label><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.ah==="true"} onChange={e=>setF({...f,ah:String(e.target.checked)})}/>Holidays</label></div>
     <button onClick={save} disabled={sv} className="btn-primary">{sv?"Saving...":"Save"}</button></div>);}

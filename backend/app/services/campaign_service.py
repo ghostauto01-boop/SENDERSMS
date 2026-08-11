@@ -75,6 +75,7 @@ class CampaignService:
             description=data.get("description"),
             list_id=data.get("list_id"),
             template_id=data.get("template_id"),
+            message_body=(data.get("message_body") or "").strip() or None,
             sequence_id=data.get("sequence_id"),
             gateway_setting_id=data.get("gateway_setting_id"),
             status="draft",
@@ -82,6 +83,32 @@ class CampaignService:
         self.db.add(campaign)
         await self.db.flush()
         return campaign
+
+    async def resolve_body(self, campaign: Campaign, template_id: int | None = None) -> str | None:
+        """Return the raw (unrendered) message text a campaign will send.
+
+        Precedence: an explicit sequence-step template, then the campaign's own
+        inline message_body, then its selected template. Returns None when the
+        campaign has no message at all -- callers must treat that as an error
+        rather than inventing a placeholder, since anything we invent would be
+        texted verbatim to real people.
+        """
+        tid = template_id or (None if campaign.message_body else campaign.template_id)
+        if tid:
+            row = await self.db.execute(select(Template).where(Template.id == tid))
+            template = row.scalar_one_or_none()
+            if template and (template.body or "").strip():
+                return template.body
+            if template_id:
+                return None
+        if campaign.message_body and campaign.message_body.strip():
+            return campaign.message_body
+        if campaign.template_id:
+            row = await self.db.execute(select(Template).where(Template.id == campaign.template_id))
+            template = row.scalar_one_or_none()
+            if template and (template.body or "").strip():
+                return template.body
+        return None
 
     async def validate_and_schedule(self, campaign_id: int) -> Campaign:
         """
@@ -109,6 +136,14 @@ class CampaignService:
             )
             if count_result.scalar() == 0:
                 errors.append("Contact list is empty")
+
+        # A campaign with neither an inline message nor a usable template used
+        # to fall through to a hardcoded "Hello" at send time and blast that
+        # literal word to every contact. Refuse to schedule instead.
+        if not campaign.sequence_id and not await self.resolve_body(campaign):
+            errors.append(
+                "No message to send. Write a message or choose a template."
+            )
 
         gateway_error = await self._check_gateway(campaign)
         if gateway_error:

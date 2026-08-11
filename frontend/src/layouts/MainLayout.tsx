@@ -6,6 +6,7 @@ import {
   Inbox, Send, Clock, FileText, BarChart3, Settings,
   Moon, Sun, Menu, X, LogOut, Search,
 } from "lucide-react";
+import BrandMark from "../components/BrandMark";
 
 const navItems = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -75,9 +76,7 @@ export default function MainLayout() {
       >
         <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200 dark:border-gray-700">
           <Link to="/dashboard" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">S</span>
-            </div>
+            <BrandMark className="w-8 h-8 shrink-0" />
             <span className="font-bold text-lg text-gray-900 dark:text-white">
               SMS SENDER
             </span>

@@ -13,6 +13,9 @@ class CampaignCreate(BaseModel):
     description: Optional[str] = None
     list_id: Optional[int] = None
     template_id: Optional[int] = None
+    # Write a message inline instead of selecting a saved template. When both
+    # are provided this wins (see CampaignService.resolve_body).
+    message_body: Optional[str] = None
     sequence_id: Optional[int] = None
     gateway_setting_id: Optional[int] = None
 
@@ -20,6 +23,9 @@ class CampaignCreate(BaseModel):
 class CampaignUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
+    message_body: Optional[str] = None
+    template_id: Optional[int] = None
+    list_id: Optional[int] = None
     daily_limit: Optional[int] = None
     hourly_limit: Optional[int] = None
     per_minute_limit: Optional[int] = None
@@ -37,6 +43,7 @@ class CampaignOut(BaseModel):
     status: str
     list_id: Optional[int]
     template_id: Optional[int]
+    message_body: Optional[str]
     sequence_id: Optional[int]
     sequence_version_id: Optional[int]
     gateway_setting_id: Optional[int]

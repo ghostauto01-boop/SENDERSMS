@@ -105,12 +105,40 @@ class TestValidateAndSchedule:
         await db.flush()
 
         db.add(ContactListMember(list_id=lst.id, contact_id=contact.id))
-        campaign = Campaign(name="C", status="draft", list_id=lst.id)
+        # A message is now required: this campaign previously scheduled with
+        # no template and sent the literal word "Hello" to every contact.
+        campaign = Campaign(
+            name="C", status="draft", list_id=lst.id, message_body="Hi {{first_name}}"
+        )
         db.add(campaign)
         await db.flush()
 
         result = await CampaignService(db).validate_and_schedule(campaign.id)
         assert result.status == "scheduled"
+
+    @pytest.mark.asyncio
+    async def test_campaign_without_any_message_rejected(self, db, env_gateway):
+        """No template and no inline text must not be schedulable.
+
+        Regression: campaign_tasks fell back to a hardcoded body of "Hello",
+        so this configuration silently texted "Hello" to the whole list.
+        """
+        from app.models.contact import Contact
+        from app.models.contact_list import ContactList, ContactListMember
+
+        lst = ContactList(name="L")
+        db.add(lst)
+        await db.flush()
+        contact = Contact(phone_number="+2348031234567")
+        db.add(contact)
+        await db.flush()
+        db.add(ContactListMember(list_id=lst.id, contact_id=contact.id))
+        campaign = Campaign(name="C", status="draft", list_id=lst.id)
+        db.add(campaign)
+        await db.flush()
+
+        with pytest.raises(ValueError, match="No message to send"):
+            await CampaignService(db).validate_and_schedule(campaign.id)
 
     @pytest.mark.asyncio
     async def test_empty_list_still_rejected(self, db, env_gateway):

@@ -25,6 +25,11 @@ class Campaign(Base):
     list_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("contact_lists.id"), nullable=True)
     template_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("templates.id"), nullable=True)
     sequence_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("sequences.id"), nullable=True)
+    # Ad-hoc message written directly on the campaign, as an alternative to
+    # picking a saved Template. Takes precedence over template_id when set, so
+    # a one-off blast does not require creating a throwaway template first.
+    # Supports the same {{first_name}} style placeholders as templates.
+    message_body: Mapped[str | None] = mapped_column(Text, nullable=True)
     sequence_version_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     gateway_setting_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("gateway_settings.id"), nullable=True)
 

@@ -167,14 +167,23 @@ async def _execute_sequence_step(db, campaign, cc, contact, steps, current_step_
 
 async def _send_template_message(db, campaign, cc, contact, template_id=None):
     """Send a template message to a contact."""
-    tid = template_id or campaign.template_id
-    body = "Hello"  # Default fallback
+    # Resolve through the shared resolver so an inline campaign message, a
+    # selected template and a sequence step all follow one precedence rule.
+    from app.services.campaign_service import CampaignService
 
-    if tid:
-        template_result = await db.execute(select(Template).where(Template.id == tid))
-        template = template_result.scalar_one_or_none()
-        if template:
-            body = template.body
+    body = await CampaignService(db).resolve_body(campaign, template_id)
+    if not body or not body.strip():
+        # There used to be a hardcoded `body = "Hello"` fallback here, so a
+        # campaign with no template texted the literal word "Hello" to every
+        # contact. Failing the send is the only safe option: these go to real
+        # phone numbers and cannot be recalled.
+        # CampaignContact has no error_message column; status + log is the
+        # extent of what we can record here.
+        cc.status = "failed"
+        logger.error(
+            f"Campaign {campaign.id} has no message body; skipping contact {contact.id}"
+        )
+        return
 
     # Personalize via the shared renderer so campaign sends, direct sends and
     # the preview endpoint all produce identical text.

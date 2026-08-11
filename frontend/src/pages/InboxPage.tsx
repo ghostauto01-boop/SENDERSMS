@@ -121,7 +121,7 @@ export default function InboxPage() {
       {/* LEFT */}
       <div className={`${selected ? "hidden md:flex" : "flex"} w-full md:w-80 flex-shrink-0 flex-col`}>
         <div className="flex items-center justify-between mb-2">
-          <h1 className="text-2xl font-bold">Inbox</h1>
+          <h1 className="text-xl sm:text-2xl font-bold">Inbox</h1>
           <div className="flex gap-1">
             <button onClick={doPoll} disabled={polling} className="btn-secondary btn-sm">{polling ? "Syncing..." : "📥 Sync"}</button>
             <button onClick={doPollDebug} disabled={debugLoading} className="btn-ghost btn-sm" title="Debug: show raw API response"><Bug size={14}/></button>

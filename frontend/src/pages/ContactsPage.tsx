@@ -51,7 +51,7 @@ export default function ContactsPage() {
 
   return (<div className="space-y-4">
     <div className="flex items-center justify-between flex-wrap gap-2">
-      <h1 className="text-2xl font-bold">Contacts</h1>
+      <h1 className="text-xl sm:text-2xl font-bold">Contacts</h1>
       <div className="flex gap-2 flex-wrap">
         {selected.size>0 && (<><span className="text-sm text-gray-500 self-center">{selected.size} selected</span>
           <button onClick={handleBulkDelete} className="btn-danger btn-sm"><Trash2 size={14} className="mr-1"/>Delete</button>
@@ -99,8 +99,8 @@ export default function ContactsPage() {
 
     {showAdd && <AddContactModal lists={availableLists} onClose={()=>{setShowAdd(false);loadContacts()}} onOpen={()=>{api.get("/lists/").then(r=>setAvailableLists(r.data.items))}}/>}
     {showImport && <ImportModal onClose={()=>setShowImport(false)} onDone={()=>{setShowImport(false);loadContacts()}}/>}
-    {showListModal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"><div className="card p-6 w-full max-w-md"><div className="flex justify-between mb-4"><h2 className="text-lg font-semibold">Add to List</h2><button onClick={()=>setShowListModal(false)} className="btn-ghost btn-sm"><X size={16}/></button></div><p className="text-sm text-gray-500 mb-3">{selected.size} contacts</p><select className="input mb-3" value={selectedListId} onChange={e=>setSelectedListId(e.target.value)}><option value="">Select list...</option>{availableLists.map((l:any)=><option key={l.id} value={l.id}>{l.name} ({l.contact_count})</option>)}</select><button onClick={async()=>{if(!selectedListId){toast.error("Select a list");return};try{await api.post(`/lists/${selectedListId}/contacts`,[...selected]);toast.success("Added");setShowListModal(false);setSelected(new Set());setSelectedListId("");loadContacts();}catch{toast.error("Failed")}}} className="btn-primary w-full">Add to List</button></div></div>}
-    {quickSendId && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"><div className="card p-6 w-full max-w-md"><div className="flex justify-between mb-4"><h2 className="text-lg font-semibold">Send SMS</h2><button onClick={()=>setQuickSendId(null)} className="btn-ghost btn-sm"><X size={16}/></button></div><textarea className="input" rows={4} placeholder="Type message..." value={quickMsg} onChange={e=>setQuickMsg(e.target.value)} autoFocus/><p className="text-xs text-gray-500 mt-1">{quickMsg.length} chars</p><button onClick={doQuickSend} disabled={quickSending||!quickMsg.trim()} className="btn-primary w-full mt-3">{quickSending?"Sending...":"Send SMS"}</button></div></div>}
+    {showListModal && <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4"><div className="card w-full sm:max-w-md max-h-[92vh] overflow-y-auto rounded-t-2xl sm:rounded-xl p-4 sm:p-6"><div className="flex justify-between mb-4"><h2 className="text-lg font-semibold">Add to List</h2><button onClick={()=>setShowListModal(false)} className="btn-ghost btn-sm"><X size={16}/></button></div><p className="text-sm text-gray-500 mb-3">{selected.size} contacts</p><select className="input mb-3" value={selectedListId} onChange={e=>setSelectedListId(e.target.value)}><option value="">Select list...</option>{availableLists.map((l:any)=><option key={l.id} value={l.id}>{l.name} ({l.contact_count})</option>)}</select><button onClick={async()=>{if(!selectedListId){toast.error("Select a list");return};try{await api.post(`/lists/${selectedListId}/contacts`,[...selected]);toast.success("Added");setShowListModal(false);setSelected(new Set());setSelectedListId("");loadContacts();}catch{toast.error("Failed")}}} className="btn-primary w-full">Add to List</button></div></div>}
+    {quickSendId && <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4"><div className="card w-full sm:max-w-md max-h-[92vh] overflow-y-auto rounded-t-2xl sm:rounded-xl p-4 sm:p-6"><div className="flex justify-between mb-4"><h2 className="text-lg font-semibold">Send SMS</h2><button onClick={()=>setQuickSendId(null)} className="btn-ghost btn-sm"><X size={16}/></button></div><textarea className="input" rows={4} placeholder="Type message..." value={quickMsg} onChange={e=>setQuickMsg(e.target.value)} autoFocus/><p className="text-xs text-gray-500 mt-1">{quickMsg.length} chars</p><button onClick={doQuickSend} disabled={quickSending||!quickMsg.trim()} className="btn-primary w-full mt-3">{quickSending?"Sending...":"Send SMS"}</button></div></div>}
   </div>);
 }
 
@@ -118,16 +118,16 @@ function AddContactModal({ lists, onClose, onOpen }: { lists: any[]; onClose: ()
     finally { setSub(false); }
   };
 
-  return (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"><div className="card p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto"><div className="flex justify-between mb-4"><h2 className="text-lg font-semibold">Add Contact</h2><button onClick={onClose} className="btn-ghost btn-sm"><X size={16}/></button></div>
+  return (<div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4"><div className="card w-full sm:max-w-lg max-h-[92vh] overflow-y-auto rounded-t-2xl sm:rounded-xl p-4 sm:p-6"><div className="flex justify-between mb-4"><h2 className="text-lg font-semibold">Add Contact</h2><button onClick={onClose} className="btn-ghost btn-sm"><X size={16}/></button></div>
     <form onSubmit={handle} className="space-y-3">
-      <div className="grid grid-cols-2 gap-3"><div><label className="label">First Name</label><input className="input" value={f.first_name} onChange={e=>setF({...f,first_name:e.target.value})}/></div><div><label className="label">Last Name</label><input className="input" value={f.last_name} onChange={e=>setF({...f,last_name:e.target.value})}/></div></div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><div><label className="label">First Name</label><input className="input" value={f.first_name} onChange={e=>setF({...f,first_name:e.target.value})}/></div><div><label className="label">Last Name</label><input className="input" value={f.last_name} onChange={e=>setF({...f,last_name:e.target.value})}/></div></div>
       <div><label className="label">Phone Number *</label><input className="input" placeholder="08012345678" value={f.phone_number} onChange={e=>setF({...f,phone_number:e.target.value})} required/></div>
       <div><label className="label">Business Name</label><input className="input" value={f.business_name} onChange={e=>setF({...f,business_name:e.target.value})}/></div>
       <div><label className="label">Email</label><input className="input" type="email" value={f.email} onChange={e=>setF({...f,email:e.target.value})}/></div>
-      <div className="grid grid-cols-2 gap-3"><div><label className="label">City</label><input className="input" value={f.city} onChange={e=>setF({...f,city:e.target.value})}/></div><div><label className="label">State</label><input className="input" value={f.state} onChange={e=>setF({...f,state:e.target.value})}/></div></div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><div><label className="label">City</label><input className="input" value={f.city} onChange={e=>setF({...f,city:e.target.value})}/></div><div><label className="label">State</label><input className="input" value={f.state} onChange={e=>setF({...f,state:e.target.value})}/></div></div>
       <div><label className="label">Industry</label><input className="input" value={f.industry} onChange={e=>setF({...f,industry:e.target.value})}/></div>
       <div><label className="label">Source</label><input className="input" value={f.source} onChange={e=>setF({...f,source:e.target.value})}/></div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div><label className="label">Lead Status</label><select className="input" value={f.lead_status} onChange={e=>setF({...f,lead_status:e.target.value})}>{LEAD_STATUSES.map(s=><option key={s} value={s}>{s}</option>)}</select></div>
         <div><label className="label">Add to List</label><select className="input" value={f.list_id} onChange={e=>setF({...f,list_id:e.target.value})}><option value="">No list</option>{loadedLists.map((l:any)=><option key={l.id} value={l.id}>{l.name}</option>)}</select></div>
       </div>
@@ -187,7 +187,7 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
     } catch { toast.error("Import failed"); setStep("upload"); }
   };
 
-  return (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"><div className="card p-6 w-full max-w-xl max-h-[90vh] overflow-y-auto">
+  return (<div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4"><div className="card w-full sm:max-w-xl max-h-[92vh] overflow-y-auto rounded-t-2xl sm:rounded-xl p-4 sm:p-6">
     <div className="flex justify-between mb-4"><h2 className="text-lg font-semibold">Import CSV</h2><button onClick={onClose} className="btn-ghost btn-sm"><X size={16}/></button></div>
 
     {step==="upload" && (<div className="space-y-3">
@@ -201,7 +201,7 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
         <table className="w-full"><thead><tr className="bg-gray-50 dark:bg-gray-700">{preview.headers.map((h:string)=><th key={h} className="px-2 py-1 text-left">{h}</th>)}</tr></thead>
         <tbody>{preview.rows.map((r:string[],i:number)=><tr key={i} className="border-t">{r.map((c:string,j:number)=><td key={j} className="px-2 py-1 truncate max-w-[100px]">{c}</td>)}</tr>)}</tbody></table>
       </div>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         {preview.headers.map((h:string) => (
           <div key={h}><label className="label text-xs">{h}</label>
             <select className="input py-1 text-xs" value={mapping[h]||""} onChange={e=>setMapping({...mapping,[h]:e.target.value})}>

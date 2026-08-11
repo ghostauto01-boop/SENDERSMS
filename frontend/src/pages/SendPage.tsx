@@ -80,7 +80,7 @@ export default function SendPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold">Send SMS</h1>
+      <h1 className="text-xl sm:text-2xl font-bold">Send SMS</h1>
       <div className="flex gap-2 flex-wrap">
         {[{id:"contact"as const,label:"Pick Contact",icon:UserPlus},{id:"number"as const,label:"Enter Number",icon:Phone},{id:"list"as const,label:"Send to List",icon:List}].map(m=>(
           <button key={m.id} onClick={()=>{setMode(m.id);setResult(null)}} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium ${mode===m.id?"bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300":"text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"}`}><m.icon size={14}/>{m.label}</button>

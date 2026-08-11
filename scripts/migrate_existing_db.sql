@@ -92,6 +92,16 @@ WHERE c.contact_id = keeper.contact_id
 CREATE UNIQUE INDEX IF NOT EXISTS uq_conversation_contact
     ON conversations (contact_id);
 
+-- ------------------------------------------------------------
+-- 4. Inline campaign messages
+--
+-- Campaigns can now carry their own message text instead of requiring a saved
+-- template. Existing campaigns keep using their template_id; this column is
+-- simply NULL for them.
+-- ------------------------------------------------------------
+ALTER TABLE campaigns
+    ADD COLUMN IF NOT EXISTS message_body TEXT;
+
 COMMIT;
 
 -- ------------------------------------------------------------

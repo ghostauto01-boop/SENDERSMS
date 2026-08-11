@@ -35,7 +35,7 @@ export default function DashboardPage() {
 
   if (loading) return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Dashboard</h1>
+      <h1 className="text-xl sm:text-2xl font-bold">Dashboard</h1>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[...Array(8)].map((_, i) => (
           <div key={i} className="card p-4">
@@ -73,8 +73,8 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
         <span className={`badge ${(s.gateway_status || "") === "healthy" ? "badge-green" : "badge-gray"}`}>
           Gateway: {s.gateway_status || "unknown"}
         </span>
