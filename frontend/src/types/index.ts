@@ -53,6 +53,7 @@ export interface Campaign {
   status: string;
   list_id: number | null;
   template_id: number | null;
+  message_body: string | null;
   sequence_id: number | null;
   gateway_setting_id: number | null;
   total_contacts: number;
@@ -61,6 +62,8 @@ export interface Campaign {
   messages_failed: number;
   replies: number;
   interested: number;
+  // Future time the campaign launches by itself. null = manual start.
+  scheduled_start_at: string | null;
   created_at: string;
   updated_at: string;
 }

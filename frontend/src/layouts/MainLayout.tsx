@@ -3,9 +3,10 @@ import { Link, useLocation, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import {
   LayoutDashboard, Users, List, Megaphone, GitBranch,
-  Inbox, Send, Clock, FileText, BarChart3, Settings,
+  Inbox, Send, Clock, FileText, BarChart3, Settings, MessageSquareReply,
   Moon, Sun, Menu, X, LogOut, Search,
 } from "lucide-react";
+import BrandMark from "../components/BrandMark";
 
 const navItems = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -15,6 +16,7 @@ const navItems = [
   { to: "/campaigns", label: "Campaigns", icon: Megaphone },
   { to: "/sequences", label: "Sequences", icon: GitBranch },
   { to: "/inbox", label: "Inbox", icon: Inbox },
+  { to: "/auto-reply", label: "Auto-Reply", icon: MessageSquareReply },
   { to: "/follow-ups", label: "Follow-ups", icon: Clock },
   { to: "/templates", label: "Templates", icon: FileText },
   { to: "/analytics", label: "Analytics", icon: BarChart3 },
@@ -75,9 +77,7 @@ export default function MainLayout() {
       >
         <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200 dark:border-gray-700">
           <Link to="/dashboard" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">S</span>
-            </div>
+            <BrandMark className="w-8 h-8 shrink-0" />
             <span className="font-bold text-lg text-gray-900 dark:text-white">
               SMS SENDER
             </span>

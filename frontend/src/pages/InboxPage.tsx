@@ -11,6 +11,7 @@ export default function InboxPage() {
   const [replyText, setReplyText] = useState("");
   const [sending, setSending] = useState(false);
   const [filter, setFilter] = useState("all");
+  const [search, setSearch] = useState("");
   const [showInfo, setShowInfo] = useState(false);
   const [polling, setPolling] = useState(false);
   const [pollDebug, setPollDebug] = useState<any>(null);
@@ -19,14 +20,25 @@ export default function InboxPage() {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<any>(null);
 
-  useEffect(() => { loadConvs(); return () => clearInterval(pollRef.current); }, [filter]);
+  useEffect(() => { loadConvs(); }, [filter]);
+  useEffect(() => { const t = setTimeout(loadConvs, 300); return () => clearTimeout(t); }, [search]);
   useEffect(() => { if (selected) loadMessages(selected.id); }, [selected]);
   useEffect(() => { chatEndRef.current?.scrollIntoView({behavior:"smooth"}); }, [messages]);
   useEffect(() => { pollRef.current = setInterval(() => { loadConvs(); if(selected) loadMessages(selected.id); }, 10000); return () => clearInterval(pollRef.current); }, [selected]);
 
+  // Kept in refs so the 10s poller always sends the CURRENT filter/search
+  // without having to tear down and recreate the interval.
+  const filterRef = useRef(filter);
+  const searchRef = useRef(search);
+  useEffect(() => { filterRef.current = filter; }, [filter]);
+  useEffect(() => { searchRef.current = search; }, [search]);
+
   const loadConvs = async () => {
     try {
-      const { data } = await api.get("/inbox/conversations", { params: { per_page: 500 } });
+      const params: any = { per_page: 500 };
+      if (filterRef.current && filterRef.current !== "all") params.status = filterRef.current;
+      if (searchRef.current.trim()) params.search = searchRef.current.trim();
+      const { data } = await api.get("/inbox/conversations", { params });
       setConvs(data.items || []);
     } catch {} finally { setLoading(false); }
   };
@@ -37,14 +49,29 @@ export default function InboxPage() {
 
   const sendReply = async () => {
     if (!replyText.trim() || !selected) return; setSending(true);
-    try { await api.post(`/inbox/conversations/${selected.id}/reply`, null, { params: { body: replyText } }); setReplyText(""); toast.success("Sent"); loadMessages(selected.id); loadConvs(); }
+    try {
+      const { data } = await api.post(`/inbox/conversations/${selected.id}/reply`, null, { params: { body: replyText } });
+      if (data?.success === false) {
+        // The row is saved as `failed`; surface the gateway's own reason.
+        toast.error(data.error || "The SMS gateway rejected the message.");
+      } else {
+        setReplyText("");
+        toast.success("Sent");
+      }
+      loadMessages(selected.id); loadConvs();
+    }
     catch (err: any) { toast.error(err.response?.data?.detail || "Failed"); }
     finally { setSending(false); }
   };
 
   const markAs = async (status: string) => {
     if (!selected) return;
-    try { await api.post(`/inbox/conversations/${selected.id}/mark-${status}`); toast.success("Updated"); loadConvs(); } catch { toast.error("Failed"); }
+    try {
+      const { data } = await api.post(`/inbox/conversations/${selected.id}/mark-${status}`);
+      setSelected((s:any) => s ? { ...s, status: data.status ?? s.status } : s);
+      toast.success("Updated");
+      loadConvs();
+    } catch { toast.error("Failed"); }
   };
 
   const doPoll = async () => {
@@ -52,11 +79,27 @@ export default function InboxPage() {
     try {
       const { data } = await api.post("/inbox/poll-now");
       setPollDebug(data);
-      const total = data.new_inbound || 0;
-      if (total > 0) { toast.success(`${total} messages synced to inbox!`); loadConvs(); }
-      else if (data.outgoing_updated > 0) { toast.success(`${data.outgoing_updated} statuses updated`); loadConvs(); }
-      else { toast(`Checked ${data.total_api_messages || 0} messages — up to date`, {icon: "ℹ️"}); }
-    } catch(err:any) { toast.error("Sync failed"); setPollDebug({error:err.message}); }
+      loadConvs();
+
+      if (data.problems?.length) {
+        toast.error(data.problems[0], { duration: 6000 });
+      } else if (data.outgoing_updated > 0) {
+        toast.success(`${data.outgoing_updated} delivery status${data.outgoing_updated>1?"es":""} updated`);
+      } else if (data.export_triggered) {
+        toast.success("Phone is replaying recent messages — they'll appear shortly");
+      } else {
+        toast("Webhooks registered — new SMS arrive automatically", { icon: "\u2705" });
+      }
+
+      // Inbound SMS come back asynchronously as webhooks, not in this response.
+      // Refresh a couple of times so the replay lands without another click.
+      [4000, 10000].forEach((ms) => setTimeout(() => {
+        loadConvs(); if (selected) loadMessages(selected.id);
+      }, ms));
+    } catch(err:any) {
+      toast.error(err.response?.data?.detail || "Sync failed");
+      setPollDebug({error: err.message});
+    }
     finally { setPolling(false); }
   };
 
@@ -65,7 +108,8 @@ export default function InboxPage() {
     try {
       const { data } = await api.post("/inbox/poll-debug");
       setDebugData(data);
-      toast.success("Debug data loaded");
+      if (data.issues?.length) toast.error(`${data.issues.length} problem(s) found`);
+      else toast.success("Receive path healthy");
     } catch(err:any) { toast.error("Debug failed"); setDebugData({error:err.message}); }
     finally { setDebugLoading(false); }
   };
@@ -77,7 +121,7 @@ export default function InboxPage() {
       {/* LEFT */}
       <div className={`${selected ? "hidden md:flex" : "flex"} w-full md:w-80 flex-shrink-0 flex-col`}>
         <div className="flex items-center justify-between mb-2">
-          <h1 className="text-2xl font-bold">Inbox</h1>
+          <h1 className="text-xl sm:text-2xl font-bold">Inbox</h1>
           <div className="flex gap-1">
             <button onClick={doPoll} disabled={polling} className="btn-secondary btn-sm">{polling ? "Syncing..." : "📥 Sync"}</button>
             <button onClick={doPollDebug} disabled={debugLoading} className="btn-ghost btn-sm" title="Debug: show raw API response"><Bug size={14}/></button>
@@ -86,6 +130,8 @@ export default function InboxPage() {
         <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-2 mb-2 text-xs text-blue-700 dark:text-blue-300">
           <p>Syncs ALL SMS from your phone. Webhook: <code className="text-xs bg-blue-100 dark:bg-blue-800 px-1 rounded">/api/v1/webhooks/smsgateway</code></p>
         </div>
+        <input className="input w-full mb-2 text-sm" placeholder="Search name, phone or message..."
+               value={search} onChange={e=>setSearch(e.target.value)} />
         <div className="flex flex-wrap gap-1 mb-2">{filters.map(f=>(<button key={f.v} onClick={()=>{setFilter(f.v);setSelected(null)}} className={`text-xs px-2 py-1 rounded-full ${filter===f.v?"bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300":"bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400"}`}>{f.l}</button>))}</div>
         <div className="flex-1 overflow-y-auto space-y-1">
           {loading ? [...Array(5)].map((_,i)=>(<div key={i} className="card p-3"><div className="skeleton h-4 w-32 mb-1"/><div className="skeleton h-3 w-48"/></div>))
@@ -100,89 +146,91 @@ export default function InboxPage() {
       {debugData ? (
         <div className="flex-1 p-4 overflow-y-auto">
           <div className="flex items-center justify-between mb-2">
-            <h2 className="font-bold text-lg">🔍 Poll Debug</h2>
+            <h2 className="font-bold text-lg">🔍 Receive path diagnostic</h2>
             <button onClick={()=>setDebugData(null)} className="btn-ghost btn-sm">Close</button>
           </div>
           {debugData.error ? (
             <p className="text-red-600">Error: {debugData.error}</p>
           ) : (
-            <div className="space-y-4 text-xs">
-              <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
-                <p className="font-medium mb-1">Message Count: <strong>{debugData.total_api_messages}</strong></p>
-                <p>Known outgoing IDs: <strong>{debugData.known_outgoing_ids_count}</strong></p>
-                {debugData.known_outgoing_ids_sample?.length > 0 && (
-                  <p className="text-gray-500">Sample: {debugData.known_outgoing_ids_sample.join(", ").slice(0,80)}</p>
-                )}
-              </div>
-
-              {/* Processing Trace */}
-              {debugData.processing_trace?.length > 0 && (
-                <div>
-                  <p className="font-medium mb-1">Processing Trace (first 5 messages):</p>
-                  {debugData.processing_trace.map((t:any,i:number)=>(
-                    <div key={i} className={`mb-2 p-2 rounded ${t.would_match==="NONE_all_zero"||t.would_match?.startsWith("CASE3_but") ? "bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800" : "bg-green-50 dark:bg-green-900/20"}`}>
-                      <p><strong>Msg {t.index}:</strong> would_match=<code className="font-bold">{t.would_match}</code></p>
-                      <p>ID: {t.id?.slice(0,30)} | State: {t.state} | In known IDs: {String(t.in_known_ids)}</p>
-                      <p>Has sender: {String(t.has_sender)} | Has text: {String(t.has_text)} | Recipients: {t.recipients_count}</p>
-                      {t.first_recipient_type && <p>1st recipient type: {t.first_recipient_type} | keys: {JSON.stringify(t.first_recipient_keys)}</p>}
-                      {t.phone_sample && <p>Phone sample: {t.phone_sample} → normalizes: {String(t.normalizes)} → {t.normalized || "NULL"}</p>}
-                      {t.first_recipient_value && <p>1st recipient value: {t.first_recipient_value}</p>}
-                    </div>
-                  ))}
+            <div className="space-y-3 text-xs">
+              {debugData.issues?.length > 0 ? (
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
+                  <p className="font-medium mb-1 text-red-700 dark:text-red-400">Problems blocking incoming SMS</p>
+                  <ul className="list-disc ml-4 space-y-1">
+                    {debugData.issues.map((i:string,n:number)=>(<li key={n}>{i}</li>))}
+                  </ul>
+                </div>
+              ) : (
+                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3">
+                  <p className="font-medium text-green-700 dark:text-green-400">{debugData.note}</p>
                 </div>
               )}
 
-              {/* Raw API Response */}
-              {debugData.raw_responses && (
-                <details open><summary className="cursor-pointer font-medium text-orange-600">Raw API Responses</summary>
-                  <pre className="text-[10px] mt-1 bg-gray-100 dark:bg-gray-900 p-2 rounded max-h-60 overflow-y-auto whitespace-pre-wrap">{JSON.stringify(debugData.raw_responses, null, 2)}</pre>
-                </details>
+              <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 space-y-1">
+                <p className="font-medium mb-1">Configuration</p>
+                <p>Public URL set: <strong>{String(debugData.config?.public_base_url_set)}</strong></p>
+                <p>Gateway credentials: <strong>{String(debugData.config?.credentials_set)}</strong></p>
+                <p>Signing secret: <strong>{String(debugData.config?.signing_secret_set)}</strong>{debugData.config?.allow_unsigned && " (unsigned allowed)"}</p>
+                {debugData.webhook_url && <p className="text-gray-500 break-all">Delivering to: <code className="text-[10px] bg-gray-200 dark:bg-gray-700 px-1 rounded">{debugData.webhook_url}</code></p>}
+              </div>
+
+              <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 space-y-1">
+                <p className="font-medium mb-1">Device &amp; webhooks</p>
+                <p>Devices online: <strong>{debugData.devices?.count ?? 0}</strong></p>
+                <p>Events registered: <strong>{debugData.matching_events?.length ?? 0}</strong> {debugData.matching_events?.join(", ")}</p>
+                <p>Inbound messages stored: <strong>{debugData.stored_inbound_messages ?? 0}</strong></p>
+              </div>
+
+              {debugData.recent_webhook_events?.length > 0 ? (
+                <div>
+                  <p className="font-medium mb-1">Last webhooks received</p>
+                  {debugData.recent_webhook_events.map((e:any,i:number)=>(
+                    <div key={i} className={`mb-1 p-2 rounded ${e.status==="error" ? "bg-red-50 dark:bg-red-900/20" : "bg-green-50 dark:bg-green-900/20"}`}>
+                      <p><code>{e.event_type}</code> — {e.status} @ {e.at?.slice(11,19)}</p>
+                      {e.error && <p className="text-red-600">{e.error}</p>}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-orange-600">No webhook has ever reached this server.</p>
               )}
 
-              {/* Sample messages */}
-              {debugData.sample_messages?.length > 0 && (
-                <details open><summary className="cursor-pointer font-medium">Sample Messages (full keys)</summary>
-                  <pre className="text-[10px] mt-1 bg-gray-100 dark:bg-gray-900 p-2 rounded max-h-60 overflow-y-auto whitespace-pre-wrap">{JSON.stringify(debugData.sample_messages, null, 2)}</pre>
-                </details>
-              )}
+              <details><summary className="cursor-pointer font-medium text-gray-500">Raw response</summary>
+                <pre className="text-[10px] mt-1 bg-gray-100 dark:bg-gray-900 p-2 rounded max-h-60 overflow-y-auto whitespace-pre-wrap">{JSON.stringify(debugData, null, 2)}</pre>
+              </details>
             </div>
-          )}
-          {!debugData?.processing_trace?.length && !debugData?.error && (
-            <p className="text-gray-500 mt-4">No messages found in API response.</p>
           )}
         </div>
       ) : pollDebug && !selected ? (
         <div className="flex-1 p-4 overflow-y-auto">
           <div className="text-xs bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
-            <p className="font-medium mb-2">📊 Sync Result</p>
+            <p className="font-medium mb-2">📊 Sync result</p>
             <div className="space-y-1">
-              <p>Total in API: <strong>{pollDebug.total_api_messages || 0}</strong></p>
-              <p>New synced: <strong className={pollDebug.new_inbound>0?"text-green-600":""}>{pollDebug.new_inbound || 0}</strong></p>
-              <p>Statuses updated: <strong>{pollDebug.outgoing_updated || 0}</strong></p>
-              <p>New contacts: {pollDebug.new_contacts || 0} · Conversations: {pollDebug.new_conversations || 0}</p>
-              <p>Dupes skipped: {pollDebug.skipped || 0}</p>
-              {pollDebug.unhandled && pollDebug.unhandled > 0 && (
-                <p className="text-orange-600 font-medium">⚠️ {pollDebug.unhandled} messages could not be processed!</p>
-              )}
-              {pollDebug.webhook_url && <p className="mt-1 text-gray-500">Webhook: <code className="text-[10px] bg-gray-200 dark:bg-gray-700 px-1 rounded">{pollDebug.webhook_url}</code></p>}
+              <p>Device online: <strong className={pollDebug.device_online?"text-green-600":"text-red-600"}>{String(!!pollDebug.device_online)}</strong></p>
+              <p>Events registered: <strong className={pollDebug.registered_events?.length?"text-green-600":"text-red-600"}>{pollDebug.registered_events?.length || 0}</strong> {pollDebug.registered_events?.join(", ")}</p>
+              <p>History replay triggered: <strong>{String(!!pollDebug.export_triggered)}</strong></p>
+              <p>Delivery statuses updated: <strong>{pollDebug.outgoing_updated || 0}</strong></p>
+              <p>Outgoing messages checked: {pollDebug.total_api_messages || 0}</p>
+              {pollDebug.webhook_url && <p className="mt-1 text-gray-500 break-all">Webhook: <code className="text-[10px] bg-gray-200 dark:bg-gray-700 px-1 rounded">{pollDebug.webhook_url}</code></p>}
               {pollDebug.error && <p className="text-red-600 mt-1">Error: {pollDebug.error}</p>}
+              {pollDebug.problems?.length > 0 && (
+                <div className="mt-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded p-2">
+                  <p className="font-medium text-red-700 dark:text-red-400 mb-1">Needs attention</p>
+                  <ul className="list-disc ml-4 space-y-1">{pollDebug.problems.map((p:string,i:number)=>(<li key={i}>{p}</li>))}</ul>
+                </div>
+              )}
               {pollDebug.note && <p className="text-blue-600 mt-1">{pollDebug.note}</p>}
-              {pollDebug.details && pollDebug.details.length > 0 && (
+              {pollDebug.details?.length > 0 && (
                 <details className="mt-2"><summary className="cursor-pointer font-medium">{pollDebug.details.length} activity entries</summary>
                   <div className="max-h-32 overflow-y-auto mt-1">
-                    {pollDebug.details.slice(0,20).map((d:any,i:number)=>(<div key={i} className="text-[10px] py-0.5 border-b border-gray-200 dark:border-gray-700">{d.type}: 📱 {d.from||d.phone} {d.text||d.state} @ {d.time?.slice(11,19)||""}</div>))}
+                    {pollDebug.details.slice(0,20).map((d:any,i:number)=>(<div key={i} className="text-[10px] py-0.5 border-b border-gray-200 dark:border-gray-700">{d.type}: {d.id} {d.state}</div>))}
                   </div>
-                </details>
-              )}
-              {pollDebug.debug && (
-                <details className="mt-2"><summary className="cursor-pointer font-medium text-orange-600">🔍 Raw API Debug</summary>
-                  <pre className="text-[10px] mt-1 bg-gray-100 dark:bg-gray-900 p-2 rounded max-h-40 overflow-y-auto whitespace-pre-wrap">{JSON.stringify(pollDebug.debug, null, 2)}</pre>
                 </details>
               )}
             </div>
           </div>
           <div className="mt-4 text-center text-gray-400">
-            <button onClick={doPollDebug} className="text-xs text-blue-500 hover:underline">🔍 Full Poll Debug (raw API inspection)</button>
+            <button onClick={doPollDebug} className="text-xs text-blue-500 hover:underline">🔍 Full receive-path diagnostic</button>
             <p className="text-sm mt-2">Select a conversation on the left to view</p>
           </div>
         </div>
@@ -202,7 +250,7 @@ export default function InboxPage() {
           {showInfo && selected?.contact && (<div className="px-4 py-2 bg-gray-50 dark:bg-gray-700/50 text-xs space-y-1 border-b">{selected.contact.business_name&&<p><strong>Business:</strong> {selected.contact.business_name}</p>}{selected.contact.city&&<p><strong>Location:</strong> {selected.contact.city}{selected.contact.state?`, ${selected.contact.state}`:""}</p>}<p><strong>Phone:</strong> {selected.contact.phone_number}</p></div>)}
           <div className="flex-1 overflow-y-auto p-3 space-y-2 bg-gray-50 dark:bg-gray-900/50">
             {messages.length===0 ? <p className="text-center text-gray-400 text-sm py-12">No messages</p>
-            : messages.map(m => (<div key={m.id} className={`flex ${m.direction==="outgoing"?"justify-end":"justify-start"}`}><div className={`max-w-[80%] px-3 py-2 rounded-xl text-sm ${m.direction==="outgoing"?"bg-primary-600 text-white rounded-br-sm":"bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-bl-sm shadow-sm"}`}><p className="whitespace-pre-wrap">{m.body}</p><div className={`flex items-center gap-1 justify-end mt-1 text-[10px] ${m.direction==="outgoing"?"text-primary-200":"text-gray-400"}`}>{new Date(m.created_at).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}{m.direction==="outgoing"&&<span>· {m.status==="delivered"?"✓✓":m.status==="sent"?"✓":"·"}</span>}</div></div></div>))}
+            : messages.map(m => (<div key={m.id} className={`flex ${m.direction==="outgoing"?"justify-end":"justify-start"}`}><div className={`max-w-[80%] px-3 py-2 rounded-xl text-sm ${m.direction==="outgoing"?"bg-primary-600 text-white rounded-br-sm":"bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-bl-sm shadow-sm"}`}><p className="whitespace-pre-wrap">{m.body}</p>{m.direction==="outgoing"&&(m.status==="failed"||m.status==="cancelled")&&m.last_error&&<p className="text-[10px] mt-1 text-red-200">{m.last_error}</p>}<div className={`flex items-center gap-1 justify-end mt-1 text-[10px] ${m.direction==="outgoing"?"text-primary-200":"text-gray-400"}`}>{new Date(m.created_at).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}{m.direction==="outgoing"&&<span title={m.last_error||m.status}>· {m.status==="delivered"?"✓✓":m.status==="sent"?"✓":m.status==="failed"?"⚠ failed":m.status==="cancelled"?"⚠ cancelled":"·"}</span>}</div></div></div>))}
             <div ref={chatEndRef}/>
           </div>
           <div className="p-3 border-t border-gray-200 dark:border-gray-700 flex gap-2 bg-white dark:bg-gray-800">

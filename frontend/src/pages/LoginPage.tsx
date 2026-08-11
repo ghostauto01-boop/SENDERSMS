@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import toast from "react-hot-toast";
+import BrandMark from "../components/BrandMark";
 
 export default function LoginPage() {
   const [username, setUsername] = useState("");
@@ -35,9 +36,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-primary-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <span className="text-white font-bold text-2xl">S</span>
-          </div>
+          <BrandMark className="w-16 h-16 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
             SMS SENDER
           </h1>

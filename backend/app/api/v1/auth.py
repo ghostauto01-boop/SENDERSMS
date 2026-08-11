@@ -18,6 +18,7 @@ from app.security.auth import (
     get_current_user,
 )
 from app.config import settings
+from app.security.rate_limit import limiter
 
 router = APIRouter()
 
@@ -42,6 +43,7 @@ async def _bootstrap_admin(db: AsyncSession):
 
 
 @router.post("/login", response_model=LoginResponse)
+@limiter.limit(settings.RATE_LIMIT_LOGIN)
 async def login(request: Request, data: LoginRequest, db: AsyncSession = Depends(get_db)):
     """Authenticate user and set session cookie."""
     # Bootstrap admin if needed

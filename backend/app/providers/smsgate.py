@@ -7,8 +7,28 @@ from app.providers.base import DeliveryStatus, GatewayHealth, InboundMessage, SM
 from app.config import settings
 
 logger = logging.getLogger(__name__)
-GW_API = "https://api.sms-gate.app/3rdparty/v1/messages"
-GW_WH = "https://api.sms-gate.app/3rdparty/v1/webhooks"
+DEFAULT_BASE = "https://api.sms-gate.app/3rdparty/v1"
+
+
+def _base():
+    """Gateway API root, honouring SMSGATE_BASE_URL.
+
+    Read per call rather than captured at import so the setting can be pointed
+    at a local server (or a mock) without reimporting the module.
+    """
+    return (settings.SMSGATE_BASE_URL or DEFAULT_BASE).rstrip("/")
+
+
+def _api():
+    return f"{_base()}/messages"
+
+
+def _wh():
+    return f"{_base()}/webhooks"
+
+
+def _dev():
+    return f"{_base()}/devices"
 
 def _creds():
     u=(settings.SMSGATE_USERNAME or "").strip()
@@ -22,7 +42,7 @@ async def send_sms_direct(phone,body,sim=1):
     payload={"textMessage":{"text":body},"phoneNumbers":[phone],"simNumber":sim,"ttl":3600}
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(45)) as c:
-            r=await c.post(f"{GW_API}?skipPhoneValidation=true",
+            r=await c.post(f"{_api()}?skipPhoneValidation=true",
                 headers={"Content-Type":"application/json","Authorization":f"Basic {auth}"},json=payload)
             d=r.json() if r.text else {}
             logger.info(f"SMS: HTTP {r.status_code} {json.dumps(d)[:200]}")
@@ -39,11 +59,11 @@ async def test_connection_direct():
     auth=base64.b64encode(f"{u}:{p}".encode()).decode()
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(15)) as c:
-            r=await c.post(f"{GW_API}?skipPhoneValidation=true",
+            r=await c.post(f"{_api()}?skipPhoneValidation=true",
                 headers={"Content-Type":"application/json","Authorization":f"Basic {auth}"},
                 json={"textMessage":{"text":"test"},"phoneNumbers":["+2348000000000"],"simNumber":1,"ttl":60})
             return {"success":r.status_code<500,"online":r.status_code<500,"http":r.status_code}
-    except: return {"success":False,"online":False,"message":"Cannot reach"}
+    except Exception: return {"success":False,"online":False,"message":"Cannot reach"}
 
 async def poll_status_for_ids(ids:list):
     """Check delivery status for specific provider message IDs."""
@@ -56,7 +76,7 @@ async def poll_status_for_ids(ids:list):
             for mid in ids:
                 if not mid: continue
                 try:
-                    r=await c.get(f"{GW_API}/{mid}",headers={"Content-Type":"application/json","Authorization":f"Basic {auth}"})
+                    r=await c.get(f"{_api()}/{mid}",headers={"Content-Type":"application/json","Authorization":f"Basic {auth}"})
                     if r.status_code==200:
                         d=r.json()
                         state=(d.get("state")or"").lower()
@@ -66,20 +86,141 @@ async def poll_status_for_ids(ids:list):
                         elif "process" in state: st="sent"
                         else: st=state
                         results.append({"provider_message_id":mid,"status":st})
-                except: pass
+                except Exception: pass
         return results
-    except: return[]
+    except Exception: return[]
 
-async def register_webhook_direct(url):
-    u,p=_creds()
-    if not u or not p: return{"success":False}
-    auth=base64.b64encode(f"{u}:{p}".encode()).decode()
+# SMS-Gate registers ONE event per webhook. Sending {"events": [...]} is silently
+# ignored by the API: the record is created with an empty event, so the device
+# never matches it and no webhook is ever delivered. Each event needs its own POST
+# with the singular {"event": "..."} field.
+# https://docs.sms-gate.app/features/webhooks/
+# Used to recognise our own (possibly stale) registrations on the gateway.
+WEBHOOK_PATH_SUFFIX = "/api/v1/webhooks/smsgateway"
+
+INBOUND_EVENTS = ("sms:received", "sms:data-received", "mms:received", "mms:downloaded")
+STATUS_EVENTS = ("sms:sent", "sms:delivered", "sms:failed", "sms:cancelled")
+DEFAULT_EVENTS = INBOUND_EVENTS + STATUS_EVENTS
+
+# Not every gateway account, app version or device supports every event. MMS
+# and data-SMS in particular are rejected outright (HTTP 400 "unsupported
+# event") by older app builds and by devices without MMS capability.
+#
+# Registration used to be all-or-nothing: a single rejected optional event
+# made the whole call report failure, so the UI showed "the gateway rejected
+# the webhook registration" even though sms:received had registered fine and
+# inbound SMS was working. Only these events actually matter for the app to
+# function; anything else is best-effort.
+REQUIRED_EVENTS = ("sms:received",)
+
+
+async def register_webhook_direct(url, events=None):
+    """Register `url` for each event, one registration per event.
+
+    Idempotent: existing registrations for the same (url, event) pair are left
+    alone, and stale registrations pointing at a different URL for the same path
+    are deleted so the device stops retrying a dead endpoint.
+    """
+    u, p = _creds()
+    if not u or not p:
+        return {"success": False, "error": "No credentials"}
+    if not url:
+        return {"success": False, "error": "No webhook URL"}
+
+    events = tuple(events or DEFAULT_EVENTS)
+    auth = base64.b64encode(f"{u}:{p}".encode()).decode()
+    headers = {"Content-Type": "application/json", "Authorization": f"Basic {auth}"}
+    created, kept, deleted, errors = [], [], [], []
+
     try:
-        async with httpx.AsyncClient(timeout=httpx.Timeout(15)) as c:
-            r=await c.post(GW_WH,headers={"Content-Type":"application/json","Authorization":f"Basic {auth}"},
-                json={"url":url,"events":["sms:received","sms:delivered","sms:sent","sms:failed"]})
-            return{"success":r.status_code<400,"http":r.status_code}
-    except: return{"success":False}
+        async with httpx.AsyncClient(timeout=httpx.Timeout(20)) as c:
+            existing = []
+            try:
+                r = await c.get(_wh(), headers=headers)
+                if r.status_code in (401, 403):
+                    # Bad credentials: every subsequent POST would fail the
+                    # same way and produce eight identical 401s. Say so once,
+                    # in words the user can act on.
+                    return {
+                        "success": False,
+                        "url": url,
+                        "registered": [], "created": [], "kept": [],
+                        "deleted_stale": [], "errors": [],
+                        "missing_required": list(REQUIRED_EVENTS),
+                        "unsupported": [],
+                        "auth_failed": True,
+                        "http": r.status_code,
+                        "error": (
+                            f"The gateway refused the username/password (HTTP {r.status_code}). "
+                            "Check SMSGATE_USERNAME and SMSGATE_PASSWORD on the server: they must "
+                            "match the Cloud Server credentials shown in the SMS Gate app "
+                            "(Settings -> Cloud server). Note these are NOT your sms-gate.app "
+                            "website login."
+                        ),
+                    }
+                if r.status_code == 200:
+                    data = r.json()
+                    existing = data if isinstance(data, list) else data.get("webhooks", [])
+            except Exception as e:
+                logger.warning(f"register_webhook: list failed: {e}")
+
+            have = set()
+            for w in existing:
+                if not isinstance(w, dict):
+                    continue
+                w_url, w_event, w_id = w.get("url", ""), w.get("event", ""), w.get("id")
+                if w_url == url:
+                    have.add(w_event)
+                    kept.append(w_event)
+                elif w_id and w_url.endswith(WEBHOOK_PATH_SUFFIX) and w_event in events:
+                    # Same integration, old deployment URL -> remove it.
+                    try:
+                        d = await c.delete(f"{_wh()}/{w_id}", headers=headers)
+                        if d.status_code < 400:
+                            deleted.append(w_url)
+                    except Exception:
+                        pass
+
+            for event in events:
+                if event in have:
+                    continue
+                try:
+                    r = await c.post(_wh(), headers=headers, json={"url": url, "event": event})
+                    if r.status_code < 400:
+                        created.append(event)
+                    else:
+                        errors.append(f"{event}: HTTP {r.status_code} {r.text[:120]}")
+                except Exception as e:
+                    errors.append(f"{event}: {str(e)[:120]}")
+
+        registered = sorted(set(kept) | set(created))
+
+        # Succeed as long as every *required* event registered. Optional
+        # events that the gateway refuses are reported in `errors` (and in
+        # `unsupported`) for visibility, but they must not fail the call:
+        # inbound SMS works with sms:received alone.
+        required = [e for e in REQUIRED_EVENTS if e in events]
+        missing_required = [e for e in required if e not in registered]
+        unsupported = [
+            e for e in events
+            if e not in registered and e not in missing_required
+        ]
+
+        return {
+            "success": not missing_required and bool(registered),
+            "url": url,
+            "registered": registered,
+            "created": created,
+            "kept": sorted(set(kept)),
+            "deleted_stale": deleted,
+            "errors": errors,
+            "missing_required": missing_required,
+            "unsupported": unsupported,
+        }
+    except Exception as e:
+        logger.warning(f"register_webhook error: {e}")
+        return {"success": False, "error": str(e)[:300]}
+
 
 async def list_webhooks_direct():
     u,p=_creds()
@@ -87,9 +228,23 @@ async def list_webhooks_direct():
     auth=base64.b64encode(f"{u}:{p}".encode()).decode()
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(15)) as c:
-            r=await c.get(GW_WH,headers={"Content-Type":"application/json","Authorization":f"Basic {auth}"})
-            return{"webhooks":r.json() if r.status_code==200 else[]}
-    except: return{"webhooks":[]}
+            r=await c.get(_wh(),headers={"Content-Type":"application/json","Authorization":f"Basic {auth}"})
+            if r.status_code!=200: return{"webhooks":[],"http":r.status_code,"error":r.text[:300]}
+            data=r.json()
+            return{"webhooks":data if isinstance(data,list) else data.get("webhooks",[]),"http":200}
+    except Exception as e: return{"webhooks":[],"error":str(e)[:300]}
+
+
+async def delete_webhook_direct(webhook_id:str):
+    u,p=_creds()
+    if not u or not p or not webhook_id: return{"success":False}
+    auth=base64.b64encode(f"{u}:{p}".encode()).decode()
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(15)) as c:
+            r=await c.delete(f"{_wh()}/{webhook_id}",
+                headers={"Content-Type":"application/json","Authorization":f"Basic {auth}"})
+            return{"success":r.status_code<400,"http":r.status_code}
+    except Exception as e: return{"success":False,"error":str(e)[:300]}
 
 async def get_devices_direct():
     """Get list of connected devices. Returns [{"id":"...", "name":"...", ...}]."""
@@ -98,7 +253,7 @@ async def get_devices_direct():
     auth=base64.b64encode(f"{u}:{p}".encode()).decode()
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(15)) as c:
-            r=await c.get("https://api.sms-gate.app/3rdparty/v1/devices",
+            r=await c.get(_dev(),
                 headers={"Content-Type":"application/json","Authorization":f"Basic {auth}"})
             if r.status_code==200:
                 data=r.json()
@@ -108,6 +263,17 @@ async def get_devices_direct():
     except Exception as e:
         logger.warning(f"get_devices error: {e}")
         return[]
+
+async def get_primary_device_id():
+    """Best-effort device id for the account, or "" when nothing is connected."""
+    devices = await get_devices_direct()
+    for d in devices:
+        if isinstance(d, dict):
+            did = d.get("id") or d.get("deviceId") or ""
+            if did:
+                return did
+    return ""
+
 
 async def export_inbox_direct(device_id:str, since:str=None, until:str=None):
     """
@@ -125,7 +291,7 @@ async def export_inbox_direct(device_id:str, since:str=None, until:str=None):
     if until: payload["until"]=until
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(30)) as c:
-            r=await c.post("https://api.sms-gate.app/3rdparty/v1/messages/inbox/export",
+            r=await c.post(f"{_api()}/inbox/export",
                 headers={"Content-Type":"application/json","Authorization":f"Basic {auth}"},
                 json=payload)
             logger.info(f"inbox_export: HTTP {r.status_code} {r.text[:300]}")
@@ -138,7 +304,7 @@ async def export_inbox_direct(device_id:str, since:str=None, until:str=None):
 
 class SMSGateProvider(SMSProvider):
     def __init__(self,base_url=None,username=None,password=None,sim_number=1,timeout=45):
-        self.base_url=(base_url or settings.SMSGATE_BASE_URL or "https://api.sms-gate.app/3rdparty/v1").rstrip("/")
+        self.base_url=(base_url or settings.SMSGATE_BASE_URL or DEFAULT_BASE).rstrip("/")
         self.username=(username or settings.SMSGATE_USERNAME or"").strip()
         self.password=(password or settings.SMSGATE_PASSWORD or"").strip()
         self.sim_number=sim_number or 1
@@ -160,24 +326,128 @@ class SMSGateProvider(SMSProvider):
     async def get_message_status(self,pid):
         if not pid: return DeliveryStatus(provider_message_id="",status="unknown")
         try:
-            c=await self._cli();r=await c.get(f"{GW_API}/{pid}")
+            auth=self._auth()
+            if not auth: return DeliveryStatus(provider_message_id=pid,status="unknown")
+            c=await self._cli()
+            r=await c.get(f"{self.base_url}/messages/{pid}",
+                headers={"Authorization":f"Basic {auth}","Content-Type":"application/json"})
             if r.status_code==200:
                 d=r.json();s=(d.get("state")or"").lower()
                 return DeliveryStatus(provider_message_id=pid,status="delivered"if"deliver"in s else"failed"if"fail"in s else"sent"if"sent"in s else"unknown",raw=d)
             return DeliveryStatus(provider_message_id=pid,status="unknown")
-        except: return DeliveryStatus(provider_message_id=pid,status="unknown")
+        except Exception: return DeliveryStatus(provider_message_id=pid,status="unknown")
     async def health_check(self):
         ok=await self.test_connection()
         return GatewayHealth(is_healthy=ok,status="healthy"if ok else"unhealthy",last_checked=datetime.now(timezone.utc))
-    def parse_inbound_message(self,raw):
-        p=raw.get("payload",raw);ts=p.get("sentAt")or p.get("receivedAt");dt=datetime.now(timezone.utc)
-        if ts:
-            try:dt=datetime.fromisoformat(ts.replace("Z","+00:00"))
-            except:pass
-        return InboundMessage(provider_message_id=p.get("id",str(uuid.uuid4())),from_number=p.get("from",p.get("sender","")),to_number=p.get("to",""),body=p.get("text",p.get("message","")),received_at=dt,raw=raw)
-    def parse_delivery_status(self,raw):
-        p=raw.get("payload",raw);s=str(p.get("status","")).lower()
-        return DeliveryStatus(provider_message_id=p.get("id",""),status="delivered"if"deliver"in s else"failed"if"fail"in s else"sent"if"sent"in s else"unknown",raw=raw)
+    def parse_inbound_message(self, raw):
+        """Map an SMS-Gate webhook envelope onto InboundMessage.
+
+        Envelope: {deviceId, event, id, payload:{...}, webhookId}
+        sms:received payload uses `sender`/`message`/`recipient`/`receivedAt`
+        (NOT `from`/`text` — that shape does not exist in this API).
+        """
+        p = raw.get("payload", raw) if isinstance(raw, dict) else {}
+        event = (raw.get("event") or "sms:received") if isinstance(raw, dict) else "sms:received"
+        received = self._parse_iso(p.get("receivedAt") or p.get("sentAt")) or datetime.now(timezone.utc)
+
+        if event == "mms:downloaded":
+            parts = []
+            if p.get("subject"): parts.append(f"[{p['subject']}]")
+            if p.get("body"): parts.append(str(p["body"]))
+            for a in (p.get("attachments") or []):
+                if isinstance(a, dict):
+                    parts.append(f"[attachment: {a.get('name') or a.get('mimeType') or 'file'}]")
+            body = " ".join(parts).strip() or "[MMS]"
+        elif event == "mms:received":
+            body = "[MMS received — download pending]"
+        elif event == "sms:data-received":
+            body = "[data message]"
+        else:
+            body = p.get("message") or ""
+
+        # The device's own number is the recipient for inbound traffic.
+        return InboundMessage(
+            provider_message_id=str(p.get("messageId") or p.get("id") or uuid.uuid4()),
+            from_number=str(p.get("sender") or "").strip(),
+            to_number=str(p.get("recipient") or "").strip(),
+            body=body,
+            received_at=received,
+            raw=raw,
+        )
+
+    # Status is carried by the event NAME, not a `status` field in the payload.
+    _EVENT_STATUS = {
+        "sms:sent": "sent",
+        "sms:delivered": "delivered",
+        "sms:failed": "failed",
+        "sms:cancelled": "cancelled",
+    }
+
+    def parse_delivery_status(self, raw):
+        p = raw.get("payload", raw) if isinstance(raw, dict) else {}
+        event = (raw.get("event") or "") if isinstance(raw, dict) else ""
+        status = self._EVENT_STATUS.get(event)
+        if status is None:
+            # Fall back to a state string when polling rather than webhooking.
+            s = str(p.get("state") or p.get("status") or "").lower()
+            status = ("delivered" if "deliver" in s else "failed" if "fail" in s
+                      else "sent" if "sent" in s else "unknown")
+        return DeliveryStatus(
+            provider_message_id=str(p.get("messageId") or p.get("id") or ""),
+            status=status,
+            error=p.get("reason") if status == "failed" else None,
+            raw=raw,
+        )
+
+    @staticmethod
+    def _parse_iso(value):
+        if not value: return None
+        try:
+            d = datetime.fromisoformat(str(value).strip().replace("Z", "+00:00"))
+        except (TypeError, ValueError):
+            return None
+        return d.replace(tzinfo=timezone.utc) if d.tzinfo is None else d.astimezone(timezone.utc)
+
     supports_webhooks=lambda self:True
     supports_polling=lambda self:True
-    validate_webhook_signature=lambda self,*a,**kw:True
+
+    @staticmethod
+    def validate_webhook_signature(
+        raw_body: bytes,
+        signature: str,
+        timestamp: str,
+        secret: str,
+        max_age_seconds: int = 300,
+    ) -> bool:
+        """Verify an SMS-Gate.app webhook signature.
+
+        SMS-Gate signs ``raw_body + timestamp`` with HMAC-SHA256 using the
+        signing key from Settings -> Webhooks -> Signing Key, and sends the
+        lowercase hex digest in ``X-Signature`` with the Unix seconds
+        timestamp in ``X-Timestamp``.
+        """
+        import hashlib
+        import hmac
+        import time
+
+        if not (secret and signature and timestamp):
+            return False
+
+        # Reject stale/replayed deliveries before doing any crypto work.
+        try:
+            sent_at = int(str(timestamp).strip())
+        except (TypeError, ValueError):
+            return False
+        if abs(int(time.time()) - sent_at) > max_age_seconds:
+            logger.warning("Webhook rejected: timestamp outside tolerance window")
+            return False
+
+        if isinstance(raw_body, str):
+            raw_body = raw_body.encode("utf-8")
+
+        message = raw_body + str(timestamp).strip().encode("utf-8")
+        expected = hmac.new(
+            secret.encode("utf-8"), message, hashlib.sha256
+        ).hexdigest()
+
+        return hmac.compare_digest(expected, str(signature).strip().lower())

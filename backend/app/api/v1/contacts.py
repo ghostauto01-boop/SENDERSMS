@@ -44,16 +44,22 @@ async def list_contacts(
     # Filters
     if search:
         search_term = f"%{search}%"
-        query = query.where(
-            or_(
-                Contact.first_name.ilike(search_term),
-                Contact.last_name.ilike(search_term),
-                Contact.business_name.ilike(search_term),
-                Contact.phone_number.ilike(search_term),
-                Contact.email.ilike(search_term),
-                Contact.city.ilike(search_term),
-            )
-        )
+        clauses = [
+            Contact.first_name.ilike(search_term),
+            Contact.last_name.ilike(search_term),
+            Contact.business_name.ilike(search_term),
+            Contact.phone_number.ilike(search_term),
+            Contact.email.ilike(search_term),
+            Contact.city.ilike(search_term),
+        ]
+        # Numbers are stored as +234..., but users type 0803... A literal LIKE
+        # on the typed form matches nothing, so also try the equivalent
+        # spellings of the same number.
+        from app.utils.phone import phone_search_variants
+        clauses += [
+            Contact.phone_number.ilike(f"%{v}%") for v in phone_search_variants(search)
+        ]
+        query = query.where(or_(*clauses))
 
     if lead_status:
         query = query.where(Contact.lead_status == lead_status)

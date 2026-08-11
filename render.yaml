@@ -43,6 +43,28 @@ services:
         sync: false
       - key: DEFAULT_TIMEZONE
         value: Africa/Lagos
+      # Public URL used to register the SMS-Gate inbound webhook.
+      # Render injects RENDER_EXTERNAL_URL automatically; set this explicitly
+      # if you serve the app behind a custom domain.
+      - key: PUBLIC_BASE_URL
+        sync: false
+      # Signing key from the SMS-Gate device (Settings -> Webhooks -> Signing Key).
+      # Without it, inbound webhooks are rejected with 401.
+      - key: SMSGATE_WEBHOOK_SECRET
+        sync: false
+      - key: SMSGATE_USERNAME
+        sync: false
+      - key: SMSGATE_PASSWORD
+        sync: false
+      # Automatic background polling, run inside the API process.
+      # Every INLINE_POLL_INTERVAL seconds this refreshes delivery statuses
+      # (sent -> delivered/failed) and sends any due scheduled messages.
+      # Inbound SMS still arrives instantly by webhook push; this is the
+      # safety net that needs no Celery worker and no manual button.
+      - key: ENABLE_INLINE_POLLER
+        value: "true"
+      - key: INLINE_POLL_INTERVAL
+        value: "30"
     healthCheckPath: /api/v1/health
 
   - type: web
@@ -73,4 +95,12 @@ services:
         value: INFO
       - key: DEFAULT_TIMEZONE
         value: Africa/Lagos
+      - key: PUBLIC_BASE_URL
+        sync: false
+      - key: SMSGATE_WEBHOOK_SECRET
+        sync: false
+      - key: SMSGATE_USERNAME
+        sync: false
+      - key: SMSGATE_PASSWORD
+        sync: false
     healthCheckPath: /health

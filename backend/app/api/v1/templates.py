@@ -14,6 +14,7 @@ from app.models.user import User
 from app.schemas.template import TemplateCreate, TemplateUpdate, TemplateOut
 from app.security.auth import get_current_user
 from app.utils.phone import count_sms_segments
+from app.utils.templating import render_template
 
 router = APIRouter()
 
@@ -160,15 +161,20 @@ async def preview_template(
     industry: str = "Technology",
 ):
     """Preview a template with sample data."""
-    preview = body
-    preview = preview.replace("{{first_name}}", first_name)
-    preview = preview.replace("{{last_name}}", last_name)
-    preview = preview.replace("{{business_name}}", business_name)
-    preview = preview.replace("{{phone_number}}", phone_number)
-    preview = preview.replace("{{city}}", city)
-    preview = preview.replace("{{state}}", state)
-    preview = preview.replace("{{website}}", website)
-    preview = preview.replace("{{industry}}", industry)
+    # Same renderer the senders use, so the preview is an honest picture of
+    # the outgoing message rather than a second implementation that drifts.
+    preview = render_template(
+        body,
+        None,
+        first_name=first_name,
+        last_name=last_name,
+        business_name=business_name,
+        phone_number=phone_number,
+        city=city,
+        state=state,
+        website=website,
+        industry=industry,
+    )
 
     char_count, segment_count = count_sms_segments(preview)
 

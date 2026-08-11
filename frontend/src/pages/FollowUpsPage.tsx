@@ -69,7 +69,7 @@ export default function FollowUpsPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold">Follow-ups</h1>
+      <h1 className="text-xl sm:text-2xl font-bold">Follow-ups</h1>
 
       <div className="flex gap-2 flex-wrap">
         {views.map((v) => (

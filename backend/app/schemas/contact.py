@@ -59,6 +59,10 @@ class ContactOut(BaseModel):
     consent_status: str
     has_consented: bool
     is_opted_out: bool
+    # Opt-out audit trail. These were recorded in the DB but never returned by
+    # the API, so the UI could not show WHY or WHEN a contact opted out.
+    opt_out_reason: Optional[str] = None
+    opted_out_at: Optional[datetime] = None
     notes: Optional[str]
     custom_fields: Optional[str]
     messages_sent: int

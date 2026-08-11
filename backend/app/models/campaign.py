@@ -5,7 +5,7 @@ Campaign and CampaignContact models.
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -25,6 +25,11 @@ class Campaign(Base):
     list_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("contact_lists.id"), nullable=True)
     template_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("templates.id"), nullable=True)
     sequence_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("sequences.id"), nullable=True)
+    # Ad-hoc message written directly on the campaign, as an alternative to
+    # picking a saved Template. Takes precedence over template_id when set, so
+    # a one-off blast does not require creating a throwaway template first.
+    # Supports the same {{first_name}} style placeholders as templates.
+    message_body: Mapped[str | None] = mapped_column(Text, nullable=True)
     sequence_version_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     gateway_setting_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("gateway_settings.id"), nullable=True)
 
@@ -36,7 +41,7 @@ class Campaign(Base):
     max_delay: Mapped[int | None] = mapped_column(Integer, nullable=True)  # seconds
     send_start_hour: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 0-23
     send_end_hour: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 0-23
-    allow_weekends: Mapped[bool] = mapped_column(Integer, default=True, nullable=False)
+    allow_weekends: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     # Stats
     total_contacts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -47,7 +52,15 @@ class Campaign(Base):
     interested: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     # Timestamps
+    # When the campaign was moved into the "scheduled" state (bookkeeping).
     scheduled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # The future time the user asked the campaign to launch at. Distinct from
+    # scheduled_at, which only records when validation happened: a campaign can
+    # be validated today and set to go out next Monday. NULL means "send as
+    # soon as it is started", which is the pre-existing behaviour.
+    scheduled_start_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(

@@ -727,3 +727,41 @@ SENDERSMS/
 ├── .env.example                 # Environment template
 └── README.md                    # This file
 ```
+
+---
+
+## Upgrading an existing database
+
+The schema is created with `create_all()`, which adds new tables but **does not
+alter existing columns**. If you already have a database from before this
+release, apply the change below once. Fresh databases need nothing.
+
+`campaigns.allow_weekends` changed from `INTEGER` to `BOOLEAN` (the model always
+declared it as a bool; the column type disagreed).
+
+**PostgreSQL**
+
+```sql
+ALTER TABLE campaigns
+  ALTER COLUMN allow_weekends DROP DEFAULT,
+  ALTER COLUMN allow_weekends TYPE BOOLEAN USING (allow_weekends <> 0),
+  ALTER COLUMN allow_weekends SET DEFAULT TRUE,
+  ALTER COLUMN allow_weekends SET NOT NULL;
+```
+
+SQLite stores booleans as integers, so no change is required there.
+
+## Required environment variables
+
+Beyond the usual `DATABASE_URL` / `REDIS_URL` / `SECRET_KEY`, this release adds:
+
+| Variable | Why it matters |
+|---|---|
+| `PUBLIC_BASE_URL` | The address registered with SMS-Gate as the inbound webhook target. **Without it you receive no replies.** On Render, `RENDER_EXTERNAL_URL` is used as a fallback. |
+| `SMSGATE_WEBHOOK_SECRET` | Inbound webhooks are rejected with `401` unless their HMAC-SHA256 signature matches. Found on the device under Settings → Webhooks → Signing Key. |
+| `SMSGATE_USERNAME` / `SMSGATE_PASSWORD` | Gateway credentials. These are now **env-only** — the previous hardcoded defaults were removed. |
+| `ENABLE_INLINE_POLLER` | Set to `true` only when running without a Celery worker. |
+
+In production (`APP_ENV=production`) the app **refuses to start** if
+`SECRET_KEY`, `CREDENTIAL_ENCRYPTION_KEY`, or `ADMIN_PASSWORD` are left at their
+insecure development defaults.

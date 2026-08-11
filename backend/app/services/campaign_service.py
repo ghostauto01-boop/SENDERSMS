@@ -35,6 +35,39 @@ class CampaignService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
+    async def _check_gateway(self, campaign: Campaign) -> Optional[str]:
+        """Return an error string if no usable SMS gateway is available.
+
+        A campaign may either point at an explicit GatewaySetting row or fall
+        back to the gateway configured through the environment (the same one
+        the direct-send path uses). Requiring gateway_setting_id outright made
+        every campaign unschedulable, because nothing ever creates those rows.
+        """
+        if campaign.gateway_setting_id:
+            from app.models.gateway import GatewaySetting
+
+            result = await self.db.execute(
+                select(GatewaySetting).where(
+                    GatewaySetting.id == campaign.gateway_setting_id
+                )
+            )
+            gateway = result.scalar_one_or_none()
+            if not gateway:
+                return "Selected SMS gateway no longer exists"
+            if not gateway.is_enabled:
+                return "Selected SMS gateway is disabled"
+            return None
+
+        # No explicit gateway: fall back to the environment-configured one.
+        from app.config import settings
+
+        if not settings.smsgate_configured:
+            return (
+                "No SMS gateway configured. Set SMSGATE_BASE_URL, SMSGATE_USERNAME "
+                "and SMSGATE_PASSWORD, or select a gateway for this campaign."
+            )
+        return None
+
     async def create_campaign(self, data: dict) -> Campaign:
         """Create a new campaign (draft)."""
         campaign = Campaign(
@@ -42,24 +75,62 @@ class CampaignService:
             description=data.get("description"),
             list_id=data.get("list_id"),
             template_id=data.get("template_id"),
+            message_body=(data.get("message_body") or "").strip() or None,
             sequence_id=data.get("sequence_id"),
             gateway_setting_id=data.get("gateway_setting_id"),
+            # Optional future launch time; None means "start it manually".
+            scheduled_start_at=data.get("scheduled_start_at"),
             status="draft",
         )
         self.db.add(campaign)
         await self.db.flush()
         return campaign
 
-    async def validate_and_schedule(self, campaign_id: int) -> Campaign:
+    async def resolve_body(self, campaign: Campaign, template_id: int | None = None) -> str | None:
+        """Return the raw (unrendered) message text a campaign will send.
+
+        Precedence: an explicit sequence-step template, then the campaign's own
+        inline message_body, then its selected template. Returns None when the
+        campaign has no message at all -- callers must treat that as an error
+        rather than inventing a placeholder, since anything we invent would be
+        texted verbatim to real people.
+        """
+        tid = template_id or (None if campaign.message_body else campaign.template_id)
+        if tid:
+            row = await self.db.execute(select(Template).where(Template.id == tid))
+            template = row.scalar_one_or_none()
+            if template and (template.body or "").strip():
+                return template.body
+            if template_id:
+                return None
+        if campaign.message_body and campaign.message_body.strip():
+            return campaign.message_body
+        if campaign.template_id:
+            row = await self.db.execute(select(Template).where(Template.id == campaign.template_id))
+            template = row.scalar_one_or_none()
+            if template and (template.body or "").strip():
+                return template.body
+        return None
+
+    async def validate_and_schedule(
+        self,
+        campaign_id: int,
+        allowed_statuses: tuple = ("draft",),
+    ) -> Campaign:
         """
         Validate a campaign and move it to scheduled state.
         Validates: list, template, sequence, gateway.
+
+        allowed_statuses widens the set of states this may be called from. The
+        /schedule endpoint re-validates a campaign that is already "scheduled"
+        (the user is changing the launch time), which must not be treated as an
+        error the way a second /validate on a running campaign would be.
         """
         result = await self.db.execute(select(Campaign).where(Campaign.id == campaign_id))
         campaign = result.scalar_one_or_none()
         if not campaign:
             raise ValueError("Campaign not found")
-        if campaign.status != "draft":
+        if campaign.status not in allowed_statuses:
             raise ValueError(f"Cannot schedule campaign in {campaign.status} status")
 
         # Validate requirements
@@ -77,8 +148,17 @@ class CampaignService:
             if count_result.scalar() == 0:
                 errors.append("Contact list is empty")
 
-        if not campaign.gateway_setting_id:
-            errors.append("No SMS gateway selected")
+        # A campaign with neither an inline message nor a usable template used
+        # to fall through to a hardcoded "Hello" at send time and blast that
+        # literal word to every contact. Refuse to schedule instead.
+        if not campaign.sequence_id and not await self.resolve_body(campaign):
+            errors.append(
+                "No message to send. Write a message or choose a template."
+            )
+
+        gateway_error = await self._check_gateway(campaign)
+        if gateway_error:
+            errors.append(gateway_error)
 
         if errors:
             raise ValueError("; ".join(errors))

@@ -14,6 +14,7 @@ from app.models.followup import FollowUp
 from app.models.contact import Contact
 from app.models.user import User
 from app.security.auth import get_current_user
+from app.utils.naming import contact_display_name
 
 router = APIRouter()
 
@@ -68,7 +69,7 @@ async def list_followups(
             "id": f.id,
             "contact_id": f.contact_id,
             "contact_name": (
-                contact.business_name or f"{contact.first_name or ''} {contact.last_name or ''}".strip() or contact.phone_number
+                contact_display_name(contact, contact.phone_number)
             ) if contact else "Unknown",
             "campaign_id": f.campaign_id,
             "sequence_step_order": f.sequence_step_order,
@@ -95,7 +96,12 @@ async def send_followup_now(
         raise HTTPException(status_code=404, detail="Follow-up not found")
 
     from app.tasks.campaign_tasks import process_followup
-    process_followup.delay(followup_id)
+    from app.tasks.queue import QueueUnavailable, enqueue
+
+    try:
+        enqueue(process_followup, followup_id)
+    except QueueUnavailable as e:
+        raise HTTPException(status_code=503, detail=str(e))
 
     return {"success": True, "message": "Follow-up queued for sending"}
 

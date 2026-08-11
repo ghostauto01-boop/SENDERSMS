@@ -15,20 +15,16 @@ from app.config import settings
 
 logger=logging.getLogger(__name__)
 router=APIRouter()
-SIM_FILE=os.path.join(os.path.dirname(__file__),"..","..","..",".sim_number")
-
-def _get_sim():
-    try:return int(open(SIM_FILE).read().strip())
-    except:return 1
-def _set_sim(n:int):
-    with open(SIM_FILE,"w")as f:f.write(str(n))
 
 @router.get("/gateway")
-async def get_gw():
-    return{"configured":bool(settings.SMSGATE_USERNAME and settings.SMSGATE_PASSWORD),"is_enabled":True,"username":settings.SMSGATE_USERNAME or"","password":mask_value(settings.SMSGATE_PASSWORD or""),"base_url":"https://api.sms-gate.app/3rdparty/v1","sim_number":_get_sim(),"connection_status":"unknown","last_error":None}
+async def get_gw(db:AsyncSession=Depends(get_db)):
+    from app.services.system_settings import get_sim_number
+    return{"configured":settings.smsgate_configured,"is_enabled":True,"username":settings.SMSGATE_USERNAME or"","password":mask_value(settings.SMSGATE_PASSWORD or""),"base_url":settings.SMSGATE_BASE_URL or"","sim_number":await get_sim_number(db),"connection_status":"unknown","last_error":None}
 
 @router.put("/gateway/sim")
-async def set_sim(sim:int=1):_set_sim(max(1,min(2,sim)));return{"success":True,"sim_number":_get_sim()}
+async def set_sim(sim:int=1,db:AsyncSession=Depends(get_db),cu:User=Depends(get_current_user)):
+    from app.services.system_settings import set_sim_number
+    return{"success":True,"sim_number":await set_sim_number(db,sim)}
 
 @router.post("/gateway/test")
 async def test_gw():
@@ -37,16 +33,77 @@ async def test_gw():
     return{"success":r["success"]and r.get("online",False),"online":r.get("online",False),"name":r.get("name",""),"sims":r.get("sims",1),"message":"Connected"if r["success"]and r.get("online")else"Failed — phone offline or bad credentials","raw":r}
 
 @router.post("/gateway/register-webhook")
-async def reg_wh():
+async def reg_wh(url:Optional[str]=Query(None),cu:User=Depends(get_current_user)):
+    """Register this deployment's webhook endpoint for every event we consume.
+
+    `url` may be supplied to point the gateway somewhere else (a tunnel while
+    developing, for example); otherwise PUBLIC_BASE_URL is used.
+    """
     from app.providers.smsgate import register_webhook_direct
-    r=await register_webhook_direct("https://sendsms-api.onrender.com/api/v1/webhooks/smsgateway")
+    from app.utils.urls import webhook_url,WEBHOOK_PATH
+    if url:
+        url=url.strip().rstrip("/")
+        if not url.startswith(("http://","https://")):
+            raise HTTPException(400,"The webhook URL must start with http:// or https://")
+        if not url.endswith(WEBHOOK_PATH):
+            url=f"{url}{WEBHOOK_PATH}"
+        if url.startswith("http://") and not url.startswith("http://127.0.0.1"):
+            raise HTTPException(400,"SMS-Gate only delivers to HTTPS endpoints (plain HTTP is allowed for 127.0.0.1 only). Use an HTTPS URL or a tunnel such as ngrok or Cloudflare Tunnel.")
+    else:
+        url=webhook_url()
+    if not url:
+        raise HTTPException(400,"PUBLIC_BASE_URL is not set. Set it to this deployment's public URL (e.g. https://your-app.onrender.com), or pass a URL explicitly, so the gateway knows where to deliver events.")
+    r=await register_webhook_direct(url)
+    if not r.get("success"):
+        # Only a missing *required* event is fatal. Report exactly which one
+        # failed and why, instead of a generic "rejected" message.
+        missing=r.get("missing_required") or []
+        detail=r.get("error")
+        if not detail and missing:
+            why="; ".join(e for e in (r.get("errors") or []) if e.split(":")[0]+":"+e.split(":")[1] in missing) or "; ".join(r.get("errors") or [])
+            detail=f"The gateway rejected the required event(s) {', '.join(missing)}. {why}".strip()
+        raise HTTPException(502,detail or "The gateway rejected the webhook registration.")
     return r
 
 @router.get("/gateway/webhooks")
 async def list_wh():
-    from app.providers.smsgate import list_webhooks_direct
+    """List webhooks registered on the gateway, annotated for the settings UI.
+
+    Reports which of the events we consume are already delivered to this
+    deployment and which are missing, so the UI can offer a one-click repair
+    instead of forcing the user to call the API by hand.
+    """
+    from app.providers.smsgate import list_webhooks_direct,DEFAULT_EVENTS
+    from app.utils.urls import webhook_url
     r=await list_webhooks_direct()
-    return r
+    hooks=[w for w in r.get("webhooks",[]) if isinstance(w,dict)]
+    ours=webhook_url()
+    mine=[w for w in hooks if w.get("url")==ours] if ours else []
+    registered=sorted({w.get("event","") for w in mine if w.get("event")})
+    missing=[e for e in DEFAULT_EVENTS if e not in registered]
+    return{
+        "configured":settings.smsgate_configured,
+        "webhook_url":ours,
+        "public_base_url_set":bool(ours),
+        "signing_secret_set":bool(settings.SMSGATE_WEBHOOK_SECRET),
+        "required_events":list(DEFAULT_EVENTS),
+        "registered_events":registered,
+        "missing_events":missing,
+        "healthy":bool(ours) and not missing,
+        "webhooks":[{"id":w.get("id"),"url":w.get("url",""),"event":w.get("event",""),
+                     "is_ours":w.get("url")==ours}for w in hooks],
+        "error":r.get("error"),
+        "http":r.get("http"),
+    }
+
+@router.delete("/gateway/webhooks/{webhook_id}")
+async def del_wh(webhook_id:str,cu:User=Depends(get_current_user)):
+    """Remove a single webhook registration from the gateway."""
+    from app.providers.smsgate import delete_webhook_direct
+    r=await delete_webhook_direct(webhook_id)
+    if not r.get("success"):
+        raise HTTPException(502,r.get("error") or f"The gateway refused to delete this webhook (HTTP {r.get('http')}).")
+    return{"success":True,"deleted":webhook_id}
 
 @router.get("/notifications")
 async def get_notifs(db:AsyncSession=Depends(get_db),cu:User=Depends(get_current_user)):

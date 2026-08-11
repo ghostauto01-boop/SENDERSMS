@@ -132,8 +132,8 @@ export default function ListsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Contact Lists</h1>
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <h1 className="text-xl sm:text-2xl font-bold">Contact Lists</h1>
         <button onClick={() => setShowCreate(true)} className="btn-primary btn-sm">
           <Plus size={14} className="mr-1" /> Create List
         </button>
@@ -151,8 +151,8 @@ export default function ListsPage() {
 
       {/* View contacts modal */}
       {viewListId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="card p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4">
+          <div className="card w-full sm:max-w-2xl max-h-[92vh] overflow-y-auto rounded-t-2xl sm:rounded-xl p-4 sm:p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold">{viewListName} — {listTotal} contacts</h2>
               <div className="flex gap-2">
