@@ -78,6 +78,8 @@ class CampaignService:
             message_body=(data.get("message_body") or "").strip() or None,
             sequence_id=data.get("sequence_id"),
             gateway_setting_id=data.get("gateway_setting_id"),
+            # Optional future launch time; None means "start it manually".
+            scheduled_start_at=data.get("scheduled_start_at"),
             status="draft",
         )
         self.db.add(campaign)
@@ -110,16 +112,25 @@ class CampaignService:
                 return template.body
         return None
 
-    async def validate_and_schedule(self, campaign_id: int) -> Campaign:
+    async def validate_and_schedule(
+        self,
+        campaign_id: int,
+        allowed_statuses: tuple = ("draft",),
+    ) -> Campaign:
         """
         Validate a campaign and move it to scheduled state.
         Validates: list, template, sequence, gateway.
+
+        allowed_statuses widens the set of states this may be called from. The
+        /schedule endpoint re-validates a campaign that is already "scheduled"
+        (the user is changing the launch time), which must not be treated as an
+        error the way a second /validate on a running campaign would be.
         """
         result = await self.db.execute(select(Campaign).where(Campaign.id == campaign_id))
         campaign = result.scalar_one_or_none()
         if not campaign:
             raise ValueError("Campaign not found")
-        if campaign.status != "draft":
+        if campaign.status not in allowed_statuses:
             raise ValueError(f"Cannot schedule campaign in {campaign.status} status")
 
         # Validate requirements

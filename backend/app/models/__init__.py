@@ -17,6 +17,7 @@ from app.models.webhook import WebhookEvent
 from app.models.audit import AuditLog
 from app.models.system import SystemSetting
 from app.models.scheduled import ScheduledMessage
+from app.models.autoreply import AutoReplyRule
 
 from app.database import Base
 
@@ -45,4 +46,5 @@ __all__ = [
     "AuditLog",
     "SystemSetting",
     "ScheduledMessage",
+    "AutoReplyRule",
 ]

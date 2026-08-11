@@ -62,6 +62,8 @@ export interface Campaign {
   messages_failed: number;
   replies: number;
   interested: number;
+  // Future time the campaign launches by itself. null = manual start.
+  scheduled_start_at: string | null;
   created_at: string;
   updated_at: string;
 }

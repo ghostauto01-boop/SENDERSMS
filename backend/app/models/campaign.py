@@ -52,7 +52,15 @@ class Campaign(Base):
     interested: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     # Timestamps
+    # When the campaign was moved into the "scheduled" state (bookkeeping).
     scheduled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # The future time the user asked the campaign to launch at. Distinct from
+    # scheduled_at, which only records when validation happened: a campaign can
+    # be validated today and set to go out next Monday. NULL means "send as
+    # soon as it is started", which is the pre-existing behaviour.
+    scheduled_start_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(

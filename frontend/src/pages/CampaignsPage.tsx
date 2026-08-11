@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import api from "../api/client";
 import { Campaign } from "../types";
 import toast from "react-hot-toast";
-import { Plus, Play, Pause, Square, Trash2, Copy, Megaphone, Pencil } from "lucide-react";
+import { Plus, Play, Pause, Square, Trash2, Copy, Megaphone, Pencil, CalendarClock } from "lucide-react";
 
 const statusBadge = (status: string) => {
   const map: Record<string, string> = {
@@ -12,12 +12,106 @@ const statusBadge = (status: string) => {
   return map[status] || "badge-gray";
 };
 
+/** Format a stored UTC timestamp in the user's own timezone. */
+const formatWhen = (iso: string) =>
+  new Date(iso).toLocaleString(undefined, {
+    weekday: "short", day: "numeric", month: "short",
+    hour: "2-digit", minute: "2-digit",
+  });
+
+/** A UTC ISO string as the value a datetime-local input expects (local time). */
+const toLocalInput = (iso: string | null) => {
+  const d = iso ? new Date(iso) : new Date(Date.now() + 60 * 60 * 1000);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
+function ScheduleModal({
+  campaign, onClose, onSaved,
+}: {
+  campaign: Campaign;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [when, setWhen] = useState(toLocalInput(campaign.scheduled_start_at));
+  const [saving, setSaving] = useState(false);
+
+  const submit = async (clear: boolean) => {
+    setSaving(true);
+    try {
+      // new Date(local string).toISOString() converts to UTC, so a campaign
+      // set for 9am is sent at 9am where the user is, not 9am UTC.
+      const payload = clear
+        ? { scheduled_start_at: null }
+        : { scheduled_start_at: new Date(when).toISOString() };
+      const { data } = await api.post(`/campaigns/${campaign.id}/schedule`, payload);
+      toast.success(data.message || "Schedule updated");
+      onSaved();
+      onClose();
+    } catch (e: any) {
+      toast.error(e.response?.data?.detail || "Could not schedule the campaign");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4">
+      <div className="card w-full sm:max-w-md max-h-[92vh] overflow-y-auto rounded-t-2xl sm:rounded-xl p-4 sm:p-6">
+        <h2 className="text-lg font-semibold mb-1">Schedule Campaign</h2>
+        <p className="text-xs text-gray-500 mb-4">
+          "{campaign.name}" will send by itself at the time you pick. Times are in
+          your local timezone.
+        </p>
+
+        <label className="label">Send at</label>
+        <input
+          type="datetime-local"
+          className="input text-base sm:text-sm"
+          value={when}
+          min={toLocalInput(null)}
+          onChange={(e) => setWhen(e.target.value)}
+        />
+
+        {campaign.scheduled_start_at && (
+          <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
+            Currently scheduled for {formatWhen(campaign.scheduled_start_at)}.
+          </p>
+        )}
+
+        <div className="flex gap-2 mt-5">
+          <button
+            onClick={() => submit(false)}
+            disabled={saving || !when}
+            className="btn-primary flex-1 min-h-[44px] sm:min-h-0"
+          >
+            {saving ? "Saving..." : "Schedule"}
+          </button>
+          {campaign.scheduled_start_at && (
+            <button
+              onClick={() => submit(true)}
+              disabled={saving}
+              className="btn-secondary min-h-[44px] sm:min-h-0"
+            >
+              Cancel schedule
+            </button>
+          )}
+          <button onClick={onClose} className="btn-ghost min-h-[44px] sm:min-h-0">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function CampaignsPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<Campaign | null>(null);
+  const [scheduling, setScheduling] = useState<Campaign | null>(null);
 
   useEffect(() => { loadCampaigns(); }, []);
 
@@ -111,6 +205,12 @@ export default function CampaignsPage() {
                   {camp.description && (
                     <p className="text-sm text-gray-500 mt-1">{camp.description}</p>
                   )}
+                  {camp.scheduled_start_at && camp.status === "scheduled" && (
+                    <p className="text-sm text-blue-600 dark:text-blue-400 mt-1 flex items-center gap-1">
+                      <CalendarClock size={14} />
+                      Sends automatically on {formatWhen(camp.scheduled_start_at)}
+                    </p>
+                  )}
                   <div className="flex gap-4 mt-2 text-sm text-gray-500">
                     <span>Sent: {camp.messages_sent}</span>
                     <span>Delivered: {camp.messages_delivered}</span>
@@ -127,7 +227,17 @@ export default function CampaignsPage() {
                     </>
                   )}
                   {camp.status === "scheduled" && (
-                    <button onClick={() => handleAction(camp.id, "start")} className="btn-primary btn-sm"><Play size={14} className="mr-1" /> Start</button>
+                    <button onClick={() => handleAction(camp.id, "start")} className="btn-primary btn-sm"><Play size={14} className="mr-1" /> Start now</button>
+                  )}
+                  {(camp.status === "draft" || camp.status === "scheduled") && (
+                    <button
+                      onClick={() => setScheduling(camp)}
+                      className="btn-secondary btn-sm"
+                      title="Send automatically at a chosen time"
+                    >
+                      <CalendarClock size={14} className="mr-1" />
+                      {camp.scheduled_start_at ? "Reschedule" : "Schedule"}
+                    </button>
                   )}
                   {camp.status === "running" && (
                     <>
@@ -162,6 +272,14 @@ export default function CampaignsPage() {
           key={editing.id}
           campaign={editing}
           onClose={() => { setEditing(null); loadCampaigns(); }}
+        />
+      )}
+      {scheduling && (
+        <ScheduleModal
+          key={`sched-${scheduling.id}`}
+          campaign={scheduling}
+          onClose={() => setScheduling(null)}
+          onSaved={loadCampaigns}
         />
       )}
     </div>

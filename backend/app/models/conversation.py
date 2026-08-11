@@ -82,6 +82,11 @@ class Message(Base):
     provider_response: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Retry
+    # Marks a message the autoresponder generated. Needed to enforce the
+    # per-contact cooldown, and to make automated traffic distinguishable from
+    # something a human actually typed.
+    is_auto_reply: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
     retry_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
 

@@ -45,6 +45,92 @@ def process_running_campaigns():
     loop.run_until_complete(_process())
 
 
+async def launch_due_campaigns_async() -> list[int]:
+    """Start every campaign whose scheduled launch time has passed.
+
+    Shared by the Celery beat task and the API's inline poller, so scheduling
+    still works on deployments where only one of the two is running. Safe to
+    call concurrently -- see the atomic claim below. Returns the launched ids.
+    """
+    from app.services.campaign_service import CampaignService
+
+    now = datetime.now(timezone.utc)
+    async with async_session_factory() as db:
+        result = await db.execute(
+            select(Campaign)
+            .where(
+                Campaign.status == "scheduled",
+                Campaign.scheduled_start_at.is_not(None),
+                Campaign.scheduled_start_at <= now,
+            )
+            .order_by(Campaign.scheduled_start_at.asc())
+            .limit(10)
+        )
+        due = result.scalars().all()
+        if not due:
+            return []
+
+        service = CampaignService(db)
+        started = []
+        for campaign in due:
+            # Claim the campaign atomically before touching it. Beat and the
+            # API's inline poller can both run this, and two launchers that
+            # each read status="scheduled" would both start the same
+            # campaign. The conditional UPDATE lets exactly one win: the
+            # loser matches 0 rows and skips.
+            claim = await db.execute(
+                update(Campaign)
+                .where(Campaign.id == campaign.id, Campaign.status == "scheduled")
+                .values(scheduled_start_at=None)
+            )
+            if claim.rowcount != 1:
+                logger.info("SCHEDULE: campaign %s already claimed; skipping", campaign.id)
+                continue
+            try:
+                # Same path as a manual start: populates CampaignContact
+                # rows from the list and flips the status to "running".
+                await service.start_campaign(campaign.id)
+                started.append(campaign.id)
+            except ValueError as e:
+                # Invalid campaign (no contacts, no message). Do not retry
+                # every 2 minutes forever -- drop it back to draft so the
+                # user sees it did not go out and why.
+                logger.error("SCHEDULE: campaign %s not startable: %s", campaign.id, e)
+                campaign.status = "draft"
+            except Exception as e:
+                logger.error("SCHEDULE: campaign %s failed to launch: %s", campaign.id, e)
+
+        # Commit BEFORE enqueuing so the worker sees "running" and the
+        # contact rows (same ordering bug as the manual start path).
+        await db.commit()
+
+        for campaign_id in started:
+            if try_enqueue(process_campaign, campaign_id):
+                logger.info("SCHEDULE: launched campaign %s", campaign_id)
+            else:
+                # Still "running"; the next process_running_campaigns
+                # beat cycle will pick it up.
+                logger.warning(
+                    "SCHEDULE: campaign %s started but broker unavailable", campaign_id
+                )
+
+        return started
+
+
+@celery_app.task
+def launch_due_campaigns():
+    """Beat entrypoint for scheduled campaign launches.
+
+    Without this, setting a launch time only records an intention: the
+    campaign would sit in "scheduled" forever waiting for a manual Start.
+    """
+    loop = asyncio.get_event_loop()
+    if loop.is_closed():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    loop.run_until_complete(launch_due_campaigns_async())
+
+
 @celery_app.task
 def process_campaign(campaign_id: int):
     """Process the next batch of contacts for a campaign."""

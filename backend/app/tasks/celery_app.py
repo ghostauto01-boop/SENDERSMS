@@ -84,4 +84,10 @@ celery_app.conf.beat_schedule = {
         "task": "app.tasks.campaign_tasks.process_running_campaigns",
         "schedule": timedelta(minutes=2),
     },
+    # Every minute: a campaign scheduled for 09:00 should not go out at 09:02.
+    # The task is a cheap indexed query that returns nothing almost every run.
+    "launch-scheduled-campaigns": {
+        "task": "app.tasks.campaign_tasks.launch_due_campaigns",
+        "schedule": timedelta(minutes=1),
+    },
 }

@@ -2,6 +2,7 @@
 Campaigns API routes.
 """
 
+from datetime import timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -11,7 +12,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models.campaign import Campaign, CampaignContact
 from app.models.user import User
-from app.schemas.campaign import CampaignCreate, CampaignUpdate, CampaignOut
+from app.schemas.campaign import (
+    CampaignCreate,
+    CampaignOut,
+    CampaignScheduleRequest,
+    CampaignUpdate,
+)
 from app.security.auth import get_current_user
 from app.services.campaign_service import CampaignService
 
@@ -147,7 +153,12 @@ async def update_campaign(
     # draft so it must pass validation again before it can be started -- without
     # this, editing a scheduled campaign into an invalid state (empty list, no
     # message) would still let Start succeed.
-    if campaign.status == "scheduled" and update_data:
+    #
+    # Changing only the launch time is exempt: the campaign's content and
+    # audience are unchanged, so re-validating adds nothing, and demoting it
+    # would quietly cancel the scheduled send the user just set up.
+    content_changes = set(update_data) - {"scheduled_start_at"}
+    if campaign.status == "scheduled" and content_changes:
         campaign.status = "draft"
         campaign.scheduled_at = None
 
@@ -169,6 +180,69 @@ async def validate_campaign(
         return {"success": True, "status": campaign.status, "message": "Campaign validated and scheduled"}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/{campaign_id}/schedule")
+async def schedule_campaign(
+    campaign_id: int,
+    data: CampaignScheduleRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Set the time a campaign should launch by itself, or clear it.
+
+    Validates the campaign first (same checks as /validate) so a scheduled
+    launch cannot fail at 3am for a reason we could have caught now. Pass
+    scheduled_start_at=null to cancel the schedule and leave it validated for
+    a manual start.
+    """
+    result = await db.execute(select(Campaign).where(Campaign.id == campaign_id))
+    campaign = result.scalar_one_or_none()
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+
+    # Only a campaign that has not started can be given a start time.
+    if campaign.status not in EDITABLE_STATUSES:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cannot schedule a campaign that is {campaign.status}.",
+        )
+
+    if data.scheduled_start_at is None:
+        campaign.scheduled_start_at = None
+        await db.commit()
+        await db.refresh(campaign)
+        return {
+            "success": True,
+            "status": campaign.status,
+            "scheduled_start_at": None,
+            "message": "Schedule cleared. Campaign must be started manually.",
+        }
+
+    service = CampaignService(db)
+    try:
+        # Raises if there is no message, no audience, etc. A campaign that is
+        # already scheduled is being rescheduled, which is allowed.
+        await service.validate_and_schedule(
+            campaign_id, allowed_statuses=("draft", "scheduled")
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    campaign.scheduled_start_at = data.scheduled_start_at
+    await db.commit()
+    await db.refresh(campaign)
+    # Stamp UTC if the driver gave the value back naive, so the browser does
+    # not read the timestamp as local time.
+    when = campaign.scheduled_start_at
+    if when is not None and when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+    return {
+        "success": True,
+        "status": campaign.status,
+        "scheduled_start_at": when.isoformat(),
+        "message": f"Campaign will send automatically at {when.isoformat()}",
+    }
 
 
 @router.post("/{campaign_id}/start")

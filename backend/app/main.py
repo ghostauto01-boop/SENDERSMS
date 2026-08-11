@@ -90,8 +90,27 @@ async def _poll():
                 logger.info(f"STATUS: updated {count} messages")
 
         await _process_scheduled()
+        await _launch_scheduled_campaigns()
     except Exception as e:
         logger.warning(f"Poll: {e}")
+
+
+async def _launch_scheduled_campaigns():
+    """Start campaigns whose scheduled time has arrived.
+
+    Celery beat does this too. It is repeated here because on the Render free
+    tier the worker sleeps after inactivity, and a campaign scheduled for
+    tomorrow morning must still go out if nothing has woken the worker. The
+    launcher claims each campaign with an atomic UPDATE, so both running at
+    once cannot double-send.
+    """
+    try:
+        from app.tasks.campaign_tasks import launch_due_campaigns_async
+        launched = await launch_due_campaigns_async()
+        if launched:
+            logger.info("SCHEDULED CAMPAIGNS: launched %s", launched)
+    except Exception as e:
+        logger.warning(f"Scheduled campaigns: {e}")
 
 async def _process_scheduled():
     try:
@@ -163,7 +182,7 @@ async def health():
     """
     return JSONResponse({"status":"ok","app":settings.APP_NAME,"version":"1.0.0"})
 
-from app.api.v1 import auth, contacts, lists, campaigns, sequences, followups, inbox, templates, analytics, settings as settings_api, webhooks, dashboard, send
+from app.api.v1 import auth, contacts, lists, campaigns, sequences, followups, inbox, templates, analytics, settings as settings_api, webhooks, dashboard, send, autoreply
 app.include_router(auth.router, prefix="/api/v1/auth")
 app.include_router(dashboard.router, prefix="/api/v1/dashboard")
 app.include_router(contacts.router, prefix="/api/v1/contacts")
@@ -177,6 +196,7 @@ app.include_router(analytics.router, prefix="/api/v1/analytics")
 app.include_router(settings_api.router, prefix="/api/v1/settings")
 app.include_router(webhooks.router, prefix="/api/v1/webhooks")
 app.include_router(send.router, prefix="/api/v1/send")
+app.include_router(autoreply.router, prefix="/api/v1/autoreply")
 
 PUBLIC_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "public")
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist")

@@ -102,6 +102,48 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_conversation_contact
 ALTER TABLE campaigns
     ADD COLUMN IF NOT EXISTS message_body TEXT;
 
+-- ------------------------------------------------------------
+-- 5. Campaign scheduling
+--
+-- The future time a campaign should launch by itself. Distinct from
+-- scheduled_at, which only records when the campaign passed validation.
+-- NULL means "start it manually", which is how every existing campaign
+-- behaves, so this is a no-op for current data.
+-- ------------------------------------------------------------
+ALTER TABLE campaigns
+    ADD COLUMN IF NOT EXISTS scheduled_start_at TIMESTAMPTZ;
+
+CREATE INDEX IF NOT EXISTS ix_campaigns_scheduled_start_at
+    ON campaigns (scheduled_start_at);
+
+-- ------------------------------------------------------------
+-- 6. Auto-reply
+--
+-- User-defined rules for answering inbound SMS automatically. The table
+-- starts empty and the feature is inert until the first rule is created.
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS auto_reply_rules (
+    id                SERIAL PRIMARY KEY,
+    name              VARCHAR(120) NOT NULL,
+    keywords          TEXT,
+    match_type        VARCHAR(20)  NOT NULL DEFAULT 'contains',
+    reply_body        TEXT         NOT NULL,
+    is_enabled        BOOLEAN      NOT NULL DEFAULT TRUE,
+    priority          INTEGER      NOT NULL DEFAULT 100,
+    cooldown_minutes  INTEGER      NOT NULL DEFAULT 240,
+    stop_on_match     BOOLEAN      NOT NULL DEFAULT TRUE,
+    times_triggered   INTEGER      NOT NULL DEFAULT 0,
+    last_triggered_at TIMESTAMPTZ,
+    created_at        TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at        TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+-- Flags messages the autoresponder generated. Needed for the per-contact
+-- cooldown; existing messages are correctly FALSE (a human or a campaign
+-- sent them).
+ALTER TABLE messages
+    ADD COLUMN IF NOT EXISTS is_auto_reply BOOLEAN NOT NULL DEFAULT FALSE;
+
 COMMIT;
 
 -- ------------------------------------------------------------

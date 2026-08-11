@@ -138,7 +138,56 @@ class SMSService:
         if not kw:await self._stop_seq(c.id)
         cr.sequence_paused=True;await self.db.flush()
         await self._notify_inbound(c,body[:160])
+        # Auto-reply last: it must never be able to stop the inbound message
+        # from being stored, so it is best-effort and swallows its own errors.
+        # Skipped entirely for opt-out keywords -- answering "STOP" with
+        # marketing copy is exactly what compliance rules forbid.
+        if not kw:
+            try:
+                await self._maybe_auto_reply(c,cr,body)
+            except Exception as e:
+                logger.error(f"AUTOREPLY err:{e}")
         return m
+
+    async def _maybe_auto_reply(self,contact,conversation,body):
+        """Answer an inbound message if the operator configured a rule for it.
+
+        Returns the outgoing Message, or None when no rule applies. The reply
+        is queued through the normal outbound path so it gets delivery
+        receipts, segment counting and retries like any other message.
+        """
+        from app.services.autoreply_service import AutoReplyService
+
+        rule,text=await AutoReplyService(self.db).build_reply(contact,body)
+        if not rule or not text:
+            return None
+
+        ik=f"autoreply-{rule.id}-{contact.id}-{uuid.uuid4().hex[:12]}"[:255]
+        ch,sg=count_sms_segments(text)
+        out=Message(
+            conversation_id=conversation.id,contact_id=contact.id,direction="outgoing",
+            body=text,segment_count=sg,char_count=ch,status="queued",provider="smsgate",
+            idempotency_key=ik,is_auto_reply=True,
+        )
+        self.db.add(out)
+        rule.times_triggered=(rule.times_triggered or 0)+1
+        rule.last_triggered_at=datetime.now(timezone.utc)
+        conversation.message_count=(conversation.message_count or 0)+1
+        conversation.last_message_preview=text[:100]
+        conversation.last_message_at=datetime.now(timezone.utc)
+        await self.db.flush()
+
+        # Commit before handing the id to the worker: the worker looks the
+        # message up by id and would not see an uncommitted row.
+        await self.db.commit()
+
+        from app.tasks.queue import try_enqueue
+        from app.tasks.sms_tasks import send_sms
+        if try_enqueue(send_sms,out.id):
+            logger.info(f"AUTOREPLY: rule '{rule.name}' -> contact {contact.id}")
+        else:
+            logger.error(f"AUTOREPLY: broker unavailable; reply {out.id} left queued")
+        return out
 
     async def _notify_inbound(self,contact,body):
         """Fire a Pushover alert for an inbound SMS.
