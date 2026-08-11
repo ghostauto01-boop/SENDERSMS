@@ -13,6 +13,7 @@ These are the regressions that made incoming SMS never appear in the chat:
    (a late sms:sent overwrote delivered; sms:delivered fires once per part).
 """
 
+import asyncio
 import hashlib
 import hmac
 import json
@@ -527,3 +528,148 @@ class TestChatListAndLabels:
         assert m["status"] == "failed"
         assert m["last_error"] == "SIM has no credit"
         assert m["segment_count"] == 1
+
+
+class TestInboundNotifications:
+    """Pushover alerts for inbound SMS.
+
+    The notification is dispatched from inside the webhook request. SMS-Gate
+    requires a 2xx within 30 seconds or it retries for ~2 days, so a slow or
+    blackholed Pushover must never delay the response: measured at 15.3s before
+    the fix, 0.38s after.
+    """
+
+    async def _setup_pushover(self, db, enabled=True):
+        from app.models.notification import NotificationProvider
+        from app.security.encryption import encrypt_value
+        p = NotificationProvider(
+            provider="pushover", is_enabled=enabled,
+            config_json=json.dumps({
+                "user_key_encrypted": encrypt_value("uk-test"),
+                "app_token_encrypted": encrypt_value("at-test"),
+            }),
+        )
+        db.add(p)
+        await db.flush()
+        return p
+
+    @pytest.mark.asyncio
+    async def test_inbound_triggers_pushover(self, client, db, monkeypatch):
+        await self._setup_pushover(db)
+        sent = []
+
+        import app.providers.pushover as po
+
+        async def fake_send(self, title, body, **kw):
+            sent.append((title, body))
+            return True
+
+        monkeypatch.setattr(po.PushoverProvider, "send_notification", fake_send)
+
+        r = await post_webhook(client, envelope("sms:received", {
+            "messageId": "in-n1", "message": "notify me", "sender": "+2348012345678",
+            "recipient": "+2340000000000", "simNumber": 1,
+            "receivedAt": "2026-08-11T09:00:00.000Z"}, "evt-n1"))
+        assert r.status_code == 200
+
+        for _ in range(20):          # dispatched as a background task
+            if sent:
+                break
+            await asyncio.sleep(0.05)
+
+        assert len(sent) == 1
+        assert "+2348012345678" in sent[0][0]
+        assert sent[0][1] == "notify me"
+
+    @pytest.mark.asyncio
+    async def test_slow_pushover_does_not_delay_webhook(self, client, db, monkeypatch):
+        """The whole point: a hanging Pushover must not risk SMS-Gate retries."""
+        await self._setup_pushover(db)
+
+        import app.providers.pushover as po
+
+        async def hanging_send(self, title, body, **kw):
+            await asyncio.sleep(30)
+            return True
+
+        monkeypatch.setattr(po.PushoverProvider, "send_notification", hanging_send)
+
+        start = time.monotonic()
+        r = await post_webhook(client, envelope("sms:received", {
+            "messageId": "in-n2", "message": "slow notify", "sender": "+2348012345679",
+            "recipient": "+2340000000000", "simNumber": 1,
+            "receivedAt": "2026-08-11T09:01:00.000Z"}, "evt-n2"))
+        elapsed = time.monotonic() - start
+
+        assert r.status_code == 200
+        assert elapsed < 5, f"webhook blocked for {elapsed:.1f}s on a slow Pushover"
+
+        msg = (await db.execute(select(Message).where(
+            Message.body == "slow notify"))).scalar_one_or_none()
+        assert msg is not None  # stored regardless
+
+    @pytest.mark.asyncio
+    async def test_pushover_failure_never_loses_the_message(self, client, db, monkeypatch):
+        await self._setup_pushover(db)
+
+        import app.providers.pushover as po
+
+        async def boom(self, title, body, **kw):
+            raise RuntimeError("pushover down")
+
+        monkeypatch.setattr(po.PushoverProvider, "send_notification", boom)
+
+        r = await post_webhook(client, envelope("sms:received", {
+            "messageId": "in-n3", "message": "still stored", "sender": "+2348012345680",
+            "recipient": "+2340000000000", "simNumber": 1,
+            "receivedAt": "2026-08-11T09:02:00.000Z"}, "evt-n3"))
+        assert r.status_code == 200
+        await asyncio.sleep(0.2)
+
+        msg = (await db.execute(select(Message).where(
+            Message.body == "still stored"))).scalar_one_or_none()
+        assert msg is not None
+
+    @pytest.mark.asyncio
+    async def test_duplicate_delivery_does_not_double_notify(self, client, db, monkeypatch):
+        await self._setup_pushover(db)
+        sent = []
+
+        import app.providers.pushover as po
+
+        async def fake_send(self, title, body, **kw):
+            sent.append(body)
+            return True
+
+        monkeypatch.setattr(po.PushoverProvider, "send_notification", fake_send)
+
+        env = envelope("sms:received", {
+            "messageId": "in-n4", "message": "only once", "sender": "+2348012345681",
+            "recipient": "+2340000000000", "simNumber": 1,
+            "receivedAt": "2026-08-11T09:03:00.000Z"}, "evt-n4")
+        for _ in range(3):
+            assert (await post_webhook(client, env)).status_code == 200
+        await asyncio.sleep(0.3)
+
+        assert sent == ["only once"]
+
+    @pytest.mark.asyncio
+    async def test_disabled_pushover_is_silent(self, client, db, monkeypatch):
+        await self._setup_pushover(db, enabled=False)
+        sent = []
+
+        import app.providers.pushover as po
+
+        async def fake_send(self, title, body, **kw):
+            sent.append(body)
+            return True
+
+        monkeypatch.setattr(po.PushoverProvider, "send_notification", fake_send)
+
+        await post_webhook(client, envelope("sms:received", {
+            "messageId": "in-n5", "message": "no alert", "sender": "+2348012345682",
+            "recipient": "+2340000000000", "simNumber": 1,
+            "receivedAt": "2026-08-11T09:04:00.000Z"}, "evt-n5"))
+        await asyncio.sleep(0.2)
+
+        assert sent == []

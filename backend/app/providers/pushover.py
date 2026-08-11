@@ -24,7 +24,7 @@ class PushoverProvider(NotificationProvider):
             logger.warning("Pushover: not configured (need user_key + app_token)")
             return False
         try:
-            async with httpx.AsyncClient(timeout=15) as c:
+            async with httpx.AsyncClient(timeout=10) as c:
                 r = await c.post(f"{self.BASE}/messages.json", data={"token": self.app_token, "user": self.user_key.strip(), "title": title, "message": body})
                 d = r.json()
                 ok = r.status_code == 200 and d.get("status") == 1

@@ -15,6 +15,9 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
+# Strong refs for detached background tasks (asyncio only holds weak ones).
+_BG_TASKS:set=set()
+
 class SMSService:
     def __init__(self,db:AsyncSession):self.db=db
 
@@ -113,15 +116,32 @@ class SMSService:
         return m
 
     async def _notify_inbound(self,contact,body):
+        """Fire a Pushover alert for an inbound SMS.
+
+        This runs in the webhook request path, and SMS-Gate retries for ~2 days
+        unless it gets a 2xx within 30 seconds. A slow or blackholed Pushover
+        must therefore never hold up the response: we read the credentials
+        inline (we need the DB session) but dispatch the HTTP call as a
+        detached background task. The message is already committed by then, so
+        losing a notification is survivable; losing the message is not.
+        """
         try:
             r=await self.db.execute(select(NotificationProvider).where(NotificationProvider.provider=="pushover",NotificationProvider.is_enabled==True).limit(1))
             prov=r.scalar_one_or_none()
             if not prov:return
             cfg=json.loads(prov.config_json or"{}");uk=decrypt_value(cfg.get("user_key_encrypted",""));at=decrypt_value(cfg.get("app_token_encrypted",""))
             if not uk or not at:return
-            from app.providers.pushover import PushoverProvider
-            ok=await PushoverProvider(app_token=at,user_key=uk).send_notification(f"📱 New SMS from {contact.business_name or contact.first_name or contact.phone_number}",body)
-            logger.info(f"NOTIFY: Pushover {'OK' if ok else 'FAIL'}")
+            title=f"📱 New SMS from {contact.business_name or contact.first_name or contact.phone_number}"
+            import asyncio
+            async def _send():
+                try:
+                    from app.providers.pushover import PushoverProvider
+                    ok=await PushoverProvider(app_token=at,user_key=uk).send_notification(title,body)
+                    logger.info(f"NOTIFY: Pushover {'OK' if ok else 'FAIL'}")
+                except Exception as e:logger.error(f"NOTIFY send err:{e}")
+            task=asyncio.create_task(_send())
+            # Hold a reference so the task is not garbage-collected mid-flight.
+            _BG_TASKS.add(task);task.add_done_callback(_BG_TASKS.discard)
         except Exception as e:logger.error(f"NOTIFY err:{e}")
 
     async def check_gateway_health(self):
