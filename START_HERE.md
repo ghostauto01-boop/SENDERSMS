@@ -71,18 +71,26 @@ None of these ask for a card on the free plan.
    ```
    postgresql://neondb_owner:AbC123xyz@ep-cool-name.eu-central-1.aws.neon.tech/neondb?sslmode=require
    ```
-3. **You must edit it.** Change the beginning from `postgresql://` to
-   `postgresql+asyncpg://`, and delete `?sslmode=require` from the end. Result:
+3. **You must edit it: delete the `?` and everything after it.** That's the only change
+   needed. Result:
    ```
-   postgresql+asyncpg://neondb_owner:AbC123xyz@ep-cool-name.eu-central-1.aws.neon.tech/neondb
+   postgresql://neondb_owner:AbC123xyz@ep-cool-name.eu-central-1.aws.neon.tech/neondb
    ```
 
-> **Why:** the app talks to the database in a fast "async" way and needs that exact prefix.
-> Getting this wrong is the single most common reason the app won't start.
+> **Why this one edit is not optional.** Neon's copy button adds `?sslmode=require`
+> (and often `&channel_binding=require`). The app's database driver does not understand
+> those two words and **crashes on startup** with
+> `TypeError: connect() got an unexpected keyword argument 'sslmode'`.
+> I tested this directly against this project's driver — with the `?...` left on it fails
+> every time; with it removed it starts fine. Your connection is still encrypted: Neon
+> requires TLS on its side regardless.
+>
+> **You do *not* need to add `+asyncpg`.** The app rewrites the prefix for you
+> automatically (`backend/app/database.py`). Adding it yourself is harmless if you prefer,
+> but it is not required — an earlier version of this guide said it was, which was wrong.
 
-**Save two versions in your notes:**
-- `DATABASE_URL` = the edited one (`postgresql+asyncpg://...`) — for the app.
-- `PLAIN_DATABASE_URL` = the original one Neon gave you — you'll need it in Step 8.
+**Save in notes:** `DATABASE_URL` = that cleaned-up URL. You'll use the same one again in
+Step 8.
 
 ---
 
@@ -111,7 +119,7 @@ Open https://www.random.org/strings/ and generate, **or** if you have a Mac/Linu
 # SECRET_KEY — signs your login session
 openssl rand -hex 32
 
-# CREDENTIAL_ENCRYPTION_KEY — encrypts saved gateway passwords (must be this exact format)
+# CREDENTIAL_ENCRYPTION_KEY — encrypts saved gateway passwords
 openssl rand -base64 32
 ```
 
@@ -170,21 +178,22 @@ This phone must stay on, charged, and with airtime/an SMS bundle. It does the ac
 4. Render reads the `render.yaml` file and offers to create **two services**:
    - `sendsms-api` — the website and control panel
    - `sendsms-worker` — the background helper that sends campaigns on schedule
-5. Render will ask you to fill in the blanks. Enter these on **both** services:
+5. Render will ask you to fill in the blanks. Render prompts you once per service, so you
+   will type most of these **twice** — the values must match exactly.
 
-   | Setting | Value |
-   |---|---|
-   | `DATABASE_URL` | your `postgresql+asyncpg://...` from Step 2 |
-   | `REDIS_URL` | from Step 3 |
-   | `SECRET_KEY` | from Step 4 |
-   | `CREDENTIAL_ENCRYPTION_KEY` | from Step 4 |
-   | `ADMIN_USERNAME` | from Step 4 |
-   | `ADMIN_PASSWORD` | from Step 4 |
-   | `SMSGATE_USERNAME` | from Step 5 |
-   | `SMSGATE_PASSWORD` | from Step 5 |
-   | `SMSGATE_WEBHOOK_SECRET` | from Step 5 |
-   | `PUBLIC_BASE_URL` | leave blank for now — Step 7 |
-   | `CORS_ORIGINS` | leave blank for now — Step 7 |
+   | Setting | Value | Which service |
+   |---|---|---|
+   | `DATABASE_URL` | the cleaned-up URL from Step 2 (no `?sslmode=...` on the end) | both |
+   | `REDIS_URL` | from Step 3 | both |
+   | `SECRET_KEY` | from Step 4 | both — **same value** |
+   | `CREDENTIAL_ENCRYPTION_KEY` | from Step 4 | both — **same value** |
+   | `ADMIN_USERNAME` | from Step 4 | both |
+   | `ADMIN_PASSWORD` | from Step 4 | both |
+   | `SMSGATE_USERNAME` | from Step 5 | both |
+   | `SMSGATE_PASSWORD` | from Step 5 | both |
+   | `SMSGATE_WEBHOOK_SECRET` | from Step 5 | both |
+   | `PUBLIC_BASE_URL` | leave blank for now — Step 7 | both |
+   | `CORS_ORIGINS` | leave blank for now — Step 7 | api only |
 
    > ⚠️ **`SECRET_KEY` and `CREDENTIAL_ENCRYPTION_KEY` must be *identical* on both
    > services.** Render offers to auto-generate them on the api service — don't accept
@@ -198,7 +207,8 @@ This phone must stay on, charged, and with airtime/an SMS bundle. It does the ac
    **Save in notes:** `PUBLIC_BASE_URL`
 
 **If the build fails**, click the **Logs** tab and read the last red lines:
-- `Invalid argument(s) 'pool_size'` → your `DATABASE_URL` is missing `+asyncpg`. Step 2.
+- `unexpected keyword argument 'sslmode'` → you left `?sslmode=require` on your
+  `DATABASE_URL`. Delete the `?` and everything after it. Step 2.
 - `password authentication failed` → the database password is wrong; re-copy from Neon.
 - Build ran out of memory → retry; the free tier is occasionally short on RAM.
 
@@ -212,12 +222,22 @@ Now the app knows its own address, so tell it.
    - `PUBLIC_BASE_URL` = the address from Step 6, no trailing slash
      (`https://sendsms-api.onrender.com`)
    - `CORS_ORIGINS` = the same address
-2. Do the same on **sendsms-worker**. **Save changes** — both services restart.
+2. On **sendsms-worker**, set `PUBLIC_BASE_URL` to the same address. **Save changes** —
+   both services restart.
 
 > **Why this matters:** on startup the app automatically tells SMS-Gate *"send new messages
-> to `<your address>/api/v1/webhooks/smsgateway`"*. If the address is blank or wrong, the
+> to `<your address>/api/v1/webhooks/smsgateway`"*. If that address is wrong, the
 > registration points nowhere and **incoming SMS never arrive** — with no error shown.
 > The address must be `https://` with a valid certificate; your Render address already is.
+>
+> On Render specifically, leaving `PUBLIC_BASE_URL` blank is survivable — the code falls
+> back to the `RENDER_EXTERNAL_URL` that Render injects for you
+> (`backend/app/utils/urls.py`). Set it anyway: it costs nothing, and it's the difference
+> between "works by luck" and "works on purpose" — especially if you ever add a custom
+> domain, where the fallback would point at the wrong host.
+
+**`CORS_ORIGINS` note:** the worker has no `CORS_ORIGINS` field in the blueprint, so set it
+on **sendsms-api** only. `PUBLIC_BASE_URL` goes on both.
 
 3. Wait for both to go green, then visit your address and log in with your
    `ADMIN_USERNAME` / `ADMIN_PASSWORD`.
@@ -243,15 +263,14 @@ correct. This is only for a database that already had contacts and messages in i
 
 I've written the script for you: **`scripts/migrate_existing_db.sql`**.
 
-Using the **plain** database URL you saved in Step 2 (the `postgresql://` one, *not*
-`+asyncpg`):
+Using the `DATABASE_URL` you saved in Step 2:
 
 ```bash
 # 1. Back up first — always
-pg_dump "PASTE_PLAIN_DATABASE_URL_HERE" > backup-before-migration.sql
+pg_dump "PASTE_YOUR_DATABASE_URL_HERE" > backup-before-migration.sql
 
 # 2. Run the migration
-psql "PASTE_PLAIN_DATABASE_URL_HERE" -f scripts/migrate_existing_db.sql
+psql "PASTE_YOUR_DATABASE_URL_HERE" -f scripts/migrate_existing_db.sql
 ```
 
 > No `psql` on your computer? In Neon, open your project → **SQL Editor**, then copy the
@@ -309,7 +328,7 @@ If all six happen, you are fully live.
 | Replies never show in the Inbox | `PUBLIC_BASE_URL` wrong/blank, so the webhook points nowhere | Redo Step 7, then **Settings → Webhooks → Register webhook** |
 | Replies show in Inbox but no Pushover alert | Pushover not enabled in Settings | Step 9; press **Test** |
 | Login page won't load / 502 | Free service waking up | Wait 60 seconds and refresh |
-| App won't start at all | `DATABASE_URL` prefix | Must be `postgresql+asyncpg://` — Step 2 |
+| App won't start, log says `sslmode` | `?sslmode=require` left on the URL | Delete `?` and after — Step 2 |
 | Campaign says "running" but nothing sends | The worker service is down | Render → `sendsms-worker` → should be green; check its Logs |
 | One contact has several chat threads | Old database | Step 8 |
 
@@ -335,7 +354,7 @@ lines. The last few lines before it stopped tell you what happened.
 
 By the end you should have filled in all eight:
 
-- [ ] `DATABASE_URL` (with `+asyncpg`)
+- [ ] `DATABASE_URL` (with the `?sslmode=...` part deleted)
 - [ ] `REDIS_URL`
 - [ ] `SECRET_KEY`
 - [ ] `CREDENTIAL_ENCRYPTION_KEY`
