@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import api from "../api/client";
 import { Campaign } from "../types";
 import toast from "react-hot-toast";
-import { Plus, Play, Pause, Square, Trash2, Copy, Megaphone } from "lucide-react";
+import { Plus, Play, Pause, Square, Trash2, Copy, Megaphone, Pencil } from "lucide-react";
 
 const statusBadge = (status: string) => {
   const map: Record<string, string> = {
@@ -17,6 +17,7 @@ export default function CampaignsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [editing, setEditing] = useState<Campaign | null>(null);
 
   useEffect(() => { loadCampaigns(); }, []);
 
@@ -44,11 +45,14 @@ export default function CampaignsPage() {
 
   const handleDuplicate = async (id: number) => {
     try {
-      await api.post(`/campaigns/${id}/duplicate`);
-      toast.success("Campaign duplicated");
-      loadCampaigns();
-    } catch {
-      toast.error("Failed to duplicate");
+      const { data } = await api.post(`/campaigns/${id}/duplicate`);
+      toast.success(`Created "${data.name}"`);
+      await loadCampaigns();
+      // Open the copy straight away: duplicating is nearly always the first
+      // half of "duplicate and change something".
+      setEditing(data);
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || "Failed to duplicate");
     }
   };
 
@@ -137,7 +141,14 @@ export default function CampaignsPage() {
                       <button onClick={() => handleAction(camp.id, "stop")} className="btn-danger btn-sm"><Square size={14} className="mr-1" /> Stop</button>
                     </>
                   )}
-                  <button onClick={() => handleDuplicate(camp.id)} className="btn-ghost btn-sm"><Copy size={14} /></button>
+                  {(camp.status === "draft" || camp.status === "scheduled") && (
+                    <button onClick={() => setEditing(camp)} className="btn-ghost btn-sm" title="Edit campaign">
+                      <Pencil size={14} />
+                    </button>
+                  )}
+                  <button onClick={() => handleDuplicate(camp.id)} className="btn-ghost btn-sm" title="Duplicate campaign">
+                    <Copy size={14} />
+                  </button>
                 </div>
               </div>
             </div>
@@ -145,19 +156,32 @@ export default function CampaignsPage() {
         )}
       </div>
 
-      {showCreate && <CreateCampaignModal onClose={() => { setShowCreate(false); loadCampaigns(); }} />}
+      {showCreate && <CampaignModal onClose={() => { setShowCreate(false); loadCampaigns(); }} />}
+      {editing && (
+        <CampaignModal
+          key={editing.id}
+          campaign={editing}
+          onClose={() => { setEditing(null); loadCampaigns(); }}
+        />
+      )}
     </div>
   );
 }
-function CreateCampaignModal({ onClose }: { onClose: () => void }) {
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [listId, setListId] = useState("");
+function CampaignModal({ campaign, onClose }: { campaign?: Campaign | null; onClose: () => void }) {
+  // One modal for both create and edit: the fields, the validation and the
+  // segment counter are identical, and keeping two copies in sync is how they
+  // drift apart.
+  const editing = !!campaign;
+  const [name, setName] = useState(campaign?.name ?? "");
+  const [description, setDescription] = useState(campaign?.description ?? "");
+  const [listId, setListId] = useState(campaign?.list_id ? String(campaign.list_id) : "");
   // "write" = compose the message here; "template" = reuse a saved one.
-  const [mode, setMode] = useState<"write" | "template">("write");
-  const [messageBody, setMessageBody] = useState("");
-  const [templateId, setTemplateId] = useState("");
-  const [sequenceId, setSequenceId] = useState("");
+  const [mode, setMode] = useState<"write" | "template">(
+    campaign?.template_id && !campaign?.message_body ? "template" : "write"
+  );
+  const [messageBody, setMessageBody] = useState(campaign?.message_body ?? "");
+  const [templateId, setTemplateId] = useState(campaign?.template_id ? String(campaign.template_id) : "");
+  const [sequenceId, setSequenceId] = useState(campaign?.sequence_id ? String(campaign.sequence_id) : "");
   const [lists, setLists] = useState<any[]>([]);
   const [templates, setTemplates] = useState<any[]>([]);
   const [sequences, setSequences] = useState<any[]>([]);
@@ -199,21 +223,30 @@ function CreateCampaignModal({ onClose }: { onClose: () => void }) {
       }
     }
     setSubmitting(true);
+    // Send only the one the user actually chose, so precedence is never
+    // ambiguous on the server.
+    const payload = {
+      name,
+      description: description || null,
+      list_id: listId ? parseInt(listId) : null,
+      template_id: mode === "template" && templateId ? parseInt(templateId) : null,
+      message_body: mode === "write" && messageBody.trim() ? messageBody : null,
+      sequence_id: sequenceId ? parseInt(sequenceId) : null,
+    };
     try {
-      await api.post("/campaigns/", {
-        name,
-        description: description || null,
-        list_id: listId ? parseInt(listId) : null,
-        // Send only the one the user actually chose, so precedence is never
-        // ambiguous on the server.
-        template_id: mode === "template" && templateId ? parseInt(templateId) : null,
-        message_body: mode === "write" && messageBody.trim() ? messageBody : null,
-        sequence_id: sequenceId ? parseInt(sequenceId) : null,
-      });
-      toast.success("Campaign created (draft)");
+      if (editing) {
+        await api.put(`/campaigns/${campaign!.id}`, payload);
+        toast.success("Campaign updated");
+      } else {
+        await api.post("/campaigns/", payload);
+        toast.success("Campaign created (draft)");
+      }
       onClose();
     } catch (err: any) {
-      toast.error(err.response?.data?.detail || "Failed to create campaign");
+      toast.error(
+        err.response?.data?.detail ||
+          (editing ? "Failed to update campaign" : "Failed to create campaign")
+      );
     } finally {
       setSubmitting(false);
     }
@@ -222,7 +255,14 @@ function CreateCampaignModal({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4">
       <div className="card w-full sm:max-w-lg max-h-[92vh] overflow-y-auto rounded-t-2xl sm:rounded-xl p-4 sm:p-6">
-        <h2 className="text-lg font-semibold mb-4">Create Campaign</h2>
+        <h2 className="text-lg font-semibold mb-4">
+          {editing ? "Edit Campaign" : "Create Campaign"}
+        </h2>
+        {editing && campaign!.status === "scheduled" && (
+          <p className="text-xs text-amber-600 dark:text-amber-500 -mt-2 mb-3">
+            Saving changes returns this campaign to draft, so it must be validated again.
+          </p>
+        )}
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>
             <label className="label">Campaign Name *</label>
@@ -314,7 +354,9 @@ function CreateCampaignModal({ onClose }: { onClose: () => void }) {
           <div className="flex flex-col-reverse sm:flex-row gap-2 pt-2">
             <button type="button" onClick={onClose} className="btn-secondary flex-1">Cancel</button>
             <button type="submit" disabled={submitting} className="btn-primary flex-1">
-              {submitting ? "Creating..." : "Create Draft"}
+              {submitting
+                ? editing ? "Saving..." : "Creating..."
+                : editing ? "Save Changes" : "Create Draft"}
             </button>
           </div>
         </form>

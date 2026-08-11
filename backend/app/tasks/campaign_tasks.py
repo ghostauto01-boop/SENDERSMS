@@ -65,33 +65,36 @@ def process_campaign(campaign_id: int):
             contacts = cc_result.scalars().all()
 
             if not contacts:
-                # Check if all done
+                # Check if all done. "sent" means handed to the gateway but not
+                # yet acknowledged, so it stays in the in-flight set; the
+                # delivery/failure webhook moves the row to a terminal state.
                 remaining = await db.execute(
                     select(CampaignContact).where(
                         CampaignContact.campaign_id == campaign_id,
                         CampaignContact.status.in_(["pending", "queued", "sent"]),
-                    )
+                    ).limit(1)
                 )
-                if not remaining.scalars().all():
+                if remaining.scalars().first() is None:
                     campaign.status = "completed"
                     campaign.completed_at = datetime.now(timezone.utc)
                     await db.commit()
                 return
 
+            # Messages are enqueued only AFTER the transaction commits. Handing
+            # a message id to the broker while the row is still uncommitted is
+            # a race the worker loses: it looks the id up, sees nothing, and
+            # drops the send. That silently skipped most of every batch --
+            # only the last contact (whose enqueue happened to land after the
+            # commit) was ever texted.
+            outbox: list[int] = []
             for cc in contacts:
-                try:
-                    await _process_campaign_contact(db, campaign, cc)
-                except QueueUnavailable:
-                    # Broker went away mid-batch. Stop here and keep whatever
-                    # was already queued; the remaining contacts are still
-                    # pending and get picked up on the next run.
-                    logger.error(
-                        "Stopping campaign %s batch early: task queue unavailable.",
-                        campaign_id,
-                    )
-                    break
+                await _process_campaign_contact(db, campaign, cc, outbox)
 
             await db.commit()
+
+        # Separate session: the rows above are now durable and visible to the
+        # worker, so it is safe to publish.
+        await _flush_outbox(outbox)
 
     loop = asyncio.get_event_loop()
     if loop.is_closed():
@@ -100,7 +103,66 @@ def process_campaign(campaign_id: int):
     loop.run_until_complete(_process())
 
 
-async def _process_campaign_contact(db: AsyncSession, campaign: Campaign, cc: CampaignContact):
+async def _flush_outbox(message_ids):
+    """Publish committed messages to the broker.
+
+    Anything we fail to publish is rolled back to a retryable state so the
+    next beat picks it up, rather than leaving a message stuck in "queued"
+    forever with the contact never contacted.
+    """
+    if not message_ids:
+        return
+    from app.tasks.sms_tasks import send_sms
+
+    stranded = []
+    for mid in message_ids:
+        try:
+            enqueue(send_sms, mid)
+        except QueueUnavailable:
+            stranded.append(mid)
+
+    if not stranded:
+        return
+
+    logger.error(
+        "Task queue unavailable; %d campaign message(s) not published.",
+        len(stranded),
+    )
+    # Put the contacts back to pending and drop the phantom message rows so
+    # the campaign retries them instead of reporting a send that never left.
+    async with async_session_factory() as db:
+        msgs = (
+            await db.execute(select(Message).where(Message.id.in_(stranded)))
+        ).scalars().all()
+        for m in msgs:
+            cc = (
+                await db.execute(
+                    select(CampaignContact).where(
+                        CampaignContact.campaign_id == m.campaign_id,
+                        CampaignContact.contact_id == m.contact_id,
+                    )
+                )
+            ).scalar_one_or_none()
+            await _flush_outbox_rollback(db, m, cc, commit=False)
+        await db.commit()
+
+
+async def _flush_outbox_rollback(db, message, cc, commit=True):
+    """Undo a send that could not be published to the broker.
+
+    Leaves no phantom "queued" message behind and returns the contact to
+    "pending" so a later run retries it.
+    """
+    if cc is not None and cc.status == "queued":
+        cc.status = "pending"
+        if cc.sequence_step:
+            cc.sequence_step -= 1
+    await db.delete(message)
+    if commit:
+        await db.commit()
+
+
+async def _process_campaign_contact(db: AsyncSession, campaign: Campaign, cc: CampaignContact, outbox=None):
     """Process a single contact in a campaign."""
     # Get contact
     contact_result = await db.execute(select(Contact).where(Contact.id == cc.contact_id))
@@ -117,15 +179,15 @@ async def _process_campaign_contact(db: AsyncSession, campaign: Campaign, cc: Ca
         version = version_result.scalar_one_or_none()
         if version:
             steps = json.loads(version.snapshot)
-            await _execute_sequence_step(db, campaign, cc, contact, steps, cc.sequence_step)
+            await _execute_sequence_step(db, campaign, cc, contact, steps, cc.sequence_step, outbox)
         else:
             # No sequence, just send the template message
-            await _send_template_message(db, campaign, cc, contact)
+            await _send_template_message(db, campaign, cc, contact, outbox=outbox)
     else:
-        await _send_template_message(db, campaign, cc, contact)
+        await _send_template_message(db, campaign, cc, contact, outbox=outbox)
 
 
-async def _execute_sequence_step(db, campaign, cc, contact, steps, current_step_idx):
+async def _execute_sequence_step(db, campaign, cc, contact, steps, current_step_idx, outbox=None):
     """Execute a sequence step."""
     if current_step_idx >= len(steps):
         cc.status = "completed"
@@ -134,7 +196,7 @@ async def _execute_sequence_step(db, campaign, cc, contact, steps, current_step_
     step = steps[current_step_idx]
 
     if step["step_type"] == "send_sms":
-        await _send_template_message(db, campaign, cc, contact, step.get("template_id"))
+        await _send_template_message(db, campaign, cc, contact, step.get("template_id"), outbox=outbox)
 
     elif step["step_type"] == "wait":
         wait_hours = step.get("wait_duration_hours", 24)
@@ -157,7 +219,7 @@ async def _execute_sequence_step(db, campaign, cc, contact, steps, current_step_
         next_step = step.get("true_branch_step_order" if condition_met else "false_branch_step_order")
         if next_step is not None:
             cc.sequence_step = next_step
-            await _execute_sequence_step(db, campaign, cc, contact, steps, next_step)
+            await _execute_sequence_step(db, campaign, cc, contact, steps, next_step, outbox)
         else:
             cc.status = "completed"
 
@@ -165,7 +227,7 @@ async def _execute_sequence_step(db, campaign, cc, contact, steps, current_step_
         cc.status = "completed"
 
 
-async def _send_template_message(db, campaign, cc, contact, template_id=None):
+async def _send_template_message(db, campaign, cc, contact, template_id=None, outbox=None):
     """Send a template message to a contact."""
     # Resolve through the shared resolver so an inline campaign message, a
     # selected template and a sequence step all follow one precedence rule.
@@ -237,16 +299,38 @@ async def _send_template_message(db, campaign, cc, contact, template_id=None):
     conversation.last_message_preview = body[:100]
     conversation.last_message_at = datetime.now(timezone.utc)
 
-    # Queue the actual send. If the broker is unreachable we must NOT leave a
-    # phantom "queued" message behind nor inflate the campaign counters --
-    # otherwise the campaign reports messages as sent that will never go out.
-    # Drop the row and let the contact stay pending so the next beat retries it.
+    # Update campaign contact.
+    #
+    # NOTE: the "sent" counters are deliberately NOT incremented here. Being
+    # handed to the broker is not the same as being accepted by the gateway --
+    # when the gateway rejected every message (auth failure, device offline)
+    # the campaign still reported a full send and the failures were invisible.
+    # app.tasks.sms_tasks records the real outcome once the gateway answers.
+    cc.status = "queued"
+    cc.last_message_at = datetime.now(timezone.utc)
+    cc.sequence_step += 1
+
+    # Update contact
+    contact.last_contacted_at = datetime.now(timezone.utc)
+
+    # Hand the send off to the caller's outbox rather than publishing here.
+    # The broker must only learn about this message once the surrounding
+    # transaction has committed, otherwise the worker can dequeue the id
+    # before the row is visible and silently drop the send. The caller
+    # publishes (and cleans up after a broker failure) after it commits.
+    if outbox is not None:
+        outbox.append(message.id)
+        return
+
+    # Standalone caller with no outbox: commit the full unit of work first --
+    # message, contact row and counters -- so the worker cannot outrun it.
     from app.tasks.sms_tasks import send_sms
+
+    await db.commit()
     try:
         enqueue(send_sms, message.id)
     except QueueUnavailable:
-        await db.delete(message)
-        await db.flush()
+        await _flush_outbox_rollback(db, message, cc)
         logger.error(
             "Broker unavailable while sending campaign %s to contact %s; "
             "contact left pending for retry.",
@@ -254,19 +338,6 @@ async def _send_template_message(db, campaign, cc, contact, template_id=None):
             cc.contact_id,
         )
         raise
-
-    # Update campaign contact
-    cc.status = "queued"
-    cc.messages_sent += 1
-    cc.last_message_at = datetime.now(timezone.utc)
-    cc.sequence_step += 1
-
-    # Update campaign stats
-    campaign.messages_sent = (campaign.messages_sent or 0) + 1
-
-    # Update contact
-    contact.messages_sent = (contact.messages_sent or 0) + 1
-    contact.last_contacted_at = datetime.now(timezone.utc)
 
 
 async def _check_condition(db, cc, step):
@@ -314,6 +385,7 @@ async def _check_condition(db, cc, step):
 def process_followup(followup_id: int):
     """Process a scheduled follow-up."""
     async def _process():
+        outbox: list[int] = []
         async with async_session_factory() as db:
             result = await db.execute(select(FollowUp).where(FollowUp.id == followup_id))
             followup = result.scalar_one_or_none()
@@ -345,11 +417,18 @@ def process_followup(followup_id: int):
                             if version:
                                 steps = json.loads(version.snapshot)
                                 cc.sequence_step = followup.sequence_step_order
-                                await _execute_sequence_step(db, campaign, cc, contact, steps, followup.sequence_step_order)
+                                await _execute_sequence_step(
+                                    db, campaign, cc, contact, steps,
+                                    followup.sequence_step_order, outbox,
+                                )
 
             followup.status = "sent"
             followup.executed_at = datetime.now(timezone.utc)
             await db.commit()
+
+        # Publish only after the commit above, so the worker cannot dequeue a
+        # message id before its row exists.
+        await _flush_outbox(outbox)
 
     loop = asyncio.get_event_loop()
     if loop.is_closed():

@@ -39,6 +39,9 @@ from typing import Any, Mapping, Optional
 # left untouched.
 _PLACEHOLDER = re.compile(r"\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*(?:\|([^}]*))?\}\}")
 
+# Same shape with single braces, applied only to field names we can resolve.
+_SINGLE_PLACEHOLDER = re.compile(r"\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*(?:\|([^}]*))?\}")
+
 # Fields lifted straight off the Contact model.
 _CONTACT_FIELDS = (
     "first_name",
@@ -142,4 +145,19 @@ def render_template(body: Optional[str], contact: Optional[object] = None, **ove
     def _sub(match: re.Match) -> str:
         return _resolve(match.group(1).lower(), match.group(2), context)
 
-    return tidy(_PLACEHOLDER.sub(_sub, body))
+    rendered = _PLACEHOLDER.sub(_sub, body)
+
+    # Tolerate single braces around a KNOWN field name. The editor inserts
+    # {{first_name}}, but people type {first_name} from memory and the result
+    # was the literal text "{first_name}" arriving on a customer's phone.
+    # Restricting this to names we can actually resolve keeps ordinary prose
+    # containing braces untouched.
+    def _sub_single(match: re.Match) -> str:
+        field = match.group(1).lower()
+        if field not in context and field not in ("first_name", "name", "full_name"):
+            return match.group(0)
+        return _resolve(field, match.group(2), context)
+
+    rendered = _SINGLE_PLACEHOLDER.sub(_sub_single, rendered)
+
+    return tidy(rendered)

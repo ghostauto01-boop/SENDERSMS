@@ -218,5 +218,13 @@ class SMSService:
             if camp:
                 if status=="delivered":camp.messages_delivered=(camp.messages_delivered or 0)+1
                 elif status in("failed","cancelled"):camp.messages_failed=(camp.messages_failed or 0)+1
+        # Settle the per-contact row too. process_campaign treats
+        # pending/queued/sent as "still in flight" and only completes a
+        # campaign once that set is empty, so leaving the row on "sent" after
+        # the final receipt arrived kept every campaign running forever.
+        if m.campaign_id and status in("delivered","failed","cancelled"):
+            cc=(await self.db.execute(select(CampaignContact).where(CampaignContact.campaign_id==m.campaign_id,CampaignContact.contact_id==m.contact_id))).scalar_one_or_none()
+            if cc is not None and cc.status in("queued","sent"):
+                cc.status="delivered"if status=="delivered"else"failed"
         await self.db.flush()
         return m

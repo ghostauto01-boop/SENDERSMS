@@ -15,6 +15,12 @@ from app.schemas.campaign import CampaignCreate, CampaignUpdate, CampaignOut
 from app.security.auth import get_current_user
 from app.services.campaign_service import CampaignService
 
+# Statuses in which a campaign's definition may still be changed. Once it is
+# scheduled, contacts have not been populated yet but the campaign is queued for
+# launch, so we still allow edits and re-validation; from "running" onward the
+# definition is frozen.
+EDITABLE_STATUSES = {"draft", "scheduled"}
+
 router = APIRouter()
 
 
@@ -62,6 +68,21 @@ async def get_campaign(
     return campaign
 
 
+def _unique_copy_name(name: str, existing: set[str]) -> str:
+    """Return "<name> (Copy)", or "(Copy 2)", "(Copy 3)"... if that is taken.
+
+    Duplicating the same campaign twice previously produced two campaigns with
+    identical names, which is impossible to tell apart in the list.
+    """
+    base = f"{name} (Copy)"
+    if base not in existing:
+        return base[:255]
+    n = 2
+    while f"{name} (Copy {n})" in existing:
+        n += 1
+    return f"{name} (Copy {n})"[:255]
+
+
 @router.post("/", response_model=CampaignOut, status_code=201)
 async def create_campaign(
     data: CampaignCreate,
@@ -87,9 +108,49 @@ async def update_campaign(
     if not campaign:
         raise HTTPException(status_code=404, detail="Campaign not found")
 
+    # A campaign that has sent, or is sending, must not have its message or
+    # audience rewritten underneath it. The worker re-reads the campaign row for
+    # every batch, so editing a running campaign would send the old text to the
+    # contacts already processed and the new text to the rest -- with no record
+    # of which got which. Duplicate it and edit the copy instead.
+    if campaign.status not in EDITABLE_STATUSES:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Cannot edit a campaign that is {campaign.status}. "
+                "Duplicate it to make changes."
+            ),
+        )
+
     update_data = data.model_dump(exclude_unset=True)
+
+    # Writing a message and picking a template are mutually exclusive choices.
+    # Setting one clears the other, otherwise a campaign edited from template to
+    # written text would keep a stale template_id and resolve_body's precedence
+    # would decide the outcome instead of the user.
+    if "message_body" in update_data:
+        body = (update_data["message_body"] or "").strip() or None
+        update_data["message_body"] = body
+        if body and "template_id" not in update_data:
+            update_data["template_id"] = None
+    if update_data.get("template_id") and "message_body" not in update_data:
+        update_data["message_body"] = None
+
     for key, value in update_data.items():
         setattr(campaign, key, value)
+
+    # Changing the audience invalidates the pre-computed total.
+    if "list_id" in update_data:
+        campaign.total_contacts = 0
+
+    # An edited campaign has not been checked in its new form. Send it back to
+    # draft so it must pass validation again before it can be started -- without
+    # this, editing a scheduled campaign into an invalid state (empty list, no
+    # message) would still let Start succeed.
+    if campaign.status == "scheduled" and update_data:
+        campaign.status = "draft"
+        campaign.scheduled_at = None
+
     await db.flush()
     await db.refresh(campaign)
     return campaign
@@ -255,13 +316,33 @@ async def duplicate_campaign(
     if not original:
         raise HTTPException(status_code=404, detail="Campaign not found")
 
+    names_result = await db.execute(select(Campaign.name))
+    existing_names = set(names_result.scalars().all())
+
+    # Copy the whole definition. This previously copied only the references and
+    # silently dropped message_body and every sending rule, so duplicating a
+    # campaign that had a written message produced a copy with NO message --
+    # which then failed validation for a reason the user could not see.
     new_campaign = Campaign(
-        name=f"{original.name} (Copy)",
+        name=_unique_copy_name(original.name, existing_names),
         description=original.description,
         list_id=original.list_id,
         template_id=original.template_id,
+        message_body=original.message_body,
         sequence_id=original.sequence_id,
         gateway_setting_id=original.gateway_setting_id,
+        # Sending rules are part of what makes a campaign worth duplicating.
+        daily_limit=original.daily_limit,
+        hourly_limit=original.hourly_limit,
+        per_minute_limit=original.per_minute_limit,
+        min_delay=original.min_delay,
+        max_delay=original.max_delay,
+        send_start_hour=original.send_start_hour,
+        send_end_hour=original.send_end_hour,
+        allow_weekends=original.allow_weekends,
+        # Deliberately NOT copied: status (always a fresh draft), the stats
+        # counters, and the scheduled/started/completed timestamps. A copy has
+        # not sent anything yet.
         status="draft",
     )
     db.add(new_campaign)

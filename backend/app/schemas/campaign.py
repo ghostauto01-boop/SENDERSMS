@@ -26,6 +26,9 @@ class CampaignUpdate(BaseModel):
     message_body: Optional[str] = None
     template_id: Optional[int] = None
     list_id: Optional[int] = None
+    # Editable after creation too, otherwise the UI silently drops them on PUT.
+    sequence_id: Optional[int] = None
+    gateway_setting_id: Optional[int] = None
     daily_limit: Optional[int] = None
     hourly_limit: Optional[int] = None
     per_minute_limit: Optional[int] = None
