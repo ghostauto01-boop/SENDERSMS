@@ -198,3 +198,61 @@ then set the new values as environment variables (`SMSGATE_USERNAME`,
 While you are there, also set `SMSGATE_WEBHOOK_SECRET` (device →
 Settings → Webhooks → Signing Key) and `PUBLIC_BASE_URL`, or inbound replies
 will not arrive.
+
+---
+
+# Final checkup — full-workflow simulation (11 Aug 2026)
+
+The earlier audit reviewed the code. This round *ran* the app: a mock SMS-Gate
+device, a mock Pushover endpoint, Redis and a real Celery worker, driven through
+the same HTTP API the UI uses — create contacts, build a list, write a template,
+launch a campaign, receive replies, opt out, pause/resume/stop.
+
+Six defects surfaced. None were visible to unit tests, because each needs two
+processes, or a real template and contact, to reproduce.
+
+| # | Defect | Impact | Status |
+|---|--------|--------|--------|
+| 1 | Three different placeholder substitution implementations | `{{first_name}}` shipped raw to real phones on some paths | **Fixed** — one shared renderer |
+| 2 | Campaign sends left empty inbox threads | Contact appeared in chat with no preview, unsortable | **Fixed** |
+| 3 | `messages_delivered` / `messages_failed` / `replies` never written | Every campaign reported 0% forever | **Fixed** |
+| 4 | Nothing prevented duplicate conversations | Second thread wedged that contact permanently (`MultipleResultsFound`) | **Fixed** |
+| 5 | **Campaign start race — campaigns sent nothing at all** | Task dispatched before the transaction committed; worker saw no contacts and exited "successfully" | **Fixed** |
+| 6 | Searching by phone number matched nothing | Stored `+234…`, users type `0803…` | **Fixed** |
+
+Defect 5 is the one worth reading twice. `POST /campaigns/{id}/start` returned
+`200`, the campaign showed **running**, the worker logged **succeeded** — and not
+one message was sent. Every surface reported success. It reproduced on the first
+clean run and disappeared on a retry, which is exactly what makes this class of
+bug so hard to catch in production.
+
+**Tests: 133 → 178.** The race test deliberately uses a file-backed sqlite
+database; an in-memory one shares a single connection and would happily pass a
+broken commit order. It was verified to fail when the fix is reverted.
+
+## Contact names in Pushover notifications
+
+Notification titles now show the same name the chat shows, falling back to the
+number when there is no contact:
+
+| Contact record | Notification title |
+|---|---|
+| Ada Obi | `📱 New SMS from Ada Obi` |
+| business name only | `📱 New SMS from Zenith Motors` |
+| first name only | `📱 New SMS from Chidi` |
+| no contact | `📱 New SMS from +2349099998888` |
+
+One shared helper (`utils/naming.py`) backs the inbox list, the notification and
+follow-ups, so these can no longer drift apart.
+
+## Still on you
+
+Besides rotating the exposed credentials above:
+
+- **Existing databases need a manual migration.** `init_db` uses `create_all`,
+  so the new unique constraint only applies to freshly created tables. Deduplicate
+  `conversations` by `contact_id`, then add the unique index. Same for the
+  `allow_weekends` column (`ALTER TABLE`).
+- Configure and enable Pushover in Settings — the keys come from the database,
+  not environment variables.
+- Send one real SMS from a named contact as a final confirmation.
