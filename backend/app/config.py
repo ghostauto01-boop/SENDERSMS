@@ -3,10 +3,18 @@ Application configuration using pydantic-settings.
 Loads from environment variables with sensible defaults.
 """
 
+import logging
 import os
 from typing import Optional
 
 from pydantic_settings import BaseSettings
+
+logger = logging.getLogger(__name__)
+
+# Placeholder values that must never survive into a production deployment.
+INSECURE_SECRET_KEY = "change-me-to-a-random-secret-key-at-least-32-chars"
+INSECURE_ENCRYPTION_KEY = "change-me-to-a-32-byte-base64-encoded-key"
+INSECURE_ADMIN_PASSWORD = "admin"
 
 
 class Settings(BaseSettings):
@@ -19,8 +27,8 @@ class Settings(BaseSettings):
     DEFAULT_TIMEZONE: str = "Africa/Lagos"
 
     # --- Security ---
-    SECRET_KEY: str = "change-me-to-a-random-secret-key-at-least-32-chars"
-    CREDENTIAL_ENCRYPTION_KEY: str = "change-me-to-a-32-byte-base64-encoded-key"
+    SECRET_KEY: str = INSECURE_SECRET_KEY
+    CREDENTIAL_ENCRYPTION_KEY: str = INSECURE_ENCRYPTION_KEY
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
 
     # --- Database ---
@@ -36,15 +44,28 @@ class Settings(BaseSettings):
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
 
+    # --- Public URL (used to register the gateway webhook) ---
+    # Must point at THIS deployment, e.g. https://your-app.onrender.com
+    PUBLIC_BASE_URL: Optional[str] = None
+
     # --- Bootstrap Admin ---
     ADMIN_USERNAME: str = "admin"
-    ADMIN_PASSWORD: str = "admin"
+    ADMIN_PASSWORD: str = INSECURE_ADMIN_PASSWORD
 
     # --- SMS Gateway (SMS-Gate.app) ---
+    # Credentials MUST come from the environment — never hardcode them here.
     SMSGATE_BASE_URL: Optional[str] = "https://api.sms-gate.app/3rdparty/v1"
-    SMSGATE_USERNAME: Optional[str] = "_O48UB"
-    SMSGATE_PASSWORD: Optional[str] = "nw_e7wyhwjwubp"
+    SMSGATE_USERNAME: Optional[str] = None
+    SMSGATE_PASSWORD: Optional[str] = None
     SMSGATE_WEBHOOK_SECRET: Optional[str] = None
+    # When no signing secret is configured the webhook rejects all traffic.
+    # Set to True only for local debugging against an unsigned sender.
+    SMSGATE_WEBHOOK_ALLOW_UNSIGNED: bool = False
+    # Poll delivery statuses / send due scheduled messages from the web
+    # process. Useful when no Celery worker is running; disable it if the
+    # worker + beat handle this, to avoid duplicate work.
+    ENABLE_INLINE_POLLER: bool = True
+    INLINE_POLL_INTERVAL: int = 30
     SMSGATE_TIMEOUT: int = 30
     SMSGATE_RETRY_COUNT: int = 3
     SMSGATE_POLL_INTERVAL: int = 60
@@ -67,5 +88,46 @@ class Settings(BaseSettings):
         "case_sensitive": True,
     }
 
+    @property
+    def is_production(self) -> bool:
+        return self.APP_ENV.strip().lower() in ("production", "prod")
+
+    @property
+    def smsgate_configured(self) -> bool:
+        """True when the SMS gateway has usable credentials."""
+        return bool(
+            self.SMSGATE_BASE_URL and self.SMSGATE_USERNAME and self.SMSGATE_PASSWORD
+        )
+
+    def insecure_defaults(self) -> list[str]:
+        """Names of settings still holding an unsafe placeholder value."""
+        problems: list[str] = []
+        if self.SECRET_KEY == INSECURE_SECRET_KEY:
+            problems.append("SECRET_KEY")
+        if self.CREDENTIAL_ENCRYPTION_KEY == INSECURE_ENCRYPTION_KEY:
+            problems.append("CREDENTIAL_ENCRYPTION_KEY")
+        if self.ADMIN_PASSWORD == INSECURE_ADMIN_PASSWORD:
+            problems.append("ADMIN_PASSWORD")
+        return problems
+
+    def validate_runtime(self) -> None:
+        """Refuse to boot in production with placeholder secrets."""
+        problems = self.insecure_defaults()
+        if not problems:
+            return
+        joined = ", ".join(problems)
+        if self.is_production:
+            raise RuntimeError(
+                f"Refusing to start in production with default values for: {joined}. "
+                "Set them to strong, unique values in the environment."
+            )
+        logger.warning(
+            "INSECURE DEFAULTS in use for: %s. This is tolerated because APP_ENV=%s, "
+            "but must be fixed before deploying.",
+            joined,
+            self.APP_ENV,
+        )
+
 
 settings = Settings()
+settings.validate_runtime()

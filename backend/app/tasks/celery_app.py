@@ -25,6 +25,12 @@ celery_app.conf.update(
     task_serializer="json",
     accept_content=["json"],
     result_serializer="json",
+    # Nothing in this codebase ever reads a task result (no AsyncResult.get()
+    # anywhere), and keeping the result backend active made every enqueue call
+    # try to reach Redis twice. When Redis was down it retried 20 times before
+    # giving up, which is what turned a broker outage into a ~19s API hang.
+    task_ignore_result=True,
+    result_backend_max_retries=3,
     timezone=settings.DEFAULT_TIMEZONE,
     enable_utc=True,
     task_track_started=True,
@@ -33,6 +39,17 @@ celery_app.conf.update(
     task_soft_time_limit=300,
     task_time_limit=600,
     broker_connection_retry_on_startup=True,
+    # Fail fast when the broker is unreachable. The defaults retry for ~20s,
+    # which blocked API requests that only wanted to enqueue a task; callers
+    # now get a prompt 503 instead of a long hang.
+    broker_transport_options={
+        "socket_connect_timeout": 3,
+        "socket_timeout": 3,
+        "max_retries": 1,
+        "retry_policy": {"timeout": 3.0},
+    },
+    broker_connection_timeout=3,
+    broker_connection_max_retries=1,
 )
 
 # --- Periodic Beat Schedule ---

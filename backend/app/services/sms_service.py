@@ -18,10 +18,9 @@ logger = logging.getLogger(__name__)
 class SMSService:
     def __init__(self,db:AsyncSession):self.db=db
 
-    @staticmethod
-    def _get_sim():
-        try: return int(open(os.path.join(os.path.dirname(__file__),"..","..","..",".sim_number")).read().strip())
-        except: return 1
+    async def _get_sim(self):
+        from app.services.system_settings import get_sim_number
+        return await get_sim_number(self.db)
 
     async def send_message(self,contact_id,body,campaign_id=None):
         c=(await self.db.execute(select(Contact).where(Contact.id==contact_id))).scalar_one_or_none()
@@ -34,7 +33,7 @@ class SMSService:
         msg=Message(conversation_id=cr.id,contact_id=contact_id,campaign_id=campaign_id,direction="outgoing",body=body,segment_count=sg,char_count=ch,status="sending",provider="smsgate",idempotency_key=ik)
         self.db.add(msg);await self.db.flush()
         from app.providers.smsgate import send_sms_direct
-        r=await send_sms_direct(c.phone_number,body,SMSService._get_sim())
+        r=await send_sms_direct(c.phone_number,body,await self._get_sim())
         if r["success"]:msg.status="sent";msg.provider_message_id=r.get("provider_message_id","");msg.sent_at=datetime.now(timezone.utc)
         else:msg.status="failed";msg.last_error=r.get("error","");msg.failed_at=datetime.now(timezone.utc)
         msg.provider_response=json.dumps(r.get("raw"))if r.get("raw")else None

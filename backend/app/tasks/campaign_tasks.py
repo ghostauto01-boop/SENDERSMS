@@ -11,6 +11,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.tasks.celery_app import celery_app
+from app.tasks.queue import QueueUnavailable, enqueue, try_enqueue
 from app.database import async_session_factory
 from app.models.campaign import Campaign, CampaignContact
 from app.models.sequence import SequenceVersion
@@ -31,8 +32,11 @@ def process_running_campaigns():
                 select(Campaign).where(Campaign.status == "running").limit(10)
             )
             campaigns = result.scalars().all()
+            from app.tasks.queue import try_enqueue
             for campaign in campaigns:
-                process_campaign.delay(campaign.id)
+                # Best-effort: a broker blip on one campaign must not abort
+                # the whole beat cycle.
+                try_enqueue(process_campaign, campaign.id)
 
     loop = asyncio.get_event_loop()
     if loop.is_closed():
@@ -75,7 +79,17 @@ def process_campaign(campaign_id: int):
                 return
 
             for cc in contacts:
-                await _process_campaign_contact(db, campaign, cc)
+                try:
+                    await _process_campaign_contact(db, campaign, cc)
+                except QueueUnavailable:
+                    # Broker went away mid-batch. Stop here and keep whatever
+                    # was already queued; the remaining contacts are still
+                    # pending and get picked up on the next run.
+                    logger.error(
+                        "Stopping campaign %s batch early: task queue unavailable.",
+                        campaign_id,
+                    )
+                    break
 
             await db.commit()
 
@@ -208,9 +222,23 @@ async def _send_template_message(db, campaign, cc, contact, template_id=None):
     db.add(message)
     await db.flush()
 
-    # Queue the actual send
+    # Queue the actual send. If the broker is unreachable we must NOT leave a
+    # phantom "queued" message behind nor inflate the campaign counters --
+    # otherwise the campaign reports messages as sent that will never go out.
+    # Drop the row and let the contact stay pending so the next beat retries it.
     from app.tasks.sms_tasks import send_sms
-    send_sms.delay(message.id)
+    try:
+        enqueue(send_sms, message.id)
+    except QueueUnavailable:
+        await db.delete(message)
+        await db.flush()
+        logger.error(
+            "Broker unavailable while sending campaign %s to contact %s; "
+            "contact left pending for retry.",
+            campaign.id,
+            cc.contact_id,
+        )
+        raise
 
     # Update campaign contact
     cc.status = "queued"
@@ -319,7 +347,16 @@ def process_followup(followup_id: int):
 def schedule_followup(followup_id: int):
     """Schedule a follow-up for later execution."""
     # This is a placeholder - in production, you'd use Celery's ETA/countdown
-    process_followup.apply_async(
-        args=[followup_id],
-        countdown=60,  # Default 1 minute; in production, use the actual scheduled time
-    )
+    try:
+        process_followup.apply_async(
+            args=[followup_id],
+            countdown=60,  # Default 1 minute; in production, use the actual scheduled time
+        )
+    except Exception as exc:
+        # Surface a clear reason instead of a raw kombu error; the follow-up is
+        # still in the DB and will be retried by the periodic sweep.
+        logger.error("Could not schedule follow-up %s: %s", followup_id, exc)
+        raise QueueUnavailable(
+            "Background task queue is unavailable. Check that the Redis broker "
+            "(REDIS_URL) is reachable, then try again."
+        ) from exc

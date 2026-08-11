@@ -15,20 +15,16 @@ from app.config import settings
 
 logger=logging.getLogger(__name__)
 router=APIRouter()
-SIM_FILE=os.path.join(os.path.dirname(__file__),"..","..","..",".sim_number")
-
-def _get_sim():
-    try:return int(open(SIM_FILE).read().strip())
-    except:return 1
-def _set_sim(n:int):
-    with open(SIM_FILE,"w")as f:f.write(str(n))
 
 @router.get("/gateway")
-async def get_gw():
-    return{"configured":bool(settings.SMSGATE_USERNAME and settings.SMSGATE_PASSWORD),"is_enabled":True,"username":settings.SMSGATE_USERNAME or"","password":mask_value(settings.SMSGATE_PASSWORD or""),"base_url":"https://api.sms-gate.app/3rdparty/v1","sim_number":_get_sim(),"connection_status":"unknown","last_error":None}
+async def get_gw(db:AsyncSession=Depends(get_db)):
+    from app.services.system_settings import get_sim_number
+    return{"configured":settings.smsgate_configured,"is_enabled":True,"username":settings.SMSGATE_USERNAME or"","password":mask_value(settings.SMSGATE_PASSWORD or""),"base_url":settings.SMSGATE_BASE_URL or"","sim_number":await get_sim_number(db),"connection_status":"unknown","last_error":None}
 
 @router.put("/gateway/sim")
-async def set_sim(sim:int=1):_set_sim(max(1,min(2,sim)));return{"success":True,"sim_number":_get_sim()}
+async def set_sim(sim:int=1,db:AsyncSession=Depends(get_db),cu:User=Depends(get_current_user)):
+    from app.services.system_settings import set_sim_number
+    return{"success":True,"sim_number":await set_sim_number(db,sim)}
 
 @router.post("/gateway/test")
 async def test_gw():
@@ -37,10 +33,13 @@ async def test_gw():
     return{"success":r["success"]and r.get("online",False),"online":r.get("online",False),"name":r.get("name",""),"sims":r.get("sims",1),"message":"Connected"if r["success"]and r.get("online")else"Failed — phone offline or bad credentials","raw":r}
 
 @router.post("/gateway/register-webhook")
-async def reg_wh():
+async def reg_wh(cu:User=Depends(get_current_user)):
     from app.providers.smsgate import register_webhook_direct
-    r=await register_webhook_direct("https://sendsms-api.onrender.com/api/v1/webhooks/smsgateway")
-    return r
+    from app.utils.urls import webhook_url
+    url=webhook_url()
+    if not url:
+        raise HTTPException(400,"PUBLIC_BASE_URL is not set. Set it to this deployment's public URL (e.g. https://your-app.onrender.com) so the gateway knows where to deliver events.")
+    return await register_webhook_direct(url)
 
 @router.get("/gateway/webhooks")
 async def list_wh():

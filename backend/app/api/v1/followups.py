@@ -95,7 +95,12 @@ async def send_followup_now(
         raise HTTPException(status_code=404, detail="Follow-up not found")
 
     from app.tasks.campaign_tasks import process_followup
-    process_followup.delay(followup_id)
+    from app.tasks.queue import QueueUnavailable, enqueue
+
+    try:
+        enqueue(process_followup, followup_id)
+    except QueueUnavailable as e:
+        raise HTTPException(status_code=503, detail=str(e))
 
     return {"success": True, "message": "Follow-up queued for sending"}
 

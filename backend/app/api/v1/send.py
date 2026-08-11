@@ -17,19 +17,16 @@ from app.config import settings
 
 logger=logging.getLogger(__name__)
 router=APIRouter()
-SIM_FILE=os.path.join(os.path.dirname(__file__),"..","..","..",".sim_number")
-def _get_sim():
-    try:return int(open(SIM_FILE).read().strip())
-    except:return 1
 
 @router.post("/")
 async def send_sms_now(contact_id:Optional[int]=Query(None),phone_number:Optional[str]=Query(None),list_id:Optional[int]=Query(None),body:str=Query(...,min_length=1,max_length=1600),schedule_at:Optional[str]=Query(None),db:AsyncSession=Depends(get_db),cu:User=Depends(get_current_user)):
-    sim=_get_sim()
+    from app.services.system_settings import get_sim_number
+    sim=await get_sim_number(db)
 
     # SCHEDULED
     if schedule_at:
         try:sched_dt=datetime.fromisoformat(schedule_at)
-        except:raise HTTPException(400,"Invalid schedule_at format")
+        except Exception:raise HTTPException(400,"Invalid schedule_at format")
         if sched_dt<=datetime.now(timezone.utc):raise HTTPException(400,"schedule_at must be in the future")
         scheduled=[]
         if contact_id:

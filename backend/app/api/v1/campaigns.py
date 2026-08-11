@@ -120,12 +120,24 @@ async def start_campaign(
     service = CampaignService(db)
     try:
         campaign = await service.start_campaign(campaign_id)
-        # Trigger campaign processing via Celery
-        from app.tasks.campaign_tasks import process_campaign
-        process_campaign.delay(campaign_id)
-        return {"success": True, "status": campaign.status, "message": "Campaign started"}
+        previous_status = "scheduled"
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+    # Trigger campaign processing via Celery. If the broker is down we must
+    # not leave the campaign stranded in "running" with nothing processing it.
+    from app.tasks.campaign_tasks import process_campaign
+    from app.tasks.queue import QueueUnavailable, enqueue
+
+    try:
+        enqueue(process_campaign, campaign_id)
+    except QueueUnavailable as e:
+        campaign.status = previous_status
+        campaign.started_at = None
+        await db.flush()
+        raise HTTPException(status_code=503, detail=str(e))
+
+    return {"success": True, "status": campaign.status, "message": "Campaign started"}
 
 
 @router.post("/{campaign_id}/pause")
@@ -153,11 +165,21 @@ async def resume_campaign(
     service = CampaignService(db)
     try:
         campaign = await service.resume_campaign(campaign_id)
-        from app.tasks.campaign_tasks import process_campaign
-        process_campaign.delay(campaign_id)
-        return {"success": True, "status": campaign.status}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+    from app.tasks.campaign_tasks import process_campaign
+    from app.tasks.queue import QueueUnavailable, enqueue
+
+    try:
+        enqueue(process_campaign, campaign_id)
+    except QueueUnavailable as e:
+        # Put it back to paused so the UI reflects reality.
+        campaign.status = "paused"
+        await db.flush()
+        raise HTTPException(status_code=503, detail=str(e))
+
+    return {"success": True, "status": campaign.status}
 
 
 @router.post("/{campaign_id}/stop")

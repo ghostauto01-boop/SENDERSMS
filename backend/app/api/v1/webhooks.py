@@ -1,9 +1,10 @@
 """Webhook handler — receives SMS-Gate.app events. Parses nested payload format."""
 import json, logging
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.config import settings
 from app.database import get_db
 from app.models.webhook import WebhookEvent
 from app.models.user import User
@@ -11,6 +12,42 @@ from app.security.auth import get_current_user
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+def _verify_signature(request: Request, raw_body: bytes) -> None:
+    """Reject webhook deliveries that are not signed by our SMS gateway.
+
+    Without this any anonymous caller can inject fake inbound messages,
+    poison lead statuses and trigger push notifications.
+    """
+    secret = settings.SMSGATE_WEBHOOK_SECRET
+
+    if not secret:
+        if settings.SMSGATE_WEBHOOK_ALLOW_UNSIGNED and not settings.is_production:
+            logger.warning(
+                "Webhook signature check SKIPPED (SMSGATE_WEBHOOK_ALLOW_UNSIGNED=1). "
+                "Never do this in production."
+            )
+            return
+        logger.error(
+            "Webhook rejected: SMSGATE_WEBHOOK_SECRET is not configured. "
+            "Set it to the signing key from SMS-Gate Settings -> Webhooks."
+        )
+        raise HTTPException(status_code=503, detail="Webhook signing not configured")
+
+    from app.providers.smsgate import SMSGateProvider
+
+    signature = request.headers.get("x-signature", "")
+    timestamp = request.headers.get("x-timestamp", "")
+
+    if not SMSGateProvider.validate_webhook_signature(
+        raw_body, signature, timestamp, secret
+    ):
+        logger.warning(
+            "Webhook rejected: invalid signature from %s",
+            request.client.host if request.client else "unknown",
+        )
+        raise HTTPException(status_code=401, detail="Invalid webhook signature")
 
 async def _parse(req: Request) -> dict:
     ct = (req.headers.get("content-type","")or"").lower()
@@ -20,11 +57,11 @@ async def _parse(req: Request) -> dict:
         else:
             raw = await req.body()
             try: body = json.loads(raw)
-            except: 
+            except Exception: 
                 from urllib.parse import parse_qs
                 try: body = {k:v[0]if isinstance(v,list)and len(v)==1 else v for k,v in parse_qs(raw.decode("utf-8",errors="replace")).items()}
-                except: pass
-    except: pass
+                except Exception: pass
+    except Exception: pass
     if not body: body = dict(req.query_params)
     return body
 
@@ -60,6 +97,12 @@ async def smsgateway_webhook(request: Request, db: AsyncSession = Depends(get_db
       }
     }
     """
+    # Read the raw bytes first: the signature is computed over the body
+    # exactly as sent, before any JSON parsing. Starlette caches this so
+    # the later _parse() call still works.
+    raw_body = await request.body()
+    _verify_signature(request, raw_body)
+
     body = await _parse(request)
     if not body: return {"ok": True}
     

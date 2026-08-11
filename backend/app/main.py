@@ -10,28 +10,56 @@ from app.database import init_db, async_session_factory
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-LAST_POLL = os.path.join(os.path.dirname(__file__), "..", "..", ".last_poll")
-WEBHOOK_DONE = os.path.join(os.path.dirname(__file__), "..", "..", ".webhook_done")
 
 async def _startup_webhook():
+    """Register our webhook URL with the gateway once per deployment target."""
     try:
-        if os.path.exists(WEBHOOK_DONE): return
-        from app.providers.smsgate import register_webhook_direct
-        r = await register_webhook_direct("https://sendsms-api.onrender.com/api/v1/webhooks/smsgateway")
-        if r.get("success"):
-            with open(WEBHOOK_DONE, "w") as f: f.write("ok")
-            logger.info("Webhook auto-registered")
-    except Exception as e: logger.warning(f"Webhook: {e}")
+        from app.services.system_settings import (
+            WEBHOOK_REGISTERED, get_setting, set_setting,
+        )
+        from app.utils.urls import webhook_url
+
+        url = webhook_url()
+        if not url:
+            logger.warning(
+                "Skipping webhook registration: PUBLIC_BASE_URL is not set. "
+                "Inbound SMS will not be delivered until it is configured."
+            )
+            return
+        if not settings.smsgate_configured:
+            logger.warning("Skipping webhook registration: gateway credentials not configured.")
+            return
+
+        async with async_session_factory() as db:
+            # Re-register whenever the target URL changes (new deployment,
+            # new domain), not just the first time ever.
+            if await get_setting(db, WEBHOOK_REGISTERED) == url:
+                return
+
+            from app.providers.smsgate import register_webhook_direct
+            r = await register_webhook_direct(url)
+            if r.get("success"):
+                await set_setting(db, WEBHOOK_REGISTERED, url,
+                                  description="Webhook URL registered with the SMS gateway")
+                await db.commit()
+                logger.info("Webhook auto-registered at %s", url)
+            else:
+                logger.warning("Webhook registration failed: %s", r)
+    except Exception as e:
+        logger.warning(f"Webhook: {e}")
 
 async def _poll():
     """Update delivery statuses for pending messages."""
     try:
+        from app.services.system_settings import LAST_POLL, get_float, set_setting
+
         now = time.time()
-        try:
-            with open(LAST_POLL) as f:
-                if now - float(f.read().strip()) < 15: return
-        except: pass
-        with open(LAST_POLL, "w") as f: f.write(str(now))
+        async with async_session_factory() as db:
+            if now - await get_float(db, LAST_POLL, 0.0) < 15:
+                return
+            await set_setting(db, LAST_POLL, str(now),
+                              description="Unix time of the last delivery-status poll")
+            await db.commit()
 
         from sqlalchemy import select
         from app.models.conversation import Message
@@ -86,20 +114,53 @@ async def _process_scheduled():
             logger.info(f"SCHEDULED: {len(scheduled)} messages")
     except Exception as e: logger.warning(f"Scheduled: {e}")
 
+async def _poll_loop():
+    """Run _poll() on a timer instead of piggybacking on health checks."""
+    import asyncio
+    while True:
+        try:
+            await asyncio.sleep(settings.INLINE_POLL_INTERVAL)
+            await _poll()
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            logger.warning("Poll loop: %s", e)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    import asyncio
+
     try: await init_db(); logger.info("DB ready")
     except Exception as e: logger.warning("init_db: %s", e)
     try: await _startup_webhook()
     except Exception as e: logger.warning("webhook: %s", e)
+
+    poller = None
+    if settings.ENABLE_INLINE_POLLER:
+        poller = asyncio.create_task(_poll_loop())
+        logger.info("Inline poller started (every %ss)", settings.INLINE_POLL_INTERVAL)
+
     yield
+
+    if poller:
+        poller.cancel()
+        try: await poller
+        except (asyncio.CancelledError, Exception): pass
 
 app = FastAPI(title=settings.APP_NAME, version="1.0.0", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins_list, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
+from app.security.rate_limit import install_rate_limiting
+install_rate_limiting(app)
+
 @app.get("/api/v1/health")
-async def health(bg: BackgroundTasks):
-    bg.add_task(_poll)
+async def health():
+    """Liveness probe. Must stay cheap and side-effect free.
+
+    This used to kick off _poll() (delivery-status sync AND sending due
+    scheduled messages) on every call, so any uptime monitor or load
+    balancer probe drove real SMS traffic.
+    """
     return JSONResponse({"status":"ok","app":settings.APP_NAME,"version":"1.0.0"})
 
 from app.api.v1 import auth, contacts, lists, campaigns, sequences, followups, inbox, templates, analytics, settings as settings_api, webhooks, dashboard, send

@@ -97,13 +97,13 @@ def _get_cached_device_id():
     try:
         with open(DEVICE_ID_FILE) as f:
             return f.read().strip()
-    except: return ""
+    except Exception: return ""
 
 def _cache_device_id(device_id: str):
     try:
         with open(DEVICE_ID_FILE, "w") as f:
             f.write(device_id)
-    except: pass
+    except Exception: pass
 
 @router.get("/device-info")
 async def get_device_info():

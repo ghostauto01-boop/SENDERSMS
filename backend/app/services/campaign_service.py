@@ -35,6 +35,39 @@ class CampaignService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
+    async def _check_gateway(self, campaign: Campaign) -> Optional[str]:
+        """Return an error string if no usable SMS gateway is available.
+
+        A campaign may either point at an explicit GatewaySetting row or fall
+        back to the gateway configured through the environment (the same one
+        the direct-send path uses). Requiring gateway_setting_id outright made
+        every campaign unschedulable, because nothing ever creates those rows.
+        """
+        if campaign.gateway_setting_id:
+            from app.models.gateway import GatewaySetting
+
+            result = await self.db.execute(
+                select(GatewaySetting).where(
+                    GatewaySetting.id == campaign.gateway_setting_id
+                )
+            )
+            gateway = result.scalar_one_or_none()
+            if not gateway:
+                return "Selected SMS gateway no longer exists"
+            if not gateway.is_enabled:
+                return "Selected SMS gateway is disabled"
+            return None
+
+        # No explicit gateway: fall back to the environment-configured one.
+        from app.config import settings
+
+        if not settings.smsgate_configured:
+            return (
+                "No SMS gateway configured. Set SMSGATE_BASE_URL, SMSGATE_USERNAME "
+                "and SMSGATE_PASSWORD, or select a gateway for this campaign."
+            )
+        return None
+
     async def create_campaign(self, data: dict) -> Campaign:
         """Create a new campaign (draft)."""
         campaign = Campaign(
@@ -77,8 +110,9 @@ class CampaignService:
             if count_result.scalar() == 0:
                 errors.append("Contact list is empty")
 
-        if not campaign.gateway_setting_id:
-            errors.append("No SMS gateway selected")
+        gateway_error = await self._check_gateway(campaign)
+        if gateway_error:
+            errors.append(gateway_error)
 
         if errors:
             raise ValueError("; ".join(errors))

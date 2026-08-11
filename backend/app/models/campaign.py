@@ -5,7 +5,7 @@ Campaign and CampaignContact models.
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -36,7 +36,7 @@ class Campaign(Base):
     max_delay: Mapped[int | None] = mapped_column(Integer, nullable=True)  # seconds
     send_start_hour: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 0-23
     send_end_hour: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 0-23
-    allow_weekends: Mapped[bool] = mapped_column(Integer, default=True, nullable=False)
+    allow_weekends: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     # Stats
     total_contacts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)

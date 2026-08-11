@@ -109,8 +109,9 @@ def process_pending_notifications():
                 select(NotificationEvent).where(NotificationEvent.status == "pending").limit(50)
             )
             events = result.scalars().all()
+            from app.tasks.queue import try_enqueue
             for event in events:
-                send_push_notification.delay(event.id)
+                try_enqueue(send_push_notification, event.id)
             await db.commit()
 
     loop = asyncio.get_event_loop()

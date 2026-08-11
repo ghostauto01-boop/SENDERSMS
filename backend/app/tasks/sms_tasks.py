@@ -9,10 +9,6 @@ from app.config import settings
 
 logger=logging.getLogger(__name__)
 
-def _get_sim():
-    try:return int(open(os.path.join(os.path.dirname(__file__),"..","..","..",".sim_number")).read().strip())
-    except:return 1
-
 async def _send_one(mid):
     async with async_session_factory() as db:
         m=(await db.execute(select(Message).where(Message.id==mid))).scalar_one_or_none()
@@ -21,7 +17,8 @@ async def _send_one(mid):
         c=(await db.execute(select(Contact).where(Contact.id==m.contact_id))).scalar_one_or_none()
         if not c:m.status="failed";m.last_error="Contact not found";await db.commit();return
         from app.providers.smsgate import send_sms_direct
-        r=await send_sms_direct(c.phone_number,m.body,_get_sim())
+        from app.services.system_settings import get_sim_number
+        r=await send_sms_direct(c.phone_number,m.body,await get_sim_number(db))
         if r["success"]:m.status="sent";m.provider_message_id=r.get("provider_message_id","");m.sent_at=datetime.now(timezone.utc)
         else:
             m.retry_count=(m.retry_count or 0)+1;m.status="failed"if m.retry_count>=3 else"retrying"
@@ -45,7 +42,7 @@ def sync_delivery_status():
             p=SMSGateProvider()
             for m in ms:
                 try:st=await p.get_message_status(m.provider_message_id);m.status=st.status if st.status in("delivered","failed")else m.status;m.delivered_at=st.delivered_at if st.status=="delivered"else m.delivered_at
-                except:pass
+                except Exception:pass
             await p.close();await db.commit()
     _run(s())
 
