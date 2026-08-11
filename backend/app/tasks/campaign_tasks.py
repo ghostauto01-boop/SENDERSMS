@@ -176,15 +176,10 @@ async def _send_template_message(db, campaign, cc, contact, template_id=None):
         if template:
             body = template.body
 
-    # Personalize
-    body = body.replace("{{first_name}}", contact.first_name or "")
-    body = body.replace("{{last_name}}", contact.last_name or "")
-    body = body.replace("{{business_name}}", contact.business_name or "")
-    body = body.replace("{{phone_number}}", contact.phone_number or "")
-    body = body.replace("{{city}}", contact.city or "")
-    body = body.replace("{{state}}", contact.state or "")
-    body = body.replace("{{website}}", contact.website or "")
-    body = body.replace("{{industry}}", contact.industry or "")
+    # Personalize via the shared renderer so campaign sends, direct sends and
+    # the preview endpoint all produce identical text.
+    from app.utils.templating import render_template
+    body = render_template(body, contact)
 
     # Create message
     from app.utils.phone import count_sms_segments
@@ -195,9 +190,12 @@ async def _send_template_message(db, campaign, cc, contact, template_id=None):
     # Find or create conversation
     from app.models.conversation import Conversation
     conv_result = await db.execute(
-        select(Conversation).where(Conversation.contact_id == contact.id)
+        select(Conversation)
+        .where(Conversation.contact_id == contact.id)
+        .order_by(Conversation.id)
+        .limit(1)
     )
-    conversation = conv_result.scalar_one_or_none()
+    conversation = conv_result.scalars().first()
     if not conversation:
         conversation = Conversation(
             contact_id=contact.id,
@@ -221,6 +219,14 @@ async def _send_template_message(db, campaign, cc, contact, template_id=None):
     )
     db.add(message)
     await db.flush()
+
+    # Keep the conversation summary in step with the message we just created.
+    # Every other send path does this; campaign sends did not, so a contact
+    # messaged only by a campaign showed up in the inbox as an empty thread
+    # with no preview and no timestamp to sort by.
+    conversation.message_count = (conversation.message_count or 0) + 1
+    conversation.last_message_preview = body[:100]
+    conversation.last_message_at = datetime.now(timezone.utc)
 
     # Queue the actual send. If the broker is unreachable we must NOT leave a
     # phantom "queued" message behind nor inflate the campaign counters --

@@ -13,6 +13,8 @@ from phonenumbers import PhoneNumberFormat, NumberParseException
 logger = logging.getLogger(__name__)
 
 # Nigerian mobile number patterns
+NIGERIA_COUNTRY_CODE = "234"
+
 NG_MOBILE_PREFIXES = [
     "0701", "07020", "07025", "07026", "07027", "07028", "07029",
     "0703", "0704", "0705", "0706", "0707", "0708", "0709",
@@ -210,3 +212,48 @@ def normalize_inbound_sender(raw: str) -> Optional[str]:
         return alnum.upper()[:20]
 
     return None
+
+
+def phone_search_variants(term: str) -> list:
+    """Return the phone fragments to try when a user searches by number.
+
+    Numbers are stored in E.164 (``+2348031112222``), but people type them the
+    way they say them: ``08031112222``, or a fragment like ``0803111``. A plain
+    ``LIKE %0803111%`` never matches the stored ``+234...`` form, so searching
+    by phone silently returned nothing -- the single most common way to look
+    someone up.
+
+    Given a numeric term we return every reasonable stored spelling:
+      ``08031112222`` -> also try ``8031112222`` / ``2348031112222``
+      ``8031112222``  -> also try ``2348031112222``
+      ``2348031112222`` / ``+234...`` -> also try the national ``0`` form
+
+    Non-numeric input yields no variants (the caller still does its normal
+    name/business search). Fragments are returned bare so the caller can wrap
+    them in wildcards.
+    """
+    if not term:
+        return []
+
+    digits = re.sub(r"[^\d]", "", str(term))
+    if not digits:
+        return []
+
+    variants = {digits}
+
+    # Typed with the national trunk prefix: 0803... -> 803... / 234803...
+    if digits.startswith("0") and len(digits) > 1:
+        national = digits[1:]
+        variants.add(national)
+        variants.add(NIGERIA_COUNTRY_CODE + national)
+    # Typed with the country code: 234803... -> 803... / 0803...
+    elif digits.startswith(NIGERIA_COUNTRY_CODE) and len(digits) > 3:
+        national = digits[len(NIGERIA_COUNTRY_CODE):]
+        variants.add(national)
+        variants.add("0" + national)
+    # Typed bare: 803... -> 234803... / 0803...
+    else:
+        variants.add(NIGERIA_COUNTRY_CODE + digits)
+        variants.add("0" + digits)
+
+    return sorted(variants, key=len, reverse=True)

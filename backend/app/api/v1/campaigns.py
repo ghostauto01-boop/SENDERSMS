@@ -129,12 +129,20 @@ async def start_campaign(
     from app.tasks.campaign_tasks import process_campaign
     from app.tasks.queue import QueueUnavailable, enqueue
 
+    # Commit BEFORE enqueuing. The worker is a separate process reading its own
+    # connection: if the task is dispatched while this transaction is still
+    # open, the worker can look up the campaign before the CampaignContact rows
+    # (and the "running" status) are visible, find nothing to do, and exit --
+    # leaving the campaign stuck at 0 sent until the next beat cycle, or
+    # forever if beat is not running. This was reproducible on a fast broker.
+    await db.commit()
+
     try:
         enqueue(process_campaign, campaign_id)
     except QueueUnavailable as e:
         campaign.status = previous_status
         campaign.started_at = None
-        await db.flush()
+        await db.commit()
         raise HTTPException(status_code=503, detail=str(e))
 
     return {"success": True, "status": campaign.status, "message": "Campaign started"}

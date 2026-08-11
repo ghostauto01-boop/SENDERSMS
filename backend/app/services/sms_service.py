@@ -6,10 +6,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.contact import Contact
 from app.models.conversation import Conversation,Message
 from app.models.suppression import SuppressionEntry
-from app.models.campaign import CampaignContact
+from app.models.campaign import Campaign,CampaignContact
 from app.models.followup import FollowUp
 from app.models.notification import NotificationProvider
 from app.utils.phone import normalize_nigerian_number,normalize_inbound_sender,detect_opt_out_keyword,count_sms_segments
+from app.utils.templating import render_template
 from app.utils.naming import contact_display_name
 from app.security.encryption import decrypt_value
 from app.config import settings
@@ -30,9 +31,9 @@ class SMSService:
         c=(await self.db.execute(select(Contact).where(Contact.id==contact_id))).scalar_one_or_none()
         if not c or c.is_opted_out:return None
         if(await self.db.execute(select(SuppressionEntry).where(SuppressionEntry.phone_number==c.phone_number))).scalar_one_or_none():return None
-        body=body.replace("{{first_name}}",c.first_name or"").replace("{{business_name}}",c.business_name or"").replace("{{city}}",c.city or"").replace("{{state}}",c.state or"")
+        body=render_template(body,c)
         ch,sg=count_sms_segments(body);ik=f"send-{contact_id}-{uuid.uuid4().hex[:12]}"
-        cr=(await self.db.execute(select(Conversation).where(Conversation.contact_id==contact_id))).scalar_one_or_none()
+        cr=(await self.db.execute(select(Conversation).where(Conversation.contact_id==contact_id).order_by(Conversation.id).limit(1))).scalars().first()
         if not cr:cr=Conversation(contact_id=contact_id,campaign_id=campaign_id,status="active");self.db.add(cr);await self.db.flush()
         msg=Message(conversation_id=cr.id,contact_id=contact_id,campaign_id=campaign_id,direction="outgoing",body=body,segment_count=sg,char_count=ch,status="sending",provider="smsgate",idempotency_key=ik)
         self.db.add(msg);await self.db.flush()
@@ -92,7 +93,7 @@ class SMSService:
         if not c:c=Contact(phone_number=n,country="Nigeria",lead_status="new",source="inbound_sms");self.db.add(c);await self.db.flush()
         kw=detect_opt_out_keyword(body)
         if kw:c.is_opted_out=True;c.opted_out_at=datetime.now(timezone.utc);c.opt_out_reason=f"Keyword:{kw}";self.db.add(SuppressionEntry(phone_number=n,contact_id=c.id,reason=f"Opt-out:{kw}",source="keyword",opt_out_keyword=kw));await self._stop_seq(c.id)
-        cr=(await self.db.execute(select(Conversation).where(Conversation.contact_id==c.id))).scalar_one_or_none()
+        cr=(await self.db.execute(select(Conversation).where(Conversation.contact_id==c.id).order_by(Conversation.id).limit(1))).scalars().first()
         if not cr:
             # A brand-new conversation still has one unread message in it.
             cr=Conversation(contact_id=c.id,status="unread",unread_count=1);self.db.add(cr);await self.db.flush()
@@ -111,6 +112,22 @@ class SMSService:
             cr.last_message_at=received_at;cr.last_message_preview=body[:100]
         c.messages_received=(c.messages_received or 0)+1;c.last_reply_at=datetime.now(timezone.utc)
         if c.lead_status=="new":c.lead_status="replied"
+        # Credit the reply to the campaign that last messaged this contact, so
+        # the campaign reply rate stops reading 0. Count one reply per contact
+        # per campaign: a chatty contact is still a single responder.
+        last_out=(await self.db.execute(select(Message).where(Message.contact_id==c.id,Message.direction=="outgoing",Message.campaign_id.isnot(None)).order_by(Message.created_at.desc()).limit(1))).scalar_one_or_none()
+        if last_out is not None and last_out.campaign_id:
+            cc=(await self.db.execute(select(CampaignContact).where(CampaignContact.campaign_id==last_out.campaign_id,CampaignContact.contact_id==c.id))).scalar_one_or_none()
+            # Dedup per campaign, not per contact: someone who replied to last
+            # month's campaign is still a new responder for this one. The
+            # CampaignContact row is the natural per-campaign marker.
+            first_reply_to_campaign=cc is None or cc.last_reply_at is None
+            if first_reply_to_campaign:
+                camp=(await self.db.execute(select(Campaign).where(Campaign.id==last_out.campaign_id))).scalar_one_or_none()
+                if camp:camp.replies=(camp.replies or 0)+1
+            if cc is not None:
+                cc.last_reply_at=received_at
+                if cc.status in("pending","queued","sent","delivered"):cc.status="replied"
         if not kw:await self._stop_seq(c.id)
         cr.sequence_paused=True;await self.db.flush()
         await self._notify_inbound(c,body[:160])
@@ -169,6 +186,10 @@ class SMSService:
         rank={"queued":0,"sending":1,"sent":2,"delivered":3,"failed":3,"cancelled":3}
         if rank.get(status,0)<rank.get(m.status,0):
             return m
+        # Was this message already in the state we are about to record? If so
+        # the campaign counter was incremented on the first webhook and must
+        # not move again (SMS-Gate sends one sms:delivered per message part).
+        counted_before=(m.status==status)
         m.status=status
         now=datetime.now(timezone.utc)
         # sms:delivered fires once per part of a multipart message; keep the
@@ -179,5 +200,16 @@ class SMSService:
             if not m.failed_at:m.failed_at=delivered_at or now
         elif status=="sent":
             if not m.sent_at:m.sent_at=delivered_at or now
+        # Roll the campaign's aggregate counters forward. These are what the
+        # analytics endpoint and the dashboard report, and nothing else
+        # maintained them, so every campaign showed a 0% delivery rate no
+        # matter how many messages actually landed. Only count a transition
+        # into the state (guarded by the rank check above plus the timestamp
+        # guards) so per-part delivery webhooks cannot double-count.
+        if m.campaign_id and not counted_before:
+            camp=(await self.db.execute(select(Campaign).where(Campaign.id==m.campaign_id))).scalar_one_or_none()
+            if camp:
+                if status=="delivered":camp.messages_delivered=(camp.messages_delivered or 0)+1
+                elif status in("failed","cancelled"):camp.messages_failed=(camp.messages_failed or 0)+1
         await self.db.flush()
         return m

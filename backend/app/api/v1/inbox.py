@@ -27,7 +27,20 @@ async def list_conversations(page:int=1,per_page:int=500,status:Optional[str]=No
             query = query.where(or_(Conversation.status == "unread", Conversation.unread_count > 0))
         else:
             query = query.where(Conversation.status == status)
-    if search: query = query.join(Contact, Conversation.contact_id == Contact.id).where(or_(Contact.first_name.ilike(f"%{search}%"),Contact.last_name.ilike(f"%{search}%"),Contact.business_name.ilike(f"%{search}%"),Contact.phone_number.ilike(f"%{search}%"),Conversation.last_message_preview.ilike(f"%{search}%")))
+    if search:
+        # Phone numbers are stored as +234..., but users type 0803... -- match
+        # every equivalent spelling so searching by the number people actually
+        # know finds the thread.
+        from app.utils.phone import phone_search_variants
+        _clauses = [
+            Contact.first_name.ilike(f"%{search}%"),
+            Contact.last_name.ilike(f"%{search}%"),
+            Contact.business_name.ilike(f"%{search}%"),
+            Contact.phone_number.ilike(f"%{search}%"),
+            Conversation.last_message_preview.ilike(f"%{search}%"),
+        ]
+        _clauses += [Contact.phone_number.ilike(f"%{v}%") for v in phone_search_variants(search)]
+        query = query.join(Contact, Conversation.contact_id == Contact.id).where(or_(*_clauses))
     total = (await db.execute(select(func.count()).select_from(query.subquery()))).scalar() or 0
     query = query.order_by(Conversation.last_message_at.desc().nullslast()).offset((page-1)*per_page).limit(per_page)
     items = []

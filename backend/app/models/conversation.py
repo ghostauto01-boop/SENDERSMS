@@ -4,7 +4,7 @@ Conversation and Message models for the SMS inbox.
 
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -14,6 +14,11 @@ class Conversation(Base):
     __tablename__ = "conversations"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    # One thread per contact. The whole codebase looks conversations up with
+    # scalar_one_or_none(), so a duplicate row would make every send and every
+    # inbound message for that contact raise MultipleResultsFound forever.
+    __table_args__ = (UniqueConstraint("contact_id", name="uq_conversation_contact"),)
+
     contact_id: Mapped[int] = mapped_column(Integer, ForeignKey("contacts.id"), nullable=False, index=True)
     campaign_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("campaigns.id"), nullable=True, index=True)
 

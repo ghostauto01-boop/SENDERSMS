@@ -13,6 +13,7 @@ from app.models.contact_list import ContactListMember
 from app.models.conversation import Conversation,Message
 from app.models.scheduled import ScheduledMessage
 from app.utils.phone import normalize_nigerian_number,count_sms_segments
+from app.utils.templating import render_template
 from app.config import settings
 
 logger=logging.getLogger(__name__)
@@ -70,15 +71,17 @@ async def send_sms_now(contact_id:Optional[int]=Query(None),phone_number:Optiona
         if not recipients:raise HTTPException(400,"List empty")
     else:raise HTTPException(400,"Provide contact_id, phone_number, or list_id")
 
+    # Counted per recipient below: personalization changes the length, so a
+    # single count taken from the raw template misreports segments (and cost)
+    # for every contact.
     char_count,segment_count=count_sms_segments(body)
     from app.providers.smsgate import send_sms_direct
     results=[]
 
     for contact in recipients:
-        msg=body
-        for k,v in[("{{first_name}}",contact.first_name or""),("{{business_name}}",contact.business_name or""),("{{city}}",contact.city or""),("{{state}}",contact.state or"")]:
-            msg=msg.replace(k,v)
-        cr=await db.execute(select(Conversation).where(Conversation.contact_id==contact.id));conv=cr.scalar_one_or_none()
+        msg=render_template(body,contact)
+        char_count,segment_count=count_sms_segments(msg)
+        cr=await db.execute(select(Conversation).where(Conversation.contact_id==contact.id).order_by(Conversation.id).limit(1));conv=cr.scalars().first()
         if not conv:conv=Conversation(contact_id=contact.id,status="active");db.add(conv);await db.flush()
         message=Message(conversation_id=conv.id,contact_id=contact.id,direction="outgoing",body=msg,segment_count=segment_count,char_count=char_count,status="sending",provider="smsgate",idempotency_key=f"direct-{contact.id}-{uuid.uuid4().hex[:8]}")
         db.add(message);await db.flush()
