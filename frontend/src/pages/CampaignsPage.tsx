@@ -118,10 +118,23 @@ export default function CampaignsPage() {
   const loadCampaigns = async () => {
     try {
       setLoading(true);
+      setError(null);
       const { data } = await api.get("/campaigns/");
       setCampaigns(data.items);
     } catch (err: any) {
-      setError(err.response?.data?.detail || "Failed to load campaigns");
+      const status = err.response?.status;
+      const detail = err.response?.data?.detail;
+      if (!err.response) {
+        setError("Can't reach the server. Check your connection and try again.");
+      } else if (status >= 500) {
+        setError(
+          "The server hit an error loading campaigns. If this just started " +
+            "after an update, the database may be missing a recent change — " +
+            "restarting the service applies it automatically.",
+        );
+      } else {
+        setError(detail || "Failed to load campaigns");
+      }
     } finally {
       setLoading(false);
     }

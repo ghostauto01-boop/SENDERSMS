@@ -32,5 +32,26 @@ async def get_db() -> AsyncSession:
             raise
 
 async def init_db():
+    """Create missing tables, then add any missing columns.
+
+    create_all() only ever creates whole tables -- it will not add a column to
+    a table that already exists. On a database with existing data that means a
+    new column silently never appears and every query touching it fails at
+    runtime, while the service itself looks healthy. repair_schema_sync closes
+    that gap with additive-only ALTER TABLE ... ADD COLUMN.
+    """
+    from app.schema_repair import repair_schema_sync
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        added = await conn.run_sync(repair_schema_sync, Base.metadata)
+
+    if added:
+        import logging
+        logging.getLogger(__name__).warning(
+            "Schema auto-repair added %d missing column(s): %s. "
+            "This is a safety net -- run scripts/migrate_existing_db.sql for "
+            "indexes, constraints and data migrations.",
+            len(added), ", ".join(added),
+        )
+    return added
