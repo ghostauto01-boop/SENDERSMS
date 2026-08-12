@@ -116,6 +116,15 @@ def process_inbound_sms(from_number,body,webhook_data=None):
         async with async_session_factory()as db:await SMSService(db).process_inbound_message(from_number,body,webhook_data);await db.commit()
     _run(p())
 
+@celery_app.task
+def process_scheduled_messages():
+    """Celery wrapper for due scheduled messages (also run inline via _poll)."""
+    async def _do():
+        # Reuse the same logic as inline poller: import and delegate
+        from app.main import _process_scheduled
+        await _process_scheduled()
+    _run(_do())
+
 def _run(coro):
     loop=asyncio.get_event_loop()
     if loop.is_closed():loop=asyncio.new_event_loop();asyncio.set_event_loop(loop)

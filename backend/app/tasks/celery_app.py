@@ -90,4 +90,8 @@ celery_app.conf.beat_schedule = {
         "task": "app.tasks.campaign_tasks.launch_due_campaigns",
         "schedule": timedelta(minutes=1),
     },
+    "process-scheduled-messages": {
+        "task": "app.tasks.sms_tasks.process_scheduled_messages",
+        "schedule": timedelta(seconds=30),
+    },
 }
