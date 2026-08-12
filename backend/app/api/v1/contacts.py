@@ -4,17 +4,20 @@ Contacts API routes.
 
 import csv
 import io
+import json
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, status
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select, func, or_, delete as sa_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.contact import Contact, Tag, ContactTag
+from app.models.contact_list import ContactList
 from app.models.user import User
-from app.schemas.contact import ContactCreate, ContactUpdate, ContactOut, ContactListOut, BulkAction, CSVImportRequest
+from app.schemas.contact import ContactCreate, ContactUpdate, ContactOut, ContactListOut, BulkAction
 from app.security.auth import get_current_user
 from app.utils.phone import normalize_nigerian_number
 
@@ -26,22 +29,8 @@ LEAD_STATUSES = [
 ]
 
 
-@router.get("/", response_model=ContactListOut)
-async def list_contacts(
-    page: int = Query(default=1, ge=1),
-    per_page: int = Query(default=25, ge=1, le=100),
-    search: Optional[str] = None,
-    lead_status: Optional[str] = None,
-    tag: Optional[str] = None,
-    sort_by: str = "created_at",
-    sort_dir: str = "desc",
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """List contacts with pagination, search, filter, and sort."""
-    query = select(Contact)
-
-    # Filters
+def _apply_contact_filters(query, search: Optional[str], lead_status: Optional[str], tag: Optional[str]):
+    """Apply the shared search / status / tag filters to a contact query."""
     if search:
         search_term = f"%{search}%"
         clauses = [
@@ -66,6 +55,24 @@ async def list_contacts(
 
     if tag:
         query = query.join(ContactTag, Contact.id == ContactTag.contact_id).join(Tag, ContactTag.tag_id == Tag.id).where(Tag.name == tag)
+
+    return query
+
+
+@router.get("/", response_model=ContactListOut)
+async def list_contacts(
+    page: int = Query(default=1, ge=1),
+    per_page: int = Query(default=25, ge=1, le=100),
+    search: Optional[str] = None,
+    lead_status: Optional[str] = None,
+    tag: Optional[str] = None,
+    sort_by: str = "created_at",
+    sort_dir: str = "desc",
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List contacts with pagination, search, filter, and sort."""
+    query = _apply_contact_filters(select(Contact), search, lead_status, tag)
 
     # Count
     count_query = select(func.count()).select_from(query.subquery())
@@ -227,48 +234,52 @@ async def bulk_action(
 @router.post("/import/csv")
 async def import_csv(
     file: UploadFile = File(...),
-    list_id: Optional[int] = None,
-    skip_duplicates: bool = True,
+    list_id: Optional[int] = Form(None),
+    skip_duplicates: bool = Form(True),
+    column_mapping: Optional[str] = Form(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Import contacts from CSV file."""
-    from app.services.csv_service import CSVImportService
+    """Import contacts from CSV file, optionally into a contact list.
+
+    ``list_id`` / ``skip_duplicates`` / ``column_mapping`` arrive as multipart
+    form fields (the UI uploads the file and these together), so they must be
+    declared with ``Form`` -- previously ``list_id`` was a query parameter and
+    the browser's form field never reached it, so imports always landed with
+    no list attached.
+    """
+    from app.services.csv_service import CSVImportService, detect_column_mapping
 
     content = await file.read()
-    service = CSVImportService(db)
 
-    # Auto-detect column mapping
+    # Fail fast with a clean 404 if the target list does not exist, instead of
+    # importing the contacts and silently dropping the list attachment.
+    if list_id is not None:
+        list_result = await db.execute(select(ContactList).where(ContactList.id == list_id))
+        if not list_result.scalar_one_or_none():
+            raise HTTPException(status_code=404, detail="List not found")
+
+    # Auto-detect column mapping from the real CSV headers (case-insensitive).
     text = content.decode("utf-8-sig", errors="replace")
     reader = csv.DictReader(io.StringIO(text))
     if not reader.fieldnames:
         raise HTTPException(status_code=400, detail="No headers found in CSV")
 
-    csv_headers = [h.strip().lower() for h in reader.fieldnames]
-    column_mapping = {}
-    for h in csv_headers:
-        if h in ("phone", "phone_number"):
-            column_mapping[h] = "phone_number"
-        elif h in ("first_name", "firstname"):
-            column_mapping[h] = "first_name"
-        elif h in ("last_name", "lastname"):
-            column_mapping[h] = "last_name"
-        elif h in ("business_name", "business", "company"):
-            column_mapping[h] = "business_name"
-        elif h == "email":
-            column_mapping[h] = "email"
-        elif h == "city":
-            column_mapping[h] = "city"
-        elif h == "state":
-            column_mapping[h] = "state"
-        elif h == "website":
-            column_mapping[h] = "website"
-        elif h == "industry":
-            column_mapping[h] = "industry"
-        elif h == "source":
-            column_mapping[h] = "source"
+    column_mapping_map = detect_column_mapping(list(reader.fieldnames))
 
-    result = await service.validate_and_import(content, column_mapping, list_id, skip_duplicates)
+    # Merge any mapping the user chose in the "map columns" step, so manual
+    # overrides are respected on top of the auto-detection.
+    if column_mapping:
+        try:
+            client_mapping = json.loads(column_mapping)
+        except (ValueError, TypeError):
+            client_mapping = {}
+        for header, field in client_mapping.items():
+            if field:
+                column_mapping_map[str(header).strip().lower()] = field
+
+    service = CSVImportService(db)
+    result = await service.validate_and_import(content, column_mapping_map, list_id, skip_duplicates)
 
     return {
         "imported": result.imported,
@@ -279,6 +290,40 @@ async def import_csv(
         "errors": result.errors[:50],  # Limit error report
         "imported_ids": result.imported_contact_ids,
     }
+
+
+@router.get("/export/csv")
+async def export_csv(
+    search: Optional[str] = None,
+    lead_status: Optional[str] = None,
+    tag: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Export all matching contacts to a CSV file."""
+    query = _apply_contact_filters(select(Contact), search, lead_status, tag)
+    query = query.order_by(Contact.created_at.desc())
+
+    result = await db.execute(query)
+    contacts = result.scalars().all()
+
+    columns = [
+        "first_name", "last_name", "business_name", "phone_number", "email",
+        "city", "state", "country", "website", "industry", "source", "lead_status",
+    ]
+
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(columns)
+    for c in contacts:
+        writer.writerow([getattr(c, col) or "" for col in columns])
+
+    buffer.seek(0)
+    return StreamingResponse(
+        iter([buffer.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=contacts.csv"},
+    )
 
 
 @router.get("/{contact_id}/activity")
