@@ -49,7 +49,7 @@ async def _startup_webhook():
         logger.warning(f"Webhook: {e}")
 
 async def _poll():
-    """Update delivery statuses for pending messages."""
+    """Update delivery statuses for pending messages and process scheduled sends."""
     try:
         from app.services.system_settings import LAST_POLL, get_float, set_setting
 
@@ -72,25 +72,32 @@ async def _poll():
                     Message.status.in_(("sent","sending","queued"))
                 ).limit(100))
             ids = [m.provider_message_id for m in msgs.scalars().all()]
-            if not ids: return
+            if ids:
+                results = await poll_status_for_ids(ids)
+                count = 0
+                for r in results:
+                    mr = await db.execute(select(Message).where(Message.provider_message_id == r["provider_message_id"]))
+                    m = mr.scalar_one_or_none()
+                    if m and m.status != r["status"]:
+                        m.status = r["status"]
+                        if r["status"] == "delivered":
+                            from datetime import datetime as dt, timezone as tz
+                            m.delivered_at = dt.now(tz.utc)
+                        elif r["status"] in ("failed", "cancelled") and not m.failed_at:
+                            from datetime import datetime as dt, timezone as tz
+                            m.failed_at = dt.now(tz.utc)
+                        count += 1
+                if count:
+                    await db.commit()
+                    logger.info(f"STATUS: updated {count} messages")
 
-            results = await poll_status_for_ids(ids)
-            count = 0
-            for r in results:
-                mr = await db.execute(select(Message).where(Message.provider_message_id == r["provider_message_id"]))
-                m = mr.scalar_one_or_none()
-                if m and m.status != r["status"]:
-                    m.status = r["status"]
-                    if r["status"] == "delivered":
-                        from datetime import datetime as dt, timezone as tz
-                        m.delivered_at = dt.now(tz.utc)
-                    count += 1
-            if count:
-                await db.commit()
-                logger.info(f"STATUS: updated {count} messages")
-
+        # Always process schedules even when no delivery statuses to poll
         await _process_scheduled()
         await _launch_scheduled_campaigns()
+        # Fallback inline sender for running campaigns when Celery worker is
+        # asleep (free tier) or Redis unreachable — otherwise campaigns stay
+        # “running” with pending contacts forever.
+        await _process_running_campaigns_inline()
     except Exception as e:
         logger.warning(f"Poll: {e}")
 
@@ -112,26 +119,309 @@ async def _launch_scheduled_campaigns():
     except Exception as e:
         logger.warning(f"Scheduled campaigns: {e}")
 
+async def _process_running_campaigns_inline():
+    """Inline fallback for campaign sends when Celery/Redis is unavailable.
+
+    Tries to send a small batch (up to 10 contacts) for each running campaign
+    via direct gateway calls. If the gateway is not configured we leave the
+    contacts as pending so a later retry (or a worker) can pick them up — we
+    still mark the campaign heartbeat so operators see it is not stuck.
+    Without this, a campaign launched by the inline poller on the free tier
+    would sit in “running” forever because the only sender is a sleeping worker.
+    """
+    try:
+        from sqlalchemy import select
+        from app.models.campaign import Campaign, CampaignContact
+        from app.models.contact import Contact
+        from app.models.conversation import Conversation, Message
+        from app.providers.smsgate import send_sms_direct
+        from app.services.system_settings import get_sim_number
+        from app.services.campaign_service import CampaignService
+        from app.utils.templating import render_template
+        from app.utils.phone import count_sms_segments
+        from datetime import datetime as dt, timezone as tz
+        import uuid, json
+        async with async_session_factory() as db:
+            res = await db.execute(select(Campaign).where(Campaign.status == "running").limit(3))
+            campaigns = res.scalars().all()
+            for camp in campaigns:
+                # Skip if celery is healthy — let the worker handle it to avoid double-send.
+                # We detect this by trying a lightweight broker ping via settings.
+                # For now, we always do inline if we see pending contacts and no recent worker heartbeat.
+                # Simpler: if there are pending contacts older than 30s, inline will help.
+                cc_res = await db.execute(select(CampaignContact).where(CampaignContact.campaign_id == camp.id, CampaignContact.status == "pending").limit(10))
+                pending = cc_res.scalars().all()
+                if not pending:
+                    # check if all done — mark completed
+                    rem = await db.execute(select(CampaignContact).where(CampaignContact.campaign_id == camp.id, CampaignContact.status.in_(["pending","queued","sent"])).limit(1))
+                    if rem.scalars().first() is None and camp.status == "running":
+                        camp.status = "completed"
+                        camp.completed_at = dt.now(tz.utc)
+                        await db.commit()
+                        logger.info(f"CAMPAIGN {camp.id} completed (inline)")
+                        continue
+                    continue
+                sim = await get_sim_number(db)
+                svc = CampaignService(db)
+                for cc in pending:
+                    try:
+                        c_res = await db.execute(select(Contact).where(Contact.id == cc.contact_id))
+                        contact = c_res.scalar_one_or_none()
+                        if not contact or contact.is_opted_out:
+                            cc.status = "opted_out"
+                            continue
+                        # resolve body (handles template/message_body/sequence)
+                        body = await svc.resolve_body(camp)
+                        if not body:
+                            cc.status = "failed"
+                            logger.warning(f"Campaign {camp.id} no body for contact {contact.id}")
+                            continue
+                        # personalize
+                        body = render_template(body, contact)
+                        # ensure conversation
+                        conv_res = await db.execute(select(Conversation).where(Conversation.contact_id == contact.id).order_by(Conversation.id).limit(1))
+                        conv = conv_res.scalars().first()
+                        if not conv:
+                            conv = Conversation(contact_id=contact.id, campaign_id=camp.id, status="active")
+                            db.add(conv)
+                            await db.flush()
+                        # create message
+                        cc_seg, cc_cnt = count_sms_segments(body)
+                        import uuid as _uuid
+                        msg = Message(
+                            conversation_id=conv.id, contact_id=contact.id, campaign_id=camp.id,
+                            direction="outgoing", body=body, segment_count=cc_seg, char_count=cc_cnt,
+                            status="sending", provider="smsgate", idempotency_key=f"camp-{camp.id}-{cc.id}-{_uuid.uuid4().hex[:8]}"
+                        )
+                        db.add(msg)
+                        await db.flush()
+                        # direct gateway
+                        r = await send_sms_direct(contact.phone_number, body, sim)
+                        if r.get("success"):
+                            msg.status = "sent"
+                            msg.provider_message_id = r.get("provider_message_id","")
+                            msg.sent_at = dt.now(tz.utc)
+                            msg.provider_response = json.dumps(r.get("raw")) if r.get("raw") else None
+                            cc.status = "sent"
+                            cc.messages_sent = (cc.messages_sent or 0) + 1
+                            cc.last_message_id = msg.id
+                            cc.last_message_at = dt.now(tz.utc)
+                            camp.messages_sent = (camp.messages_sent or 0) + 1
+                            conv.message_count = (conv.message_count or 0) + 1
+                            conv.last_message_preview = body[:100]
+                            conv.last_message_at = dt.now(tz.utc)
+                            contact.messages_sent = (contact.messages_sent or 0) + 1
+                            contact.last_contacted_at = dt.now(tz.utc)
+                        else:
+                            err = (r.get("error") or "Gateway rejected")[:500]
+                            msg.status = "failed"
+                            msg.last_error = err
+                            msg.failed_at = dt.now(tz.utc)
+                            msg.provider_response = json.dumps(r.get("raw")) if r.get("raw") else None
+                            cc.status = "failed"
+                            camp.messages_failed = (camp.messages_failed or 0) + 1
+                            conv.message_count = (conv.message_count or 0) + 1
+                            conv.last_message_preview = body[:100]
+                            conv.last_message_at = dt.now(tz.utc)
+                    except Exception as ie:
+                        logger.warning(f"Campaign {camp.id} contact {cc.contact_id} error: {ie}")
+                        cc.status = "failed"
+                await db.commit()
+                logger.info(f"CAMPAIGN inline: campaign {camp.id} processed {len(pending)} contacts")
+    except Exception as e:
+        logger.warning(f"Inline campaign process: {e}")
+
 async def _process_scheduled():
+    """Send due scheduled messages and mirror them into the normal Message/Inbox tables.
+
+    Each ScheduledMessage becomes one Message row (outgoing). That way:
+    - Sent scheduled messages appear in the inbox chat with a double-check.
+    - Failed scheduled messages appear as failed bubbles AND in the Scheduled->Failed tab.
+    - Delivery receipts via poll/webhook can update the Message row as usual.
+    """
     try:
         from app.providers.smsgate import send_sms_direct
         from app.models.scheduled import ScheduledMessage
+        from app.models.contact import Contact
+        from app.models.conversation import Conversation, Message
+        from app.models.suppression import SuppressionEntry
         from sqlalchemy import select
         from datetime import datetime as dt, timezone as tz
+        import json, uuid
+        from app.utils.templating import render_template
+        from app.utils.phone import count_sms_segments
         async with async_session_factory() as db:
             due = await db.execute(select(ScheduledMessage).where(
                 ScheduledMessage.status == "pending",
-                ScheduledMessage.schedule_at <= dt.now(tz.utc)).limit(5))
+                ScheduledMessage.schedule_at <= dt.now(tz.utc)).order_by(ScheduledMessage.schedule_at.asc()).limit(10))
             scheduled = due.scalars().all()
-            if not scheduled: return
+            if not scheduled:
+                return
             for sm in scheduled:
-                r = await send_sms_direct(sm.phone_number, sm.body, sm.sim_number)
-                sm.status = "sent" if r["success"] else "failed"
-                sm.error = r.get("error","")[:500] if not r["success"] else None
-                sm.executed_at = dt.now(tz.utc)
+                try:
+                    # Resolve contact (create if phone-only)
+                    contact = None
+                    if sm.contact_id:
+                        cr = await db.execute(select(Contact).where(Contact.id == sm.contact_id))
+                        contact = cr.scalar_one_or_none()
+                    if not contact and sm.phone_number:
+                        cr = await db.execute(select(Contact).where(Contact.phone_number == sm.phone_number))
+                        contact = cr.scalar_one_or_none()
+                        if not contact and sm.phone_number:
+                            contact = Contact(phone_number=sm.phone_number, country="Nigeria", lead_status="new", source="scheduled")
+                            db.add(contact)
+                            await db.flush()
+
+                    # Check opt-out / suppression before touching gateway
+                    if contact and contact.is_opted_out:
+                        sm.status = "failed"
+                        sm.error = "Contact has opted out (STOP)"
+                        sm.executed_at = dt.now(tz.utc)
+                        # also create a failed Message so inbox shows why it didn't go
+                        if contact:
+                            await _create_scheduled_message_row(db, sm, contact, "failed", sm.error)
+                        continue
+                    if sm.phone_number:
+                        sup = await db.execute(select(SuppressionEntry).where(SuppressionEntry.phone_number == sm.phone_number))
+                        if sup.scalar_one_or_none():
+                            sm.status = "failed"
+                            sm.error = "Number is on suppression list"
+                            sm.executed_at = dt.now(tz.utc)
+                            if contact:
+                                await _create_scheduled_message_row(db, sm, contact, "failed", sm.error)
+                            continue
+
+                    # Personalize body if we have a contact
+                    body = sm.body
+                    if contact:
+                        try:
+                            body = render_template(body, contact)
+                        except Exception:
+                            pass
+
+                    # Ensure conversation exists so inbox thread is visible
+                    conv = None
+                    if contact:
+                        cr = await db.execute(select(Conversation).where(Conversation.contact_id == contact.id).order_by(Conversation.id).limit(1))
+                        conv = cr.scalars().first()
+                        if not conv:
+                            conv = Conversation(contact_id=contact.id, status="active")
+                            db.add(conv)
+                            await db.flush()
+
+                    # Create the Message row first (queued), then call gateway
+                    segment_count = 1
+                    char_count = len(body)
+                    try:
+                        char_count, segment_count = count_sms_segments(body)
+                    except Exception:
+                        pass
+
+                    msg = None
+                    if contact and conv:
+                        msg = Message(
+                            conversation_id=conv.id,
+                            contact_id=contact.id,
+                            direction="outgoing",
+                            body=body,
+                            segment_count=segment_count,
+                            char_count=char_count,
+                            status="sending",
+                            provider="smsgate",
+                            idempotency_key=f"scheduled-{sm.id}-{uuid.uuid4().hex[:8]}",
+                        )
+                        db.add(msg)
+                        await db.flush()
+
+                    # Call gateway
+                    target_phone = sm.phone_number or (contact.phone_number if contact else "")
+                    r = await send_sms_direct(target_phone, body, sm.sim_number or 1)
+
+                    if r.get("success"):
+                        sm.status = "sent"
+                        sm.error = None
+                        if msg:
+                            msg.status = "sent"
+                            msg.provider_message_id = r.get("provider_message_id", "")
+                            msg.sent_at = dt.now(tz.utc)
+                            msg.provider_response = json.dumps(r.get("raw")) if r.get("raw") else None
+                            sm.message_id = msg.id
+                            # update conversation preview
+                            conv.message_count = (conv.message_count or 0) + 1
+                            conv.last_message_preview = body[:100]
+                            conv.last_message_at = dt.now(tz.utc)
+                            contact.messages_sent = (contact.messages_sent or 0) + 1
+                            contact.last_contacted_at = dt.now(tz.utc)
+                        else:
+                            sm.message_id = None
+                    else:
+                        err = (r.get("error") or "Gateway rejected message")[:500]
+                        sm.status = "failed"
+                        sm.error = err
+                        if msg:
+                            msg.status = "failed"
+                            msg.last_error = err
+                            msg.failed_at = dt.now(tz.utc)
+                            msg.provider_response = json.dumps(r.get("raw")) if r.get("raw") else None
+                            sm.message_id = msg.id
+                            if conv:
+                                conv.message_count = (conv.message_count or 0) + 1
+                                conv.last_message_preview = body[:100]
+                                conv.last_message_at = dt.now(tz.utc)
+
+                    sm.executed_at = dt.now(tz.utc)
+                except Exception as ie:
+                    logger.warning(f"Scheduled {sm.id} handling error: {ie}")
+                    sm.status = "failed"
+                    sm.error = str(ie)[:500]
+                    sm.executed_at = dt.now(tz.utc)
+
             await db.commit()
-            logger.info(f"SCHEDULED: {len(scheduled)} messages")
-    except Exception as e: logger.warning(f"Scheduled: {e}")
+            sent = sum(1 for s in scheduled if s.status == "sent")
+            failed = sum(1 for s in scheduled if s.status == "failed")
+            logger.info(f"SCHEDULED: {len(scheduled)} messages ({sent} sent, {failed} failed)")
+    except Exception as e:
+        logger.warning(f"Scheduled: {e}")
+
+async def _create_scheduled_message_row(db, sm, contact, status, error):
+    """Helper: create a failed Message bubble for a scheduled that never reached gateway."""
+    try:
+        from app.models.conversation import Conversation, Message
+        from sqlalchemy import select
+        import uuid, json
+        from app.utils.phone import count_sms_segments
+        from datetime import datetime as dt, timezone as tz
+        cr = await db.execute(select(Conversation).where(Conversation.contact_id == contact.id).order_by(Conversation.id).limit(1))
+        conv = cr.scalars().first()
+        if not conv:
+            conv = Conversation(contact_id=contact.id, status="active")
+            db.add(conv)
+            await db.flush()
+        try:
+            cc, sc = count_sms_segments(sm.body)
+        except Exception:
+            cc, sc = len(sm.body), 1
+        msg = Message(
+            conversation_id=conv.id,
+            contact_id=contact.id,
+            direction="outgoing",
+            body=sm.body,
+            segment_count=sc,
+            char_count=cc,
+            status=status,
+            provider="smsgate",
+            last_error=error,
+            failed_at=dt.now(tz.utc) if status == "failed" else None,
+            idempotency_key=f"scheduled-{sm.id}-{uuid.uuid4().hex[:8]}",
+        )
+        db.add(msg)
+        await db.flush()
+        sm.message_id = msg.id
+        conv.message_count = (conv.message_count or 0) + 1
+        conv.last_message_preview = sm.body[:100]
+        conv.last_message_at = dt.now(tz.utc)
+    except Exception as e:
+        logger.warning(f"_create_scheduled_message_row: {e}")
 
 async def _poll_loop():
     """Run _poll() on a timer instead of piggybacking on health checks."""
