@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import api from "../api/client";
 import toast from "react-hot-toast";
-import { Send, UserPlus, Search, X, Users, Phone, List, Clock, AlertCircle, CheckCircle2, Hourglass, RotateCcw, Trash2, Eye, Calendar } from "lucide-react";
+import { Send, UserPlus, Search, X, Users, Phone, List, Clock, AlertCircle, CheckCircle2, Hourglass, RotateCcw, Trash2, Eye, Calendar, MessageSquare } from "lucide-react";
 
 export default function SendPage() {
   const [mode, setMode] = useState<"contact" | "number" | "list">("contact");
