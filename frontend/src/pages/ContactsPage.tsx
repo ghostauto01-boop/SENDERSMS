@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import Papa from "papaparse";
 import api from "../api/client";
 import { Contact, PaginatedResponse } from "../types";
 import toast from "react-hot-toast";
@@ -41,6 +42,24 @@ export default function ContactsPage() {
     finally { setLoading(false); }
   };
 
+  const handleExport = async () => {
+    try {
+      const res = await api.get("/contacts/export/csv", {
+        params: { search: search || undefined, lead_status: leadStatus || undefined },
+        responseType: "blob",
+      });
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: "text/csv" }));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "contacts.csv";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success("Contacts exported");
+    } catch { toast.error("Failed to export"); }
+  };
+
   const handleDelete = async (id:number) => { if(!confirm("Delete this contact? This cannot be undone."))return; try { await api.delete(`/contacts/${id}`); toast.success("Contact deleted"); loadContacts(); } catch { toast.error("Failed to delete"); } };
   const handleBulkDelete = async () => { if(selected.size===0||!confirm(`Delete ${selected.size} contacts?`))return; try { await api.post("/contacts/bulk",{contact_ids:[...selected],action:"delete"}); toast.success(`${selected.size} deleted`); setSelected(new Set()); loadContacts(); } catch { toast.error("Failed"); } };
   const handleBulkStatus = async (status:string) => { if(selected.size===0)return; try { await api.post("/contacts/bulk",{contact_ids:[...selected],action:"status",value:status}); toast.success(`Updated ${selected.size} contacts`); setSelected(new Set()); loadContacts(); } catch { toast.error("Failed"); } };
@@ -77,6 +96,9 @@ export default function ContactsPage() {
           <div className="flex gap-1.5">
             <button onClick={()=>setShowImport(true)} className="w-10 h-10 lg:w-auto lg:px-3 lg:py-2 rounded-full lg:rounded-lg bg-[#f0f2f5] dark:bg-[#202c33] text-[#54656f] dark:text-[#aebac1] flex items-center justify-center gap-1.5 text-sm font-medium hover:bg-[#e9edef] dark:hover:bg-[#2a3942]">
               <Upload size={16}/> <span className="hidden lg:inline">Import</span>
+            </button>
+            <button onClick={handleExport} className="w-10 h-10 lg:w-auto lg:px-3 lg:py-2 rounded-full lg:rounded-lg bg-[#f0f2f5] dark:bg-[#202c33] text-[#54656f] dark:text-[#aebac1] flex items-center justify-center gap-1.5 text-sm font-medium hover:bg-[#e9edef] dark:hover:bg-[#2a3942]" title="Export CSV">
+              <Download size={16}/> <span className="hidden lg:inline">Export</span>
             </button>
             <button onClick={()=>setShowAdd(true)} className="w-10 h-10 lg:w-auto lg:px-4 lg:py-2 rounded-full lg:rounded-lg bg-[#00a884] hover:bg-[#06cf9c] text-white flex items-center justify-center gap-1.5 text-sm font-medium shadow-sm">
               <Plus size={18}/> <span className="hidden lg:inline">Add</span>
@@ -336,6 +358,7 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
   const [preview, setPreview] = useState<any>(null);
   const [step, setStep] = useState<"upload"|"map"|"importing"|"done">("upload");
   const [mapping, setMapping] = useState<Record<string,string>>({});
+  const [autoMapping, setAutoMapping] = useState<Record<string,string>>({});
   const [selectedListId, setSelectedListId] = useState("");
   const [lists, setLists] = useState<any[]>([]);
   const [result, setResult] = useState<any>(null);
@@ -343,35 +366,51 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
 
   useEffect(() => { api.get("/lists/").then(r=>setLists(r.data.items)); }, []);
 
+  const detectColumns = (headers: string[]): Record<string,string> => {
+    const map: Record<string,string> = {};
+    headers.forEach(h => {
+      const l = h.toLowerCase().replace(/[^a-z0-9 ]/g,"").trim();
+      if(/(first.?name|firstname|given.?name)/.test(l)) map[h] = "first_name";
+      else if(/(last.?name|lastname|surname|family.?name)/.test(l)) map[h] = "last_name";
+      else if(/(name|person|contact)/.test(l) && !/(phone|mobile|tel|cell|number|email|mail|fax)/.test(l)) map[h] = "first_name";
+      else if(/(phone|mobile|telephone|tel|cell|sms|number)/.test(l) && !/(name|person|email|fax)/.test(l)) map[h] = "phone_number";
+      else if(/(email|e.?mail|mail)/.test(l)) map[h] = "email";
+      else if(/(business|company|brand|organization|organisation|restaurant|shop|store)/.test(l)) map[h] = "business_name";
+      else if(/(city|town)/.test(l)) map[h] = "city";
+      else if(/(state|region|province)/.test(l)) map[h] = "state";
+      else if(/(website|web|url|site)/.test(l)) map[h] = "website";
+      else if(/(industry|sector|category)/.test(l)) map[h] = "industry";
+      else if(/(source|channel|origin)/.test(l)) map[h] = "source";
+    });
+    return map;
+  };
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]; if(!f)return; setFile(f);
     setStep("map");
-    const text = await f.text();
-    const rows = text.split("\n").filter(r=>r.trim());
-    const headers = (rows[0]||"").split(",").map(h=>h.trim().replace(/"/g,""));
-    const previewRows = rows.slice(1,6).map(r=>r.split(",").map(c=>c.trim().replace(/"/g,"")));
-    setPreview({ headers, rows: previewRows });
-    const map: Record<string,string> = {};
-    headers.forEach(h => {
-      const l = h.toLowerCase();
-      if(/phone|mobile|tel|number|contact/.test(l)) map[h] = "phone_number";
-      else if(/first.*name|firstname/.test(l)) map[h] = "first_name";
-      else if(/last.*name|lastname/.test(l)) map[h] = "last_name";
-      else if(/business|company|brand|organization|restaurant/.test(l)) map[h] = "business_name";
-      else if(/email|mail/.test(l)) map[h] = "email";
-      else if(/city/.test(l)) map[h] = "city";
-      else if(/state|region/.test(l)) map[h] = "state";
-      else if(/website|url|site/.test(l)) map[h] = "website";
-      else if(/industry|sector/.test(l)) map[h] = "industry";
-      else if(/source|channel/.test(l)) map[h] = "source";
+    Papa.parse<string[]>(f, {
+      complete: (res) => {
+        const rows = res.data.filter((r: string[]) => r && r.some((c: string) => c && c.trim() !== ""));
+        const headers = (rows[0] || []).map((h: string) => (h || "").trim());
+        const previewRows = rows.slice(1, 6);
+        setPreview({ headers, rows: previewRows });
+        const map = detectColumns(headers);
+        setAutoMapping(map);
+        setMapping(map);
+      },
     });
-    setMapping(map);
   };
 
   const doImport = async () => {
     if(!file)return; setStep("importing");
     const fd = new FormData(); fd.append("file",file);
-    fd.append("column_mapping",JSON.stringify(mapping));
+    // Only send columns the user actually changed in the map step, so a bad
+    // auto-guess can never override the server's own header detection.
+    const overrides: Record<string,string> = {};
+    Object.keys(mapping).forEach(h => {
+      if (mapping[h] !== (autoMapping[h] ?? "")) overrides[h] = mapping[h];
+    });
+    if (Object.keys(overrides).length > 0) fd.append("column_mapping", JSON.stringify(overrides));
     if(selectedListId) fd.append("list_id",selectedListId);
     try {
       const { data } = await api.post("/contacts/import/csv",fd,{headers:{"Content-Type":"multipart/form-data"}});
