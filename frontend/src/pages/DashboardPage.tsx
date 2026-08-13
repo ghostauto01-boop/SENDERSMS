@@ -26,7 +26,7 @@ export default function DashboardPage() {
       ]);
       if (sr.status === "fulfilled") setStats(sr.value.data);
       if (cr.status === "fulfilled") setCharts(cr.value.data);
-    } catch (err: any) {
+    } catch {
       setError("Failed to load dashboard");
     } finally {
       setLoading(false);

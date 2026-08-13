@@ -360,8 +360,10 @@ function CampaignModal({ campaign, onClose }: { campaign?: Campaign | null; onCl
       name,
       description: description || null,
       list_id: listId ? parseInt(listId) : null,
-      template_id: mode === "template" && templateId ? parseInt(templateId) : null,
-      message_body: mode === "write" && messageBody.trim() ? messageBody : null,
+      // A sequence owns every step's message. Clear campaign-level text so the
+      // worker cannot accidentally fall back to stale copy from an earlier edit.
+      template_id: !sequenceId && mode === "template" && templateId ? parseInt(templateId) : null,
+      message_body: !sequenceId && mode === "write" && messageBody.trim() ? messageBody : null,
       sequence_id: sequenceId ? parseInt(sequenceId) : null,
     };
     try {
@@ -477,7 +479,8 @@ function CampaignModal({ campaign, onClose }: { campaign?: Campaign | null; onCl
             </select>
             {sequenceId && (
               <p className="text-xs text-gray-400 mt-1">
-                The sequence controls the messages; the text above is ignored.
+                This sequence controls every message and wait. Its wait steps appear in Follow-ups.
+                Campaign-level text above will not be saved.
               </p>
             )}
           </div>

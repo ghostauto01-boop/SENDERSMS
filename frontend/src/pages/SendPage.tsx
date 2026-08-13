@@ -87,16 +87,6 @@ export default function SendPage() {
       const { data } = await api.get("/send/history", { params: { status: "failed", per_page: 50 } });
       setFailed(data.items||[]);
       setFailedTotal(data.total||0);
-      // also include failed scheduled
-      try {
-        const s = await api.get("/send/scheduled", { params: { status: "failed", per_page: 50 } });
-        if (s.data.items?.length) {
-          // merge failed scheduled into failed list as combined view? keep separate but we show both in same tab via second section
-          // We'll append scheduled failed as well with flag
-          const schedFailed = s.data.items.map((x:any)=>({ ...x, _isScheduled: true }));
-          // we will handle in render via separate section, but for count combine
-        }
-      } catch {}
     } catch {
       // fallback to scheduled failed
       try { const s = await api.get("/send/scheduled", { params: { status: "failed", per_page: 50 } }); setFailed(s.data.items||[]); setFailedTotal(s.data.total||0);} catch {}
@@ -355,7 +345,7 @@ export default function SendPage() {
                   </div>
                   <div className="flex flex-col gap-1 self-center">
                     <button onClick={()=> m._isScheduled ? retryFailed(m.id) : retryMessage(m.id)} className="w-8 h-8 rounded-full bg-[#00a884] hover:bg-[#06cf9c] text-white flex items-center justify-center" title="Retry now"><RotateCcw size={14}/></button>
-                    {m.conversation_id && <a href={`/inbox`} onClick={(e)=>{/* could deep link to conversation */}} className="w-8 h-8 rounded-full bg-[#f0f2f5] dark:bg-[#111b21] flex items-center justify-center text-[#54656f]" title="View in Inbox"><Eye size={14}/></a>}
+                    {m.conversation_id && <a href="/inbox" className="w-8 h-8 rounded-full bg-[#f0f2f5] dark:bg-[#111b21] flex items-center justify-center text-[#54656f]" title="View in Inbox"><Eye size={14}/></a>}
                   </div>
                 </div>
               ))}

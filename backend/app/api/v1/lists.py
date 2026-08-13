@@ -1,20 +1,36 @@
-"""
-Contact Lists API routes.
-"""
+"""Contact Lists API routes."""
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status, Body
-from sqlalchemy import select, func, delete as sa_delete
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from sqlalchemy import delete as sa_delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models.contact_list import ContactList, ContactListMember
 from app.models.contact import Contact
+from app.models.contact_list import ContactList, ContactListMember
 from app.models.user import User
 from app.security.auth import get_current_user
 
 router = APIRouter()
+
+
+async def _find_list(db: AsyncSession, list_id: int) -> ContactList:
+    result = await db.execute(select(ContactList).where(ContactList.id == list_id))
+    contact_list = result.scalar_one_or_none()
+    if not contact_list:
+        raise HTTPException(status_code=404, detail="List not found")
+    return contact_list
+
+
+async def _sync_contact_count(db: AsyncSession, contact_list: ContactList) -> int:
+    """Keep the cached count honest after membership changes."""
+    result = await db.execute(
+        select(func.count(ContactListMember.id)).where(ContactListMember.list_id == contact_list.id)
+    )
+    count = result.scalar() or 0
+    contact_list.contact_count = count
+    return count
 
 
 @router.get("/")
@@ -25,33 +41,56 @@ async def list_lists(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """List all contact lists."""
-    query = select(ContactList)
+    """List all contact lists with live membership counts.
 
+    ``contact_count`` used to be read only from a cached column. Deleting a
+    contact or an older failed import could leave that value at zero even when
+    memberships existed. The correlated count makes the Lists tab reflect the
+    actual members every time it loads.
+    """
+    filters = []
     if search:
-        query = query.where(ContactList.name.ilike(f"%{search}%"))
+        filters.append(ContactList.name.ilike(f"%{search}%"))
 
-    count_query = select(func.count()).select_from(query.subquery())
-    total = (await db.execute(count_query)).scalar() or 0
+    total_query = select(func.count()).select_from(ContactList)
+    if filters:
+        total_query = total_query.where(*filters)
+    total = (await db.execute(total_query)).scalar() or 0
 
-    query = query.order_by(ContactList.updated_at.desc()).offset((page - 1) * per_page).limit(per_page)
-    result = await db.execute(query)
-    lists = result.scalars().all()
+    member_count = (
+        select(func.count(ContactListMember.id))
+        .where(ContactListMember.list_id == ContactList.id)
+        .correlate(ContactList)
+        .scalar_subquery()
+    )
+    query = select(ContactList, member_count.label("actual_contact_count"))
+    if filters:
+        query = query.where(*filters)
+    query = (
+        query.order_by(ContactList.updated_at.desc())
+        .offset((page - 1) * per_page)
+        .limit(per_page)
+    )
+    rows = (await db.execute(query)).all()
 
-    return {
-        "total": total,
-        "items": [
+    items = []
+    for contact_list, actual_count in rows:
+        # Repair the cache opportunistically as well; campaigns and stats from
+        # older code paths may still inspect the model column directly.
+        if contact_list.contact_count != actual_count:
+            contact_list.contact_count = actual_count
+        items.append(
             {
-                "id": lst.id,
-                "name": lst.name,
-                "description": lst.description,
-                "contact_count": lst.contact_count,
-                "created_at": lst.created_at.isoformat(),
-                "updated_at": lst.updated_at.isoformat(),
+                "id": contact_list.id,
+                "name": contact_list.name,
+                "description": contact_list.description,
+                "contact_count": actual_count,
+                "created_at": contact_list.created_at.isoformat(),
+                "updated_at": contact_list.updated_at.isoformat(),
             }
-            for lst in lists
-        ],
-    }
+        )
+
+    return {"total": total, "items": items}
 
 
 @router.post("/", status_code=201)
@@ -62,7 +101,7 @@ async def create_list(
     current_user: User = Depends(get_current_user),
 ):
     """Create a new contact list."""
-    contact_list = ContactList(name=name, description=description)
+    contact_list = ContactList(name=name.strip(), description=description)
     db.add(contact_list)
     await db.flush()
     await db.refresh(contact_list)
@@ -83,13 +122,10 @@ async def update_list(
     current_user: User = Depends(get_current_user),
 ):
     """Rename/update a list."""
-    result = await db.execute(select(ContactList).where(ContactList.id == list_id))
-    contact_list = result.scalar_one_or_none()
-    if not contact_list:
-        raise HTTPException(status_code=404, detail="List not found")
+    contact_list = await _find_list(db, list_id)
 
     if name:
-        contact_list.name = name
+        contact_list.name = name.strip()
     if description is not None:
         contact_list.description = description
     await db.flush()
@@ -103,10 +139,7 @@ async def delete_list(
     current_user: User = Depends(get_current_user),
 ):
     """Delete a list and its memberships."""
-    result = await db.execute(select(ContactList).where(ContactList.id == list_id))
-    contact_list = result.scalar_one_or_none()
-    if not contact_list:
-        raise HTTPException(status_code=404, detail="List not found")
+    contact_list = await _find_list(db, list_id)
     await db.delete(contact_list)
     await db.flush()
 
@@ -120,6 +153,7 @@ async def get_list_contacts(
     current_user: User = Depends(get_current_user),
 ):
     """Get contacts in a list."""
+    await _find_list(db, list_id)
     query = (
         select(Contact)
         .join(ContactListMember, Contact.id == ContactListMember.contact_id)
@@ -130,21 +164,20 @@ async def get_list_contacts(
     total = (await db.execute(count_query)).scalar() or 0
 
     query = query.order_by(Contact.created_at.desc()).offset((page - 1) * per_page).limit(per_page)
-    result = await db.execute(query)
-    contacts = result.scalars().all()
+    contacts = (await db.execute(query)).scalars().all()
 
     return {
         "total": total,
         "items": [
             {
-                "id": c.id,
-                "first_name": c.first_name,
-                "last_name": c.last_name,
-                "business_name": c.business_name,
-                "phone_number": c.phone_number,
-                "lead_status": c.lead_status,
+                "id": contact.id,
+                "first_name": contact.first_name,
+                "last_name": contact.last_name,
+                "business_name": contact.business_name,
+                "phone_number": contact.phone_number,
+                "lead_status": contact.lead_status,
             }
-            for c in contacts
+            for contact in contacts
         ],
     }
 
@@ -156,29 +189,38 @@ async def add_contacts_to_list(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Add contacts to a list."""
-    result = await db.execute(select(ContactList).where(ContactList.id == list_id))
-    contact_list = result.scalar_one_or_none()
-    if not contact_list:
-        raise HTTPException(status_code=404, detail="List not found")
+    """Add existing contacts to a list."""
+    contact_list = await _find_list(db, list_id)
+    requested_ids = set(contact_ids)
+    if not requested_ids:
+        return {"success": True, "added": 0, "contact_count": await _sync_contact_count(db, contact_list)}
 
-    added = 0
-    for cid in contact_ids:
-        existing = await db.execute(
-            select(ContactListMember).where(
-                ContactListMember.list_id == list_id,
-                ContactListMember.contact_id == cid,
+    valid_ids = set(
+        (await db.execute(select(Contact.id).where(Contact.id.in_(requested_ids)))).scalars().all()
+    )
+    missing_ids = requested_ids - valid_ids
+    if missing_ids:
+        missing = ", ".join(str(contact_id) for contact_id in sorted(missing_ids))
+        raise HTTPException(status_code=404, detail=f"Contact not found: {missing}")
+
+    existing_ids = set(
+        (
+            await db.execute(
+                select(ContactListMember.contact_id).where(
+                    ContactListMember.list_id == list_id,
+                    ContactListMember.contact_id.in_(valid_ids),
+                )
             )
-        )
-        if not existing.scalar_one_or_none():
-            member = ContactListMember(list_id=list_id, contact_id=cid)
-            db.add(member)
-            added += 1
+        ).scalars().all()
+    )
+    new_ids = valid_ids - existing_ids
+    for contact_id in new_ids:
+        db.add(ContactListMember(list_id=list_id, contact_id=contact_id))
 
-    contact_list.contact_count = (contact_list.contact_count or 0) + added
     await db.flush()
-
-    return {"success": True, "added": added}
+    count = await _sync_contact_count(db, contact_list)
+    await db.flush()
+    return {"success": True, "added": len(new_ids), "contact_count": count}
 
 
 @router.post("/{list_id}/contacts/remove")
@@ -188,27 +230,22 @@ async def remove_contacts_from_list(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Remove contacts from a list."""
-    await db.execute(
-        sa_delete(ContactListMember).where(
-            ContactListMember.list_id == list_id,
-            ContactListMember.contact_id.in_(contact_ids),
+    """Remove contacts from a list without deleting the contacts themselves."""
+    contact_list = await _find_list(db, list_id)
+    requested_ids = set(contact_ids)
+    removed = 0
+    if requested_ids:
+        result = await db.execute(
+            sa_delete(ContactListMember).where(
+                ContactListMember.list_id == list_id,
+                ContactListMember.contact_id.in_(requested_ids),
+            )
         )
-    )
+        removed = result.rowcount or 0
 
-    # Update count
-    count_result = await db.execute(
-        select(func.count()).select_from(ContactListMember).where(ContactListMember.list_id == list_id)
-    )
-    count = count_result.scalar() or 0
-
-    lst_result = await db.execute(select(ContactList).where(ContactList.id == list_id))
-    lst = lst_result.scalar_one_or_none()
-    if lst:
-        lst.contact_count = count
-
+    count = await _sync_contact_count(db, contact_list)
     await db.flush()
-    return {"success": True, "removed": len(contact_ids)}
+    return {"success": True, "removed": removed, "contact_count": count}
 
 
 @router.get("/{list_id}/stats")
@@ -218,12 +255,9 @@ async def get_list_stats(
     current_user: User = Depends(get_current_user),
 ):
     """Get statistics for a list."""
-    result = await db.execute(select(ContactList).where(ContactList.id == list_id))
-    lst = result.scalar_one_or_none()
-    if not lst:
-        raise HTTPException(status_code=404, detail="List not found")
+    contact_list = await _find_list(db, list_id)
+    count = await _sync_contact_count(db, contact_list)
 
-    # Count by lead status
     status_query = (
         select(Contact.lead_status, func.count(Contact.id))
         .join(ContactListMember, Contact.id == ContactListMember.contact_id)
@@ -234,8 +268,8 @@ async def get_list_stats(
     status_distribution = {row[0]: row[1] for row in status_result}
 
     return {
-        "id": lst.id,
-        "name": lst.name,
-        "contact_count": lst.contact_count,
+        "id": contact_list.id,
+        "name": contact_list.name,
+        "contact_count": count,
         "lead_status_distribution": status_distribution,
     }

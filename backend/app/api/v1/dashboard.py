@@ -14,6 +14,7 @@ from app.models.campaign import Campaign
 from app.models.conversation import Conversation, Message
 from app.models.followup import FollowUp
 from app.security.auth import get_current_user
+from app.utils.datetime import local_day_utc_bounds
 from app.models.user import User
 
 router = APIRouter()
@@ -86,8 +87,7 @@ async def get_dashboard_stats(
     active_campaigns = active_result.scalar() or 0
 
     # Follow-ups due today
-    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-    today_end = today_start + timedelta(days=1)
+    today_start, today_end = local_day_utc_bounds()
     due_result = await db.execute(
         select(func.count(FollowUp.id)).where(
             FollowUp.status == "pending",

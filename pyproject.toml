@@ -8,6 +8,7 @@ addopts = [
 ]
 testpaths = ["backend/tests"]
 pythonpath = ["backend"]
+asyncio_default_fixture_loop_scope = "function"
 
 [tool.black]
 line-length = 100
