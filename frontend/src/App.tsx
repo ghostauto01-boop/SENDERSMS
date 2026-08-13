@@ -50,6 +50,16 @@ function AppRoutes() {
     <Suspense fallback={<PageSpinner />}>
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      {/* The inbox is a full-screen WhatsApp-style app of its own, so it
+          renders outside the dashboard shell (no sidebar / top header). */}
+      <Route
+        path="/inbox"
+        element={
+          <ProtectedRoute>
+            <InboxPage />
+          </ProtectedRoute>
+        }
+      />
       <Route
         element={
           <ProtectedRoute>
@@ -62,7 +72,6 @@ function AppRoutes() {
         <Route path="/lists" element={<ListsPage />} />
         <Route path="/campaigns" element={<CampaignsPage />} />
         <Route path="/sequences" element={<SequencesPage />} />
-        <Route path="/inbox" element={<InboxPage />} />
         <Route path="/follow-ups" element={<FollowUpsPage />} />
         <Route path="/templates" element={<TemplatesPage />} />
         <Route path="/analytics" element={<AnalyticsPage />} />

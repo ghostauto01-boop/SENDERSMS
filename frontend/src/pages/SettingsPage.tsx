@@ -272,11 +272,22 @@ function NotifsTab({ provs, onUpdate }: { provs: NotificationProviderSettings[];
 
 function PushoverCard({ s, onUpdate }: { s?: NotificationProviderSettings; onUpdate: () => void }) {
   const [on,setOn]=useState(s?.is_enabled||false); const [uk,setUk]=useState(""); const [at,setAt]=useState(""); const [sv,setSv]=useState(false); const [ts,setTs]=useState(false); const [sa,setSa]=useState(false);
+  const [muted,setMuted]=useState(""); const [mutedLoaded,setMutedLoaded]=useState(false); const [msv,setMsv]=useState(false);
+  useEffect(()=>{ if(!mutedLoaded){ api.get("/settings/notifications/muted-senders").then(({data}:any)=>{ setMuted((data.senders||[]).join(", ")); setMutedLoaded(true); }).catch(()=>setMutedLoaded(true)); } },[mutedLoaded]);
   const save=async()=>{setSv(true);try{await api.put("/settings/notifications/pushover",null,{params:{is_enabled:on,user_key:uk||undefined,app_token:at||undefined}});toast.success("Saved");onUpdate();}catch{toast.error("Failed")}finally{setSv(false)}};
+  const saveMuted=async()=>{setMsv(true);try{const{data}=await api.put("/settings/notifications/muted-senders",null,{params:{senders:muted}});setMuted((data.senders||[]).join(", "));toast.success("Muted senders saved");}catch{toast.error("Failed")}finally{setMsv(false)}};
   const test=async()=>{if(!uk||!at){toast.error("Enter both keys");return;}setTs(true);try{await save();const{data}=await api.post("/settings/notifications/pushover/test");data.success?toast.success("Test sent!"):toast.error(data.error||"Failed");}catch{toast.error("Failed")}finally{setTs(false)}};
   return(<div className="card p-4"><div className="flex items-center justify-between mb-3"><div className="flex items-center gap-3"><input type="checkbox" checked={on} onChange={e=>setOn(e.target.checked)}/><h3 className="font-semibold">Pushover</h3></div><button onClick={save} disabled={sv} className="btn-primary btn-sm">{sv?"Saving...":"Save"}</button></div>
   {on&&(<div className="space-y-3"><div><label className="label">User Key</label><input className="input" value={uk} onChange={e=>setUk(e.target.value)} placeholder="Pushover User Key"/></div>
   <div><label className="label">App Token</label><div className="relative"><input type={sa?"text":"password"} className="input pr-10" value={at} onChange={e=>setAt(e.target.value)} placeholder="From pushover.net/apps/build"/><button onClick={()=>setSa(!sa)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">{sa?<EyeOff size={16}/>:<Eye size={16}/>}</button></div></div>
+  <div className="border-t border-gray-100 dark:border-gray-700 pt-3">
+    <label className="label">Muted senders — no alert (comma-separated)</label>
+    <div className="flex gap-2">
+      <input className="input flex-1" value={muted} onChange={e=>setMuted(e.target.value)} placeholder="MTN, AIRTEL"/>
+      <button onClick={saveMuted} disabled={msv||!mutedLoaded} className="btn-secondary btn-sm">{msv?"Saving...":"Save"}</button>
+    </div>
+    <p className="text-xs text-gray-400 mt-1">Carrier alerts (MTN, Airtel, banks, 2FA short codes) never ping your phone. Their messages still appear in the Inbox.</p>
+  </div>
   <button onClick={test} disabled={ts} className="btn-secondary btn-sm"><TestTube size={14} className="mr-1"/>{ts?"Sending...":"Send Test"}</button></div>)}</div>);}
 
 function CompTab({ s, onUpdate }: { s: Record<string, string>; onUpdate: () => void }) {

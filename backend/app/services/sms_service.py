@@ -200,6 +200,15 @@ class SMSService:
         losing a notification is survivable; losing the message is not.
         """
         try:
+            # Carrier/service sender IDs (MTN, Airtel, banks, 2FA short codes)
+            # only send automated alerts; pinging Pushover for each one is
+            # noise. Muted senders are stored uppercased and editable from
+            # Settings -> Pushover. The message still lands in the inbox.
+            from app.services.system_settings import get_muted_notify_senders
+            sender = (contact.phone_number or "").strip().upper()
+            if sender and sender in await get_muted_notify_senders(self.db):
+                logger.info(f"NOTIFY: muted sender {sender!r} — no Pushover alert")
+                return
             r=await self.db.execute(select(NotificationProvider).where(NotificationProvider.provider=="pushover",NotificationProvider.is_enabled==True).limit(1))
             prov=r.scalar_one_or_none()
             if not prov:return

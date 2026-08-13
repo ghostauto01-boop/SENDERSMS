@@ -110,6 +110,22 @@ async def get_notifs(db:AsyncSession=Depends(get_db),cu:User=Depends(get_current
     ps=await db.execute(select(NotificationProvider))
     return{"providers":[{"id":p.id,"provider":p.provider,"is_enabled":p.is_enabled,"notify_new_reply":p.notify_new_reply,"notify_campaign_completed":p.notify_campaign_completed,"notify_campaign_failed":p.notify_campaign_failed,"notify_gateway_offline":p.notify_gateway_offline,"notify_followup_due":p.notify_followup_due,"notify_system_error":p.notify_system_error}for p in ps.scalars().all()]}
 
+# NOTE: these two routes MUST stay above `put_notif` — the generic
+# /notifications/{provider} route would otherwise swallow "muted-senders".
+@router.get("/notifications/muted-senders")
+async def get_muted_senders(db:AsyncSession=Depends(get_db),cu:User=Depends(get_current_user)):
+    """Senders that never trigger a Pushover alert (e.g. MTN, Airtel)."""
+    from app.services.system_settings import get_muted_notify_senders,DEFAULT_MUTED_SENDERS
+    senders=await get_muted_notify_senders(db)
+    return{"senders":senders,"defaults":list(DEFAULT_MUTED_SENDERS)}
+
+@router.put("/notifications/muted-senders")
+async def put_muted_senders(senders:str=Query("",description="Comma-separated sender IDs, e.g. MTN,AIRTEL"),db:AsyncSession=Depends(get_db),cu:User=Depends(get_current_user)):
+    from app.services.system_settings import set_muted_notify_senders
+    clean=await set_muted_notify_senders(db,[s for s in senders.split(",") if s.strip()])
+    await db.flush()
+    return{"success":True,"senders":clean}
+
 @router.put("/notifications/{provider}")
 async def put_notif(provider:str,is_enabled:Optional[bool]=Query(None),user_key:Optional[str]=Query(None),app_token:Optional[str]=Query(None),db:AsyncSession=Depends(get_db),cu:User=Depends(get_current_user)):
     if provider!="pushover":raise HTTPException(400,"Invalid")

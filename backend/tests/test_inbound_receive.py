@@ -654,6 +654,76 @@ class TestInboundNotifications:
         assert sent == ["only once"]
 
     @pytest.mark.asyncio
+    async def test_muted_sender_mtn_skips_pushover(self, client, db, monkeypatch):
+        """MTN/Airtel alert short codes must not ping Pushover.
+
+        The message is still stored in the inbox — only the notification is
+        suppressed. This is what kills the constant "MTN alert" / "AIRTEL
+        alert" push spam while keeping carrier conversations visible.
+        """
+        await self._setup_pushover(db)
+        sent = []
+
+        import app.providers.pushover as po
+
+        async def fake_send(self, title, body, **kw):
+            sent.append((title, body))
+            return True
+
+        monkeypatch.setattr(po.PushoverProvider, "send_notification", fake_send)
+
+        for i, sender in enumerate(["MTN", "AIRTEL"]):
+            r = await post_webhook(client, envelope("sms:received", {
+                "messageId": f"in-muted-{i}", "message": f"{sender} alert: N500 debit",
+                "sender": sender, "recipient": "+2340000000000", "simNumber": 1,
+                "receivedAt": "2026-08-11T10:00:00.000Z"}, f"evt-muted-{i}"))
+            assert r.status_code == 200
+
+        await asyncio.sleep(0.3)
+        assert sent == [], f"muted senders must not notify, got {sent}"
+
+        # But the messages themselves still reached the inbox.
+        msgs = (await db.execute(select(Message).where(
+            Message.direction == "incoming"))).scalars().all()
+        assert len(msgs) == 2
+
+    @pytest.mark.asyncio
+    async def test_muted_senders_are_configurable(self, client, db, monkeypatch):
+        """Editing the muted list in Settings changes what gets muted."""
+        await self._setup_pushover(db)
+        from app.services.system_settings import set_muted_notify_senders
+        await set_muted_notify_senders(db, ["MTN"])  # Airtel now NOT muted
+        await db.flush()
+
+        sent = []
+
+        import app.providers.pushover as po
+
+        async def fake_send(self, title, body, **kw):
+            sent.append((title, body))
+            return True
+
+        monkeypatch.setattr(po.PushoverProvider, "send_notification", fake_send)
+
+        await post_webhook(client, envelope("sms:received", {
+            "messageId": "in-a", "message": "Airtel alert",
+            "sender": "AIRTEL", "recipient": "+2340000000000", "simNumber": 1,
+            "receivedAt": "2026-08-11T10:01:00.000Z"}, "evt-a"))
+        await post_webhook(client, envelope("sms:received", {
+            "messageId": "in-m", "message": "MTN alert",
+            "sender": "MTN", "recipient": "+2340000000000", "simNumber": 1,
+            "receivedAt": "2026-08-11T10:02:00.000Z"}, "evt-m"))
+
+        for _ in range(20):
+            if len(sent) >= 1:
+                break
+            await asyncio.sleep(0.05)
+        await asyncio.sleep(0.2)
+
+        assert len(sent) == 1, f"expected only Airtel to notify, got {sent}"
+        assert sent[0][1] == "Airtel alert"
+
+    @pytest.mark.asyncio
     async def test_disabled_pushover_is_silent(self, client, db, monkeypatch):
         await self._setup_pushover(db, enabled=False)
         sent = []

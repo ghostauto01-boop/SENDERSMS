@@ -22,6 +22,13 @@ logger = logging.getLogger(__name__)
 SIM_NUMBER = "gateway.sim_number"
 LAST_POLL = "gateway.last_poll"
 WEBHOOK_REGISTERED = "gateway.webhook_registered"
+NOTIFY_MUTED_SENDERS = "notifications.muted_senders"
+
+# Carrier/service short codes & sender IDs that only ever send automated
+# balance/top-up alerts (MTN, Airtel, 9mobile, Glo, banks, ...). Nobody wants
+# a Pushover ping for each one, so they are muted by default. The list is
+# stored in the DB and editable from Settings -> Pushover.
+DEFAULT_MUTED_SENDERS = ["MTN", "AIRTEL"]
 
 
 async def get_setting(db: AsyncSession, key: str, default: Optional[str] = None) -> Optional[str]:
@@ -87,3 +94,37 @@ async def set_sim_number(db: AsyncSession, sim: int) -> int:
         db, SIM_NUMBER, str(sim), category="gateway", description="Active SIM slot"
     )
     return sim
+
+
+async def get_muted_notify_senders(db: AsyncSession) -> list[str]:
+    """Senders that must NOT trigger a Pushover notification.
+
+    Alphanumeric sender IDs are stored uppercased (``MTN``, ``AIRTEL``), so we
+    compare case-insensitively. The value is a comma-separated list kept in
+    ``system_settings``; when unset it falls back to the carrier defaults so
+    the noise is muted out of the box.
+    """
+    raw = await get_setting(db, NOTIFY_MUTED_SENDERS, ",".join(DEFAULT_MUTED_SENDERS))
+    muted: list[str] = []
+    for part in (raw or "").split(","):
+        s = part.strip().upper()
+        if s and s not in muted:
+            muted.append(s)
+    return muted
+
+
+async def set_muted_notify_senders(db: AsyncSession, senders: list[str]) -> list[str]:
+    """Persist the muted-sender list (stored as a comma-separated string)."""
+    clean: list[str] = []
+    for part in senders:
+        s = (part or "").strip().upper()
+        if s and s not in clean:
+            clean.append(s)
+    await set_setting(
+        db,
+        NOTIFY_MUTED_SENDERS,
+        ",".join(clean),
+        category="notifications",
+        description="Sender IDs that never trigger Pushover alerts (comma-separated)",
+    )
+    return clean
