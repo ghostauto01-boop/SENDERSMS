@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import Papa from "papaparse";
 import api from "../api/client";
 import { Contact, PaginatedResponse } from "../types";
@@ -32,7 +32,6 @@ export default function ContactsPage() {
   const [quickMsg, setQuickMsg] = useState(""); const [quickSendId, setQuickSendId] = useState<number|null>(null);
   const [quickSending, setQuickSending] = useState(false);
   const [quickContact, setQuickContact] = useState<Contact|null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(()=>{loadContacts();},[page,search,leadStatus]);
 

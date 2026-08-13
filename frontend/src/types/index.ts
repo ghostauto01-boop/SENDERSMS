@@ -197,6 +197,7 @@ export interface FollowUp {
   contact_name: string;
   contact_phone: string | null;
   campaign_id: number | null;
+  sequence_id: number | null;
   sequence_step_order: number | null;
   status: string;
   scheduled_at: string | null;

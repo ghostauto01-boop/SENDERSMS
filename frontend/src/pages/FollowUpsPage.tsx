@@ -155,10 +155,13 @@ export default function FollowUpsPage() {
     }
   };
 
-  const handleSkip = async (id: number) => {
-    if (!window.confirm("Skip this follow-up?")) return;
+  const handleSkip = async (followup: FollowUp) => {
+    const warning = followup.sequence_id
+      ? "Skip this follow-up? This will end the sequence for this contact."
+      : "Skip this follow-up?";
+    if (!window.confirm(warning)) return;
     try {
-      await api.post(`/followups/${id}/skip`);
+      await api.post(`/followups/${followup.id}/skip`);
       toast.success("Follow-up skipped");
       loadFollowups();
     } catch (err: any) {
@@ -272,7 +275,12 @@ export default function FollowUpsPage() {
                       {followup.contact_phone && <p className="text-xs text-gray-400 mt-0.5">{followup.contact_phone}</p>}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300 max-w-xs">
-                      <p className="line-clamp-2">{followup.message_text || "Sequence follow-up"}</p>
+                      <p className="line-clamp-2">{followup.message_text || "Sequence continuation"}</p>
+                      {followup.sequence_id && (
+                        <p className="text-[11px] text-primary-600 mt-1">
+                          Sequence #{followup.sequence_id} · step {(followup.sequence_step_order ?? 0) + 1}
+                        </p>
+                      )}
                       {followup.last_error && <p className="text-xs text-red-600 mt-1">{followup.last_error}</p>}
                     </td>
                     <td className="px-4 py-3 text-sm whitespace-nowrap">
@@ -292,7 +300,7 @@ export default function FollowUpsPage() {
                           <button onClick={() => handleSendNow(followup.id)} className="btn-primary btn-sm" title="Send now">
                             <Send size={14} />
                           </button>
-                          <button onClick={() => handleSkip(followup.id)} className="btn-secondary btn-sm" title="Skip">
+                          <button onClick={() => handleSkip(followup)} className="btn-secondary btn-sm" title="Skip">
                             <SkipForward size={14} />
                           </button>
                         </div>

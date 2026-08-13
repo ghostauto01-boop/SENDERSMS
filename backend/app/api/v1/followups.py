@@ -1,6 +1,6 @@
 """Follow-ups API routes."""
 
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select, func
@@ -8,10 +8,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.followup import FollowUp
+from app.models.campaign import CampaignContact
 from app.models.contact import Contact
 from app.models.user import User
 from app.schemas.followup import FollowUpCreate
 from app.security.auth import get_current_user
+from app.utils.datetime import local_day_utc_bounds
 from app.utils.naming import contact_display_name
 
 router = APIRouter()
@@ -40,6 +42,7 @@ def _followup_item(followup: FollowUp, contact: Contact | None) -> dict:
         ),
         "contact_phone": contact.phone_number if contact else None,
         "campaign_id": followup.campaign_id,
+        "sequence_id": followup.sequence_id,
         "sequence_step_order": followup.sequence_step_order,
         "status": followup.status,
         "scheduled_at": _utc_iso(followup.scheduled_at),
@@ -61,8 +64,7 @@ async def list_followups(
     current_user: User = Depends(get_current_user),
 ):
     """List follow-ups based on view."""
-    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-    today_end = today_start + timedelta(days=1)
+    today_start, today_end = local_day_utc_bounds()
 
     query = select(FollowUp)
 
@@ -177,6 +179,19 @@ async def skip_followup(
         raise HTTPException(status_code=409, detail="Only pending follow-ups can be skipped")
 
     followup.status = "skipped"
+    if followup.campaign_contact_id:
+        campaign_contact = (
+            await db.execute(
+                select(CampaignContact).where(
+                    CampaignContact.id == followup.campaign_contact_id
+                )
+            )
+        ).scalar_one_or_none()
+        if campaign_contact:
+            # Skipping the scheduled continuation ends automation for this
+            # contact; leaving it queued would keep the campaign running forever.
+            campaign_contact.status = "completed"
+            campaign_contact.next_action_at = None
     await db.flush()
     return {"success": True}
 
@@ -207,5 +222,16 @@ async def reschedule_followup(
     followup.scheduled_at = new_dt
     followup.status = "pending"
     followup.last_error = None
+    if followup.campaign_contact_id:
+        campaign_contact = (
+            await db.execute(
+                select(CampaignContact).where(
+                    CampaignContact.id == followup.campaign_contact_id
+                )
+            )
+        ).scalar_one_or_none()
+        if campaign_contact:
+            campaign_contact.status = "queued"
+            campaign_contact.next_action_at = new_dt
     await db.flush()
     return {"success": True, "scheduled_at": _utc_iso(followup.scheduled_at)}

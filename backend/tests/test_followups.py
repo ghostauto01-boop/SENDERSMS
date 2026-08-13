@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.database import Base, get_db
+from app.models.campaign import Campaign, CampaignContact
 from app.models.contact import Contact
 from app.models.followup import FollowUp
 from app.models.user import User
@@ -152,6 +153,39 @@ async def test_create_followup_rejects_opted_out_contact(client, db):
     )
     assert response.status_code == 400
     assert "opted-out" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_skipping_sequence_followup_finishes_contact_automation(client, db):
+    contact = await _contact(db)
+    campaign = Campaign(name="Sequence campaign", status="running")
+    db.add(campaign)
+    await db.flush()
+    campaign_contact = CampaignContact(
+        campaign_id=campaign.id,
+        contact_id=contact.id,
+        status="queued",
+        sequence_step=2,
+        next_action_at=datetime.now(timezone.utc) + timedelta(hours=1),
+    )
+    db.add(campaign_contact)
+    await db.flush()
+    followup = FollowUp(
+        contact_id=contact.id,
+        campaign_id=campaign.id,
+        campaign_contact_id=campaign_contact.id,
+        sequence_step_order=2,
+        status="pending",
+        scheduled_at=campaign_contact.next_action_at,
+    )
+    db.add(followup)
+    await db.flush()
+
+    response = await client.post(f"/api/v1/followups/{followup.id}/skip")
+    assert response.status_code == 200
+    assert followup.status == "skipped"
+    assert campaign_contact.status == "completed"
+    assert campaign_contact.next_action_at is None
 
 
 @pytest.mark.asyncio

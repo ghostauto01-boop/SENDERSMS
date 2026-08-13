@@ -13,8 +13,13 @@ class MessageNotVisible(RuntimeError):
     """The message row could not be found yet (producer commit not visible)."""
 
 
-async def _send_one(mid):
-    """Send one message. Returns True when the gateway should be retried."""
+async def _send_one(mid, final_on_failure=False):
+    """Send one message. Returns True when the gateway should be retried.
+
+    ``final_on_failure`` is used by the API's no-worker fallback. There is no
+    Celery retry context in that path, so a failed direct attempt must settle
+    visibly instead of becoming a permanent ``retrying`` row.
+    """
     async with async_session_factory() as db:
         m=(await db.execute(select(Message).where(Message.id==mid))).scalar_one_or_none()
         if m is None:
@@ -31,8 +36,9 @@ async def _send_one(mid):
         r=await send_sms_direct(c.phone_number,m.body,await get_sim_number(db))
         if r["success"]:m.status="sent";m.provider_message_id=r.get("provider_message_id","");m.sent_at=datetime.now(timezone.utc)
         else:
-            m.retry_count=(m.retry_count or 0)+1;m.status="failed"if m.retry_count>=3 else"retrying"
-            if m.retry_count>=3:m.failed_at=datetime.now(timezone.utc)
+            m.retry_count=(m.retry_count or 0)+1
+            m.status="failed"if final_on_failure or m.retry_count>=3 else"retrying"
+            if m.status=="failed":m.failed_at=datetime.now(timezone.utc)
             m.last_error=r.get("error")
         m.provider_response=json.dumps(r.get("raw"))if r.get("raw")else None
         # Reflect the real gateway outcome on the campaign. The campaign task
@@ -68,7 +74,19 @@ async def _record_campaign_outcome(db,m,ok):
         # Only settle as failed once retries are exhausted, otherwise a
         # transient blip would permanently mark the contact undeliverable.
         if camp:camp.messages_failed=(camp.messages_failed or 0)+1
-        if cc and cc.status in("queued","sent"):cc.status="failed"
+        if cc and cc.status in("queued","sent"):
+            cc.status="failed"
+            cc.next_action_at=None
+            # Do not advance to a follow-up when the preceding sequence SMS
+            # never reached the gateway.
+            from app.models.followup import FollowUp
+            pending=(await db.execute(select(FollowUp).where(
+                FollowUp.campaign_contact_id==cc.id,
+                FollowUp.status=="pending",
+            ))).scalars().all()
+            for followup in pending:
+                followup.status="cancelled"
+                followup.last_error="Previous sequence SMS failed"
 
 @celery_app.task(bind=True,max_retries=3,default_retry_delay=60)
 def send_sms(self,mid):

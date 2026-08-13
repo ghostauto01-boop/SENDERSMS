@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.campaign import Campaign, CampaignContact
 from app.models.contact import Contact
 from app.models.contact_list import ContactList, ContactListMember
+from app.models.followup import FollowUp
 from app.models.sequence import Sequence, SequenceStep, SequenceVersion
 from app.models.template import Template
 
@@ -156,6 +157,44 @@ class CampaignService:
                 "No message to send. Write a message or choose a template."
             )
 
+        sequence = None
+        sequence_steps = []
+        if campaign.sequence_id:
+            sequence = (
+                await self.db.execute(
+                    select(Sequence).where(Sequence.id == campaign.sequence_id)
+                )
+            ).scalar_one_or_none()
+            if not sequence:
+                errors.append("Selected sequence no longer exists")
+            elif not sequence.is_active:
+                errors.append("Selected sequence is inactive")
+            else:
+                sequence_steps = list(
+                    (
+                        await self.db.execute(
+                            select(SequenceStep)
+                            .where(
+                                SequenceStep.sequence_id == sequence.id,
+                                SequenceStep.version == sequence.current_version,
+                            )
+                            .order_by(SequenceStep.step_order)
+                        )
+                    ).scalars().all()
+                )
+                from app.services.sequence_service import validate_sequence_steps
+
+                try:
+                    sequence_steps = await validate_sequence_steps(
+                        self.db,
+                        sequence_steps,
+                        allow_campaign_message_fallback=bool(
+                            await self.resolve_body(campaign)
+                        ),
+                    )
+                except ValueError as exc:
+                    errors.append(f"Sequence is invalid: {exc}")
+
         gateway_error = await self._check_gateway(campaign)
         if gateway_error:
             errors.append(gateway_error)
@@ -163,44 +202,23 @@ class CampaignService:
         if errors:
             raise ValueError("; ".join(errors))
 
-        # Snapshot the sequence version if using one
-        if campaign.sequence_id:
-            seq_result = await self.db.execute(
-                select(Sequence).where(Sequence.id == campaign.sequence_id)
+        # Freeze the exact sequence definition for this campaign. Editing the
+        # reusable sequence later must not rewrite automation already running.
+        if sequence is not None:
+            from app.services.sequence_service import snapshot_steps
+
+            version = SequenceVersion(
+                sequence_id=sequence.id,
+                version=sequence.current_version,
+                snapshot=snapshot_steps(sequence_steps),
             )
-            sequence = seq_result.scalar_one_or_none()
-            if sequence:
-                # Create version snapshot
-                import json
-                steps_result = await self.db.execute(
-                    select(SequenceStep).where(
-                        SequenceStep.sequence_id == sequence.id,
-                        SequenceStep.version == sequence.current_version,
-                    ).order_by(SequenceStep.step_order)
-                )
-                steps = steps_result.scalars().all()
-                snapshot = json.dumps([
-                    {
-                        "step_order": s.step_order,
-                        "step_type": s.step_type,
-                        "config": s.config,
-                        "wait_duration_hours": s.wait_duration_hours,
-                        "template_id": s.template_id,
-                        "condition_type": s.condition_type,
-                        "condition_value": s.condition_value,
-                        "true_branch_step_order": s.true_branch_step_order,
-                        "false_branch_step_order": s.false_branch_step_order,
-                    }
-                    for s in steps
-                ])
-                version = SequenceVersion(
-                    sequence_id=sequence.id,
-                    version=sequence.current_version,
-                    snapshot=snapshot,
-                )
-                self.db.add(version)
-                await self.db.flush()
-                campaign.sequence_version_id = version.id
+            self.db.add(version)
+            await self.db.flush()
+            campaign.sequence_version_id = version.id
+        else:
+            # A campaign edited from "sequence" back to a single message must
+            # not keep executing its stale sequence snapshot.
+            campaign.sequence_version_id = None
 
         campaign.status = "scheduled"
         campaign.scheduled_at = datetime.now(timezone.utc)
@@ -300,6 +318,18 @@ class CampaignService:
                 CampaignContact.status.in_(["pending", "queued"]),
             )
             .values(status="cancelled", next_action_at=None)
+        )
+        await self.db.execute(
+            update(FollowUp)
+            .where(
+                FollowUp.campaign_id == campaign_id,
+                FollowUp.status == "pending",
+            )
+            .values(
+                status="cancelled",
+                last_error="Campaign stopped",
+                updated_at=datetime.now(timezone.utc),
+            )
         )
 
         await self.db.flush()
