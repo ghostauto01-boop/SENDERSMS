@@ -376,10 +376,21 @@ async def _poll_loop():
 async def lifespan(app: FastAPI):
     import asyncio
 
-    try: await init_db(); logger.info("DB ready")
-    except Exception as e: logger.warning("init_db: %s", e)
-    try: await _startup_webhook()
-    except Exception as e: logger.warning("webhook: %s", e)
+    # Uvicorn binds the listen socket only AFTER this startup section
+    # returns (i.e. we reach `yield`). Blocking here on Postgres / SMS-Gate
+    # is what made Render report "no open ports" and time the deploy out.
+    async def _boot():
+        try:
+            await asyncio.wait_for(init_db(), timeout=45)
+            logger.info("DB ready")
+        except Exception as e:
+            logger.warning("init_db: %s", e)
+        try:
+            await asyncio.wait_for(_startup_webhook(), timeout=20)
+        except Exception as e:
+            logger.warning("webhook: %s", e)
+
+    boot = asyncio.create_task(_boot())
 
     poller = None
     if settings.ENABLE_INLINE_POLLER:
@@ -388,10 +399,17 @@ async def lifespan(app: FastAPI):
 
     yield
 
+    boot.cancel()
     if poller:
         poller.cancel()
-        try: await poller
-        except (asyncio.CancelledError, Exception): pass
+        try:
+            await poller
+        except (asyncio.CancelledError, Exception):
+            pass
+        try:
+            await boot
+        except (asyncio.CancelledError, Exception):
+            pass
 
 app = FastAPI(title=settings.APP_NAME, version="1.0.0", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins_list, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
