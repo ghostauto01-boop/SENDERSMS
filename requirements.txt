@@ -7,6 +7,8 @@ pydantic-settings==2.7.0
 # Database
 sqlalchemy[asyncio]==2.0.36
 asyncpg==0.30.0
+# SQLite driver used by the automated tests and local simulator runs.
+aiosqlite==0.20.0
 alembic==1.14.0
 psycopg2-binary==2.9.10
 

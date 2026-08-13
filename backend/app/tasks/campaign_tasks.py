@@ -467,76 +467,171 @@ async def _check_condition(db, cc, step):
     return False
 
 
-@celery_app.task
-def process_followup(followup_id: int):
-    """Process a scheduled follow-up."""
-    async def _process():
-        outbox: list[int] = []
-        async with async_session_factory() as db:
-            result = await db.execute(select(FollowUp).where(FollowUp.id == followup_id))
-            followup = result.scalar_one_or_none()
-            if not followup or followup.status != "pending":
-                return
+async def process_followup_async(followup_id: int) -> bool:
+    """Claim and execute one follow-up exactly once.
 
-            followup.status = "sending"
-            followup.attempt_count += 1
+    Manual follow-ups send their saved message directly through SMSService.
+    Sequence follow-ups advance the campaign sequence as before. The atomic
+    pending -> sending claim prevents the inline poller and Celery beat from
+    sending the same due follow-up at the same time.
+    """
+    async with async_session_factory() as claim_db:
+        claim = await claim_db.execute(
+            update(FollowUp)
+            .where(FollowUp.id == followup_id, FollowUp.status == "pending")
+            .values(
+                status="sending",
+                attempt_count=FollowUp.attempt_count + 1,
+            )
+        )
+        await claim_db.commit()
+        if claim.rowcount != 1:
+            return False
 
-            # Get campaign contact if applicable
+    outbox: list[int] = []
+    async with async_session_factory() as db:
+        followup = (
+            await db.execute(select(FollowUp).where(FollowUp.id == followup_id))
+        ).scalar_one_or_none()
+        if not followup or followup.status != "sending":
+            return False
+
+        try:
+            contact = (
+                await db.execute(select(Contact).where(Contact.id == followup.contact_id))
+            ).scalar_one_or_none()
+            if not contact:
+                raise ValueError("Contact not found")
+            if contact.is_opted_out:
+                raise ValueError("Contact has opted out")
+
             if followup.campaign_contact_id:
-                cc_result = await db.execute(
-                    select(CampaignContact).where(CampaignContact.id == followup.campaign_contact_id)
+                cc = (
+                    await db.execute(
+                        select(CampaignContact).where(
+                            CampaignContact.id == followup.campaign_contact_id
+                        )
+                    )
+                ).scalar_one_or_none()
+                campaign = (
+                    await db.execute(
+                        select(Campaign).where(Campaign.id == followup.campaign_id)
+                    )
+                ).scalar_one_or_none()
+                if not cc or not campaign:
+                    raise ValueError("Campaign follow-up data is missing")
+                if not campaign.sequence_version_id:
+                    raise ValueError("Campaign sequence version is missing")
+
+                version = (
+                    await db.execute(
+                        select(SequenceVersion).where(
+                            SequenceVersion.id == campaign.sequence_version_id
+                        )
+                    )
+                ).scalar_one_or_none()
+                if not version:
+                    raise ValueError("Campaign sequence version not found")
+                if followup.sequence_step_order is None:
+                    raise ValueError("Campaign follow-up step is missing")
+
+                steps = json.loads(version.snapshot)
+                cc.sequence_step = followup.sequence_step_order
+                await _execute_sequence_step(
+                    db,
+                    campaign,
+                    cc,
+                    contact,
+                    steps,
+                    followup.sequence_step_order,
+                    outbox,
                 )
-                cc = cc_result.scalar_one_or_none()
-                if cc:
-                    contact_result = await db.execute(select(Contact).where(Contact.id == followup.contact_id))
-                    contact = contact_result.scalar_one_or_none()
-                    campaign_result = await db.execute(select(Campaign).where(Campaign.id == followup.campaign_id))
-                    campaign = campaign_result.scalar_one_or_none()
+                followup.status = "sent"
+            else:
+                if not followup.message_text or not followup.message_text.strip():
+                    raise ValueError("Follow-up message is empty")
+                from app.services.sms_service import SMSService
 
-                    if contact and campaign and not contact.is_opted_out:
-                        # Get sequence version
-                        if campaign.sequence_version_id:
-                            ver_result = await db.execute(
-                                select(SequenceVersion).where(SequenceVersion.id == campaign.sequence_version_id)
-                            )
-                            version = ver_result.scalar_one_or_none()
-                            if version:
-                                steps = json.loads(version.snapshot)
-                                cc.sequence_step = followup.sequence_step_order
-                                await _execute_sequence_step(
-                                    db, campaign, cc, contact, steps,
-                                    followup.sequence_step_order, outbox,
-                                )
+                message = await SMSService(db).send_message(
+                    followup.contact_id, followup.message_text
+                )
+                if message is None:
+                    raise ValueError("Contact cannot receive this message")
+                followup.message_id = message.id
+                if message.status == "failed":
+                    raise ValueError(message.last_error or "SMS gateway rejected the message")
+                followup.status = "sent"
 
-            followup.status = "sent"
+            followup.last_error = None
             followup.executed_at = datetime.now(timezone.utc)
             await db.commit()
+        except Exception as exc:
+            followup.last_error = str(exc)[:2000]
+            followup.executed_at = datetime.now(timezone.utc)
+            # A gateway failure is visible immediately instead of retrying the
+            # same real phone number every 30 seconds without operator input.
+            followup.status = "failed"
+            await db.commit()
+            logger.error("Follow-up %s failed: %s", followup_id, exc)
+            return False
 
-        # Publish only after the commit above, so the worker cannot dequeue a
-        # message id before its row exists.
-        await _flush_outbox(outbox)
+    # Publish sequence-created messages only after their rows are committed.
+    await _flush_outbox(outbox)
+    return True
 
+
+async def process_due_followups_async(limit: int = 50) -> list[int]:
+    """Execute pending follow-ups whose scheduled time has arrived."""
+    now = datetime.now(timezone.utc)
+    async with async_session_factory() as db:
+        due_ids = (
+            await db.execute(
+                select(FollowUp.id)
+                .where(
+                    FollowUp.status == "pending",
+                    FollowUp.scheduled_at <= now,
+                )
+                .order_by(FollowUp.scheduled_at.asc())
+                .limit(limit)
+            )
+        ).scalars().all()
+
+    processed: list[int] = []
+    for followup_id in due_ids:
+        if await process_followup_async(followup_id):
+            processed.append(followup_id)
+    return processed
+
+
+@celery_app.task
+def process_followup(followup_id: int):
+    """Celery entrypoint for sending one follow-up now."""
     loop = asyncio.get_event_loop()
     if loop.is_closed():
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-    loop.run_until_complete(_process())
+    return loop.run_until_complete(process_followup_async(followup_id))
+
+
+@celery_app.task
+def process_due_followups():
+    """Celery beat entrypoint for the due follow-up sweep."""
+    loop = asyncio.get_event_loop()
+    if loop.is_closed():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    return loop.run_until_complete(process_due_followups_async())
 
 
 @celery_app.task
 def schedule_followup(followup_id: int):
-    """Schedule a follow-up for later execution."""
-    # This is a placeholder - in production, you'd use Celery's ETA/countdown
+    """Queue a follow-up for immediate execution.
+
+    Future follow-ups are picked up by ``process_due_followups`` at their real
+    scheduled time; this helper remains for callers that explicitly want now.
+    """
     try:
-        process_followup.apply_async(
-            args=[followup_id],
-            countdown=60,  # Default 1 minute; in production, use the actual scheduled time
-        )
-    except Exception as exc:
-        # Surface a clear reason instead of a raw kombu error; the follow-up is
-        # still in the DB and will be retried by the periodic sweep.
+        enqueue(process_followup, followup_id)
+    except QueueUnavailable as exc:
         logger.error("Could not schedule follow-up %s: %s", followup_id, exc)
-        raise QueueUnavailable(
-            "Background task queue is unavailable. Check that the Redis broker "
-            "(REDIS_URL) is reachable, then try again."
-        ) from exc
+        raise

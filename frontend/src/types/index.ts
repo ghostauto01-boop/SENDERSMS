@@ -195,6 +195,7 @@ export interface FollowUp {
   id: number;
   contact_id: number;
   contact_name: string;
+  contact_phone: string | null;
   campaign_id: number | null;
   sequence_step_order: number | null;
   status: string;
@@ -202,6 +203,9 @@ export interface FollowUp {
   executed_at: string | null;
   message_text: string | null;
   attempt_count: number;
+  max_attempts: number;
+  notify_on_due: boolean;
+  last_error: string | null;
 }
 
 export interface GatewaySettings {

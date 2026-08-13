@@ -94,6 +94,7 @@ async def _poll():
         # Always process schedules even when no delivery statuses to poll
         await _process_scheduled()
         await _launch_scheduled_campaigns()
+        await _process_due_followups()
         # Fallback inline sender for running campaigns when Celery worker is
         # asleep (free tier) or Redis unreachable — otherwise campaigns stay
         # “running” with pending contacts forever.
@@ -118,6 +119,18 @@ async def _launch_scheduled_campaigns():
             logger.info("SCHEDULED CAMPAIGNS: launched %s", launched)
     except Exception as e:
         logger.warning(f"Scheduled campaigns: {e}")
+
+async def _process_due_followups():
+    """Send due follow-ups when this deployment has no awake Celery worker."""
+    try:
+        from app.tasks.campaign_tasks import process_due_followups_async
+
+        processed = await process_due_followups_async()
+        if processed:
+            logger.info("FOLLOW-UPS: processed %s", processed)
+    except Exception as exc:
+        logger.warning("Due follow-ups: %s", exc)
+
 
 async def _process_running_campaigns_inline():
     """Inline fallback for campaign sends when Celery/Redis is unavailable.
