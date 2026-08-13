@@ -1,13 +1,40 @@
 """Database session management."""
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
+
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 from app.config import settings
 
-db_url = settings.DATABASE_URL
-if db_url.startswith("postgresql://"):
-    db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
-elif db_url.startswith("postgres://"):
-    db_url = db_url.replace("postgres://", "postgresql+asyncpg://", 1)
+
+def _normalize_database_url(raw: str) -> tuple[str, dict]:
+    """Make a DATABASE_URL usable by asyncpg and fail fast on connect.
+
+    Neon / Render often hand out ``postgresql://…?sslmode=require``. asyncpg
+    does not accept the libpq ``sslmode`` query key, and without an explicit
+    connect timeout a bad host hangs until Render's port scan times out —
+    uvicorn only binds *after* FastAPI lifespan startup finishes.
+    """
+    url = raw
+    if url.startswith("postgresql://"):
+        url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    elif url.startswith("postgres://"):
+        url = url.replace("postgres://", "postgresql+asyncpg://", 1)
+
+    connect_args: dict = {}
+    parsed = urlparse(url)
+    if parsed.scheme.startswith("postgresql"):
+        qs = dict(parse_qsl(parsed.query, keep_blank_values=True))
+        sslmode = (qs.pop("sslmode", None) or "").lower()
+        if sslmode in {"require", "verify-ca", "verify-full", "prefer"}:
+            connect_args["ssl"] = True
+        qs.pop("channel_binding", None)
+        url = urlunparse(parsed._replace(query=urlencode(qs)))
+        connect_args["timeout"] = 10
+        connect_args["command_timeout"] = 30
+    return url, connect_args
+
+
+db_url, _connect_args = _normalize_database_url(settings.DATABASE_URL)
 
 # SQLite (used by the test suite and local runs) does not accept the
 # QueuePool sizing arguments; passing them raises TypeError at import time.
@@ -15,7 +42,13 @@ _engine_kwargs = {"echo": False}
 if db_url.startswith("sqlite"):
     _engine_kwargs["pool_pre_ping"] = True
 else:
-    _engine_kwargs.update(pool_size=20, max_overflow=10, pool_pre_ping=True)
+    _engine_kwargs.update(
+        pool_size=5,
+        max_overflow=5,
+        pool_pre_ping=True,
+        pool_timeout=10,
+        connect_args=_connect_args,
+    )
 
 engine = create_async_engine(db_url, **_engine_kwargs)
 async_session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
