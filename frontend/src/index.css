@@ -71,4 +71,50 @@
     overflow-wrap: anywhere;
     word-break: break-word;
   }
+
+  /* Hide scrollbars entirely (filter chip row, etc.) */
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  /* WhatsApp-style slim scrollbars */
+  .wa-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .wa-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .wa-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.18);
+    border-radius: 999px;
+  }
+  .dark .wa-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.18);
+  }
+  .wa-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 0, 0, 0.18) transparent;
+  }
+  .dark .wa-scrollbar {
+    scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+  }
+
+  /* Keep the composer above the iOS home indicator / notched phones */
+  .safe-bottom {
+    padding-bottom: max(env(safe-area-inset-bottom), 0px);
+  }
+
+  /* The full-height inbox must behave like a native app: no rubber-band
+     bounce on iOS, no pull-to-refresh fighting the scroll areas. */
+  .app-shell {
+    height: 100vh;
+    height: 100dvh;
+    overscroll-behavior: none;
+    overflow: hidden;
+  }
 }
