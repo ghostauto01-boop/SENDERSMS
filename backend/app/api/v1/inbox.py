@@ -1,5 +1,5 @@
 """Inbox API — full SMS sync with proper chat threading."""
-import logging, base64
+import logging, base64, json
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func, or_
@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models.conversation import Conversation, Message
 from app.models.contact import Contact
+from app.models.template import Template
 from app.models.user import User
 from app.security.auth import get_current_user
 from app.utils.phone import normalize_nigerian_number
@@ -16,6 +17,18 @@ from datetime import datetime as dt, timezone as tz
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+def _custom_fields(contact: Optional[Contact]) -> dict:
+    """Return a safe object even when legacy custom_fields JSON is malformed."""
+    if not contact or not contact.custom_fields:
+        return {}
+    try:
+        value = json.loads(contact.custom_fields)
+        return value if isinstance(value, dict) else {}
+    except (ValueError, TypeError):
+        return {}
+
 
 @router.get("/conversations")
 async def list_conversations(page:int=1,per_page:int=500,status:Optional[str]=None,search:Optional[str]=None,db:AsyncSession=Depends(get_db),cu:User=Depends(get_current_user)):
@@ -47,7 +60,7 @@ async def list_conversations(page:int=1,per_page:int=500,status:Optional[str]=No
     for conv in (await db.execute(query)).scalars().all():
         cr = await db.execute(select(Contact).where(Contact.id == conv.contact_id)); contact = cr.scalar_one_or_none()
         name = contact_display_name(contact)
-        items.append({"id":conv.id,"contact_id":conv.contact_id,"contact_name":name,"contact_phone":contact.phone_number if contact else"","contact_lead_status":contact.lead_status if contact else"","status":conv.status,"message_count":conv.message_count,"unread_count":conv.unread_count,"last_message_preview":conv.last_message_preview,"last_message_at":conv.last_message_at.isoformat()if conv.last_message_at else None,"created_at":conv.created_at.isoformat(),"contact":{"phone_number":contact.phone_number if contact else"","lead_status":contact.lead_status if contact else"","business_name":contact.business_name if contact else"","first_name":contact.first_name if contact else"","last_name":contact.last_name if contact else"","city":contact.city if contact else"","state":contact.state if contact else""}if contact else None})
+        items.append({"id":conv.id,"contact_id":conv.contact_id,"contact_name":name,"contact_phone":contact.phone_number if contact else"","contact_lead_status":contact.lead_status if contact else"","status":conv.status,"message_count":conv.message_count,"unread_count":conv.unread_count,"last_message_preview":conv.last_message_preview,"last_message_at":conv.last_message_at.isoformat()if conv.last_message_at else None,"created_at":conv.created_at.isoformat(),"contact":{"phone_number":contact.phone_number if contact else"","lead_status":contact.lead_status if contact else"","business_name":contact.business_name if contact else"","first_name":contact.first_name if contact else"","last_name":contact.last_name if contact else"","city":contact.city if contact else"","state":contact.state if contact else"","custom_fields":_custom_fields(contact)}if contact else None})
     return {"total":total,"items":items}
 
 @router.get("/conversations/{conversation_id}")
@@ -63,27 +76,80 @@ async def get_conversation(conversation_id:int,db:AsyncSession=Depends(get_db),c
     cr=await db.execute(select(Contact).where(Contact.id==conv.contact_id));contact=cr.scalar_one_or_none()
     mr=await db.execute(select(Message).where(Message.conversation_id==conversation_id).order_by(Message.created_at.asc()))
     await db.flush()
-    return {"id":conv.id,"contact":{"id":contact.id if contact else None,"phone_number":contact.phone_number if contact else"","first_name":contact.first_name if contact else"","last_name":contact.last_name if contact else"","business_name":contact.business_name if contact else"","lead_status":contact.lead_status if contact else"","city":contact.city if contact else"","state":contact.state if contact else"","email":contact.email if contact else"","website":contact.website if contact else"","notes":contact.notes if contact else""}if contact else None,"status":conv.status,"sequence_paused":conv.sequence_paused,"messages":[{"id":m.id,"direction":m.direction,"body":m.body,"status":m.status,"created_at":m.created_at.isoformat(),"sent_at":m.sent_at.isoformat()if m.sent_at else None,"delivered_at":m.delivered_at.isoformat()if m.delivered_at else None,"failed_at":m.failed_at.isoformat()if m.failed_at else None,"last_error":m.last_error,"segment_count":m.segment_count,"provider_message_id":m.provider_message_id}for m in mr.scalars().all()]}
+    return {"id":conv.id,"contact":{"id":contact.id if contact else None,"phone_number":contact.phone_number if contact else"","first_name":contact.first_name if contact else"","last_name":contact.last_name if contact else"","business_name":contact.business_name if contact else"","lead_status":contact.lead_status if contact else"","city":contact.city if contact else"","state":contact.state if contact else"","email":contact.email if contact else"","website":contact.website if contact else"","notes":contact.notes if contact else"","custom_fields":_custom_fields(contact)}if contact else None,"status":conv.status,"sequence_paused":conv.sequence_paused,"messages":[{"id":m.id,"direction":m.direction,"body":m.body,"status":m.status,"created_at":m.created_at.isoformat(),"sent_at":m.sent_at.isoformat()if m.sent_at else None,"delivered_at":m.delivered_at.isoformat()if m.delivered_at else None,"failed_at":m.failed_at.isoformat()if m.failed_at else None,"last_error":m.last_error,"segment_count":m.segment_count,"provider_message_id":m.provider_message_id}for m in mr.scalars().all()]}
+
+@router.get("/conversations/{conversation_id}/templates/{template_id}/preview")
+async def preview_reply_template(
+    conversation_id: int,
+    template_id: int,
+    db: AsyncSession = Depends(get_db),
+    cu: User = Depends(get_current_user),
+):
+    """Personalize a template with this conversation's contact fields."""
+    conv = await _get_conv(db, conversation_id)
+    contact = (await db.execute(
+        select(Contact).where(Contact.id == conv.contact_id)
+    )).scalar_one_or_none()
+    template = (await db.execute(
+        select(Template).where(Template.id == template_id, Template.is_active == True)  # noqa: E712
+    )).scalar_one_or_none()
+    if not template:
+        raise HTTPException(404, "Template not found or inactive")
+    from app.utils.phone import count_sms_segments
+    from app.utils.templating import render_template
+    body = render_template(template.body, contact)
+    char_count, segment_count = count_sms_segments(body)
+    return {
+        "template_id": template.id, "template_name": template.name, "body": body,
+        "char_count": char_count, "segment_count": segment_count,
+    }
+
 
 @router.post("/conversations/{conversation_id}/reply")
-async def send_reply(conversation_id:int,body:str=Query(...,min_length=1),db:AsyncSession=Depends(get_db),cu:User=Depends(get_current_user)):
-    """Send an outbound reply in a conversation via SMS-Gate.
+async def send_reply(
+    conversation_id: int,
+    body: Optional[str] = Query(None, min_length=1),
+    template_id: Optional[int] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    cu: User = Depends(get_current_user),
+):
+    """Send a plain or template-based outbound reply via SMS-Gate.
 
-    Reports the true outcome: `send_message` returns None when the contact is
-    opted out or suppressed, and returns a *failed* message when the gateway
-    rejected it. Previously both cases looked like a success to the UI.
+    If only ``template_id`` is provided, personalization happens server-side at
+    send time. The UI normally sends the personalized (and optionally edited)
+    body too, while template_id records usage.
     """
-    conv=await _get_conv(db,conversation_id)
+    conv = await _get_conv(db, conversation_id)
+    template = None
+    if template_id is not None:
+        template = (await db.execute(
+            select(Template).where(Template.id == template_id, Template.is_active == True)  # noqa: E712
+        )).scalar_one_or_none()
+        if not template:
+            raise HTTPException(404, "Template not found or inactive")
+
+    outgoing_body = (body or "").strip()
+    if not outgoing_body and template:
+        contact = (await db.execute(
+            select(Contact).where(Contact.id == conv.contact_id)
+        )).scalar_one_or_none()
+        from app.utils.templating import render_template
+        outgoing_body = render_template(template.body, contact)
+    if not outgoing_body:
+        raise HTTPException(422, "Message body or template is required")
+
     from app.services.sms_service import SMSService
-    msg=await SMSService(db).send_message(contact_id=conv.contact_id,body=body)
+    msg = await SMSService(db).send_message(contact_id=conv.contact_id, body=outgoing_body)
     if not msg:
-        raise HTTPException(409,"Cannot send: the contact has opted out or is on the suppression list.")
+        raise HTTPException(409, "Cannot send: the contact has opted out or is on the suppression list.")
+    if template:
+        template.use_count = (template.use_count or 0) + 1
     await db.flush()
-    if msg.status=="failed":
-        return {"success":False,"message_id":msg.id,"status":msg.status,
-                "error":msg.last_error or "The SMS gateway rejected the message."}
-    return {"success":True,"message_id":msg.id,"status":msg.status,
-            "provider_message_id":msg.provider_message_id}
+    if msg.status == "failed":
+        return {"success": False, "message_id": msg.id, "status": msg.status,
+                "error": msg.last_error or "The SMS gateway rejected the message."}
+    return {"success": True, "message_id": msg.id, "status": msg.status,
+            "provider_message_id": msg.provider_message_id}
 
 async def _get_conv(db, conversation_id: int) -> Conversation:
     conv = (await db.execute(

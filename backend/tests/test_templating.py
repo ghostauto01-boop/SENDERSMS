@@ -93,6 +93,10 @@ class TestTokenSyntax:
         c = contact(first_name="Ada", custom_fields={"first_name": "WRONG"})
         assert render_template("{{first_name}}", c) == "Ada"
 
+    def test_brand_name_alias_uses_business_name(self):
+        c = contact(business_name="Acme Foods")
+        assert render_template("{{brand_name}} / {{brand}}", c) == "Acme Foods / Acme Foods"
+
 
 class TestOverridesAndContext:
     def test_overrides_win(self):

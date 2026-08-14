@@ -96,6 +96,10 @@ def build_context(contact: Optional[object]) -> dict[str, str]:
     full_name = " ".join(p for p in (context.get("first_name"), context.get("last_name")) if p)
     context["full_name"] = full_name
     context["name"] = full_name or context.get("business_name", "")
+    # Common CRM/CSV wording: Brand Name is stored in the first-class
+    # business_name column but both spellings should work in a template.
+    context["brand_name"] = context.get("business_name", "")
+    context["brand"] = context.get("business_name", "")
 
     return context
 

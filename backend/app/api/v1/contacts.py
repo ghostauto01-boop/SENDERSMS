@@ -275,8 +275,10 @@ async def import_csv(
         except (ValueError, TypeError):
             client_mapping = {}
         for header, field in client_mapping.items():
-            if field:
-                column_mapping_map[str(header).strip().lower()] = field
+            # An explicit blank/"ignore" means the user chose not to import
+            # that column. Non-empty custom:<key> targets preserve arbitrary
+            # CSV data in Contact.custom_fields.
+            column_mapping_map[str(header).strip().lower()] = field or "ignore"
 
     service = CSVImportService(db)
     result = await service.validate_and_import(content, column_mapping_map, list_id, skip_duplicates)
@@ -310,13 +312,33 @@ async def export_csv(
     columns = [
         "first_name", "last_name", "business_name", "phone_number", "email",
         "city", "state", "country", "website", "industry", "source", "lead_status",
+        "notes",
     ]
+
+    # Include the union of imported custom fields so an export/re-import is
+    # lossless and users can inspect fields such as pain_point or account_tier.
+    parsed_custom: list[dict] = []
+    custom_columns: list[str] = []
+    for contact in contacts:
+        try:
+            values = json.loads(contact.custom_fields or "{}")
+            values = values if isinstance(values, dict) else {}
+        except (ValueError, TypeError):
+            values = {}
+        parsed_custom.append(values)
+        for key in values:
+            if key not in columns and key not in custom_columns:
+                custom_columns.append(key)
+    all_columns = columns + custom_columns
 
     buffer = io.StringIO()
     writer = csv.writer(buffer)
-    writer.writerow(columns)
-    for c in contacts:
-        writer.writerow([getattr(c, col) or "" for col in columns])
+    writer.writerow(all_columns)
+    for contact, custom in zip(contacts, parsed_custom):
+        writer.writerow(
+            [getattr(contact, col) or "" for col in columns]
+            + [custom.get(col, "") for col in custom_columns]
+        )
 
     buffer.seek(0)
     return StreamingResponse(
