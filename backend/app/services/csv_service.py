@@ -1,11 +1,11 @@
-"""
-CSV Import Service.
-Handles CSV parsing, validation, and import of contacts.
-"""
+"""CSV contact import with automatic standard and custom-field mapping."""
 
 import csv
 import io
+import json
 import logging
+import re
+import unicodedata
 from typing import Optional
 
 from sqlalchemy import select
@@ -17,34 +17,20 @@ from app.utils.phone import normalize_nigerian_number
 
 logger = logging.getLogger(__name__)
 
-# Supported CSV columns
-SUPPORTED_COLUMNS = [
-    "first_name", "last_name", "business_name", "phone", "phone_number",
-    "email", "city", "state", "website", "industry", "source",
-]
-
-COLUMN_MAP = {
-    "phone": "phone_number",
-    "phone_number": "phone_number",
-    "first_name": "first_name",
-    "last_name": "last_name",
-    "business_name": "business_name",
-    "email": "email",
-    "city": "city",
-    "state": "state",
-    "website": "website",
-    "industry": "industry",
-    "source": "source",
+# Fields that can safely be populated directly on Contact during an import.
+CONTACT_FIELDS = {
+    "first_name", "last_name", "business_name", "phone_number", "email",
+    "city", "state", "country", "website", "industry", "source",
+    "lead_status", "notes",
 }
 
-# Header aliases -> Contact field. Matching is case-insensitive and tolerant of
-# the spellings real restaurant/CRM exports use (e.g. "Phone Number", "Mobile",
-# "Restaurant", "First Name"). Anything not listed is ignored.
+# Header aliases -> Contact field. Everything not recognized here is still
+# imported automatically into Contact.custom_fields instead of being dropped.
 HEADER_ALIASES = {
     "phone_number": ("phone", "phone_number", "phonenumber", "phone number", "phone no",
                      "phone_no", "mobile", "mobile number", "mobile_number", "mobile no",
                      "mobile_no", "tel", "telephone", "telephone number", "contact",
-                     "contact number", "number"),
+                     "contact number", "number", "cell", "cell phone", "sms number"),
     "first_name": ("first_name", "firstname", "first name", "fname", "given name",
                    "given_name", "name", "full name", "fullname", "customer name",
                    "customer_name", "contact name", "contact_name", "contact person",
@@ -52,75 +38,95 @@ HEADER_ALIASES = {
     "last_name": ("last_name", "lastname", "last name", "lname", "surname", "family name",
                   "family_name"),
     "business_name": ("business_name", "businessname", "business name", "business", "company",
-                      "brand", "organization", "organisation", "restaurant", "restaurant name",
-                      "shop", "store"),
+                      "company name", "brand", "brand name", "brand_name", "organization",
+                      "organisation", "restaurant", "restaurant name", "shop", "store"),
     "email": ("email", "e-mail", "mail", "email address", "email_address"),
     "city": ("city", "town"),
     "state": ("state", "region", "province"),
+    "country": ("country", "nation"),
     "website": ("website", "web", "url", "site", "web site"),
     "industry": ("industry", "sector", "category"),
     "source": ("source", "channel", "origin"),
+    "lead_status": ("lead status", "lead_status", "status", "pipeline status"),
+    "notes": ("notes", "note", "comments", "comment"),
 }
 
 
-def detect_column_mapping(headers: list[str]) -> dict[str, str]:
-    """Auto-detect a CSV header -> Contact field mapping.
+def custom_field_key(header: str) -> str:
+    """Turn an arbitrary CSV heading into a template-safe identifier.
 
-    ``headers`` are the raw header strings (any casing). The returned mapping is
-    keyed by the *normalized* (lowercased, stripped) header so it lines up with
-    the normalized row keys produced during import.
+    For example ``Pain Point`` becomes ``pain_point``, usable as
+    ``{{pain_point}}``. Unicode headings are retained where possible, while the
+    ASCII identifier rule used by templates is respected.
+    """
+    value = unicodedata.normalize("NFKD", str(header)).encode("ascii", "ignore").decode()
+    value = re.sub(r"[^A-Za-z0-9]+", "_", value.strip().lower()).strip("_")
+    if not value:
+        value = "custom_field"
+    if value[0].isdigit():
+        value = f"field_{value}"
+    return value
+
+
+def detect_column_mapping(headers: list[str]) -> dict[str, str]:
+    """Map every CSV header to a Contact field or ``custom:<key>``.
+
+    Keys in the returned mapping are normalized raw headers because import rows
+    are matched case-insensitively. Unknown columns are never silently lost.
+    Duplicate custom identifiers receive a stable numeric suffix.
     """
     mapping: dict[str, str] = {}
+    used_custom: set[str] = set()
     for header in headers:
-        key = str(header).strip().lower()
+        raw_key = str(header).strip().lower()
+        if not raw_key:
+            continue
+        target = None
         for field, aliases in HEADER_ALIASES.items():
-            if key in aliases:
-                mapping[key] = field
+            if raw_key in aliases:
+                target = field
                 break
+        if target is None:
+            base = custom_field_key(str(header))
+            key = base
+            suffix = 2
+            while key in used_custom:
+                key = f"{base}_{suffix}"
+                suffix += 1
+            used_custom.add(key)
+            target = f"custom:{key}"
+        mapping[raw_key] = target
     return mapping
 
 
 class CSVImportResult:
-    """Result of a CSV import operation."""
-
     def __init__(self):
-        self.imported: int = 0
-        self.skipped: int = 0
-        self.invalid: int = 0
-        self.duplicates: int = 0
-        self.total_rows: int = 0
+        self.imported = 0
+        self.skipped = 0
+        self.invalid = 0
+        self.duplicates = 0
+        self.total_rows = 0
         self.errors: list[dict] = []
         self.imported_contact_ids: list[int] = []
 
 
 class CSVImportService:
-    """Service for importing contacts from CSV."""
-
     def __init__(self, db: AsyncSession):
         self.db = db
 
     async def preview_csv(self, content: bytes, max_rows: int = 20) -> dict:
-        """Preview CSV content: return headers and sample rows."""
         text = content.decode("utf-8-sig", errors="replace")
         reader = csv.DictReader(io.StringIO(text))
-
         if not reader.fieldnames:
             return {"error": "No headers found in CSV", "headers": [], "rows": [], "total_rows": 0}
-
         headers = [h.strip() for h in reader.fieldnames]
-        rows = []
-        row_count = 0
-
+        rows, row_count = [], 0
         for row in reader:
             row_count += 1
             if len(rows) < max_rows:
-                rows.append({k.strip(): v for k, v in row.items()})
-
-        return {
-            "headers": headers,
-            "rows": rows,
-            "total_rows": row_count,
-        }
+                rows.append({(k or "").strip(): v for k, v in row.items()})
+        return {"headers": headers, "rows": rows, "total_rows": row_count,
+                "column_mapping": detect_column_mapping(headers)}
 
     async def validate_and_import(
         self,
@@ -129,73 +135,57 @@ class CSVImportService:
         list_id: Optional[int] = None,
         skip_duplicates: bool = True,
     ) -> CSVImportResult:
-        """
-        Validate and import contacts from CSV.
-        column_mapping maps CSV column names to Contact field names.
-        """
         result = CSVImportResult()
         text = content.decode("utf-8-sig", errors="replace")
         reader = csv.DictReader(io.StringIO(text))
-
         if not reader.fieldnames:
             result.errors.append({"row": 0, "error": "No headers found"})
             return result
 
-        # Normalize mapping keys so they match the normalized row keys below.
-        # The client may send original-case header names; we compare case-blind.
-        mapping = {str(k).strip().lower(): v for k, v in (column_mapping or {}).items()}
-
-        # Resolve the target list once (and only once) so we can attach members.
+        mapping = {str(k).strip().lower(): str(v).strip() for k, v in (column_mapping or {}).items()}
         contact_list = None
         if list_id is not None:
-            contact_list = (
-                await self.db.execute(select(ContactList).where(ContactList.id == list_id))
-            ).scalar_one_or_none()
+            contact_list = (await self.db.execute(
+                select(ContactList).where(ContactList.id == list_id)
+            )).scalar_one_or_none()
 
-        seen_phones = set()
-        row_num = 0
+        seen_phones: set[str] = set()
         added_to_list = 0
-
-        for row in reader:
-            row_num += 1
+        for row_num, row in enumerate(reader, start=1):
             result.total_rows += 1
+            row_lower = {str(k or "").strip().lower(): v for k, v in row.items()}
+            contact_data: dict = {}
+            custom_data: dict[str, str] = {}
 
-            # Lowercase row keys: csv.DictReader preserves the original header
-            # casing, so a "Phone Number" column never matched a mapping keyed
-            # as "phone number" -- every row came back "No phone number".
-            row_lower = {str(k).strip().lower(): v for k, v in row.items()}
+            for csv_col, target in mapping.items():
+                value = (row_lower.get(csv_col) or "").strip()
+                if not value or not target or target == "ignore":
+                    continue
+                if target in CONTACT_FIELDS:
+                    contact_data[target] = value
+                elif target.startswith("custom:"):
+                    key = custom_field_key(target.split(":", 1)[1])
+                    # A direct Contact field always wins if a custom heading
+                    # happens to normalize to the same name.
+                    if key not in CONTACT_FIELDS:
+                        custom_data[key] = value
 
-            # Build contact data from column mapping
-            contact_data = {}
-            for csv_col, contact_field in mapping.items():
-                if contact_field in COLUMN_MAP.values():
-                    value = (row_lower.get(csv_col) or "").strip()
-                    if value:
-                        contact_data[contact_field] = value
-
-            # Validate phone number
             raw_phone = contact_data.get("phone_number", "")
             if not raw_phone:
                 result.invalid += 1
                 result.errors.append({"row": row_num, "error": "No phone number"})
                 continue
-
             normalized = normalize_nigerian_number(raw_phone)
             if not normalized:
                 result.invalid += 1
                 result.errors.append({"row": row_num, "error": f"Invalid phone number: {raw_phone}"})
                 continue
 
-            # Check duplicates
             if skip_duplicates:
                 if normalized in seen_phones:
                     result.duplicates += 1
                     continue
-
-                # Check database
-                existing = await self.db.execute(
-                    select(Contact).where(Contact.phone_number == normalized)
-                )
+                existing = await self.db.execute(select(Contact).where(Contact.phone_number == normalized))
                 if existing.scalar_one_or_none():
                     result.duplicates += 1
                     continue
@@ -203,21 +193,20 @@ class CSVImportService:
             seen_phones.add(normalized)
             contact_data["phone_number"] = normalized
             contact_data.setdefault("country", "Nigeria")
+            contact_data.setdefault("lead_status", "new")
+            if custom_data:
+                contact_data["custom_fields"] = json.dumps(custom_data, ensure_ascii=False)
 
-            # Create contact
             contact = Contact(**contact_data)
             self.db.add(contact)
             await self.db.flush()
             result.imported += 1
             result.imported_contact_ids.append(contact.id)
 
-            # Attach the contact to the chosen list, if one was requested.
             if contact_list is not None:
-                member = ContactListMember(list_id=contact_list.id, contact_id=contact.id)
-                self.db.add(member)
+                self.db.add(ContactListMember(list_id=contact_list.id, contact_id=contact.id))
                 added_to_list += 1
 
         if contact_list is not None and added_to_list:
             contact_list.contact_count = (contact_list.contact_count or 0) + added_to_list
-
         return result

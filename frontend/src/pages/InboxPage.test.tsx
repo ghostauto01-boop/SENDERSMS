@@ -116,8 +116,8 @@ describe("InboxPage — WhatsApp-style inbox", () => {
 
     await waitFor(() => expect(screen.getByText("Hello! Are you open today?")).toBeInTheDocument());
     expect(screen.getByText("Yes we are! 8am–8pm 😊")).toBeInTheDocument();
-    // Date chip (Today)
-    expect(screen.getByText("Today")).toBeInTheDocument();
+    // The fixture is dated one day before this test session.
+    expect(screen.getByText("Yesterday")).toBeInTheDocument();
     // Chat header shows contact name + phone
     expect(screen.getByText("+2348012345678")).toBeInTheDocument();
     // Composer
@@ -144,6 +144,40 @@ describe("InboxPage — WhatsApp-style inbox", () => {
     expect(url).toContain("/reply");
     const params = (apiPost.mock.calls[0][2] as any).params;
     expect(params.body).toBe("Sounds great!");
+  });
+
+  it("personalizes a selected reply template and sends it with template usage", async () => {
+    apiGet.mockImplementation((url: string) => {
+      if (url === "/templates/") return Promise.resolve({ data: { items: [{
+        id: 7, name: "Pain point reply", category: "Sales",
+        body: "Hi {{first_name}}, we can help {{business_name}} with {{pain_point}}.",
+        is_active: true,
+      }] } });
+      if (url === "/inbox/conversations") return Promise.resolve({ data: { items: CONVS } });
+      if (url === "/inbox/conversations/1/templates/7/preview") {
+        return Promise.resolve({ data: { body: "Hi Ada, we can help Acme Foods with slow follow-up." } });
+      }
+      if (url.startsWith("/inbox/conversations/")) {
+        return Promise.resolve({ data: { messages: MESSAGES, status: "interested" } });
+      }
+      return Promise.reject(new Error("unmocked GET " + url));
+    });
+
+    renderInbox();
+    await waitFor(() => expect(screen.getByText("Ada Obi")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("Ada Obi"));
+    const picker = await screen.findByLabelText("Reply with a template") as HTMLSelectElement;
+    await waitFor(() => expect(screen.getByText("Pain point reply · Sales")).toBeInTheDocument());
+    fireEvent.change(picker, { target: { value: "7" } });
+
+    const composer = screen.getByPlaceholderText("Type a message") as HTMLTextAreaElement;
+    await waitFor(() => expect(composer.value).toBe("Hi Ada, we can help Acme Foods with slow follow-up."));
+    fireEvent.keyDown(composer, { key: "Enter", shiftKey: false });
+    await waitFor(() => expect(apiPost).toHaveBeenCalled());
+    expect(apiPost.mock.calls[0][2].params).toEqual({
+      body: "Hi Ada, we can help Acme Foods with slow follow-up.",
+      template_id: "7",
+    });
   });
 
   it("Shift+Enter inserts a newline instead of sending", async () => {

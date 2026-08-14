@@ -181,6 +181,40 @@ class TestCSVImport:
         assert contact.phone_number == "+2348031234567"
 
 
+    @pytest.mark.asyncio
+    async def test_imports_every_unknown_column_as_template_ready_custom_field(self, client, db):
+        csv_content = (
+            "First Name,Phone Number,Brand Name,Pain Point,Account Tier,2026 Score\n"
+            "Ada,08031234567,Acme Foods,Slow follow-up,Gold,98\n"
+        ).encode()
+        response = await client.post(
+            "/api/v1/contacts/import/csv",
+            files={"file": ("contacts.csv", csv_content, "text/csv")},
+        )
+        assert response.status_code == 200
+        assert response.json()["imported"] == 1
+
+        contact = (await db.execute(select(Contact))).scalar_one()
+        assert contact.business_name == "Acme Foods"
+        assert json.loads(contact.custom_fields) == {
+            "pain_point": "Slow follow-up",
+            "account_tier": "Gold",
+            "field_2026_score": "98",
+        }
+
+    @pytest.mark.asyncio
+    async def test_explicit_ignore_does_not_import_custom_column(self, client, db):
+        content = b"Phone,Painpoint\n08031234567,Too expensive\n"
+        response = await client.post(
+            "/api/v1/contacts/import/csv",
+            files={"file": ("contacts.csv", content, "text/csv")},
+            data={"column_mapping": json.dumps({"Painpoint": "ignore"})},
+        )
+        assert response.status_code == 200
+        contact = (await db.execute(select(Contact))).scalar_one()
+        assert contact.custom_fields is None
+
+
 class TestCSVExport:
     @pytest.mark.asyncio
     async def test_export_returns_all_contacts(self, client, db):

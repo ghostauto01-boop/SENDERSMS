@@ -357,7 +357,6 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
   const [preview, setPreview] = useState<any>(null);
   const [step, setStep] = useState<"upload"|"map"|"importing"|"done">("upload");
   const [mapping, setMapping] = useState<Record<string,string>>({});
-  const [autoMapping, setAutoMapping] = useState<Record<string,string>>({});
   const [selectedListId, setSelectedListId] = useState("");
   const [lists, setLists] = useState<any[]>([]);
   const [result, setResult] = useState<any>(null);
@@ -365,21 +364,33 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
 
   useEffect(() => { api.get("/lists/").then(r=>setLists(r.data.items)); }, []);
 
+  const customKey = (header: string) => {
+    let key = header.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+    if (!key) key = "custom_field";
+    if (/^\d/.test(key)) key = `field_${key}`;
+    return key;
+  };
+
   const detectColumns = (headers: string[]): Record<string,string> => {
     const map: Record<string,string> = {};
     headers.forEach(h => {
-      const l = h.toLowerCase().replace(/[^a-z0-9 ]/g,"").trim();
-      if(/(first.?name|firstname|given.?name)/.test(l)) map[h] = "first_name";
-      else if(/(last.?name|lastname|surname|family.?name)/.test(l)) map[h] = "last_name";
-      else if(/(name|person|contact)/.test(l) && !/(phone|mobile|tel|cell|number|email|mail|fax)/.test(l)) map[h] = "first_name";
-      else if(/(phone|mobile|telephone|tel|cell|sms|number)/.test(l) && !/(name|person|email|fax)/.test(l)) map[h] = "phone_number";
-      else if(/(email|e.?mail|mail)/.test(l)) map[h] = "email";
+      const l = h.toLowerCase().replace(/[^a-z0-9 ]/g," ").replace(/\s+/g, " ").trim();
+      if(/(phone|mobile|telephone|tel|cell|sms|number)/.test(l) && !/(name|person|email|fax)/.test(l)) map[h] = "phone_number";
+      else if(/(first name|firstname|given name)/.test(l)) map[h] = "first_name";
+      else if(/(last name|lastname|surname|family name)/.test(l)) map[h] = "last_name";
       else if(/(business|company|brand|organization|organisation|restaurant|shop|store)/.test(l)) map[h] = "business_name";
+      else if(/(email|e mail|mail)/.test(l)) map[h] = "email";
       else if(/(city|town)/.test(l)) map[h] = "city";
       else if(/(state|region|province)/.test(l)) map[h] = "state";
+      else if(/country|nation/.test(l)) map[h] = "country";
       else if(/(website|web|url|site)/.test(l)) map[h] = "website";
       else if(/(industry|sector|category)/.test(l)) map[h] = "industry";
       else if(/(source|channel|origin)/.test(l)) map[h] = "source";
+      else if(/(lead status|pipeline status|^status$)/.test(l)) map[h] = "lead_status";
+      else if(/(notes|note|comments|comment)/.test(l)) map[h] = "notes";
+      else if(/(name|person|contact)/.test(l)) map[h] = "first_name";
+      else map[h] = `custom:${customKey(h)}`;
     });
     return map;
   };
@@ -394,7 +405,6 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
         const previewRows = rows.slice(1, 6);
         setPreview({ headers, rows: previewRows });
         const map = detectColumns(headers);
-        setAutoMapping(map);
         setMapping(map);
       },
     });
@@ -403,13 +413,9 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
   const doImport = async () => {
     if(!file)return; setStep("importing");
     const fd = new FormData(); fd.append("file",file);
-    // Only send columns the user actually changed in the map step, so a bad
-    // auto-guess can never override the server's own header detection.
-    const overrides: Record<string,string> = {};
-    Object.keys(mapping).forEach(h => {
-      if (mapping[h] !== (autoMapping[h] ?? "")) overrides[h] = mapping[h];
-    });
-    if (Object.keys(overrides).length > 0) fd.append("column_mapping", JSON.stringify(overrides));
+    // Send the complete visible mapping. This preserves explicit Ignore
+    // choices and gives every otherwise-unknown column a custom field target.
+    fd.append("column_mapping", JSON.stringify(mapping));
     if(selectedListId) fd.append("list_id",selectedListId);
     try {
       const { data } = await api.post("/contacts/import/csv",fd,{headers:{"Content-Type":"multipart/form-data"}});
@@ -424,10 +430,10 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
       <div className="border-2 border-dashed border-[#00a884]/30 bg-[#f0f9f6] dark:bg-[#0a332c]/30 rounded-2xl p-6 text-center">
         <Upload size={32} className="mx-auto text-[#00a884] mb-2"/>
         <p className="font-medium text-[#111b21] dark:text-white">Drop CSV here</p>
-        <p className="text-xs text-[#667781] mt-1">Restaurant contacts with phone, name, business columns</p>
+        <p className="text-xs text-[#667781] mt-1">Every column is imported — including your own custom fields</p>
         <input type="file" accept=".csv" onChange={handleFileChange} className="mt-3 block w-full text-sm"/>
       </div>
-      <p className="text-xs text-[#667781] text-center"> Columns auto-detected. Works with Kilimanjaro, Chicken Republic exports.</p>
+      <p className="text-xs text-[#667781] text-center">Columns are auto-detected. Unknown columns become template-ready custom fields.</p>
     </div>)}
     {step==="map" && preview && (<div className="space-y-3">
       <p className="text-sm font-semibold text-[#111b21] dark:text-white">Map columns (auto-detected)</p>
@@ -440,6 +446,7 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
           <div key={h}><label className="text-xs font-medium text-[#54656f]">{h}</label>
             <select className="w-full mt-1 px-2 py-2 bg-[#f0f2f5] dark:bg-[#111b21] rounded-xl text-xs" value={mapping[h]||""} onChange={e=>setMapping({...mapping,[h]:e.target.value})}>
               <option value="">Ignore</option>
+              <option value={`custom:${customKey(h)}`}>Custom field · {customKey(h)}</option>
               <option value="phone_number">Phone</option>
               <option value="first_name">First Name</option>
               <option value="last_name">Last Name</option>
@@ -447,9 +454,12 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
               <option value="email">Email</option>
               <option value="city">City</option>
               <option value="state">State</option>
+              <option value="country">Country</option>
               <option value="website">Website</option>
               <option value="industry">Industry</option>
               <option value="source">Source</option>
+              <option value="lead_status">Lead Status</option>
+              <option value="notes">Notes</option>
             </select></div>
         ))}
       </div>

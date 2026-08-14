@@ -6,8 +6,9 @@ import { useAuth } from "../hooks/useAuth";
 import {
   Send, Star, ThumbsDown, Archive, ChevronLeft, CheckCheck, MessageCircle,
   Bug, Search as SearchIcon, MoreVertical, Phone, Video, Paperclip, Smile,
-  Mic, LogOut, Settings as SettingsIcon, Users, Megaphone, Home,
+  Mic, LogOut, Settings as SettingsIcon, Users, Megaphone, Home, FileText,
 } from "lucide-react";
+import type { Template } from "../types";
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
@@ -101,6 +102,9 @@ export default function InboxPage() {
   const [debugLoading, setDebugLoading] = useState(false);
   const [showActions, setShowActions] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState("");
+  const [templateLoading, setTemplateLoading] = useState(false);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<any>(null);
@@ -114,6 +118,30 @@ export default function InboxPage() {
       localStorage.getItem("theme") === "dark" ||
       (!localStorage.getItem("theme") && window.matchMedia("(prefers-color-scheme: dark)").matches);
     document.documentElement.classList.toggle("dark", dark);
+  }, []);
+
+  // Templates are loaded once and personalized by the backend when selected,
+  // using both built-in and CSV-imported custom contact fields.
+  useEffect(() => {
+    let cancelled = false;
+    const loadTemplates = async () => {
+      try {
+        const all: Template[] = [];
+        let page = 1;
+        let total = 0;
+        do {
+          const { data } = await api.get("/templates/", { params: { page, per_page: 100 } });
+          all.push(...(data.items || []));
+          total = data.total ?? all.length;
+          page += 1;
+        } while (all.length < total);
+        if (!cancelled) setTemplates(all.filter(template => template.is_active));
+      } catch {
+        if (!cancelled) setTemplates([]);
+      }
+    };
+    loadTemplates();
+    return () => { cancelled = true; };
   }, []);
 
   const filterRef = useRef(filter);
@@ -176,18 +204,41 @@ export default function InboxPage() {
     setShowInfo(false);
     setPollDebug(null);
     setDebugData(null);
+    setReplyText("");
+    setSelectedTemplateId("");
     nearBottomRef.current = true;
+  };
+
+  const chooseTemplate = async (value: string) => {
+    setSelectedTemplateId(value);
+    if (!value || !selected) return;
+    setTemplateLoading(true);
+    try {
+      const { data } = await api.get(
+        `/inbox/conversations/${selected.id}/templates/${value}/preview`
+      );
+      setReplyText(data.body || "");
+      requestAnimationFrame(() => taRef.current?.focus());
+    } catch (err: any) {
+      setSelectedTemplateId("");
+      toast.error(err.response?.data?.detail || "Could not personalize this template");
+    } finally {
+      setTemplateLoading(false);
+    }
   };
 
   const sendReply = async () => {
     if (!replyText.trim() || !selected) return;
     setSending(true);
     try {
-      const { data } = await api.post(`/inbox/conversations/${selected.id}/reply`, null, { params: { body: replyText } });
+      const params: Record<string, string> = { body: replyText.trim() };
+      if (selectedTemplateId) params.template_id = selectedTemplateId;
+      const { data } = await api.post(`/inbox/conversations/${selected.id}/reply`, null, { params });
       if (data?.success === false) {
         toast.error(data.error || "Gateway rejected the message.");
       } else {
         setReplyText("");
+        setSelectedTemplateId("");
         toast.success("Sent");
       }
       loadMessages(selected.id); loadConvs();
@@ -562,6 +613,12 @@ export default function InboxPage() {
                   {selected.contact.city && <p><strong>Location:</strong> {selected.contact.city}{selected.contact.state ? `, ${selected.contact.state}` : ""}</p>}
                   <p><strong>Phone:</strong> {selected.contact.phone_number}</p>
                   {selected.contact.email && <p><strong>Email:</strong> {selected.contact.email}</p>}
+                  {Object.entries(selected.contact.custom_fields || {}).map(([key, value]) => (
+                    <p key={key}>
+                      <strong>{key.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())}:</strong>{" "}
+                      {String(value)}
+                    </p>
+                  ))}
                 </div>
               )}
 
@@ -631,6 +688,38 @@ export default function InboxPage() {
                   })}
                   <div ref={chatEndRef} className="h-2" />
                 </div>
+              </div>
+
+              {/* Template picker: selecting one inserts a contact-personalized,
+                  editable preview into the composer. */}
+              <div className="bg-[#f0f2f5] dark:bg-[#202c33] px-2 md:px-4 pt-2 flex items-center gap-2 flex-shrink-0 border-t border-[#d8dcdf] dark:border-[#2a3942]">
+                <FileText size={16} className="text-[#00a884] flex-shrink-0" />
+                <label htmlFor="reply-template" className="sr-only">Reply with a template</label>
+                <select
+                  id="reply-template"
+                  aria-label="Reply with a template"
+                  value={selectedTemplateId}
+                  disabled={templateLoading}
+                  onChange={e => chooseTemplate(e.target.value)}
+                  className="min-w-0 flex-1 sm:max-w-sm bg-white dark:bg-[#2a3942] text-[#111b21] dark:text-[#e9edef] rounded-lg px-3 py-2 text-[13px] outline-none border border-transparent focus:border-[#00a884] disabled:opacity-60"
+                >
+                  <option value="">{templateLoading ? "Personalizing template…" : "Choose a reply template…"}</option>
+                  {templates.map(template => (
+                    <option key={template.id} value={template.id}>
+                      {template.name}{template.category ? ` · ${template.category}` : ""}
+                    </option>
+                  ))}
+                </select>
+                {selectedTemplateId && !templateLoading && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedTemplateId("")}
+                    className="text-[12px] text-[#667781] hover:text-[#111b21] dark:hover:text-white px-2"
+                    title="Keep the text but unlink the template"
+                  >
+                    Unlink
+                  </button>
+                )}
               </div>
 
               {/* Composer — pinned above the mobile keyboard via 100dvh shell */}
