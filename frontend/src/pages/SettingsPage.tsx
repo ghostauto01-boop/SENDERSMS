@@ -41,15 +41,17 @@ export default function SettingsPage() {
 }
 
 function GatewayTab() {
-  const [testing, setTesting] = useState(false);
-  const [result, setResult] = useState<any>(null);
+  const [testing, setTesting] = useState<string | null>(null); // provider being tested
+  const [result, setResult] = useState<Record<string, any>>({});
   const [sim, setSim] = useState(1);
   const [savingSim, setSavingSim] = useState(false);
-  const [gw, setGw] = useState<any>(null);
+  const [gws, setGws] = useState<any>(null);
+  const [switching, setSwitching] = useState(false);
 
-  useEffect(() => {
-    api.get("/settings/gateway").then(({data}:any) => { setGw(data); if(data?.sim_number) setSim(data.sim_number); }).catch(()=>{});
-  }, []);
+  const load = () => {
+    api.get("/settings/gateways").then(({data}:any) => { setGws(data); if(data?.gateways?.smsgate?.sim_number) setSim(data.gateways.smsgate.sim_number); }).catch(()=>{});
+  };
+  useEffect(() => { load(); }, []);
 
   const saveSim = async (n: number) => {
     setSim(n); setSavingSim(true);
@@ -58,22 +60,77 @@ function GatewayTab() {
     finally { setSavingSim(false); }
   };
 
-  const test = async () => {
-    setTesting(true); setResult(null);
+  const test = async (provider: string) => {
+    setTesting(provider); setResult(r => ({ ...r, [provider]: null }));
     try {
-      const { data } = await api.post("/settings/gateway/test", null, { params: { sim } });
-      setResult(data);
-      toast.success(data.success ? "Connected!" : "Failed: " + (data.message || ""));
-    } catch (e: any) { setResult({ success: false, message: e.message }); toast.error("Test failed"); }
-    finally { setTesting(false); }
+      const { data } = await api.post("/settings/gateway/test", null, { params: { provider, sim } });
+      setResult(r => ({ ...r, [provider]: data }));
+      toast[ data.success ? "success" : "error" ](data.success ? provider + " connected!" : provider + " failed: " + (data.message || ""));
+    } catch (e: any) { setResult(r => ({ ...r, [provider]: { success: false, message: e.response?.data?.detail || e.message } })); toast.error("Test failed"); }
+    finally { setTesting(null); }
   };
+
+  const setActive = async (provider: string) => {
+    setSwitching(true);
+    try {
+      await api.put("/settings/gateways/active", null, { params: { provider } });
+      toast.success("Outbound SMS now goes through " + provider);
+      load();
+    } catch (e: any) { toast.error(e.response?.data?.detail || "Could not switch gateway"); }
+    finally { setSwitching(false); }
+  };
+
+  const copy = (text: string) => {
+    navigator.clipboard?.writeText(text).then(() => toast.success("Copied")).catch(() => toast.error("Copy failed"));
+  };
+
+  const dm = gws?.gateways?.dmobili;
+  const sg = gws?.gateways?.smsgate;
 
   return (
     <div className="space-y-4">
-    <div className="card p-6 space-y-4 max-w-lg">
-      <h2 className="text-lg font-semibold">SMS Gateway</h2>
-      <p className="text-xs text-gray-500">Connected to <code className="text-xs bg-gray-100 dark:bg-gray-700 px-1 rounded">{gw?.base_url || "api.sms-gate.app/3rdparty/v1"}</code>{gw?.username ? <> Username: <strong>{gw.username}</strong>.</> : null}</p>
-      {gw && !gw.configured && (
+    <div className="card p-6 space-y-4 max-w-2xl">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold">SMS Gateway</h2>
+        {gws && <span className="text-xs px-2 py-1 rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300">Active: {gws.active}</span>}
+      </div>
+      <p className="text-xs text-gray-500">
+        Two interchangeable gateways are available. Pick the one that carries all outbound SMS —
+        inbound replies, delivery reports, campaigns, sequences and scheduled sends all follow the selection.
+      </p>
+
+      {/* Provider toggle */}
+      <div className="grid sm:grid-cols-2 gap-3">
+        {[sg, dm].filter(Boolean).map((g: any) => (
+          <div key={g.provider} className={`rounded-lg border p-3 space-y-1 ${g.active ? "border-primary-500 bg-primary-50 dark:bg-primary-900/20" : "border-gray-200 dark:border-gray-700"}`}>
+            <div className="flex items-center justify-between">
+              <span className="font-medium text-sm">{g.name}</span>
+              {g.active
+                ? <span className="flex items-center gap-1 text-xs text-green-600"><CheckCircle size={13}/>Active</span>
+                : <span className="text-xs text-gray-400">Standby</span>}
+            </div>
+            <p className="text-[11px] text-gray-500">{g.mode}</p>
+            <p className="text-[11px] flex items-center gap-1">
+              {g.configured
+                ? <span className="flex items-center gap-1 text-green-600"><CheckCircle size={12}/>Configured</span>
+                : <span className="flex items-center gap-1 text-red-500"><XCircle size={12}/>Not configured</span>}
+            </p>
+            {!g.active && (
+              <button onClick={() => setActive(g.provider)} disabled={switching || !g.configured}
+                className="btn-secondary w-full text-xs mt-1" title={g.configured ? "" : "Configure its credentials first"}>
+                {switching ? "Switching..." : "Use this gateway"}
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+
+    {/* SMS-Gate.app card */}
+    <div className="card p-6 space-y-4 max-w-2xl">
+      <h3 className="font-semibold flex items-center gap-2"><Wifi size={16}/>SMS-Gate.app</h3>
+      <p className="text-xs text-gray-500">Connected to <code className="text-xs bg-gray-100 dark:bg-gray-700 px-1 rounded">{sg?.base_url || "api.sms-gate.app/3rdparty/v1"}</code>{sg?.username ? <> Username: <strong>{sg.username}</strong>.</> : null}</p>
+      {sg && !sg.configured && (
         <div className="p-3 rounded-lg text-sm bg-red-50 dark:bg-red-900/30 text-red-700">
           Gateway credentials are not configured. Set SMSGATE_USERNAME and SMSGATE_PASSWORD.
         </div>
@@ -92,24 +149,83 @@ function GatewayTab() {
         <p className="text-xs text-gray-400 mt-1">Select which SIM card to use for sending SMS</p>
       </div>
 
-      {result && (
-        <div className={`p-3 rounded-lg text-sm flex items-center gap-2 ${result.success ? "bg-green-50 dark:bg-green-900/30 text-green-700" : "bg-red-50 dark:bg-red-900/30 text-red-700"}`}>
-          {result.success ? <CheckCircle size={16} /> : <XCircle size={16} />}
-          <span>{result.message || (result.success ? "Connected" : "Failed")}</span>
+      {result["smsgate"] && (
+        <div className={`p-3 rounded-lg text-sm flex items-center gap-2 ${result["smsgate"].success ? "bg-green-50 dark:bg-green-900/30 text-green-700" : "bg-red-50 dark:bg-red-900/30 text-red-700"}`}>
+          {result["smsgate"].success ? <CheckCircle size={16} /> : <XCircle size={16} />}
+          <span>{result["smsgate"].message || (result["smsgate"].success ? "Connected" : "Failed")}</span>
         </div>
       )}
 
-      <button onClick={test} disabled={testing} className="btn-primary w-full">
-        <Activity size={14} className="mr-1" />{testing ? "Testing..." : "Test Connection"}
+      <button onClick={() => test("smsgate")} disabled={testing !== null} className="btn-primary w-full">
+        <Activity size={14} className="mr-1" />{testing === "smsgate" ? "Testing..." : "Test Connection"}
       </button>
 
-      {result && (
+      {result["smsgate"] && (
         <details className="text-xs bg-gray-50 dark:bg-gray-700 rounded p-2">
           <summary className="cursor-pointer font-medium">Details</summary>
-          <pre className="mt-1 whitespace-pre-wrap overflow-x-auto">{JSON.stringify(result, null, 2)}</pre>
+          <pre className="mt-1 whitespace-pre-wrap overflow-x-auto">{JSON.stringify(result["smsgate"], null, 2)}</pre>
         </details>
       )}
     </div>
+
+    {/* Dmobili card */}
+    <div className="card p-6 space-y-4 max-w-2xl">
+      <h3 className="font-semibold flex items-center gap-2"><Wifi size={16}/>Dmobili.com <span className="text-[10px] font-normal text-gray-400">(Pace Bulk SMS platform)</span></h3>
+      {dm && !dm.configured && (
+        <div className="p-3 rounded-lg text-sm bg-red-50 dark:bg-red-900/30 text-red-700">
+          Not configured. Set <code className="text-xs">DMOBILI_USERNAME</code> and <code className="text-xs">DMOBILI_PASSWORD</code>
+          (or <code className="text-xs">DMOBILI_API_TOKEN</code>) in the environment, plus <code className="text-xs">DMOBILI_SENDER_ID</code>.
+          See <code className="text-xs">docs/DMOBILI-GATEWAY.md</code>.
+        </div>
+      )}
+      {dm && (
+        <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-xs text-gray-600 dark:text-gray-300">
+          <span>Base URL: <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">{dm.base_url || "—"}</code></span>
+          <span>Send path: <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">{dm.send_path || "—"}</code></span>
+          <span>Username: <strong>{dm.username || (dm.token_auth ? "(API token auth)" : "—")}</strong></span>
+          <span>Sender ID: <strong>{dm.sender_id || "—"}</strong></span>
+          {dm.route ? <span>Route: <strong>{dm.route}</strong></span> : null}
+          <span>Balance endpoint: {dm.balance_path_set ? "set" : "not set"}</span>
+          <span>DLR report endpoint: {dm.report_path_set ? "set" : "not set"}</span>
+          <span>Callback secret: {dm.callback_secret_set
+            ? <span className="text-green-600">set</span>
+            : <span className="text-red-500">not set (inbound callbacks rejected)</span>}</span>
+        </div>
+      )}
+
+      {dm?.webhook_url && (
+        <div className="text-xs space-y-1">
+          <label className="label">Inbound SMS / DLR callback URL</label>
+          <div className="flex items-center gap-2">
+            <code className="flex-1 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded break-all">{dm.webhook_url}</code>
+            <button onClick={() => copy(dm.webhook_url)} className="btn-secondary text-xs">Copy</button>
+          </div>
+          <p className="text-[11px] text-gray-400">
+            Give this URL to Dmobili support when they activate two-way SMS on your account —
+            incoming replies and delivery reports are pushed here.
+          </p>
+        </div>
+      )}
+
+      {result["dmobili"] && (
+        <div className={`p-3 rounded-lg text-sm flex items-center gap-2 ${result["dmobili"].success ? "bg-green-50 dark:bg-green-900/30 text-green-700" : "bg-red-50 dark:bg-red-900/30 text-red-700"}`}>
+          {result["dmobili"].success ? <CheckCircle size={16} /> : <XCircle size={16} />}
+          <span>{result["dmobili"].message || (result["dmobili"].success ? "Connected" : "Failed")}</span>
+        </div>
+      )}
+
+      <button onClick={() => test("dmobili")} disabled={testing !== null || !dm?.configured} className="btn-primary w-full">
+        <Activity size={14} className="mr-1" />{testing === "dmobili" ? "Testing..." : "Test Connection"}
+      </button>
+
+      {result["dmobili"] && (
+        <details className="text-xs bg-gray-50 dark:bg-gray-700 rounded p-2">
+          <summary className="cursor-pointer font-medium">Details</summary>
+          <pre className="mt-1 whitespace-pre-wrap overflow-x-auto">{JSON.stringify(result["dmobili"], null, 2)}</pre>
+        </details>
+      )}
+    </div>
+
     <WebhooksCard />
     </div>
   );

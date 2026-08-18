@@ -268,6 +268,152 @@ async def webhook_get(): return {"ok": True}
 async def legacy(request: Request, db: AsyncSession = Depends(get_db)):
     return await smsgateway_webhook(request, db)
 
+
+# ---------------------------------------------------------------------------
+# Dmobili.com callbacks — inbound SMS and delivery reports.
+#
+# Dmobili's exact callback format is part of their private API spec, so the
+# parser accepts the field spellings this platform family is known to use
+# (from/sender/msisdn, message/text/msg, status/state/dlr). Once their docs
+# arrive, no code change should be needed unless they use exotic names.
+# ---------------------------------------------------------------------------
+
+_DMOBILI_FROM_KEYS = ("from", "sender", "msisdn", "from_number", "source", "src")
+_DMOBILI_TO_KEYS = ("to", "recipient", "dest", "destination", "to_number")
+_DMOBILI_TEXT_KEYS = ("message", "text", "msg", "body", "content", "sms")
+_DMOBILI_ID_KEYS = ("message_id", "messageId", "msgid", "id", "msg_id", "reference")
+_DMOBILI_STATUS_KEYS = ("status", "state", "dlr", "delivery_status", "report")
+_DMOBILI_TIME_KEYS = ("date", "time", "received_at", "timestamp", "done_at", "donedate")
+
+
+def _dmobili_verify(request: Request, body: dict) -> None:
+    """Reject callbacks that do not carry the configured shared secret."""
+    secret = settings.DMOBILI_WEBHOOK_SECRET
+    if not secret:
+        if settings.DMOBILI_WEBHOOK_ALLOW_UNSIGNED and not settings.is_production:
+            logger.warning(
+                "Dmobili callback secret check SKIPPED (DMOBILI_WEBHOOK_ALLOW_UNSIGNED=1). "
+                "Never do this in production."
+            )
+            return
+        logger.error(
+            "Dmobili callback rejected: DMOBILI_WEBHOOK_SECRET is not configured."
+        )
+        raise HTTPException(status_code=503, detail="Callback secret not configured")
+
+    from app.providers.dmobili import DmobiliProvider
+
+    provided = (
+        request.headers.get("x-dmobili-secret", "")
+        or request.query_params.get("secret", "")
+        or request.query_params.get("token", "")
+        or str(body.get("secret", "") or body.get("token", "") or "")
+    )
+    if not DmobiliProvider.validate_callback_secret(provided):
+        logger.warning(
+            "Dmobili callback rejected: bad secret from %s",
+            request.client.host if request.client else "unknown",
+        )
+        raise HTTPException(status_code=401, detail="Invalid callback secret")
+
+
+def _dmobili_pick(d: dict, keys: tuple) -> str:
+    for k in keys:
+        v = d.get(k)
+        if v not in (None, ""):
+            return str(v).strip()
+    return ""
+
+
+@router.get("/dmobili")
+async def dmobili_webhook_get():
+    """Some platforms verify callback URLs with GET before pushing events."""
+    return {"ok": True, "gateway": "dmobili"}
+
+
+@router.post("/dmobili")
+async def dmobili_webhook(request: Request, db: AsyncSession = Depends(get_db)):
+    """Receive inbound SMS and delivery reports pushed by Dmobili."""
+    body = await _parse(request)
+    if not body:
+        body = dict(request.query_params)
+    _dmobili_verify(request, body)
+
+    if not body:
+        return {"ok": True}
+
+    from_number = _dmobili_pick(body, _DMOBILI_FROM_KEYS)
+    to_number = _dmobili_pick(body, _DMOBILI_TO_KEYS)
+    text = _dmobili_pick(body, _DMOBILI_TEXT_KEYS)
+    msg_id = _dmobili_pick(body, _DMOBILI_ID_KEYS)
+    dlr = _dmobili_pick(body, _DMOBILI_STATUS_KEYS)
+    stamp = _dmobili_pick(body, _DMOBILI_TIME_KEYS)
+
+    # Dedup on the provider's event id, same posture as the smsgate webhook.
+    event_id = _dmobili_pick(body, ("event_id", "callback_id")) or msg_id
+    idem_key = f"dmobili-{event_id or datetime.now(timezone.utc).timestamp()}"[:255]
+    if (await db.execute(
+        select(WebhookEvent).where(WebhookEvent.idempotency_key == idem_key)
+    )).scalar_one_or_none():
+        logger.info("DMOBILI WEBHOOK: duplicate delivery %s ignored", idem_key)
+        return {"ok": True, "duplicate": True}
+
+    evt = WebhookEvent(
+        event_type="dlr" if dlr else "inbound",
+        provider="dmobili",
+        provider_event_id=msg_id or event_id,
+        idempotency_key=idem_key,
+        payload=json.dumps(body)[:100000],
+        status="received",
+    )
+    db.add(evt)
+    await db.flush()
+
+    from app.services.sms_service import SMSService
+    svc = SMSService(db)
+    result = {"ok": True}
+
+    try:
+        if dlr and msg_id:
+            # Delivery report for a message we sent.
+            from app.providers.dmobili import map_dlr_status
+
+            st = map_dlr_status(dlr)
+            if st != "unknown":
+                m = await svc.process_delivery_status(msg_id, st)
+                await db.flush()
+                result["matched"] = m is not None
+                logger.info("DMOBILI DLR: %s -> %s (matched=%s)", msg_id, st, m is not None)
+            else:
+                logger.info("DMOBILI DLR: unmapped status %r for %s", dlr, msg_id)
+        elif from_number and text:
+            msg = await svc.process_inbound_message(
+                from_number, text,
+                {"messageId": msg_id, "receivedAt": stamp, "recipient": to_number},
+                provider="dmobili",
+            )
+            await db.flush()
+            result["stored"] = bool(msg)
+            logger.info("DMOBILI INBOUND: from=%s stored=%s text=%r",
+                        from_number, bool(msg), text[:60])
+        else:
+            evt.error = "payload matched neither inbound SMS nor DLR"
+            logger.warning("DMOBILI WEBHOOK: unrecognised payload keys=%s", sorted(body.keys()))
+
+        evt.status = "processed"
+        evt.processed_at = datetime.now(timezone.utc)
+    except Exception as e:
+        # Never 500 back at the platform: retries are better than loss, and a
+        # crash must not block other deliveries.
+        evt.status = "error"
+        evt.error = str(e)[:1000]
+        evt.processed_at = datetime.now(timezone.utc)
+        logger.exception("DMOBILI WEBHOOK: failed to process")
+        result["error"] = "processing failed, logged"
+
+    await db.flush()
+    return result
+
 @router.get("/logs")
 async def logs(page: int=1, per_page: int=25, event_type: str=None,
                db: AsyncSession = Depends(get_db), cu: User = Depends(get_current_user)):

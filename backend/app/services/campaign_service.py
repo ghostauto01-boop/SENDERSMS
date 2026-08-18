@@ -60,14 +60,23 @@ class CampaignService:
             return None
 
         # No explicit gateway: fall back to the environment-configured one.
-        from app.config import settings
+        # Either of the two gateways being usable is enough — the dispatcher
+        # decides which one is live based on the active-gateway toggle.
+        from app.services.gateway_dispatch import get_active_gateway, provider_configured
 
-        if not settings.smsgate_configured:
+        active = await get_active_gateway(self.db)
+        if provider_configured(active):
+            return None
+        if provider_configured("smsgate") or provider_configured("dmobili"):
             return (
-                "No SMS gateway configured. Set SMSGATE_BASE_URL, SMSGATE_USERNAME "
-                "and SMSGATE_PASSWORD, or select a gateway for this campaign."
+                f"The active gateway ({active}) has no credentials configured. "
+                "Configure it in Settings -> SMS Gateway, or switch back to the other gateway."
             )
-        return None
+        return (
+            "No SMS gateway configured. Set SMSGATE_BASE_URL, SMSGATE_USERNAME "
+            "and SMSGATE_PASSWORD (or the DMOBILI_* equivalents), or select a "
+            "gateway for this campaign."
+        )
 
     async def create_campaign(self, data: dict) -> Campaign:
         """Create a new campaign (draft)."""

@@ -70,6 +70,48 @@ class Settings(BaseSettings):
     SMSGATE_RETRY_COUNT: int = 3
     SMSGATE_POLL_INTERVAL: int = 60
 
+    # --- SMS Gateway 2 (Dmobili.com — Pace Bulk SMS platform) ---
+    # Optional second gateway. When DMOBILI_USERNAME/PASSWORD (or API token)
+    # are set and the active gateway is switched to "dmobili" in Settings,
+    # all outbound SMS goes through Dmobili's HTTP API instead of SMS-Gate.
+    # Their API spec is issued privately by support (no public docs), so the
+    # endpoint paths are configurable to match whatever they send you.
+    DMOBILI_BASE_URL: Optional[str] = "https://dmobili.com"
+    DMOBILI_USERNAME: Optional[str] = None
+    DMOBILI_PASSWORD: Optional[str] = None
+    # Some Pace-platform accounts authenticate with a standalone API token
+    # instead of username/password. Used as an `apikey` parameter when set.
+    DMOBILI_API_TOKEN: Optional[str] = None
+    # Sender ID registered on the Dmobili account (required for their routes).
+    DMOBILI_SENDER_ID: Optional[str] = None
+    # Send endpoint relative to DMOBILI_BASE_URL. Default matches the common
+    # Pace Bulk SMS HTTP API layout; adjust to the docs Dmobili issues.
+    DMOBILI_SEND_PATH: str = "api/sms/index.php"
+    # Optional balance endpoint (e.g. "api/sms/balance.php"). When set, the
+    # connection test verifies credentials against it; without it the test
+    # only checks that the gateway is reachable.
+    DMOBILI_BALANCE_PATH: Optional[str] = None
+    # Optional delivery-report polling endpoint. Without it, delivery states
+    # come exclusively from DLR callbacks (webhooks).
+    DMOBILI_REPORT_PATH: Optional[str] = None
+    # Optional route name (their Alpha / Premium / OTP routes), passed as-is.
+    DMOBILI_ROUTE: Optional[str] = None
+    # Shared secret protecting the inbound/DLR callback endpoint. Dmobili
+    # posts it back as `secret` (or X-Dmobili-Secret header). Required in
+    # production; mirrors the smsgate signing-secret posture.
+    DMOBILI_WEBHOOK_SECRET: Optional[str] = None
+    DMOBILI_WEBHOOK_ALLOW_UNSIGNED: bool = False
+    DMOBILI_TIMEOUT: int = 30
+
+    @property
+    def dmobili_configured(self) -> bool:
+        """True when Dmobili has usable credentials."""
+        return bool(
+            self.DMOBILI_BASE_URL
+            and self.DMOBILI_USERNAME
+            and self.DMOBILI_PASSWORD
+        ) or bool(self.DMOBILI_BASE_URL and self.DMOBILI_API_TOKEN)
+
     # --- OneSignal ---
     ONESIGNAL_APP_ID: Optional[str] = None
     ONESIGNAL_REST_API_KEY: Optional[str] = None

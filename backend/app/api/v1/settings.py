@@ -19,7 +19,71 @@ router=APIRouter()
 @router.get("/gateway")
 async def get_gw(db:AsyncSession=Depends(get_db)):
     from app.services.system_settings import get_sim_number
-    return{"configured":settings.smsgate_configured,"is_enabled":True,"username":settings.SMSGATE_USERNAME or"","password":mask_value(settings.SMSGATE_PASSWORD or""),"base_url":settings.SMSGATE_BASE_URL or"","sim_number":await get_sim_number(db),"connection_status":"unknown","last_error":None}
+    from app.services.gateway_dispatch import get_active_gateway
+    return{"configured":settings.smsgate_configured,"is_enabled":True,"username":settings.SMSGATE_USERNAME or"","password":mask_value(settings.SMSGATE_PASSWORD or""),"base_url":settings.SMSGATE_BASE_URL or"","sim_number":await get_sim_number(db),"connection_status":"unknown","last_error":None,
+        "active_provider":await get_active_gateway(db)}
+
+@router.get("/gateways")
+async def get_gateways(db:AsyncSession=Depends(get_db),cu:User=Depends(get_current_user)):
+    """Summary of every SMS gateway this deployment knows about.
+
+    The UI renders one card per gateway; ``active`` marks the one all
+    outbound traffic currently goes through.
+    """
+    from app.services.system_settings import get_sim_number
+    from app.services.gateway_dispatch import get_active_gateway,provider_configured,KNOWN_PROVIDERS
+    from app.utils.urls import webhook_url,dmobili_webhook_url
+    active=await get_active_gateway(db)
+    return{
+        "active":active,
+        "known":list(KNOWN_PROVIDERS),
+        "gateways":{
+            "smsgate":{
+                "name":"SMS-Gate.app",
+                "provider":"smsgate",
+                "configured":settings.smsgate_configured,
+                "active":active=="smsgate",
+                "mode":"Android phone bridge (SIM slot "+str(await get_sim_number(db))+")",
+                "username":settings.SMSGATE_USERNAME or"",
+                "password":mask_value(settings.SMSGATE_PASSWORD or""),
+                "base_url":settings.SMSGATE_BASE_URL or"",
+                "webhook_url":webhook_url(),
+                "signing_secret_set":bool(settings.SMSGATE_WEBHOOK_SECRET),
+                "sim_number":await get_sim_number(db),
+            },
+            "dmobili":{
+                "name":"Dmobili.com",
+                "provider":"dmobili",
+                "configured":provider_configured("dmobili"),
+                "active":active=="dmobili",
+                "mode":"Hosted bulk SMS / two-way HTTP API (Pace platform)",
+                "username":settings.DMOBILI_USERNAME or"",
+                "password":mask_value(settings.DMOBILI_PASSWORD or""),
+                "token_auth":bool(settings.DMOBILI_API_TOKEN),
+                "base_url":settings.DMOBILI_BASE_URL or"",
+                "send_path":settings.DMOBILI_SEND_PATH or"",
+                "sender_id":settings.DMOBILI_SENDER_ID or"",
+                "route":settings.DMOBILI_ROUTE or"",
+                "balance_path_set":bool(settings.DMOBILI_BALANCE_PATH),
+                "report_path_set":bool(settings.DMOBILI_REPORT_PATH),
+                "webhook_url":dmobili_webhook_url(),
+                "callback_secret_set":bool(settings.DMOBILI_WEBHOOK_SECRET),
+            },
+        },
+    }
+
+@router.put("/gateways/active")
+async def set_active_gateway(provider:str=Query(...,description="smsgate | dmobili"),db:AsyncSession=Depends(get_db),cu:User=Depends(get_current_user)):
+    """Toggle which gateway carries all outbound SMS."""
+    from app.services.gateway_dispatch import set_active_gateway as _set,provider_configured,KNOWN_PROVIDERS
+    p=(provider or"").strip().lower()
+    if p not in KNOWN_PROVIDERS:
+        raise HTTPException(400,f"Unknown gateway {provider!r}. Known gateways: {', '.join(KNOWN_PROVIDERS)}")
+    if not provider_configured(p):
+        raise HTTPException(400,f"Cannot switch: {p} has no credentials configured. Set its environment variables first (see docs/DMOBILI-GATEWAY.md).")
+    active=await _set(db,p)
+    await db.flush()
+    return{"success":True,"active":active}
 
 @router.put("/gateway/sim")
 async def set_sim(sim:int=1,db:AsyncSession=Depends(get_db),cu:User=Depends(get_current_user)):
@@ -27,10 +91,13 @@ async def set_sim(sim:int=1,db:AsyncSession=Depends(get_db),cu:User=Depends(get_
     return{"success":True,"sim_number":await set_sim_number(db,sim)}
 
 @router.post("/gateway/test")
-async def test_gw():
-    from app.providers.smsgate import test_connection_direct
-    r=await test_connection_direct()
-    return{"success":r["success"]and r.get("online",False),"online":r.get("online",False),"name":r.get("name",""),"sims":r.get("sims",1),"message":"Connected"if r["success"]and r.get("online")else"Failed — phone offline or bad credentials","raw":r}
+async def test_gw(provider:str=Query("smsgate",description="Which gateway to test: smsgate | dmobili")):
+    """Connection test for one gateway. Defaults to SMS-Gate (legacy behaviour)."""
+    from app.services.gateway_dispatch import test_gateway,KNOWN_PROVIDERS
+    p=(provider or"smsgate").strip().lower()
+    if p not in KNOWN_PROVIDERS:
+        raise HTTPException(400,f"Unknown gateway {provider!r}")
+    return await test_gateway(p)
 
 @router.post("/gateway/register-webhook")
 async def reg_wh(url:Optional[str]=Query(None),cu:User=Depends(get_current_user)):

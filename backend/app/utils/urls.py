@@ -5,6 +5,7 @@ from typing import Optional
 from app.config import settings
 
 WEBHOOK_PATH = "/api/v1/webhooks/smsgateway"
+DMOBILI_WEBHOOK_PATH = "/api/v1/webhooks/dmobili"
 
 
 def public_base_url() -> Optional[str]:
@@ -27,3 +28,9 @@ def webhook_url() -> Optional[str]:
     """Absolute URL the SMS gateway should POST events to."""
     base = public_base_url()
     return f"{base}{WEBHOOK_PATH}" if base else None
+
+
+def dmobili_webhook_url() -> Optional[str]:
+    """Absolute URL Dmobili should push inbound SMS / DLR callbacks to."""
+    base = public_base_url()
+    return f"{base}{DMOBILI_WEBHOOK_PATH}" if base else None

@@ -31,9 +31,10 @@ async def _send_one(mid, final_on_failure=False):
         from app.models.contact import Contact
         c=(await db.execute(select(Contact).where(Contact.id==m.contact_id))).scalar_one_or_none()
         if not c:m.status="failed";m.last_error="Contact not found";await db.commit();return False
-        from app.providers.smsgate import send_sms_direct
+        from app.services.gateway_dispatch import send_sms_dispatch
         from app.services.system_settings import get_sim_number
-        r=await send_sms_direct(c.phone_number,m.body,await get_sim_number(db))
+        provider_name,r=await send_sms_dispatch(db,c.phone_number,m.body,await get_sim_number(db))
+        m.provider=provider_name
         if r["success"]:m.status="sent";m.provider_message_id=r.get("provider_message_id","");m.sent_at=datetime.now(timezone.utc)
         else:
             m.retry_count=(m.retry_count or 0)+1
@@ -112,12 +113,19 @@ def sync_delivery_status():
         async with async_session_factory() as db:
             ms=(await db.execute(select(Message).where(Message.status.in_(["sent","queued"]),Message.provider_message_id.isnot(None)).limit(100))).scalars().all()
             if not ms:return
+            # Each message is polled through the gateway that sent it, so a
+            # mid-flight gateway switch never strands in-flight receipts.
             from app.providers.smsgate import SMSGateProvider
-            p=SMSGateProvider()
+            from app.providers.dmobili import DmobiliProvider
+            providers={"smsgate":SMSGateProvider(),"dmobili":DmobiliProvider()}
             for m in ms:
+                p=providers.get(m.provider or "smsgate") or providers["smsgate"]
                 try:st=await p.get_message_status(m.provider_message_id);m.status=st.status if st.status in("delivered","failed")else m.status;m.delivered_at=st.delivered_at if st.status=="delivered"else m.delivered_at
                 except Exception:pass
-            await p.close();await db.commit()
+            for p in providers.values():
+                try:await p.close()
+                except Exception:pass
+            await db.commit()
     _run(s())
 
 @celery_app.task

@@ -762,6 +762,19 @@ Beyond the usual `DATABASE_URL` / `REDIS_URL` / `SECRET_KEY`, this release adds:
 | `SMSGATE_USERNAME` / `SMSGATE_PASSWORD` | Gateway credentials. These are now **env-only** — the previous hardcoded defaults were removed. |
 | `ENABLE_INLINE_POLLER` | Set to `true` only when running without a Celery worker. |
 
+### Optional second gateway — Dmobili.com
+
+All optional; only needed to enable the Dmobili gateway (toggleable from
+Settings → SMS Gateway without redeploying). Full guide:
+[docs/DMOBILI-GATEWAY.md](docs/DMOBILI-GATEWAY.md).
+
+| Variable | Why it matters |
+|---|---|
+| `DMOBILI_USERNAME` / `DMOBILI_PASSWORD` (or `DMOBILI_API_TOKEN`) | Dmobili account credentials; without them the gateway stays disabled. |
+| `DMOBILI_SENDER_ID` | Registered Sender Name used on their routes. |
+| `DMOBILI_SEND_PATH` / `DMOBILI_BALANCE_PATH` / `DMOBILI_REPORT_PATH` | Endpoint paths (their spec is issued by support; defaults match the common Pace platform layout). |
+| `DMOBILI_WEBHOOK_SECRET` | Shared secret protecting `/api/v1/webhooks/dmobili` (inbound SMS + DLRs). **Required in production.** |
+
 In production (`APP_ENV=production`) the app **refuses to start** if
 `SECRET_KEY`, `CREDENTIAL_ENCRYPTION_KEY`, or `ADMIN_PASSWORD` are left at their
 insecure development defaults.

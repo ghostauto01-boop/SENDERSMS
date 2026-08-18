@@ -147,7 +147,8 @@ async def send_sms_now(
         raise HTTPException(400, "Provide contact_id, phone_number, or list_id")
 
     char_count, segment_count = count_sms_segments(body)
-    from app.providers.smsgate import send_sms_direct
+    from app.services.gateway_dispatch import get_active_gateway, send_sms_dispatch
+    active_provider = await get_active_gateway(db)
     results = []
 
     for contact in recipients:
@@ -169,12 +170,13 @@ async def send_sms_now(
             segment_count=segment_count,
             char_count=char_count,
             status="sending",
-            provider="smsgate",
+            provider=active_provider,
             idempotency_key=f"direct-{contact.id}-{uuid.uuid4().hex[:8]}",
         )
         db.add(message)
         await db.flush()
-        r = await send_sms_direct(contact.phone_number, msg, sim)
+        provider_name, r = await send_sms_dispatch(db, contact.phone_number, msg, sim)
+        message.provider = provider_name
         if r["success"]:
             message.status = "sent"
             message.provider_message_id = r.get("provider_message_id", "")
@@ -372,10 +374,11 @@ async def retry_message(mid: int, db: AsyncSession = Depends(get_db), cu: User =
     if contact.is_opted_out:
         raise HTTPException(400, "Contact opted out")
 
-    from app.providers.smsgate import send_sms_direct
+    from app.services.gateway_dispatch import send_sms_dispatch
     from app.services.system_settings import get_sim_number
     sim = await get_sim_number(db)
-    result = await send_sms_direct(contact.phone_number, m.body, sim)
+    provider_name, result = await send_sms_dispatch(db, contact.phone_number, m.body, sim)
+    m.provider = provider_name
     if result["success"]:
         m.status = "sent"
         m.provider_message_id = result.get("provider_message_id", "")

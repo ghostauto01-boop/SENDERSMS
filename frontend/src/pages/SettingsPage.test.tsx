@@ -33,6 +33,17 @@ beforeEach(() => {
     if (url === "/settings/compliance") return Promise.resolve({ data: {} });
     if (url === "/settings/sending-rules") return Promise.resolve({ data: {} });
     if (url === "/settings/gateway") return Promise.resolve({ data: { configured: false, sim_number: 1 } });
+    if (url === "/settings/gateways") return Promise.resolve({ data: {
+      active: "smsgate", known: ["smsgate", "dmobili"],
+      gateways: {
+        smsgate: { name: "SMS-Gate.app", provider: "smsgate", configured: true, active: true,
+          mode: "Android phone bridge (SIM slot 1)", username: "u", base_url: "", sim_number: 1 },
+        dmobili: { name: "Dmobili.com", provider: "dmobili", configured: false, active: false,
+          mode: "Hosted bulk SMS / two-way HTTP API (Pace platform)", username: "", base_url: "",
+          send_path: "api/sms/index.php", sender_id: "", route: "", balance_path_set: false,
+          report_path_set: false, webhook_url: null, callback_secret_set: false },
+      },
+    } });
     if (url === "/settings/gateway/webhooks") return Promise.resolve({ data: { configured: false, webhooks: [] } });
     if (url === "/settings/notifications/muted-senders") {
       return Promise.resolve({ data: { senders: ["MTN", "AIRTEL"] } });

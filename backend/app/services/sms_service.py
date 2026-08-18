@@ -35,10 +35,13 @@ class SMSService:
         ch,sg=count_sms_segments(body);ik=f"send-{contact_id}-{uuid.uuid4().hex[:12]}"
         cr=(await self.db.execute(select(Conversation).where(Conversation.contact_id==contact_id).order_by(Conversation.id).limit(1))).scalars().first()
         if not cr:cr=Conversation(contact_id=contact_id,campaign_id=campaign_id,status="active");self.db.add(cr);await self.db.flush()
-        msg=Message(conversation_id=cr.id,contact_id=contact_id,campaign_id=campaign_id,direction="outgoing",body=body,segment_count=sg,char_count=ch,status="sending",provider="smsgate",idempotency_key=ik)
+        from app.services.gateway_dispatch import get_active_gateway
+        active=await get_active_gateway(self.db)
+        msg=Message(conversation_id=cr.id,contact_id=contact_id,campaign_id=campaign_id,direction="outgoing",body=body,segment_count=sg,char_count=ch,status="sending",provider=active,idempotency_key=ik)
         self.db.add(msg);await self.db.flush()
-        from app.providers.smsgate import send_sms_direct
-        r=await send_sms_direct(c.phone_number,body,await self._get_sim())
+        from app.services.gateway_dispatch import send_sms_dispatch
+        provider_name,r=await send_sms_dispatch(self.db,c.phone_number,body,await self._get_sim())
+        msg.provider=provider_name
         if r["success"]:msg.status="sent";msg.provider_message_id=r.get("provider_message_id","");msg.sent_at=datetime.now(timezone.utc)
         else:msg.status="failed";msg.last_error=r.get("error","");msg.failed_at=datetime.now(timezone.utc)
         msg.provider_response=json.dumps(r.get("raw"))if r.get("raw")else None
@@ -71,7 +74,7 @@ class SMSService:
             d=d.replace(tzinfo=timezone.utc)
         return d.astimezone(timezone.utc)
 
-    async def process_inbound_message(self,from_number,body,webhook_data=None):
+    async def process_inbound_message(self,from_number,body,webhook_data=None,provider="smsgate"):
         # Inbound senders are not always Nigerian mobiles: short codes, sender IDs
         # and international numbers must land in the inbox too, not be discarded.
         n=normalize_inbound_sender(from_number)
@@ -109,7 +112,7 @@ class SMSService:
         # Preserve the real receive time. Inbox export replays historical SMS, and
         # stamping them all with now() shuffles the chat into the wrong order.
         received_at=self._parse_ts(stamp) or datetime.now(timezone.utc)
-        m=Message(conversation_id=cr.id,contact_id=c.id,direction="incoming",body=body,segment_count=sg,char_count=ch,status="delivered",provider="smsgate",provider_message_id=mid or None,idempotency_key=ik,created_at=received_at)
+        m=Message(conversation_id=cr.id,contact_id=c.id,direction="incoming",body=body,segment_count=sg,char_count=ch,status="delivered",provider=provider,provider_message_id=mid or None,idempotency_key=ik,created_at=received_at)
         self.db.add(m);await self.db.flush()
         cr.message_count=(cr.message_count or 0)+1
         # Inbox export replays old SMS out of order; the preview and the sort
@@ -164,9 +167,10 @@ class SMSService:
 
         ik=f"autoreply-{rule.id}-{contact.id}-{uuid.uuid4().hex[:12]}"[:255]
         ch,sg=count_sms_segments(text)
+        from app.services.gateway_dispatch import get_active_gateway
         out=Message(
             conversation_id=conversation.id,contact_id=contact.id,direction="outgoing",
-            body=text,segment_count=sg,char_count=ch,status="queued",provider="smsgate",
+            body=text,segment_count=sg,char_count=ch,status="queued",provider=await get_active_gateway(self.db),
             idempotency_key=ik,is_auto_reply=True,
         )
         self.db.add(out)
@@ -228,9 +232,8 @@ class SMSService:
         except Exception as e:logger.error(f"NOTIFY err:{e}")
 
     async def check_gateway_health(self):
-        from app.providers.smsgate import test_connection_direct
-        r=await test_connection_direct()
-        return{"is_healthy":r["success"]and r.get("online",False),"status":"healthy"if r["success"]and r.get("online")else"unhealthy","error":r.get("error")}
+        from app.services.gateway_dispatch import gateway_health
+        return await gateway_health(self.db)
 
     async def _stop_seq(self,contact_id):
         await self.db.execute(update(FollowUp).where(FollowUp.contact_id==contact_id,FollowUp.status.in_(["pending","sending"])).values(status="cancelled"))

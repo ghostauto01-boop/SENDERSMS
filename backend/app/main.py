@@ -63,7 +63,7 @@ async def _poll():
 
         from sqlalchemy import select
         from app.models.conversation import Message
-        from app.providers.smsgate import poll_status_for_ids
+        from app.services.gateway_dispatch import poll_status_dispatch
 
         async with async_session_factory() as db:
             msgs = await db.execute(
@@ -71,9 +71,14 @@ async def _poll():
                     Message.provider_message_id.isnot(None),
                     Message.status.in_(("sent","sending","queued"))
                 ).limit(100))
-            ids = [m.provider_message_id for m in msgs.scalars().all()]
+            # Poll each gateway for the messages IT sent, so switching the
+            # active gateway never abandons in-flight delivery receipts.
+            ids_by_provider: dict = {}
+            for m in msgs.scalars().all():
+                ids_by_provider.setdefault(m.provider or "smsgate", []).append(m.provider_message_id)
+            ids = [mid for group in ids_by_provider.values() for mid in group]
             if ids:
-                results = await poll_status_for_ids(ids)
+                results = await poll_status_dispatch(db, ids_by_provider)
                 count = 0
                 for r in results:
                     mr = await db.execute(select(Message).where(Message.provider_message_id == r["provider_message_id"]))
@@ -177,7 +182,7 @@ async def _process_scheduled():
     - Delivery receipts via poll/webhook can update the Message row as usual.
     """
     try:
-        from app.providers.smsgate import send_sms_direct
+        from app.services.gateway_dispatch import get_active_gateway, send_sms_dispatch
         from app.models.scheduled import ScheduledMessage
         from app.models.contact import Contact
         from app.models.conversation import Conversation, Message
@@ -194,6 +199,7 @@ async def _process_scheduled():
             scheduled = due.scalars().all()
             if not scheduled:
                 return
+            active_provider = await get_active_gateway(db)
             for sm in scheduled:
                 try:
                     # Resolve contact (create if phone-only)
@@ -216,7 +222,7 @@ async def _process_scheduled():
                         sm.executed_at = dt.now(tz.utc)
                         # also create a failed Message so inbox shows why it didn't go
                         if contact:
-                            await _create_scheduled_message_row(db, sm, contact, "failed", sm.error)
+                            await _create_scheduled_message_row(db, sm, contact, "failed", sm.error, provider=active_provider)
                         continue
                     if sm.phone_number:
                         sup = await db.execute(select(SuppressionEntry).where(SuppressionEntry.phone_number == sm.phone_number))
@@ -225,7 +231,7 @@ async def _process_scheduled():
                             sm.error = "Number is on suppression list"
                             sm.executed_at = dt.now(tz.utc)
                             if contact:
-                                await _create_scheduled_message_row(db, sm, contact, "failed", sm.error)
+                                await _create_scheduled_message_row(db, sm, contact, "failed", sm.error, provider=active_provider)
                             continue
 
                     # Personalize body if we have a contact
@@ -264,7 +270,7 @@ async def _process_scheduled():
                             segment_count=segment_count,
                             char_count=char_count,
                             status="sending",
-                            provider="smsgate",
+                            provider=active_provider,
                             idempotency_key=f"scheduled-{sm.id}-{uuid.uuid4().hex[:8]}",
                         )
                         db.add(msg)
@@ -272,7 +278,9 @@ async def _process_scheduled():
 
                     # Call gateway
                     target_phone = sm.phone_number or (contact.phone_number if contact else "")
-                    r = await send_sms_direct(target_phone, body, sm.sim_number or 1)
+                    provider_name, r = await send_sms_dispatch(db, target_phone, body, sm.sim_number or 1)
+                    if msg:
+                        msg.provider = provider_name
 
                     if r.get("success"):
                         sm.status = "sent"
@@ -320,7 +328,7 @@ async def _process_scheduled():
     except Exception as e:
         logger.warning(f"Scheduled: {e}")
 
-async def _create_scheduled_message_row(db, sm, contact, status, error):
+async def _create_scheduled_message_row(db, sm, contact, status, error, provider="smsgate"):
     """Helper: create a failed Message bubble for a scheduled that never reached gateway."""
     try:
         from app.models.conversation import Conversation, Message
@@ -346,7 +354,7 @@ async def _create_scheduled_message_row(db, sm, contact, status, error):
             segment_count=sc,
             char_count=cc,
             status=status,
-            provider="smsgate",
+            provider=provider,
             last_error=error,
             failed_at=dt.now(tz.utc) if status == "failed" else None,
             idempotency_key=f"scheduled-{sm.id}-{uuid.uuid4().hex[:8]}",

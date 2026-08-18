@@ -485,9 +485,11 @@ async def _send_template_message(
 
     # Create message
     from app.utils.phone import count_sms_segments
+    from app.services.gateway_dispatch import get_active_gateway
     import uuid
     char_count, segment_count = count_sms_segments(body)
     idempotency_key = f"campaign-{campaign.id}-{cc.contact_id}-{uuid.uuid4().hex[:8]}"
+    active_provider = await get_active_gateway(db)
 
     # Find or create conversation
     from app.models.conversation import Conversation
@@ -516,7 +518,7 @@ async def _send_template_message(
         segment_count=segment_count,
         char_count=char_count,
         status="queued",
-        provider="smsgate",
+        provider=active_provider,
         idempotency_key=idempotency_key,
     )
     db.add(message)
