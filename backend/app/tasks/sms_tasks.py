@@ -1,7 +1,7 @@
 """Celery SMS tasks — uses send_sms_direct."""
 import asyncio,json,logging,os
 from datetime import datetime, timezone
-from sqlalchemy import select
+from sqlalchemy import select, update
 from app.tasks.celery_app import celery_app
 from app.database import async_session_factory
 from app.models.conversation import Message
@@ -12,9 +12,20 @@ logger=logging.getLogger(__name__)
 class MessageNotVisible(RuntimeError):
     """The message row could not be found yet (producer commit not visible)."""
 
+# How long the no-worker (inline) path may sleep waiting for a rate-limit
+# window before it gives up and leaves the message queued for the next sweep.
+_INLINE_RATE_WAIT_CAP = 60
 
-async def _send_one(mid, final_on_failure=False):
-    """Send one message. Returns True when the gateway should be retried.
+
+async def _send_one(mid, final_on_failure=False, rate_wait_cap=_INLINE_RATE_WAIT_CAP):
+    """Send one message.
+
+    Returns:
+      * ``False``          — settled (sent or failed), nothing more to do.
+      * ``True``           — transient gateway error, retry shortly (~60s).
+      * ``int``            — rate-limited; the number is how many seconds to
+                             wait before trying again. The message is left
+                             ``queued`` so the next retry / inline sweep sends it.
 
     ``final_on_failure`` is used by the API's no-worker fallback. There is no
     Celery retry context in that path, so a failed direct attempt must settle
@@ -28,6 +39,35 @@ async def _send_one(mid, final_on_failure=False):
             # contact is never texted at all. Retry -- by then the row exists.
             raise MessageNotVisible(f"Message {mid} not found yet")
         if m.status in("sent","delivered"):return False
+
+        # Atomic claim: exactly one worker (Celery task, inline sweep, or a
+        # retry) may attempt to send this row. A stuck "sending" row from a
+        # crashed attempt is re-claimable because it stays in the IN list.
+        claim = await db.execute(
+            update(Message)
+            .where(Message.id == mid, Message.status.in_(("queued", "retrying", "sending")))
+            .values(status="sending")
+        )
+        if claim.rowcount != 1:
+            return False
+        m.status = "sending"
+        await db.commit()
+
+        # Enforce sending limits + pacing before touching the gateway.
+        from app.services.sending_limits import SendingGate
+        gate = SendingGate(db)
+        check = await gate.check()
+        if not check["allowed"]:
+            wait = int(check["wait_seconds"] or 60)
+            if final_on_failure and 0 < wait <= rate_wait_cap:
+                await asyncio.sleep(wait)
+                check = await gate.check()
+            if not check["allowed"]:
+                m.status = "queued"
+                m.last_error = f"Rate limited: {check['reason']}"
+                await db.commit()
+                return int(check["wait_seconds"] or 60)
+
         from app.models.contact import Contact
         c=(await db.execute(select(Contact).where(Contact.id==m.contact_id))).scalar_one_or_none()
         if not c:m.status="failed";m.last_error="Contact not found";await db.commit();return False
@@ -90,7 +130,7 @@ async def _record_campaign_outcome(db,m,ok):
 
 @celery_app.task(bind=True,max_retries=3,default_retry_delay=60)
 def send_sms(self,mid):
-    try:should_retry=_run(_send_one(mid))
+    try:result=_run(_send_one(mid))
     except MessageNotVisible as e:
         # The producer's transaction has not landed yet. Retry quickly and
         # give up quietly rather than failing the send outright.
@@ -101,10 +141,22 @@ def send_sms(self,mid):
             logger.error("send_sms(%s): message never became visible; giving up.",mid)
             return
     except Exception as e:raise self.retry(exc=e)
-    if should_retry:
+    if result is True:
         from celery.exceptions import MaxRetriesExceededError
         try:raise self.retry(countdown=60)
         except MaxRetriesExceededError:pass
+    elif isinstance(result,int):
+        # Rate limited. Re-schedule rather than burn a Celery retry: a 10/hour
+        # limit can wait much longer than the transient-failure retry budget.
+        seconds=min(max(int(result),5),3600)
+        from datetime import timedelta as _td
+        from app.tasks.queue import enqueue_at
+        try:
+            enqueue_at(send_sms,datetime.now(timezone.utc)+_td(seconds=seconds),mid)
+        except Exception:
+            from celery.exceptions import MaxRetriesExceededError
+            try:raise self.retry(countdown=seconds,max_retries=20)
+            except MaxRetriesExceededError:pass
 
 @celery_app.task
 def sync_delivery_status():

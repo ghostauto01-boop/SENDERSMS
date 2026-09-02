@@ -33,6 +33,7 @@ export interface Contact {
   is_opted_out: boolean;
   notes: string | null;
   custom_fields: string | null;
+  tags: string[];
   messages_sent: number;
   messages_received: number;
   last_contacted_at: string | null;
@@ -131,6 +132,38 @@ export interface Message {
   delivered_at: string | null;
   created_at: string;
   provider_message_id: string | null;
+  ai_sentiment?: string | null;
+  ai_intent?: string | null;
+  ai_confidence?: number | null;
+}
+
+export interface AutomationCondition {
+  field: string;
+  op: string;
+  value: string;
+}
+
+export interface AutomationAction {
+  type: string;
+  value?: string;
+  body?: string;
+  delay_minutes?: number;
+}
+
+export interface Automation {
+  id: number;
+  name: string;
+  description: string | null;
+  is_enabled: boolean;
+  priority: number;
+  trigger_type: string;
+  conditions: AutomationCondition[];
+  match_all: boolean;
+  actions: AutomationAction[];
+  times_triggered: number;
+  last_triggered_at: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface ConversationDetail {

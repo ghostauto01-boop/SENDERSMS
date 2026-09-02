@@ -297,14 +297,36 @@ function CompTab({ s, onUpdate }: { s: Record<string, string>; onUpdate: () => v
   return(<div className="card p-6 space-y-4"><h2 className="text-lg font-semibold">Compliance</h2><div className="space-y-3">{["Require consent","Auto-detect opt-out","Suppression list","Campaign suppression"].map((l,i)=>{const k=["ec","ea","es","ek"][i];return<label key={k} className="flex items-center gap-3 text-sm"><input type="checkbox" checked={(f as any)[k]} onChange={e=>setF({...f,[k]:e.target.checked})}/>{l}</label>})}</div><button onClick={save} disabled={sv} className="btn-primary">{sv?"Saving...":"Save"}</button></div>);}
 
 function RulesTab({ s, onUpdate }: { s: Record<string, string>; onUpdate: () => void }) {
-  const [f,setF]=useState({dl:s.enable_daily_limit==="true",dm:parseInt(s.daily_maximum||"1000"),hl:s.enable_hourly_limit==="true",hm:parseInt(s.hourly_maximum||"100"),ml:s.enable_per_minute_limit==="true",mm:parseInt(s.messages_per_minute||"10"),ss:s.sending_start_time||"08:00",se:s.sending_end_time||"20:00",aw:s.allow_weekends||"true",ah:s.allow_holidays||"true"});
+  const bool = (v: string | boolean | undefined, d = false) => v === "true" || v === true;
+  const [f,setF]=useState({
+    dl: bool(s.enable_daily_limit), dm: parseInt(s.daily_maximum||"1000"),
+    hl: bool(s.enable_hourly_limit), hm: parseInt(s.hourly_maximum||"100"),
+    ml: bool(s.enable_per_minute_limit), mm: parseInt(s.messages_per_minute||"10"),
+    pc: s.enable_pacing === undefined ? true : bool(s.enable_pacing),
+    md: parseInt(s.min_delay_seconds||"30"),
+    ss: s.sending_start_time||"08:00", se: s.sending_end_time||"20:00",
+    aw: s.allow_weekends === undefined ? "true" : String(s.allow_weekends),
+    ah: s.allow_holidays === undefined ? "true" : String(s.allow_holidays),
+  });
   const [sv,setSv]=useState(false);
-  const save=async()=>{setSv(true);try{await api.put("/settings/sending-rules",null,{params:{enable_daily_limit:f.dl,daily_maximum:f.dm,enable_hourly_limit:f.hl,hourly_maximum:f.hm,enable_per_minute_limit:f.ml,messages_per_minute:f.mm,sending_start_time:f.ss,sending_end_time:f.se,allow_weekends:f.aw==="true",allow_holidays:f.ah==="true"}});toast.success("Saved");onUpdate();}catch{toast.error("Failed")}finally{setSv(false)}};
+  const [status,setStatus]=useState<any>(null);
+  useEffect(()=>{ api.get("/settings/sending-rules/status").then(({data}:any)=>setStatus(data)).catch(()=>{}); },[sv]);
+  const save=async()=>{setSv(true);try{await api.put("/settings/sending-rules",null,{params:{dl:f.dl,dm:f.dm,hl:f.hl,hm:f.hm,ml:f.ml,mm:f.mm,ss:f.ss,se:f.se,aw:f.aw==="true",ah:f.ah==="true",pc:f.pc,md:f.md}});toast.success("Saved");onUpdate();}catch{toast.error("Failed")}finally{setSv(false)}};
   return(<div className="card p-6 space-y-4"><h2 className="text-lg font-semibold">Sending Rules</h2>
+    <p className="text-xs text-gray-500 -mt-2">Limits apply to every outbound SMS — campaigns, follow-ups, direct sends and auto-replies — so your carrier does not flag the SIM.</p>
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <div className="space-y-2"><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.dl} onChange={e=>setF({...f,dl:e.target.checked})}/>Daily limit</label>{f.dl&&<input type="number" className="input" value={f.dm} onChange={e=>setF({...f,dm:parseInt(e.target.value)||0})}/>}</div>
-      <div className="space-y-2"><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.hl} onChange={e=>setF({...f,hl:e.target.checked})}/>Hourly limit</label>{f.hl&&<input type="number" className="input" value={f.hm} onChange={e=>setF({...f,hm:parseInt(e.target.value)||0})}/>}</div>
-      <div className="space-y-2"><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.ml} onChange={e=>setF({...f,ml:e.target.checked})}/>Per-minute limit</label>{f.ml&&<input type="number" className="input" value={f.mm} onChange={e=>setF({...f,mm:parseInt(e.target.value)||0})}/>}</div></div>
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><div><label className="label">Start</label><input type="time" className="input" value={f.ss} onChange={e=>setF({...f,ss:e.target.value})}/></div><div><label className="label">End</label><input type="time" className="input" value={f.se} onChange={e=>setF({...f,se:e.target.value})}/></div></div>
+      <div className="space-y-2"><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.hl} onChange={e=>setF({...f,hl:e.target.checked})}/>Hourly limit</label>{f.hl&&<div className="flex items-center gap-2"><input type="number" className="input" value={f.hm} onChange={e=>setF({...f,hm:parseInt(e.target.value)||0})}/><span className="text-sm text-gray-500">SMS / hour</span></div>}</div>
+      <div className="space-y-2"><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.dl} onChange={e=>setF({...f,dl:e.target.checked})}/>Daily limit</label>{f.dl&&<div className="flex items-center gap-2"><input type="number" className="input" value={f.dm} onChange={e=>setF({...f,dm:parseInt(e.target.value)||0})}/><span className="text-sm text-gray-500">SMS / day</span></div>}</div>
+      <div className="space-y-2"><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.ml} onChange={e=>setF({...f,ml:e.target.checked})}/>Per-minute limit</label>{f.ml&&<div className="flex items-center gap-2"><input type="number" className="input" value={f.mm} onChange={e=>setF({...f,mm:parseInt(e.target.value)||0})}/><span className="text-sm text-gray-500">SMS / min</span></div>}</div>
+      <div className="space-y-2"><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.pc} onChange={e=>setF({...f,pc:e.target.checked})}/>Even pacing (spread sends out)</label>{f.pc&&<div className="flex items-center gap-2"><input type="number" className="input" value={f.md} onChange={e=>setF({...f,md:parseInt(e.target.value)||0})}/><span className="text-sm text-gray-500">min. seconds between SMS</span></div>}</div></div>
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><div><label className="label">Send between</label><div className="flex items-center gap-2"><input type="time" className="input" value={f.ss} onChange={e=>setF({...f,ss:e.target.value})}/><span className="text-gray-400">→</span><input type="time" className="input" value={f.se} onChange={e=>setF({...f,se:e.target.value})}/></div></div></div>
     <div className="flex gap-4"><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.aw==="true"} onChange={e=>setF({...f,aw:String(e.target.checked)})}/>Weekends</label><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.ah==="true"} onChange={e=>setF({...f,ah:String(e.target.checked)})}/>Holidays</label></div>
-    <button onClick={save} disabled={sv} className="btn-primary">{sv?"Saving...":"Save"}</button></div>);}
+    <button onClick={save} disabled={sv} className="btn-primary">{sv?"Saving...":"Save"}</button>
+    {status && (<div className="rounded-xl border border-gray-200 dark:border-gray-700 p-4 text-sm space-y-1">
+      <div className="flex items-center justify-between"><span className="font-medium">Live throttle</span><span className={`badge ${status.allowed_now?"badge-green":"badge-yellow"}`}>{status.allowed_now?"Sending allowed":"Holding"}</span></div>
+      <p className="text-xs text-gray-500">Sent — this minute: <strong>{status.counters?.minute ?? 0}</strong> · this hour: <strong>{status.counters?.hour ?? 0}</strong> · today: <strong>{status.counters?.day ?? 0}</strong></p>
+      {status.interval_seconds>0 && <p className="text-xs text-gray-500">Pacing: one SMS every <strong>{status.interval_seconds}s</strong>.</p>}
+      {status.reason && <p className="text-xs text-amber-600">{status.reason}{status.wait_seconds ? ` — next send in ~${status.wait_seconds}s` : ""}</p>}
+      {status.last_sent_at && <p className="text-xs text-gray-400">Last send: {new Date(status.last_sent_at).toLocaleString()}</p>}
+    </div>)}
+    </div>);}

@@ -18,6 +18,7 @@ from app.models.audit import AuditLog
 from app.models.system import SystemSetting
 from app.models.scheduled import ScheduledMessage
 from app.models.autoreply import AutoReplyRule
+from app.models.automation import Automation
 
 from app.database import Base
 
@@ -47,4 +48,5 @@ __all__ = [
     "SystemSetting",
     "ScheduledMessage",
     "AutoReplyRule",
+    "Automation",
 ]

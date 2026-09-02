@@ -20,44 +20,52 @@ vi.mock("../hooks/useAuth", () => ({
   }),
 }));
 
-const CONVS = [
+const CONVS = (() => {
+  const now = new Date();
+  const yd = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+  const at = (h: number, m = 0) => new Date(yd.getFullYear(), yd.getMonth(), yd.getDate(), h, m, 0).toISOString();
+  return [
   {
     id: 1, contact_id: 10, contact_name: "Ada Obi", contact_phone: "+2348012345678",
     status: "interested", unread_count: 0, message_count: 6,
     last_message_preview: "Nice! I'll come by on Saturday with my friends 😊",
-    last_message_at: "2026-08-13T08:00:00Z",
+    last_message_at: at(8),
     contact: { phone_number: "+2348012345678", business_name: null },
   },
   {
     id: 2, contact_id: 11, contact_name: "MTN", contact_phone: "MTN",
     status: "closed", unread_count: 0, message_count: 3,
     last_message_preview: "MTN: Your balance is N1500.",
-    last_message_at: "2026-08-13T09:30:00Z",
+    last_message_at: at(9, 30),
     contact: { phone_number: "MTN", business_name: null },
   },
   {
     id: 3, contact_id: 12, contact_name: "Tunde Bakare", contact_phone: "+2348098765432",
     status: "unread", unread_count: 2, message_count: 2,
     last_message_preview: "Please deliver to my office instead.",
-    last_message_at: "2026-08-13T10:00:00Z",
+    last_message_at: at(10),
     contact: { phone_number: "+2348098765432", business_name: null },
   },
-];
+]; })();
 
-const MESSAGES = [
+const MESSAGES = (() => {
+  const now = new Date();
+  const yd = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+  const at = (h: number, m = 0) => new Date(yd.getFullYear(), yd.getMonth(), yd.getDate(), h, m, 0).toISOString();
+  return [
   {
     id: 101, direction: "incoming", body: "Hello! Are you open today?",
-    created_at: "2026-08-13T07:58:00Z", status: "delivered",
+    created_at: at(7, 58), status: "delivered",
   },
   {
     id: 102, direction: "outgoing", body: "Yes we are! 8am–8pm 😊",
-    created_at: "2026-08-13T08:00:00Z", status: "delivered",
+    created_at: at(8), status: "delivered",
   },
   {
     id: 103, direction: "outgoing", body: "See you soon!",
-    created_at: "2026-08-13T08:01:00Z", status: "sent",
+    created_at: at(8, 1), status: "sent",
   },
-];
+]; })();
 
 function renderInbox() {
   return render(

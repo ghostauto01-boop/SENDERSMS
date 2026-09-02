@@ -62,7 +62,11 @@ class Contact(Base):
     )
 
     # Relationships
-    tags: Mapped[list["ContactTag"]] = relationship("ContactTag", back_populates="contact", cascade="all, delete-orphan")
+    # `selectin` loads tags eagerly so serializing a contact (ContactOut.tags)
+    # never triggers an async lazy-load (which raises MissingGreenlet).
+    tags: Mapped[list["ContactTag"]] = relationship(
+        "ContactTag", back_populates="contact", cascade="all, delete-orphan", lazy="selectin"
+    )
     list_memberships: Mapped[list["ContactListMember"]] = relationship(
         "ContactListMember", back_populates="contact", cascade="all, delete-orphan"
     )
@@ -96,4 +100,4 @@ class ContactTag(Base):
     )
 
     contact: Mapped["Contact"] = relationship("Contact", back_populates="tags")
-    tag: Mapped["Tag"] = relationship("Tag", back_populates="contacts")
+    tag: Mapped["Tag"] = relationship("Tag", back_populates="contacts", lazy="selectin")

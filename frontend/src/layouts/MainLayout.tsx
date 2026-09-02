@@ -4,7 +4,7 @@ import { useAuth } from "../hooks/useAuth";
 import {
   LayoutDashboard, Users, List, Megaphone, GitBranch,
   Inbox, Send, Clock, FileText, BarChart3, Settings, MessageSquareReply,
-  Moon, Sun, Menu, X, LogOut, Search,
+  Zap, Moon, Sun, Menu, X, LogOut, Search,
 } from "lucide-react";
 import BrandMark from "../components/BrandMark";
 
@@ -17,6 +17,7 @@ const navItems = [
   { to: "/sequences", label: "Sequences", icon: GitBranch },
   { to: "/inbox", label: "Inbox", icon: Inbox },
   { to: "/auto-reply", label: "Auto-Reply", icon: MessageSquareReply },
+  { to: "/automations", label: "Automations", icon: Zap },
   { to: "/follow-ups", label: "Follow-ups", icon: Clock },
   { to: "/templates", label: "Templates", icon: FileText },
   { to: "/analytics", label: "Analytics", icon: BarChart3 },

@@ -63,6 +63,7 @@ export const detectColumns = (headers: string[]): Record<string,string> => {
     else if(/(source|channel|origin)/.test(l)) map[h] = "source";
     else if(/(lead status|pipeline status|^status$)/.test(l)) map[h] = "lead_status";
     else if(/(notes|note|comments|comment)/.test(l)) map[h] = "notes";
+    else if(/^(tags?|labels?|groups?)$/.test(l)) map[h] = "tags";
     else if(/(name|person|contact)/.test(l)) map[h] = "first_name";
     else map[h] = `custom:${customKey(h)}`;
   });
@@ -233,6 +234,11 @@ export default function ContactsPage() {
                       <MapPin size={12}/> <span>{[c.city,c.state].filter(Boolean).join(", ")}</span>
                     </div>
                   )}
+                  {c.tags && c.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      {c.tags.map(t=>(<span key={t} className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#e7f3ff] text-[#0066cc]">{t}</span>))}
+                    </div>
+                  )}
                 </div>
               </div>
               {/* action bar */}
@@ -291,7 +297,15 @@ export default function ContactsPage() {
                     </div>
                   </td>
                   <td className="px-3 py-3 text-[13px] font-medium text-[#111b21] dark:text-[#e9edef]">{c.phone_number}</td>
-                  <td className="px-3 py-3 text-[13px] text-[#667781] dark:text-[#8696a0] truncate max-w-[160px]">{c.business_name||"—"}</td>
+                  <td className="px-3 py-3 text-[13px] text-[#667781] dark:text-[#8696a0] max-w-[160px]">
+                    <div className="truncate">{c.business_name||"—"}</div>
+                    {c.tags && c.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {c.tags.slice(0,3).map(t=>(<span key={t} className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#e7f3ff] text-[#0066cc]">{t}</span>))}
+                        {c.tags.length > 3 && <span className="text-[10px] text-[#667781]">+{c.tags.length-3}</span>}
+                      </div>
+                    )}
+                  </td>
                   <td className="px-3 py-3"><span className={`text-[11px] px-2 py-1 rounded-full font-medium ${statusBadge(c.lead_status)}`}>{c.lead_status}</span></td>
                   <td className="px-3 py-3">
                     <div className="flex justify-end gap-1">
@@ -408,6 +422,7 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
   const [step, setStep] = useState<"upload"|"map"|"importing"|"done">("upload");
   const [mapping, setMapping] = useState<Record<string,string>>({});
   const [selectedListId, setSelectedListId] = useState("");
+  const [tags, setTags] = useState("");
   const [lists, setLists] = useState<any[]>([]);
   const [result, setResult] = useState<any>(null);
   const [impErrors, setImpErrors] = useState<any[]>([]);
@@ -436,6 +451,8 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
     // choices and gives every otherwise-unknown column a custom field target.
     fd.append("column_mapping", JSON.stringify(mapping));
     if(selectedListId) fd.append("list_id",selectedListId);
+    // Tags typed in the import box are applied to every imported contact.
+    if(tags.trim()) fd.append("tags", tags.trim());
     try {
       const { data } = await api.post("/contacts/import/csv",fd,{headers:{"Content-Type":"multipart/form-data"}});
       setResult(data); setImpErrors(data.errors||[]); setStep("done");
@@ -479,10 +496,15 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
               <option value="source">Source</option>
               <option value="lead_status">Lead Status</option>
               <option value="notes">Notes</option>
+              <option value="tags">Tags</option>
             </select></div>
         ))}
       </div>
-      <div><label className="text-xs font-medium text-[#54656f]">Import to List</label><select className="w-full mt-1 px-3 py-2.5 bg-[#f0f2f5] dark:bg-[#111b21] rounded-xl text-sm" value={selectedListId} onChange={e=>setSelectedListId(e.target.value)}><option value="">No list</option>{lists.map((l:any)=><option key={l.id} value={l.id}>{l.name}</option>)}</select></div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div><label className="text-xs font-medium text-[#54656f]">Import to List</label><select className="w-full mt-1 px-3 py-2.5 bg-[#f0f2f5] dark:bg-[#111b21] rounded-xl text-sm" value={selectedListId} onChange={e=>setSelectedListId(e.target.value)}><option value="">No list</option>{lists.map((l:any)=><option key={l.id} value={l.id}>{l.name}</option>)}</select></div>
+        <div><label className="text-xs font-medium text-[#54656f]">Tag all imported contacts</label><input className="w-full mt-1 px-3 py-2.5 bg-[#f0f2f5] dark:bg-[#111b21] rounded-xl text-sm" placeholder="restaurants, cold-leads" value={tags} onChange={e=>setTags(e.target.value)}/></div>
+      </div>
+      <p className="text-xs text-[#667781]">Tags are comma-separated and applied to every contact in this file. Use them in Automations to react to replies from a specific tag.</p>
       <button onClick={doImport} className="w-full py-3 rounded-full bg-[#00a884] text-white font-semibold">Import Contacts</button>
     </div>)}
     {step==="importing" && <div className="text-center py-8"><div className="w-10 h-10 border-4 border-[#00a884] border-t-transparent rounded-full animate-spin mx-auto"/><p className="text-sm mt-4 text-[#667781]">Importing restaurants…</p></div>}
