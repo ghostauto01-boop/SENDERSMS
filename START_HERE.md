@@ -174,7 +174,7 @@ This phone must stay on, charged, and with airtime/an SMS bundle. It does the ac
 
 1. Go to https://render.com and **Sign up with GitHub**.
 2. Click **New +** → **Blueprint**.
-3. Choose your `SENDERSMS` repository. **Select the branch `arena/019fedaf-sendersms`.**
+3. Choose your `SENDERSMS` repository. **Select the branch `main`.**
 4. Render reads the `render.yaml` file and offers to create **two services**:
    - `sendsms-api` — the website and control panel
    - `sendsms-worker` — the background helper that sends campaigns on schedule
