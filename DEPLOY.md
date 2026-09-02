@@ -313,7 +313,7 @@ The `render.yaml` only creates compute services (web + worker). You create the d
 #### Step A3: Apply the Blueprint
 
 1. Click **New +** → **Blueprint**
-2. Select `ghostauto01-boop/SENDERSMS`, branch `arena/019fe940-sendersms`
+2. Select `ghostauto01-boop/SENDERSMS`, branch `main`
 3. Render shows 2 services: `sendsms-api` and `sendsms-worker` (no databases — those are already created)
 4. Click **Apply**
 
@@ -362,7 +362,7 @@ Same as Path A Step 2 above. Save the **Internal Redis URL**.
    |-------|-------|
    | Name | `sendsms-api` |
    | Region | Frankfurt |
-   | Branch | `arena/019fe940-sendersms` |
+   | Branch | `main` |
    | Runtime | Python 3 |
    | Build Command | `pip install --upgrade pip && pip install -r requirements.txt` |
    | Start Command | `cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT` |
@@ -381,7 +381,7 @@ Same as Path A Step 2 above. Save the **Internal Redis URL**.
    |-------|-------|
    | Name | `sendsms-worker` |
    | Region | Frankfurt |
-   | Branch | `arena/019fe940-sendersms` |
+   | Branch | `main` |
    | Build Command | `pip install --upgrade pip && pip install -r requirements.txt` |
    | Start Command | `cd backend && celery -A app.tasks.celery_app worker --loglevel=INFO -B` |
    | Plan | **Free** |
@@ -424,7 +424,7 @@ Now apply the Blueprint. The `render.yaml` creates **2 free web services** — t
 
 1. Go to **[dashboard.render.com](https://dashboard.render.com)**
 2. Click **New +** → **Blueprint**
-3. Select `ghostauto01-boop/SENDERSMS`, branch `arena/019fe940-sendersms`
+3. Select `ghostauto01-boop/SENDERSMS`, branch `main`
 4. Render shows 2 services — click **Apply**
 
 **Setting environment variables (do this for BOTH services):**
