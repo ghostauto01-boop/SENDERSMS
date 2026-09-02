@@ -148,9 +148,22 @@ async def send_sms_now(
 
     char_count, segment_count = count_sms_segments(body)
     from app.providers.smsgate import send_sms_direct
+    from app.services.sending_limits import await_slot
     results = []
 
     for contact in recipients:
+        # Respect Settings -> Sending Rules (hourly/daily/per-minute caps and
+        # pacing) so a manual "send to list" cannot trip a carrier flag either.
+        slot = await await_slot(db, cap_seconds=10)
+        if not slot["allowed"]:
+            if len(recipients) == 1:
+                raise HTTPException(
+                    429,
+                    f"Rate limited: {slot['reason']}. "
+                    f"Try again in about {slot['wait_seconds']} seconds.",
+                )
+            break
+
         msg = render_template(body, contact)
         char_count, segment_count = count_sms_segments(msg)
         cr = await db.execute(
@@ -208,6 +221,7 @@ async def send_sms_now(
         "sent": sc,
         "failed": len(results) - sc,
         "total": len(results),
+        "deferred": len(recipients) - len(results),
         "char_count": char_count,
         "segments": segment_count,
         "results": results,
@@ -374,6 +388,13 @@ async def retry_message(mid: int, db: AsyncSession = Depends(get_db), cu: User =
 
     from app.providers.smsgate import send_sms_direct
     from app.services.system_settings import get_sim_number
+    from app.services.sending_limits import await_slot
+    slot = await await_slot(db, cap_seconds=8)
+    if not slot["allowed"]:
+        raise HTTPException(
+            429,
+            f"Rate limited: {slot['reason']}. Try again in about {slot['wait_seconds']} seconds.",
+        )
     sim = await get_sim_number(db)
     result = await send_sms_direct(contact.phone_number, m.body, sim)
     if result["success"]:

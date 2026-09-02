@@ -37,6 +37,16 @@ class SMSService:
         if not cr:cr=Conversation(contact_id=contact_id,campaign_id=campaign_id,status="active");self.db.add(cr);await self.db.flush()
         msg=Message(conversation_id=cr.id,contact_id=contact_id,campaign_id=campaign_id,direction="outgoing",body=body,segment_count=sg,char_count=ch,status="sending",provider="smsgate",idempotency_key=ik)
         self.db.add(msg);await self.db.flush()
+        # Respect the sending limits / pacing configured in Settings. When the
+        # next slot is not available yet, the message is left queued and the
+        # poller's queued-message sweep (or Celery) sends it once allowed.
+        from app.services.sending_limits import SendingGate
+        gate=await SendingGate(self.db).check()
+        if not gate["allowed"]:
+            msg.status="queued"
+            msg.last_error=f"Rate limited: {gate['reason']}"
+            await self.db.flush()
+            return msg
         from app.providers.smsgate import send_sms_direct
         r=await send_sms_direct(c.phone_number,body,await self._get_sim())
         if r["success"]:msg.status="sent";msg.provider_message_id=r.get("provider_message_id","");msg.sent_at=datetime.now(timezone.utc)
@@ -111,6 +121,18 @@ class SMSService:
         received_at=self._parse_ts(stamp) or datetime.now(timezone.utc)
         m=Message(conversation_id=cr.id,contact_id=c.id,direction="incoming",body=body,segment_count=sg,char_count=ch,status="delivered",provider="smsgate",provider_message_id=mid or None,idempotency_key=ik,created_at=received_at)
         self.db.add(m);await self.db.flush()
+        # Keyless AI classification (sentiment + intent) so the inbox, analytics
+        # and the automation engine know whether this reply is positive or
+        # negative without any external API.
+        ai = None
+        try:
+            from app.services.ai_classifier import classify
+            ai = classify(body, c)
+            m.ai_sentiment = ai["sentiment"]
+            m.ai_intent = ai["intent"]
+            m.ai_confidence = ai["confidence"]
+        except Exception as exc:
+            logger.warning("AI classify error: %s", exc)
         cr.message_count=(cr.message_count or 0)+1
         # Inbox export replays old SMS out of order; the preview and the sort
         # timestamp must both track the NEWEST message, not the last one to arrive.
@@ -147,6 +169,20 @@ class SMSService:
                 await self._maybe_auto_reply(c,cr,body)
             except Exception as e:
                 logger.error(f"AUTOREPLY err:{e}")
+        # Reply automations run last, after the reply has been stored and the
+        # sequence paused, so a "send the 2nd message" action is never wiped
+        # out by the default pause-on-reply behaviour.
+        if not kw:
+            try:
+                from app.services.automation_service import AutomationService
+                ctx = {
+                    "sentiment": m.ai_sentiment,
+                    "intent": m.ai_intent,
+                    "labels": (ai or {}).get("labels") or [],
+                }
+                await AutomationService(self.db).run_for_reply(c, body, ctx)
+            except Exception as e:
+                logger.error(f"AUTOMATION err:{e}")
         return m
 
     async def _maybe_auto_reply(self,contact,conversation,body):

@@ -87,6 +87,13 @@ class Message(Base):
     # something a human actually typed.
     is_auto_reply: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
+    # Keyless AI classification of inbound replies (positive/negative/neutral,
+    # intent such as wrong_number / interested / opt_out). Stored at receive
+    # time so the inbox and analytics can surface it without re-classifying.
+    ai_sentiment: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    ai_intent: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    ai_confidence: Mapped[float | None] = mapped_column(nullable=True)
+
     retry_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
 

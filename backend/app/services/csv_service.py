@@ -11,7 +11,7 @@ from typing import Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.contact import Contact
+from app.models.contact import Contact, ContactTag, Tag
 from app.models.contact_list import ContactList, ContactListMember
 from app.utils.phone import normalize_nigerian_number
 
@@ -23,6 +23,23 @@ CONTACT_FIELDS = {
     "city", "state", "country", "website", "industry", "source",
     "lead_status", "notes",
 }
+
+# Special target: a "tags" CSV column (or the per-import tag box) attaches
+# one-or-more tags to every imported contact, comma or semicolon separated.
+TAGS_FIELD = "tags"
+
+
+def split_tags(raw: str) -> list[str]:
+    """Split a tags value into clean, deduplicated, trimmed tag names."""
+    if not raw:
+        return []
+    parts = re.split(r"[;,|]", str(raw))
+    seen: list[str] = []
+    for part in parts:
+        tag = part.strip()
+        if tag and tag not in seen and len(tag) <= 100:
+            seen.append(tag)
+    return seen
 
 # Header aliases -> Contact field. Everything not recognized here is still
 # imported automatically into Contact.custom_fields instead of being dropped.
@@ -49,6 +66,7 @@ HEADER_ALIASES = {
     "source": ("source", "channel", "origin"),
     "lead_status": ("lead status", "lead_status", "status", "pipeline status"),
     "notes": ("notes", "note", "comments", "comment"),
+    "tags": ("tags", "tag", "label", "labels", "groups", "group"),
 }
 
 
@@ -134,6 +152,7 @@ class CSVImportService:
         column_mapping: dict[str, str],
         list_id: Optional[int] = None,
         skip_duplicates: bool = True,
+        tags: Optional[list[str]] = None,
     ) -> CSVImportResult:
         result = CSVImportResult()
         text = content.decode("utf-8-sig", errors="replace")
@@ -149,6 +168,23 @@ class CSVImportService:
                 select(ContactList).where(ContactList.id == list_id)
             )).scalar_one_or_none()
 
+        # Tags applied to every imported contact (the import modal's tag box).
+        global_tags = split_tags(", ".join(tags or [])) if tags else []
+
+        # Find-or-create tag rows once per import, keyed by lowercased name.
+        existing_tags = (await self.db.execute(select(Tag))).scalars().all()
+        tag_cache: dict[str, Tag] = {t.name.lower(): t for t in existing_tags}
+
+        async def _ensure_tag(name: str) -> Tag:
+            key = name.lower()
+            if key in tag_cache:
+                return tag_cache[key]
+            tag = Tag(name=name)
+            self.db.add(tag)
+            await self.db.flush()
+            tag_cache[key] = tag
+            return tag
+
         seen_phones: set[str] = set()
         added_to_list = 0
         for row_num, row in enumerate(reader, start=1):
@@ -156,6 +192,7 @@ class CSVImportService:
             row_lower = {str(k or "").strip().lower(): v for k, v in row.items()}
             contact_data: dict = {}
             custom_data: dict[str, str] = {}
+            row_tags: list[str] = []
 
             for csv_col, target in mapping.items():
                 value = (row_lower.get(csv_col) or "").strip()
@@ -163,6 +200,8 @@ class CSVImportService:
                     continue
                 if target in CONTACT_FIELDS:
                     contact_data[target] = value
+                elif target == TAGS_FIELD:
+                    row_tags.extend(split_tags(value))
                 elif target.startswith("custom:"):
                     key = custom_field_key(target.split(":", 1)[1])
                     # A direct Contact field always wins if a custom heading
@@ -202,6 +241,15 @@ class CSVImportService:
             await self.db.flush()
             result.imported += 1
             result.imported_contact_ids.append(contact.id)
+
+            # Attach tags (per-row column values + the import-wide tag box).
+            applied: set[str] = set()
+            for tag_name in [*global_tags, *row_tags]:
+                if tag_name.lower() in applied:
+                    continue
+                applied.add(tag_name.lower())
+                tag = await _ensure_tag(tag_name)
+                self.db.add(ContactTag(contact_id=contact.id, tag_id=tag.id))
 
             if contact_list is not None:
                 self.db.add(ContactListMember(list_id=contact_list.id, contact_id=contact.id))

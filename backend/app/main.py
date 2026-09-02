@@ -99,8 +99,51 @@ async def _poll():
         # asleep (free tier) or Redis unreachable — otherwise campaigns stay
         # “running” with pending contacts forever.
         await _process_running_campaigns_inline()
+        # Sweep any queued messages that were rate-limited / deferred (or that
+        # a dead broker left behind). Uses the same atomic claim as Celery so
+        # the two can never double-send the same message.
+        await _process_queued_messages_inline()
     except Exception as e:
         logger.warning(f"Poll: {e}")
+
+
+async def _process_queued_messages_inline():
+    """Send queued outgoing messages when no Celery worker picks them up.
+
+    This is the safety net behind sending limits: a rate-limited message is
+    left ``queued`` and sent here once its window/pacing slot opens. It also
+    fixes the older dead-end where an auto-reply "left queued" because Redis
+    was unreachable was never actually delivered.
+    """
+    try:
+        from sqlalchemy import select as _select
+        from app.models.conversation import Message as _Message
+        from app.tasks.sms_tasks import _send_one
+
+        async with async_session_factory() as db:
+            rows = await db.execute(
+                _select(_Message.id)
+                .where(_Message.direction == "outgoing", _Message.status == "queued")
+                .order_by(_Message.created_at.asc())
+                .limit(20)
+            )
+            ids = list(rows.scalars().all())
+
+        sent = 0
+        for mid in ids:
+            try:
+                result = await _send_one(mid, final_on_failure=True)
+                if result is False:
+                    sent += 1
+                elif isinstance(result, int):
+                    # Still rate limited; leave for the next sweep.
+                    break
+            except Exception as exc:
+                logger.warning("Queued sweep: message %s error: %s", mid, exc)
+        if sent:
+            logger.info("QUEUED SWEEP: sent %s deferred message(s)", sent)
+    except Exception as exc:
+        logger.warning("Queued sweep: %s", exc)
 
 
 async def _launch_scheduled_campaigns():
@@ -194,6 +237,20 @@ async def _process_scheduled():
             scheduled = due.scalars().all()
             if not scheduled:
                 return
+
+            # Respect sending limits / pacing. When the next slot is not open,
+            # leave the messages pending and try again on the next poll cycle —
+            # this is what spreads a big scheduled blast evenly through the day
+            # instead of firing it all at once.
+            from app.services.sending_limits import SendingGate
+            slot = await SendingGate(db).check()
+            if not slot["allowed"]:
+                logger.info(
+                    "SCHEDULED: rate limited (%s); deferring %s message(s)",
+                    slot["reason"], len(scheduled),
+                )
+                return
+
             for sm in scheduled:
                 try:
                     # Resolve contact (create if phone-only)
@@ -427,7 +484,7 @@ async def health():
     """
     return JSONResponse({"status":"ok","app":settings.APP_NAME,"version":"1.0.0"})
 
-from app.api.v1 import auth, contacts, lists, campaigns, sequences, followups, inbox, templates, analytics, settings as settings_api, webhooks, dashboard, send, autoreply
+from app.api.v1 import auth, contacts, lists, campaigns, sequences, followups, inbox, templates, analytics, settings as settings_api, webhooks, dashboard, send, autoreply, automations, ai
 app.include_router(auth.router, prefix="/api/v1/auth")
 app.include_router(dashboard.router, prefix="/api/v1/dashboard")
 app.include_router(contacts.router, prefix="/api/v1/contacts")
@@ -442,6 +499,8 @@ app.include_router(settings_api.router, prefix="/api/v1/settings")
 app.include_router(webhooks.router, prefix="/api/v1/webhooks")
 app.include_router(send.router, prefix="/api/v1/send")
 app.include_router(autoreply.router, prefix="/api/v1/autoreply")
+app.include_router(automations.router, prefix="/api/v1/automations")
+app.include_router(ai.router, prefix="/api/v1/ai")
 
 PUBLIC_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "public")
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist")

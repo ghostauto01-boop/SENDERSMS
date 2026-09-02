@@ -29,6 +29,24 @@ LEAD_STATUSES = [
 ]
 
 
+async def _tag_names(db: AsyncSession, contact_id: int) -> list[str]:
+    """Tag names for one contact, ordered and stable for the UI/export."""
+    rows = await db.execute(
+        select(Tag.name)
+        .join(ContactTag, ContactTag.tag_id == Tag.id)
+        .where(ContactTag.contact_id == contact_id)
+        .order_by(Tag.name.asc())
+    )
+    return list(rows.scalars().all())
+
+
+async def _serialize_contact(db: AsyncSession, contact: Contact) -> dict:
+    """Contact -> dict with tags attached, without an async lazy load."""
+    data = {k: v for k, v in vars(contact).items() if not k.startswith("_")}
+    data["tags"] = await _tag_names(db, contact.id)
+    return ContactOut.model_validate(data).model_dump(mode="json")
+
+
 def _apply_contact_filters(query, search: Optional[str], lead_status: Optional[str], tag: Optional[str]):
     """Apply the shared search / status / tag filters to a contact query."""
     if search:
@@ -92,10 +110,8 @@ async def list_contacts(
     result = await db.execute(query)
     contacts = result.scalars().all()
 
-    return ContactListOut(
-        total=total,
-        items=[ContactOut.model_validate(c) for c in contacts],
-    )
+    items = [await _serialize_contact(db, c) for c in contacts]
+    return ContactListOut(total=total, items=items)
 
 
 @router.get("/{contact_id}", response_model=ContactOut)
@@ -109,7 +125,7 @@ async def get_contact(
     contact = result.scalar_one_or_none()
     if not contact:
         raise HTTPException(status_code=404, detail="Contact not found")
-    return contact
+    return await _serialize_contact(db, contact)
 
 
 @router.post("/", response_model=ContactOut, status_code=201)
@@ -148,7 +164,7 @@ async def create_contact(
     db.add(contact)
     await db.flush()
     await db.refresh(contact)
-    return contact
+    return await _serialize_contact(db, contact)
 
 
 @router.put("/{contact_id}", response_model=ContactOut)
@@ -171,7 +187,41 @@ async def update_contact(
 
     await db.flush()
     await db.refresh(contact)
-    return contact
+    return await _serialize_contact(db, contact)
+
+
+async def _delete_contact_permanently(db: AsyncSession, contact: Contact) -> None:
+    """Hard-delete a contact and every row that references it.
+
+    The ORM only cascades ``Contact.tags`` and ``Contact.list_memberships``.
+    Messages, conversations, follow-ups, campaign rows and scheduled messages
+    all hold a raw ``contacts.id`` foreign key with no ORM relationship, so on
+    Postgres a bare ``db.delete(contact)`` raised a foreign-key violation and
+    on SQLite it silently left orphan rows behind (broken inbox threads). This
+    removes them all in dependency order so a delete is truly permanent.
+    """
+    from app.models.conversation import Conversation, Message
+    from app.models.followup import FollowUp
+    from app.models.campaign import CampaignContact
+    from app.models.scheduled import ScheduledMessage
+    from app.models.suppression import SuppressionEntry
+
+    contact_id = contact.id
+
+    # Outgoing/incoming messages reference both the contact and its threads.
+    await db.execute(sa_delete(Message).where(Message.contact_id == contact_id))
+    # Conversations are unique per contact.
+    await db.execute(sa_delete(Conversation).where(Conversation.contact_id == contact_id))
+    # Scheduled / follow-up / campaign state.
+    await db.execute(sa_delete(ScheduledMessage).where(ScheduledMessage.contact_id == contact_id))
+    await db.execute(sa_delete(FollowUp).where(FollowUp.contact_id == contact_id))
+    await db.execute(sa_delete(CampaignContact).where(CampaignContact.contact_id == contact_id))
+    await db.execute(sa_delete(SuppressionEntry).where(SuppressionEntry.contact_id == contact_id))
+
+    # Tag links and list memberships are removed by the ORM's own
+    # delete-orphan cascade when the contact row is deleted below.
+    await db.delete(contact)
+    await db.flush()
 
 
 @router.delete("/{contact_id}", status_code=204)
@@ -180,14 +230,13 @@ async def delete_contact(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Delete a contact."""
+    """Permanently delete a contact and everything tied to it."""
     result = await db.execute(select(Contact).where(Contact.id == contact_id))
     contact = result.scalar_one_or_none()
     if not contact:
         raise HTTPException(status_code=404, detail="Contact not found")
 
-    await db.delete(contact)
-    await db.flush()
+    await _delete_contact_permanently(db, contact)
 
 
 @router.post("/bulk")
@@ -202,7 +251,7 @@ async def bulk_action(
 
     if data.action == "delete":
         for c in contacts:
-            await db.delete(c)
+            await _delete_contact_permanently(db, c)
     elif data.action == "status":
         for c in contacts:
             c.lead_status = data.value or "new"
@@ -237,6 +286,7 @@ async def import_csv(
     list_id: Optional[int] = Form(None),
     skip_duplicates: bool = Form(True),
     column_mapping: Optional[str] = Form(None),
+    tags: Optional[str] = Form(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -280,8 +330,13 @@ async def import_csv(
             # CSV data in Contact.custom_fields.
             column_mapping_map[str(header).strip().lower()] = field or "ignore"
 
+    from app.services.csv_service import split_tags
+    tag_list = split_tags(tags) if tags else []
+
     service = CSVImportService(db)
-    result = await service.validate_and_import(content, column_mapping_map, list_id, skip_duplicates)
+    result = await service.validate_and_import(
+        content, column_mapping_map, list_id, skip_duplicates, tags=tag_list
+    )
 
     return {
         "imported": result.imported,
@@ -329,14 +384,17 @@ async def export_csv(
         for key in values:
             if key not in columns and key not in custom_columns:
                 custom_columns.append(key)
-    all_columns = columns + custom_columns
+    # Tags round-trip through the export so a re-import keeps them.
+    all_columns = columns + ["tags"] + custom_columns
 
     buffer = io.StringIO()
     writer = csv.writer(buffer)
     writer.writerow(all_columns)
     for contact, custom in zip(contacts, parsed_custom):
+        tag_names = ", ".join(await _tag_names(db, contact.id))
         writer.writerow(
             [getattr(contact, col) or "" for col in columns]
+            + [tag_names]
             + [custom.get(col, "") for col in custom_columns]
         )
 

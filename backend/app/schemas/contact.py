@@ -65,6 +65,9 @@ class ContactOut(BaseModel):
     opted_out_at: Optional[datetime] = None
     notes: Optional[str]
     custom_fields: Optional[str]
+    # NOTE: `tags` is attached by the contacts API (not read off the ORM
+    # relationship) so serialization never triggers an async lazy load.
+    tags: list[str] = []
     messages_sent: int
     messages_received: int
     last_contacted_at: Optional[datetime]

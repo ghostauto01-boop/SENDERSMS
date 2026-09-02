@@ -668,6 +668,13 @@ export default function InboxPage() {
                             {isFailed && m.last_error && (
                               <p className="text-[11px] mt-1 text-red-600 dark:text-red-300 bg-red-50 dark:bg-red-900/20 px-1.5 py-0.5 rounded">⚠ {m.last_error}</p>
                             )}
+                            {!isOut && m.ai_sentiment && (
+                              <p className="text-[10px] mt-1 inline-flex items-center gap-1 text-[#54656f] dark:text-[#8696a0]">
+                                <span className={`px-1.5 py-0.5 rounded-full ${m.ai_sentiment === "positive" ? "bg-[#d9fdd3] text-[#008069]" : m.ai_sentiment === "negative" ? "bg-[#fce8e6] text-[#c5221f]" : "bg-[#f0f2f5] text-[#54656f]"}`}>
+                                  AI: {m.ai_sentiment}{m.ai_intent && m.ai_intent !== "general" ? ` · ${m.ai_intent.replace(/_/g, " ")}` : ""}
+                                </span>
+                              </p>
+                            )}
                             {g.isLast && (
                               <div className={`flex items-center gap-1 justify-end mt-0.5 text-[11px] select-none ${isOut ? "text-[#667781] dark:text-[#8696a0]" : "text-[#667781] dark:text-[#8696a0]"}`}>
                                 <span>{formatTime(m.created_at)}</span>

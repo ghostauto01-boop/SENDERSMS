@@ -165,11 +165,18 @@ async def put_comp(ec:Optional[bool]=Query(None),ea:Optional[bool]=Query(None),e
 
 @router.get("/sending-rules")
 async def get_sr(db:AsyncSession=Depends(get_db),cu:User=Depends(get_current_user)):
-    return{s.key:s.value for s in(await db.execute(select(SystemSetting).where(SystemSetting.category=="sending_rules"))).scalars().all()}
+    from app.services.sending_limits import get_sending_rules
+    return await get_sending_rules(db)
+
+@router.get("/sending-rules/status")
+async def get_sr_status(db:AsyncSession=Depends(get_db),cu:User=Depends(get_current_user)):
+    """Live view of the sending throttle: current counts, next allowed send."""
+    from app.services.sending_limits import SendingGate
+    return await SendingGate(db).status()
 
 @router.put("/sending-rules")
-async def put_sr(dl:Optional[bool]=Query(None),dm:Optional[int]=Query(None),hl:Optional[bool]=Query(None),hm:Optional[int]=Query(None),ml:Optional[bool]=Query(None),mm:Optional[int]=Query(None),ss:Optional[str]=Query(None),se:Optional[str]=Query(None),aw:Optional[bool]=Query(None),ah:Optional[bool]=Query(None),db:AsyncSession=Depends(get_db),cu:User=Depends(get_current_user)):
-    for k,v in{"enable_daily_limit":dl,"daily_maximum":dm,"enable_hourly_limit":hl,"hourly_maximum":hm,"enable_per_minute_limit":ml,"messages_per_minute":mm,"sending_start_time":ss,"sending_end_time":se,"allow_weekends":aw,"allow_holidays":ah}.items():
+async def put_sr(dl:Optional[bool]=Query(None),dm:Optional[int]=Query(None),hl:Optional[bool]=Query(None),hm:Optional[int]=Query(None),ml:Optional[bool]=Query(None),mm:Optional[int]=Query(None),ss:Optional[str]=Query(None),se:Optional[str]=Query(None),aw:Optional[bool]=Query(None),ah:Optional[bool]=Query(None),pc:Optional[bool]=Query(None),md:Optional[int]=Query(None),db:AsyncSession=Depends(get_db),cu:User=Depends(get_current_user)):
+    for k,v in{"enable_daily_limit":dl,"daily_maximum":dm,"enable_hourly_limit":hl,"hourly_maximum":hm,"enable_per_minute_limit":ml,"messages_per_minute":mm,"sending_start_time":ss,"sending_end_time":se,"allow_weekends":aw,"allow_holidays":ah,"enable_pacing":pc,"min_delay_seconds":md}.items():
         if v is not None:
             s=(await db.execute(select(SystemSetting).where(SystemSetting.key==k))).scalar_one_or_none()
             val=str(v).lower()if isinstance(v,bool)else str(v)
