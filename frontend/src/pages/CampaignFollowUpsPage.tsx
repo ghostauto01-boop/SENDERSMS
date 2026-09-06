@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import api from "../api/client";
 import toast from "react-hot-toast";
 import {
@@ -15,6 +15,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import ShortcodePicker from "../components/ShortcodePicker";
 import type {
   CampaignFollowUp,
   CampaignFollowUpPreview,
@@ -72,6 +73,7 @@ export default function CampaignFollowUpsPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState(emptyForm());
+  const fuRef = useRef<HTMLTextAreaElement>(null);
   const [saving, setSaving] = useState(false);
 
   const [preview, setPreview] = useState<CampaignFollowUpPreview | null>(null);
@@ -457,12 +459,21 @@ export default function CampaignFollowUpsPage() {
               <div>
                 <label className="text-xs font-medium text-gray-500">Follow-up message</label>
                 <textarea
+                  ref={fuRef}
                   value={form.message_text}
                   onChange={(e) => setForm({ ...form, message_text: e.target.value })}
                   rows={4}
                   className="input mt-1"
                   placeholder="Hi {{first_name}}, just following up on my last message about {{pain_point}}."
                 />
+                <div className="mt-1">
+                  <ShortcodePicker
+                    targetRef={fuRef}
+                    value={form.message_text}
+                    onChange={(next) => setForm({ ...form, message_text: next })}
+                    label="Insert variable"
+                  />
+                </div>
                 <p className="text-xs text-gray-400 mt-1">
                   Short codes work here. Anything a contact has no value for is removed automatically.
                 </p>
