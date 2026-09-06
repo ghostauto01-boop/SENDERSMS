@@ -31,7 +31,11 @@ class SMSService:
         c=(await self.db.execute(select(Contact).where(Contact.id==contact_id))).scalar_one_or_none()
         if not c or c.is_opted_out:return None
         if(await self.db.execute(select(SuppressionEntry).where(SuppressionEntry.phone_number==c.phone_number))).scalar_one_or_none():return None
-        body=render_template(body,c)
+        # Render through the variable registry so operator-defined short
+        # codes ({{Pain Point}}) resolve, and any short code this contact has
+        # no value for is removed instead of being texted verbatim.
+        from app.services.variable_service import render_for_contact
+        body=await render_for_contact(self.db,body,c)
         ch,sg=count_sms_segments(body);ik=f"send-{contact_id}-{uuid.uuid4().hex[:12]}"
         cr=(await self.db.execute(select(Conversation).where(Conversation.contact_id==contact_id).order_by(Conversation.id).limit(1))).scalars().first()
         if not cr:cr=Conversation(contact_id=contact_id,campaign_id=campaign_id,status="active");self.db.add(cr);await self.db.flush()

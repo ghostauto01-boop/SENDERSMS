@@ -338,7 +338,20 @@ async def import_csv(
         content, column_mapping_map, list_id, skip_duplicates, tags=tag_list
     )
 
+    # Register every column this file introduced so it is immediately usable as
+    # a {{short code}} and visible on the Variables page. Best-effort: a
+    # registry hiccup must never fail an import that already stored contacts.
+    new_variables = 0
+    try:
+        from app.services.variable_service import sync_variables_from_contacts
+
+        sync = await sync_variables_from_contacts(db)
+        new_variables = sync.get("discovered", 0)
+    except Exception:
+        pass
+
     return {
+        "new_variables": new_variables,
         "imported": result.imported,
         "skipped": result.skipped,
         "invalid": result.invalid,

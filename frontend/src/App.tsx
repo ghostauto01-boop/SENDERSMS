@@ -19,6 +19,8 @@ const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const SendPage = lazy(() => import("./pages/SendPage"));
 const AutoReplyPage = lazy(() => import("./pages/AutoReplyPage"));
 const AutomationsPage = lazy(() => import("./pages/AutomationsPage"));
+const VariablesPage = lazy(() => import("./pages/VariablesPage"));
+const CampaignFollowUpsPage = lazy(() => import("./pages/CampaignFollowUpsPage"));
 
 function PageSpinner() {
   return (
@@ -80,6 +82,8 @@ function AppRoutes() {
         <Route path="/send" element={<SendPage />} />
         <Route path="/auto-reply" element={<AutoReplyPage />} />
         <Route path="/automations" element={<AutomationsPage />} />
+        <Route path="/variables" element={<VariablesPage />} />
+        <Route path="/campaign-follow-ups" element={<CampaignFollowUpsPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>

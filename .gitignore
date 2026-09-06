@@ -37,6 +37,7 @@ Thumbs.db
 # Database
 *.db
 *.sqlite3
+*.sqlite
 pgdata/
 
 # Logs

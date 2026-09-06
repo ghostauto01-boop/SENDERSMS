@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import api from "../api/client";
 import toast from "react-hot-toast";
 import { Send, UserPlus, Search, X, Users, Phone, List, Clock, AlertCircle, CheckCircle2, Hourglass, RotateCcw, Trash2, Eye, Calendar, MessageSquare } from "lucide-react";
+import ShortcodePicker from "../components/ShortcodePicker";
 
 export default function SendPage() {
   const [mode, setMode] = useState<"contact" | "number" | "list">("contact");
@@ -13,6 +14,7 @@ export default function SendPage() {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [selectedListId, setSelectedListId] = useState("");
   const [message, setMessage] = useState("");
+  const msgRef = useRef<HTMLTextAreaElement>(null);
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [scheduleDate, setScheduleDate] = useState("");
@@ -218,14 +220,16 @@ export default function SendPage() {
             <div className="bg-white dark:bg-[#202c33] rounded-xl p-4 space-y-3 shadow-sm border border-gray-100 dark:border-[#2a3942]">
               <h2 className="font-semibold text-[#111b21] dark:text-white flex items-center gap-2"><MessageSquare size={16} className="text-[#00a884]"/> Message</h2>
               <div className="relative">
-                <textarea className="w-full px-3 py-3 bg-[#f0f2f5] dark:bg-[#111b21] rounded-xl text-[15px] placeholder:text-[#667781] focus:outline-none focus:ring-2 focus:ring-[#00a884]/20 resize-none" rows={6} placeholder="Hi {{first_name}}, craving something tasty? 🍗 At Chicken Republic… Reply STOP to opt out" value={message} onChange={e=>setMessage(e.target.value)} maxLength={1600}/>
+                <textarea ref={msgRef} className="w-full px-3 py-3 bg-[#f0f2f5] dark:bg-[#111b21] rounded-xl text-[15px] placeholder:text-[#667781] focus:outline-none focus:ring-2 focus:ring-[#00a884]/20 resize-none" rows={6} placeholder="Hi {{first_name}}, craving something tasty? 🍗 At Chicken Republic… Reply STOP to opt out" value={message} onChange={e=>setMessage(e.target.value)} maxLength={1600}/>
                 <span className="absolute bottom-2 right-2 text-[11px] bg-white dark:bg-[#2a3942] px-2 py-0.5 rounded-full text-[#667781] shadow-sm">{charCount} chars</span>
               </div>
               <div className="flex justify-between text-xs text-[#667781]">
                 <span>{charCount} chars • {segmentCount} SMS • ~{segmentCount*4} NGN {segmentCount>1&& segmentCount>3?"• long message costs more":""}</span>
                 <span className={charCount>140?"text-orange-500":""}>{charCount>160?"Multi-part":"Single"}</span>
               </div>
-              <div className="flex flex-wrap gap-1.5">{["{{first_name}}","{{business_name}}","{{city}}","{{state}}"].map(v=>(<button key={v} type="button" onClick={()=>setMessage(message+" "+v)} className="text-xs px-2.5 py-1 bg-[#f0f2f5] dark:bg-[#111b21] hover:bg-[#e9edef] dark:hover:bg-[#2a3942] rounded-full font-mono text-[#54656f] dark:text-[#8696a0]">{v}</button>))}</div>
+              <div className="flex flex-wrap gap-1.5 items-center">
+                <ShortcodePicker targetRef={msgRef} value={message} onChange={setMessage} label="Insert variable" />
+                {["{{first_name}}","{{business_name}}","{{city}}","{{state}}"].map(v=>(<button key={v} type="button" onClick={()=>setMessage(message+" "+v)} className="text-xs px-2.5 py-1 bg-[#f0f2f5] dark:bg-[#111b21] hover:bg-[#e9edef] dark:hover:bg-[#2a3942] rounded-full font-mono text-[#54656f] dark:text-[#8696a0]">{v}</button>))}</div>
               <button onClick={handleSend} disabled={sending||!message.trim()} className={`w-full py-3 rounded-full font-semibold flex items-center justify-center gap-2 shadow-sm active:scale-[0.98] transition-transform ${sendType==="scheduled"?"bg-[#ffad1f] hover:bg-[#ff9f00] text-white":"bg-[#00a884] hover:bg-[#06cf9c] text-white"} disabled:opacity-50`}>
                 {sending? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"/> : sendType==="scheduled" ? <Calendar size={16}/> : <Send size={16}/>}
                 {sending?"Sending...":sendType==="scheduled"?`Schedule SMS${mode==="list"?" to List":" • "+selectedContacts.length||""}`:`Send Now${mode==="list"?" to List":""}`}

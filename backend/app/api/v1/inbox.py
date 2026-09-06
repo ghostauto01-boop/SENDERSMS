@@ -96,8 +96,8 @@ async def preview_reply_template(
     if not template:
         raise HTTPException(404, "Template not found or inactive")
     from app.utils.phone import count_sms_segments
-    from app.utils.templating import render_template
-    body = render_template(template.body, contact)
+    from app.services.variable_service import render_for_contact
+    body = await render_for_contact(db, template.body, contact)
     char_count, segment_count = count_sms_segments(body)
     return {
         "template_id": template.id, "template_name": template.name, "body": body,
@@ -133,8 +133,8 @@ async def send_reply(
         contact = (await db.execute(
             select(Contact).where(Contact.id == conv.contact_id)
         )).scalar_one_or_none()
-        from app.utils.templating import render_template
-        outgoing_body = render_template(template.body, contact)
+        from app.services.variable_service import render_for_contact
+        outgoing_body = await render_for_contact(db, template.body, contact)
     if not outgoing_body:
         raise HTTPException(422, "Message body or template is required")
 

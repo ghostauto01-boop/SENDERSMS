@@ -34,13 +34,29 @@ import json
 import re
 from typing import Any, Mapping, Optional
 
-# Placeholder with an optional "|fallback" section. The field name is
-# restricted to identifier characters so stray braces in ordinary prose are
-# left untouched.
-_PLACEHOLDER = re.compile(r"\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*(?:\|([^}]*))?\}\}")
+# Placeholder with an optional "|fallback" section.
+#
+# The name deliberately allows spaces, hyphens and dots as well as identifier
+# characters, because operators type the short code the way it reads in the
+# CSV: "{{Pain Point}}", "{{Business-Name}}". `normalize_key` collapses all of
+# those spellings onto one lookup key, so the renderer resolves them the same
+# way it resolves "{{pain_point}}".
+_PLACEHOLDER = re.compile(r"\{\{\s*([A-Za-z0-9][A-Za-z0-9 ._\-]*?)\s*(?:\|([^}]*))?\}\}")
 
 # Same shape with single braces, applied only to field names we can resolve.
-_SINGLE_PLACEHOLDER = re.compile(r"\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*(?:\|([^}]*))?\}")
+_SINGLE_PLACEHOLDER = re.compile(r"\{\s*([A-Za-z0-9][A-Za-z0-9 ._\-]*?)\s*(?:\|([^}]*))?\}")
+
+
+def normalize_key(name: Any) -> str:
+    """Collapse any spelling of a variable name onto one lookup key.
+
+    ``"Pain Point"``, ``"pain-point"``, ``"  PAIN_POINT "`` and ``"painPoint"``
+    (the last only insofar as case) all become ``pain_point``. This is the one
+    function that decides whether a short code the user typed matches a
+    variable we hold, so every caller must go through it.
+    """
+    text = re.sub(r"[^A-Za-z0-9]+", "_", str(name or "").strip().lower())
+    return text.strip("_")
 
 # Fields lifted straight off the Contact model.
 _CONTACT_FIELDS = (
@@ -84,13 +100,18 @@ def build_context(contact: Optional[object]) -> dict[str, str]:
             if isinstance(parsed, Mapping):
                 for key, value in parsed.items():
                     if isinstance(key, str) and not isinstance(value, (dict, list)):
-                        context[key.strip().lower()] = _clean(value)
+                        context[normalize_key(key)] = _clean(value)
         except (ValueError, TypeError):
             # A malformed custom_fields blob must never block a send.
             pass
 
     for field in _CONTACT_FIELDS:
-        context[field] = _clean(getattr(contact, field, None))
+        value = _clean(getattr(contact, field, None))
+        # A real column always wins over an imported key of the same name --
+        # but only when it actually holds something. An empty `state` column
+        # must not blank out an imported "State" value.
+        if value or field not in context:
+            context[field] = value
 
     # Convenience aliases people reach for in templates.
     full_name = " ".join(p for p in (context.get("first_name"), context.get("last_name")) if p)
@@ -104,19 +125,44 @@ def build_context(contact: Optional[object]) -> dict[str, str]:
     return context
 
 
-def _resolve(field: str, explicit_fallback: Optional[str], context: Mapping[str, str]) -> str:
-    value = context.get(field, "")
+def _resolve(
+    field: str,
+    explicit_fallback: Optional[str],
+    context: Mapping[str, str],
+    aliases: Optional[Mapping[str, str]] = None,
+    fallbacks: Optional[Mapping[str, str]] = None,
+) -> str:
+    """Resolve one placeholder to the text that replaces it.
+
+    ``aliases`` maps a registered short code onto the field key that actually
+    holds the value, so ``{{Pain Point}}`` can read ``pain_point`` even when
+    the operator renamed the short code to something else entirely.
+    """
+    key = field
+    if aliases and key in aliases:
+        key = aliases[key]
+
+    value = context.get(key, "")
     if value:
         return value
 
     if explicit_fallback is not None:
         return explicit_fallback.strip()
 
+    # A per-variable fallback configured on the Variables page.
+    if fallbacks:
+        configured = fallbacks.get(key) or fallbacks.get(field)
+        if configured:
+            return configured
+
     # A greeting is the one place an empty value reads as broken rather than
     # merely terse, so give the name fields a sensible human default.
-    if field in ("first_name", "name", "full_name"):
+    if key in ("first_name", "name", "full_name"):
         return context.get("business_name", "") or GENERIC_NAME
 
+    # Unknown or empty: the placeholder is dropped entirely. Shipping
+    # "{{Business_name}}" to a customer is always worse than a small gap, and
+    # `tidy()` repairs the punctuation the removal leaves behind.
     return ""
 
 
@@ -124,19 +170,42 @@ def tidy(text: str) -> str:
     """Repair the artifacts an empty substitution leaves behind."""
     # "Hi , this" -> "Hi, this" ; "about ." -> "about."
     text = re.sub(r"[ \t]+([,.!?;:])", r"\1", text)
+    # A removed placeholder can strand a duplicated separator: "for , today"
+    # became "for, today" above, and "for ,, today" collapses here.
+    text = re.sub(r"([,;:])\s*(?=[,.;:!?])", "", text)
+    # An empty value between brackets/quotes leaves "()" or "\"\"" behind.
+    text = re.sub(r"\(\s*\)|\[\s*\]|\"\s*\"|'\s*'", "", text)
     # Collapse runs of spaces/tabs created by a removed placeholder.
     text = re.sub(r"[ \t]{2,}", " ", text)
     # Tidy spaces hugging a newline, without discarding the newline itself.
     text = re.sub(r"[ \t]*\n[ \t]*", "\n", text)
+    # A line that contained nothing but a dropped placeholder is now blank;
+    # collapse the resulting triple newline so the SMS has no dead gap.
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    # Leading punctuation left by a placeholder at the start of a line.
+    text = re.sub(r"(?m)^[ \t]*[,;:]\s*", "", text)
     return text.strip()
 
 
-def render_template(body: Optional[str], contact: Optional[object] = None, **overrides: Any) -> str:
+def render_template(
+    body: Optional[str],
+    contact: Optional[object] = None,
+    *,
+    aliases: Optional[Mapping[str, str]] = None,
+    fallbacks: Optional[Mapping[str, str]] = None,
+    **overrides: Any,
+) -> str:
     """Render ``body`` for ``contact``.
 
     ``overrides`` supply or replace individual placeholder values, which is how
     the preview endpoint injects its sample data through the same code path the
     senders use.
+
+    ``aliases`` / ``fallbacks`` come from the Variables registry (see
+    ``app.services.variable_service.variable_maps``). They are optional so
+    every existing caller keeps working unchanged: without them the renderer
+    behaves exactly as before, matching short codes directly against the
+    contact's own fields.
     """
     if not body:
         return ""
@@ -144,10 +213,10 @@ def render_template(body: Optional[str], contact: Optional[object] = None, **ove
     context = build_context(contact)
     for key, value in overrides.items():
         if value is not None:
-            context[key.strip().lower()] = _clean(value)
+            context[normalize_key(key)] = _clean(value)
 
     def _sub(match: re.Match) -> str:
-        return _resolve(match.group(1).lower(), match.group(2), context)
+        return _resolve(normalize_key(match.group(1)), match.group(2), context, aliases, fallbacks)
 
     rendered = _PLACEHOLDER.sub(_sub, body)
 
@@ -157,10 +226,11 @@ def render_template(body: Optional[str], contact: Optional[object] = None, **ove
     # Restricting this to names we can actually resolve keeps ordinary prose
     # containing braces untouched.
     def _sub_single(match: re.Match) -> str:
-        field = match.group(1).lower()
-        if field not in context and field not in ("first_name", "name", "full_name"):
+        field = normalize_key(match.group(1))
+        known = field in context or (aliases is not None and field in aliases)
+        if not known and field not in ("first_name", "name", "full_name"):
             return match.group(0)
-        return _resolve(field, match.group(2), context)
+        return _resolve(field, match.group(2), context, aliases, fallbacks)
 
     rendered = _SINGLE_PLACEHOLDER.sub(_sub_single, rendered)
 

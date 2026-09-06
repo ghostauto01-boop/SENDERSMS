@@ -14,6 +14,7 @@ from app.models.conversation import Conversation, Message
 from app.models.scheduled import ScheduledMessage
 from app.utils.phone import normalize_nigerian_number, count_sms_segments
 from app.utils.templating import render_template
+from app.services.variable_service import render_for_contact
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -164,7 +165,7 @@ async def send_sms_now(
                 )
             break
 
-        msg = render_template(body, contact)
+        msg = await render_for_contact(db, body, contact)
         char_count, segment_count = count_sms_segments(msg)
         cr = await db.execute(
             select(Conversation).where(Conversation.contact_id == contact.id).order_by(Conversation.id).limit(1)

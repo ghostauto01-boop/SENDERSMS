@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import api from "../api/client";
 import { Template } from "../types";
 import toast from "react-hot-toast";
 import { Plus, Trash2, Copy, FileText, Eye } from "lucide-react";
+import ShortcodePicker from "../components/ShortcodePicker";
 
 export default function TemplatesPage() {
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -149,6 +150,7 @@ function CreateTemplateModal({ onClose }: { onClose: () => void }) {
   const [category, setCategory] = useState("");
   const [body, setBody] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
   const charCount = body.length;
   const segmentCount = charCount <= 160 ? 1 : Math.ceil(charCount / 153);
 
@@ -167,6 +169,7 @@ function CreateTemplateModal({ onClose }: { onClose: () => void }) {
     }
   };
 
+  // Kept for the quick-pick chips below; the picker inserts at the caret.
   const insertVariable = (variable: string) => {
     setBody(body + variable);
   };
@@ -187,6 +190,7 @@ function CreateTemplateModal({ onClose }: { onClose: () => void }) {
           <div>
             <label className="label">Message Body *</label>
             <textarea
+              ref={bodyRef}
               className="input"
               rows={5}
               value={body}
@@ -195,7 +199,14 @@ function CreateTemplateModal({ onClose }: { onClose: () => void }) {
               required
             />
             <div className="flex justify-between mt-1">
-              <div className="flex gap-1 flex-wrap">
+              <div className="flex gap-1 flex-wrap items-center">
+                {/* Every variable that actually exists, inserted at the cursor. */}
+                <ShortcodePicker
+                  targetRef={bodyRef}
+                  value={body}
+                  onChange={setBody}
+                  label="Insert variable"
+                />
                 {["{{first_name}}", "{{business_name}}", "{{city}}", "{{state}}", "{{website}}", "{{industry}}"].map((v) => (
                   <button
                     key={v}

@@ -3,7 +3,8 @@ import Papa from "papaparse";
 import api from "../api/client";
 import { Contact, PaginatedResponse } from "../types";
 import toast from "react-hot-toast";
-import { Plus, Search, Trash2, Upload, Download, ChevronLeft, ChevronRight, X, ListPlus, MessageSquare, Phone, MapPin, Building2, User, CheckSquare, Square } from "lucide-react";
+import { Plus, Search, Trash2, Upload, Download, ChevronLeft, ChevronRight, X, ListPlus, MessageSquare, Phone, MapPin, Building2, User, CheckSquare, Square, IdCard } from "lucide-react";
+import ContactProfileModal from "../components/ContactProfileModal";
 
 const LEAD_STATUSES = ["new","contacted","replied","interested","follow-up","meeting","customer","not_interested","closed"];
 const statusBadge = (s:string) => { const m:Record<string,string>={new:"bg-[#e7f3ff] text-[#008069]",contacted:"bg-[#fff8c4] text-[#9a6f00]",replied:"bg-[#d9fdd3] text-[#008069]",interested:"bg-[#d9fdd3] text-[#075e54]", "follow-up":"bg-[#ffecb3] text-[#8d5100]",meeting:"bg-[#e7f3ff] text-[#0066cc]",customer:"bg-[#d9fdd3] text-[#008069]",not_interested:"bg-[#fce8e6] text-[#c5221f]",closed:"bg-[#f0f2f5] text-[#54656f]"}; return m[s]||"bg-[#f0f2f5] text-[#54656f]"; };
@@ -83,6 +84,8 @@ export default function ContactsPage() {
   const [quickMsg, setQuickMsg] = useState(""); const [quickSendId, setQuickSendId] = useState<number|null>(null);
   const [quickSending, setQuickSending] = useState(false);
   const [quickContact, setQuickContact] = useState<Contact|null>(null);
+  // Full-record view: every column the CSV imported for this contact.
+  const [profileId, setProfileId] = useState<number|null>(null);
 
   useEffect(()=>{loadContacts();},[page,search,leadStatus]);
 
@@ -250,6 +253,13 @@ export default function ContactsPage() {
                   <MessageSquare size={14}/> Message
                 </button>
                 <button
+                  onClick={()=>setProfileId(c.id)}
+                  className="w-[56px] bg-[#f0f2f5] dark:bg-[#2a3942] hover:bg-[#e9edef] text-[#54656f] dark:text-[#aebac1] rounded-full py-2.5 flex items-center justify-center active:scale-[0.98] transition-transform"
+                  title="View everything imported for this contact"
+                >
+                  <IdCard size={16}/>
+                </button>
+                <button
                   onClick={()=>handleDelete(c.id)}
                   className="w-[56px] bg-[#fce8e6] dark:bg-[#2a3942] hover:bg-[#f8d7da] text-[#c5221f] dark:text-[#f15c6d] rounded-full py-2.5 flex items-center justify-center active:scale-[0.98] transition-transform"
                 >
@@ -309,6 +319,7 @@ export default function ContactsPage() {
                   <td className="px-3 py-3"><span className={`text-[11px] px-2 py-1 rounded-full font-medium ${statusBadge(c.lead_status)}`}>{c.lead_status}</span></td>
                   <td className="px-3 py-3">
                     <div className="flex justify-end gap-1">
+                      <button onClick={()=>setProfileId(c.id)} className="w-8 h-8 rounded-full bg-[#f0f2f5] dark:bg-[#2a3942] hover:bg-[#00a884] hover:text-white text-[#54656f] dark:text-[#aebac1] flex items-center justify-center" title="View full profile"><IdCard size={14}/></button>
                       <button onClick={()=>{setQuickSendId(c.id);setQuickContact(c);setQuickMsg("")}} className="w-8 h-8 rounded-full bg-[#00a884]/10 hover:bg-[#00a884] hover:text-white text-[#00a884] flex items-center justify-center" title="Send SMS"><MessageSquare size={14}/></button>
                       <button onClick={()=>handleDelete(c.id)} className="w-8 h-8 rounded-full bg-red-50 hover:bg-red-500 hover:text-white text-red-500 flex items-center justify-center" title="Delete"><Trash2 size={14}/></button>
                     </div>
@@ -323,6 +334,7 @@ export default function ContactsPage() {
 
       {showAdd && <AddContactModal lists={availableLists} onClose={()=>{setShowAdd(false);loadContacts()}} />}
       {showImport && <ImportModal onClose={()=>setShowImport(false)} onDone={()=>{setShowImport(false);loadContacts()}}/>}
+      {profileId !== null && <ContactProfileModal contactId={profileId} onClose={()=>setProfileId(null)}/>}
       {showListModal && <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4"><div className="bg-white dark:bg-[#202c33] w-full sm:max-w-md rounded-t-2xl sm:rounded-xl p-4 sm:p-6 max-h-[92vh] overflow-y-auto"><div className="flex justify-between mb-4"><h2 className="text-lg font-semibold text-[#111b21] dark:text-white">Add to List</h2><button onClick={()=>setShowListModal(false)} className="w-8 h-8 rounded-full bg-[#f0f2f5] dark:bg-[#111b21] flex items-center justify-center"><X size={16}/></button></div><p className="text-sm text-[#667781] mb-3">{selected.size} contacts</p><select className="w-full px-3 py-3 bg-[#f0f2f5] dark:bg-[#111b21] rounded-xl text-sm" value={selectedListId} onChange={e=>setSelectedListId(e.target.value)}><option value="">Select list...</option>{availableLists.map((l:any)=><option key={l.id} value={l.id}>{l.name} ({l.contact_count})</option>)}</select><button onClick={async()=>{if(!selectedListId){toast.error("Select a list");return};try{await api.post(`/lists/${selectedListId}/contacts`,[...selected]);toast.success("Added to list");setShowListModal(false);setSelected(new Set());setSelectedListId("");loadContacts();}catch{toast.error("Failed")}}} className="bg-[#00a884] text-white w-full rounded-full py-3 mt-4 font-semibold">Add to List</button></div></div>}
 
       {/* WhatsApp-style Quick Send - bottom sheet */}

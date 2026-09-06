@@ -53,8 +53,13 @@ DEFAULTS = {
     "daily_maximum": 1000,
     "enable_per_minute_limit": False,
     "messages_per_minute": 10,
-    "sending_start_time": "08:00",
-    "sending_end_time": "20:00",
+    # The sending window is OPT-IN, like every other limit above. An unset
+    # (or blank) start/end means "no window", i.e. sending is allowed at any
+    # hour. It previously defaulted to 08:00-20:00 and could not be cleared,
+    # so a fresh install silently refused to send at night with the
+    # unexplained reason "outside sending hours".
+    "sending_start_time": "",
+    "sending_end_time": "",
     "allow_weekends": True,
     "allow_holidays": True,
     ENABLE_PACING: True,
@@ -106,8 +111,16 @@ async def get_sending_rules(db: AsyncSession) -> dict:
     rules["daily_maximum"] = _parse_int(raw.get("daily_maximum"), DEFAULTS["daily_maximum"])
     rules["enable_per_minute_limit"] = _parse_bool(raw.get("enable_per_minute_limit"), DEFAULTS["enable_per_minute_limit"])
     rules["messages_per_minute"] = _parse_int(raw.get("messages_per_minute"), DEFAULTS["messages_per_minute"])
-    rules["sending_start_time"] = raw.get("sending_start_time") or DEFAULTS["sending_start_time"]
-    rules["sending_end_time"] = raw.get("sending_end_time") or DEFAULTS["sending_end_time"]
+    # Use the stored value verbatim (only falling back when the key is absent)
+    # so that clearing the field in Settings really does remove the window.
+    # `or DEFAULTS[...]` treated a deliberate blank as "unset" and reimposed
+    # 08:00-20:00, making the window impossible to switch off.
+    rules["sending_start_time"] = (
+        raw["sending_start_time"] if "sending_start_time" in raw else DEFAULTS["sending_start_time"]
+    ) or ""
+    rules["sending_end_time"] = (
+        raw["sending_end_time"] if "sending_end_time" in raw else DEFAULTS["sending_end_time"]
+    ) or ""
     rules["allow_weekends"] = _parse_bool(raw.get("allow_weekends"), DEFAULTS["allow_weekends"])
     rules["allow_holidays"] = _parse_bool(raw.get("allow_holidays"), DEFAULTS["allow_holidays"])
     rules[ENABLE_PACING] = _parse_bool(raw.get(ENABLE_PACING), DEFAULTS[ENABLE_PACING])
@@ -162,7 +175,7 @@ class SendingGate:
         now_local = now_utc.astimezone(_tz())
 
         # 1. Sending window (start/end time + weekends).
-        window = self._window_state(rules, now_local)
+        window = self._window_state(rules, now_local, now_utc)
         if not window["allowed"]:
             return window
 
@@ -176,7 +189,11 @@ class SendingGate:
                 next_minute.astimezone(timezone.utc),
             )
             if sent >= rules["messages_per_minute"]:
-                return self._wait_until(next_minute, f"per-minute limit ({rules['messages_per_minute']}) reached")
+                return self._wait_until(
+                    next_minute,
+                    f"per-minute limit ({rules['messages_per_minute']}) reached",
+                    now_utc,
+                )
 
         # 3. Hourly cap.
         hour_start = now_local.replace(minute=0, second=0, microsecond=0)
@@ -188,7 +205,9 @@ class SendingGate:
                 next_hour.astimezone(timezone.utc),
             )
             if sent >= rules["hourly_maximum"]:
-                return self._wait_until(next_hour, f"hourly limit ({rules['hourly_maximum']}) reached")
+                return self._wait_until(
+                    next_hour, f"hourly limit ({rules['hourly_maximum']}) reached", now_utc
+                )
 
         # 4. Daily cap.
         day_start = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -200,7 +219,9 @@ class SendingGate:
                 next_day.astimezone(timezone.utc),
             )
             if sent >= rules["daily_maximum"]:
-                return self._wait_until(next_day, f"daily limit ({rules['daily_maximum']}) reached")
+                return self._wait_until(
+                    next_day, f"daily limit ({rules['daily_maximum']}) reached", now_utc
+                )
 
         # 5. Pacing: minimum spacing between consecutive messages.
         if rules[ENABLE_PACING]:
@@ -235,9 +256,20 @@ class SendingGate:
                 return max(floor, int(3600 // per_hour))
         return floor
 
-    def _wait_until(self, local_dt: datetime, reason: str) -> dict:
+    def _wait_until(
+        self, local_dt: datetime, reason: str, now_utc: Optional[datetime] = None
+    ) -> dict:
+        """Build a "not yet" answer, measuring the wait from ``now_utc``.
+
+        The reference time must be the one ``check()`` was given, not the real
+        clock: ``check(now=...)`` is how callers and tests evaluate the gate at
+        a specific moment, and reading datetime.now() here reported a
+        wait_seconds for a completely different instant (often negative, and
+        then clamped to 1s, which silently defeated the wait).
+        """
         utc_dt = local_dt.astimezone(timezone.utc)
-        wait = max(1, int((utc_dt - datetime.now(timezone.utc)).total_seconds()) + 1)
+        reference = now_utc or datetime.now(timezone.utc)
+        wait = max(1, int((utc_dt - reference).total_seconds()) + 1)
         return {
             "allowed": False,
             "wait_seconds": wait,
@@ -245,7 +277,9 @@ class SendingGate:
             "next_window": utc_dt.isoformat(),
         }
 
-    def _window_state(self, rules: dict, now_local: datetime) -> dict:
+    def _window_state(
+        self, rules: dict, now_local: datetime, now_utc: Optional[datetime] = None
+    ) -> dict:
         """Apply start/end time and the weekend toggle."""
         start = _parse_time(rules.get("sending_start_time"))
         end = _parse_time(rules.get("sending_end_time"))
@@ -256,7 +290,7 @@ class SendingGate:
         # Weekend toggle
         if is_weekend and not rules["allow_weekends"]:
             next_start = self._next_window_start(now_local, start)
-            return self._wait_until(next_start, "sending paused on weekends")
+            return self._wait_until(next_start, "sending paused on weekends", now_utc)
 
         # Time-of-day window
         if start and end:
@@ -264,12 +298,12 @@ class SendingGate:
             if start < end:
                 if not (start <= t < end):
                     next_start = self._next_window_start(now_local, start)
-                    return self._wait_until(next_start, "outside sending hours")
+                    return self._wait_until(next_start, "outside sending hours", now_utc)
             else:
                 # Window wraps midnight, e.g. 20:00 -> 08:00.
                 if not (t >= start or t < end):
                     next_start = self._next_window_start(now_local, start)
-                    return self._wait_until(next_start, "outside sending hours")
+                    return self._wait_until(next_start, "outside sending hours", now_utc)
 
         return {"allowed": True, "wait_seconds": 0, "reason": None, "next_window": None}
 

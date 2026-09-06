@@ -9,6 +9,7 @@ import {
   Mic, LogOut, Settings as SettingsIcon, Users, Megaphone, Home, FileText,
 } from "lucide-react";
 import type { Template } from "../types";
+import ShortcodePicker from "../components/ShortcodePicker";
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
@@ -717,6 +718,14 @@ export default function InboxPage() {
                     </option>
                   ))}
                 </select>
+                {/* Insert a shortcode into the reply at the cursor. */}
+                <ShortcodePicker
+                  targetRef={taRef}
+                  value={replyText}
+                  onChange={setReplyText}
+                  label="Variable"
+                  className="flex-shrink-0"
+                />
                 {selectedTemplateId && !templateLoading && (
                   <button
                     type="button"
