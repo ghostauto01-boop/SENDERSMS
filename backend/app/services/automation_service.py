@@ -166,7 +166,8 @@ class AutomationService:
             delay_minutes = int(action.get("delay_minutes") or 0)
             if not body:
                 return
-            rendered = render_template(body, contact)
+            from app.services.variable_service import render_for_contact
+            rendered = await render_for_contact(self.db, body, contact)
             if not rendered.strip():
                 return
             if delay_minutes and delay_minutes > 0:

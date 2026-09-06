@@ -19,6 +19,8 @@ from app.models.system import SystemSetting
 from app.models.scheduled import ScheduledMessage
 from app.models.autoreply import AutoReplyRule
 from app.models.automation import Automation
+from app.models.variable import ContactVariable
+from app.models.campaign_followup import CampaignFollowUp, CampaignFollowUpLog
 
 from app.database import Base
 
@@ -49,4 +51,7 @@ __all__ = [
     "ScheduledMessage",
     "AutoReplyRule",
     "Automation",
+    "ContactVariable",
+    "CampaignFollowUp",
+    "CampaignFollowUpLog",
 ]

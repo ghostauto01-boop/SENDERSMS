@@ -100,7 +100,8 @@ class AutoReplyService:
                     contact.id,
                 )
                 continue
-            text = render_template(rule.reply_body, contact)
+            from app.services.variable_service import render_for_contact
+            text = await render_for_contact(self.db, rule.reply_body, contact)
             if not text or not text.strip():
                 logger.warning("AUTOREPLY: rule %s rendered empty; skipping", rule.id)
                 continue

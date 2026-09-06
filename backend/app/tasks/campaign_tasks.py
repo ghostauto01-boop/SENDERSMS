@@ -480,8 +480,8 @@ async def _send_template_message(
 
     # Personalize via the shared renderer so campaign sends, direct sends and
     # the preview endpoint all produce identical text.
-    from app.utils.templating import render_template
-    body = render_template(body, contact)
+    from app.services.variable_service import render_for_contact
+    body = await render_for_contact(db, body, contact)
 
     # Create message
     from app.utils.phone import count_sms_segments
@@ -820,3 +820,19 @@ def schedule_followup(followup_id: int):
     except QueueUnavailable as exc:
         logger.error("Could not schedule follow-up %s: %s", followup_id, exc)
         raise
+
+
+@celery_app.task
+def process_campaign_followups():
+    """Beat entrypoint for the campaign follow-up sweep.
+
+    Each active rule checks its campaign's contacts, sends the reminders whose
+    wait has elapsed, and records a stop for anyone who replied or opted out.
+    """
+    from app.services.campaign_followup_service import process_due_campaign_followups
+
+    loop = asyncio.get_event_loop()
+    if loop.is_closed():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    return loop.run_until_complete(process_due_campaign_followups())

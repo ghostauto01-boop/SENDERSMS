@@ -290,3 +290,99 @@ export interface PaginatedResponse<T> {
   total: number;
   items: T[];
 }
+
+export interface ContactVariable {
+  id: number;
+  field_key: string;
+  label: string;
+  shortcode: string;
+  fallback_text: string | null;
+  description: string | null;
+  source: string;
+  is_active: boolean;
+  contact_count: number;
+  sample_value: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MessageAnalysis {
+  preview: string;
+  resolved: Array<{ shortcode: string; field_key: string; value: string }>;
+  empty: Array<{ shortcode: string; field_key: string }>;
+  unknown: string[];
+  will_remove: string[];
+}
+
+export interface ContactProfileField {
+  field_key: string;
+  label: string;
+  shortcode: string;
+  value: string;
+  source: string;
+  is_active: boolean;
+}
+
+export interface ContactProfile {
+  contact_id: number;
+  display_name: string;
+  phone_number: string;
+  lead_status: string;
+  is_opted_out: boolean;
+  notes: string | null;
+  tags: string[];
+  messages_sent: number;
+  messages_received: number;
+  last_contacted_at: string | null;
+  last_reply_at: string | null;
+  created_at: string | null;
+  fields: ContactProfileField[];
+}
+
+export interface CampaignFollowUp {
+  id: number;
+  campaign_id: number;
+  step_order: number;
+  name: string | null;
+  message_text: string | null;
+  template_id: number | null;
+  delay_minutes: number;
+  stop_on_reply: boolean;
+  stop_on_opt_out: boolean;
+  stop_on_lead_status: string | null;
+  send_start_hour: number | null;
+  send_end_hour: number | null;
+  is_active: boolean;
+  sent_count: number;
+  stopped_count: number;
+  created_at: string;
+  updated_at: string;
+  stats?: Record<string, number>;
+}
+
+export interface CampaignWithFollowUps {
+  id: number;
+  name: string;
+  status: string;
+  total_contacts: number;
+  messages_sent: number;
+  replies: number;
+  followup_count: number;
+  followups_sent: number;
+}
+
+export interface CampaignFollowUpPreviewRow {
+  contact_id: number;
+  name: string;
+  reason: string;
+}
+
+export interface CampaignFollowUpPreview {
+  followup_id: number;
+  campaign_id: number;
+  counts: { send: number; stop: number; wait: number; done: number };
+  will_send: CampaignFollowUpPreviewRow[];
+  will_stop: CampaignFollowUpPreviewRow[];
+  waiting: CampaignFollowUpPreviewRow[];
+  already_processed: Array<{ contact_id: number; name: string; status: string; reason: string | null }>;
+}

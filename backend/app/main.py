@@ -95,6 +95,7 @@ async def _poll():
         await _process_scheduled()
         await _launch_scheduled_campaigns()
         await _process_due_followups()
+        await _process_campaign_followups()
         # Fallback inline sender for running campaigns when Celery worker is
         # asleep (free tier) or Redis unreachable — otherwise campaigns stay
         # “running” with pending contacts forever.
@@ -173,6 +174,25 @@ async def _process_due_followups():
             logger.info("FOLLOW-UPS: processed %s", processed)
     except Exception as exc:
         logger.warning("Due follow-ups: %s", exc)
+
+
+async def _process_campaign_followups():
+    """Send campaign follow-ups whose wait time has elapsed.
+
+    Runs in the same inline poller as the other sweeps so follow-up chains keep
+    moving on deployments with no awake Celery worker.
+    """
+    try:
+        from app.services.campaign_followup_service import process_due_campaign_followups
+
+        totals = await process_due_campaign_followups()
+        if totals.get("sent") or totals.get("stopped"):
+            logger.info(
+                "CAMPAIGN FOLLOW-UPS: sent %s, stopped %s across %s rule(s)",
+                totals["sent"], totals["stopped"], totals["rules"],
+            )
+    except Exception as exc:
+        logger.warning("Campaign follow-ups: %s", exc)
 
 
 async def _process_running_campaigns_inline():
@@ -289,9 +309,15 @@ async def _process_scheduled():
                     body = sm.body
                     if contact:
                         try:
-                            body = render_template(body, contact)
+                            from app.services.variable_service import render_for_contact
+                            body = await render_for_contact(db, body, contact)
                         except Exception:
-                            pass
+                            # Never let a registry lookup stop a scheduled send;
+                            # fall back to the plain renderer.
+                            try:
+                                body = render_template(body, contact)
+                            except Exception:
+                                pass
 
                     # Ensure conversation exists so inbox thread is visible
                     conv = None
@@ -484,7 +510,7 @@ async def health():
     """
     return JSONResponse({"status":"ok","app":settings.APP_NAME,"version":"1.0.0"})
 
-from app.api.v1 import auth, contacts, lists, campaigns, sequences, followups, inbox, templates, analytics, settings as settings_api, webhooks, dashboard, send, autoreply, automations, ai
+from app.api.v1 import auth, contacts, lists, campaigns, sequences, followups, inbox, templates, analytics, settings as settings_api, webhooks, dashboard, send, autoreply, automations, ai, variables, campaign_followups
 app.include_router(auth.router, prefix="/api/v1/auth")
 app.include_router(dashboard.router, prefix="/api/v1/dashboard")
 app.include_router(contacts.router, prefix="/api/v1/contacts")
@@ -501,6 +527,8 @@ app.include_router(send.router, prefix="/api/v1/send")
 app.include_router(autoreply.router, prefix="/api/v1/autoreply")
 app.include_router(automations.router, prefix="/api/v1/automations")
 app.include_router(ai.router, prefix="/api/v1/ai")
+app.include_router(variables.router, prefix="/api/v1/variables")
+app.include_router(campaign_followups.router, prefix="/api/v1/campaign-followups")
 
 PUBLIC_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "public")
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist")
