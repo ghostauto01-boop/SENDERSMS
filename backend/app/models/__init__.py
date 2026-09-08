@@ -21,6 +21,18 @@ from app.models.autoreply import AutoReplyRule
 from app.models.automation import Automation
 from app.models.variable import ContactVariable
 from app.models.campaign_followup import CampaignFollowUp, CampaignFollowUpLog
+from app.models.ads import (
+    AdsCampaign,
+    AdsSet,
+    AdsCreative,
+    AdsCreativeVersion,
+    AdsAssignment,
+    AdsFollowUpStep,
+    AdsFollowUpTask,
+    AdsCalendarEvent,
+    AdsEvent,
+    AdsActivityLog,
+)
 
 from app.database import Base
 
@@ -54,4 +66,14 @@ __all__ = [
     "ContactVariable",
     "CampaignFollowUp",
     "CampaignFollowUpLog",
+    "AdsCampaign",
+    "AdsSet",
+    "AdsCreative",
+    "AdsCreativeVersion",
+    "AdsAssignment",
+    "AdsFollowUpStep",
+    "AdsFollowUpTask",
+    "AdsCalendarEvent",
+    "AdsEvent",
+    "AdsActivityLog",
 ]

@@ -104,6 +104,10 @@ async def _poll():
         # a dead broker left behind). Uses the same atomic claim as Celery so
         # the two can never double-send the same message.
         await _process_queued_messages_inline()
+        # SMS Ads Manager: dispatch, follow-up automation and always-on
+        # audience refresh. Uses the same no-worker fallback pattern as the
+        # legacy campaign sweep above.
+        await _process_ads_manager()
     except Exception as e:
         logger.warning(f"Poll: {e}")
 
@@ -145,6 +149,24 @@ async def _process_queued_messages_inline():
             logger.info("QUEUED SWEEP: sent %s deferred message(s)", sent)
     except Exception as exc:
         logger.warning("Queued sweep: %s", exc)
+
+
+async def _process_ads_manager():
+    """Drive SMS Ads Manager campaigns without a Celery worker.
+
+    Mirrors the legacy inline campaign sweep: claim work atomically, dispatch a
+    small batch, and let the shared sending limits do the pacing. Safe to run
+    alongside the Celery beat task -- every row is claimed with a conditional
+    UPDATE, so the two can never double-send.
+    """
+    try:
+        from app.tasks.ads_tasks import run_ads_cycle
+
+        result = await run_ads_cycle(send_inline=True)
+        if result.get("sent") or result.get("followups"):
+            logger.info("ADS: %s", result)
+    except Exception as exc:
+        logger.warning("Ads manager sweep: %s", exc)
 
 
 async def _launch_scheduled_campaigns():
@@ -510,7 +532,7 @@ async def health():
     """
     return JSONResponse({"status":"ok","app":settings.APP_NAME,"version":"1.0.0"})
 
-from app.api.v1 import auth, contacts, lists, campaigns, sequences, followups, inbox, templates, analytics, settings as settings_api, webhooks, dashboard, send, autoreply, automations, ai, variables, campaign_followups
+from app.api.v1 import ads, auth, contacts, lists, campaigns, sequences, followups, inbox, templates, analytics, settings as settings_api, webhooks, dashboard, send, autoreply, automations, ai, variables, campaign_followups
 app.include_router(auth.router, prefix="/api/v1/auth")
 app.include_router(dashboard.router, prefix="/api/v1/dashboard")
 app.include_router(contacts.router, prefix="/api/v1/contacts")
@@ -529,6 +551,8 @@ app.include_router(automations.router, prefix="/api/v1/automations")
 app.include_router(ai.router, prefix="/api/v1/ai")
 app.include_router(variables.router, prefix="/api/v1/variables")
 app.include_router(campaign_followups.router, prefix="/api/v1/campaign-followups")
+# SMS Ads Manager (additive; the legacy campaign routes above are untouched).
+app.include_router(ads.router, prefix="/api/v1/ads")
 
 PUBLIC_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "public")
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist")
