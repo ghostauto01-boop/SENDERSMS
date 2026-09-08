@@ -3,9 +3,10 @@
 from typing import Optional
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
-from sqlalchemy import delete as sa_delete, func, select
+from sqlalchemy import delete as sa_delete, func, select, update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.v1.contacts import _safe_delete, _safe_update
 from app.database import get_db
 from app.models.contact import Contact
 from app.models.contact_list import ContactList, ContactListMember
@@ -135,11 +136,48 @@ async def update_list(
 @router.delete("/{list_id}", status_code=204)
 async def delete_list(
     list_id: int,
+    delete_contacts: bool = Query(False, description="Also permanently delete every contact in the list"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Delete a list and its memberships."""
+    """Delete a list.
+
+    By default only the list and its memberships are removed; the contacts
+    themselves stay. With ``delete_contacts=true`` every phone number in the
+    list is also permanently deleted before the list is removed.
+    """
+    from app.api.v1.contacts import _delete_contact_permanently
+    from app.models.campaign import Campaign
+    from app.models.scheduled import ScheduledMessage
+
     contact_list = await _find_list(db, list_id)
+
+    # Scheduled sends created against this list cannot outlive it.
+    await _safe_delete(
+        db,
+        sa_delete(ScheduledMessage).where(ScheduledMessage.list_id == list_id),
+    )
+    # Campaigns may reference the list; keep the campaign, detach the reference.
+    await _safe_update(
+        db,
+        sa_update(Campaign)
+        .where(Campaign.list_id == list_id)
+        .values(list_id=None),
+    )
+
+    if delete_contacts:
+        member_ids = (
+            await db.execute(
+                select(ContactListMember.contact_id).where(ContactListMember.list_id == list_id)
+            )
+        ).scalars().all()
+        if member_ids:
+            contacts = (
+                await db.execute(select(Contact).where(Contact.id.in_(member_ids)))
+            ).scalars().all()
+            for contact in contacts:
+                await _delete_contact_permanently(db, contact)
+
     await db.delete(contact_list)
     await db.flush()
 
@@ -246,6 +284,44 @@ async def remove_contacts_from_list(
     count = await _sync_contact_count(db, contact_list)
     await db.flush()
     return {"success": True, "removed": removed, "contact_count": count}
+
+
+@router.post("/{list_id}/contacts/delete")
+async def delete_contacts_from_list_permanently(
+    list_id: int,
+    contact_ids: list[int] = Body(..., embed=True),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Permanently delete ticked phone numbers while viewing a list.
+
+    This is the destructive action requested from the List editor: unlike
+    ``/contacts/remove`` it hard-deletes the selected contacts (and their
+    messages, conversations, follow-ups, tags, and list memberships) instead
+    of only removing them from this list.
+    """
+    from app.api.v1.contacts import _delete_contact_permanently
+
+    contact_list = await _find_list(db, list_id)
+    requested_ids = set(contact_ids)
+    if not requested_ids:
+        return {"success": True, "deleted": 0, "contact_count": await _sync_contact_count(db, contact_list)}
+
+    result = await db.execute(
+        select(Contact)
+        .join(ContactListMember, Contact.id == ContactListMember.contact_id)
+        .where(
+            ContactListMember.list_id == list_id,
+            Contact.id.in_(requested_ids),
+        )
+    )
+    contacts = result.scalars().all()
+    for contact in contacts:
+        await _delete_contact_permanently(db, contact)
+
+    count = await _sync_contact_count(db, contact_list)
+    await db.flush()
+    return {"success": True, "deleted": len(contacts), "contact_count": count}
 
 
 @router.get("/{list_id}/stats")

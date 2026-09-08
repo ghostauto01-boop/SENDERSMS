@@ -139,3 +139,62 @@ async def test_add_rejects_unknown_contact_without_partial_change(client, db):
 
     members = await client.get(f"/api/v1/lists/{contact_list.id}/contacts")
     assert members.json()["total"] == 0
+
+
+@pytest.mark.asyncio
+async def test_permanently_delete_ticked_contacts_from_list(client, db):
+    contact_list, first, second = await _list_and_contacts(db)
+    outsider = Contact(phone_number="+2348031234569", first_name="Emeka")
+    db.add(outsider)
+    await db.flush()
+    await client.post(
+        f"/api/v1/lists/{contact_list.id}/contacts", json=[first.id, second.id]
+    )
+
+    response = await client.post(
+        f"/api/v1/lists/{contact_list.id}/contacts/delete",
+        json={"contact_ids": [first.id, 999]},
+    )
+    assert response.status_code == 200
+    assert response.json()["deleted"] == 1
+    assert response.json()["contact_count"] == 1
+
+    # The selected contact is truly gone, not merely removed from this list.
+    assert (await db.execute(select(Contact).where(Contact.id == first.id))).scalar_one_or_none() is None
+    assert (await db.execute(select(Contact).where(Contact.id == second.id))).scalar_one() is not None
+    assert (await db.execute(select(Contact).where(Contact.id == outsider.id))).scalar_one() is not None
+
+    members = await client.get(f"/api/v1/lists/{contact_list.id}/contacts", params={"per_page": 100})
+    assert members.json()["total"] == 1
+    assert members.json()["items"][0]["id"] == second.id
+
+
+@pytest.mark.asyncio
+async def test_delete_list_keeps_contacts_by_default(client, db):
+    contact_list, first, second = await _list_and_contacts(db)
+    await client.post(
+        f"/api/v1/lists/{contact_list.id}/contacts", json=[first.id, second.id]
+    )
+
+    response = await client.delete(f"/api/v1/lists/{contact_list.id}")
+    assert response.status_code == 204
+    assert (await db.execute(select(ContactList))).scalars().first() is None
+    assert (await db.execute(select(Contact).where(Contact.id.in_([first.id, second.id])))).scalars().all()
+
+
+@pytest.mark.asyncio
+async def test_delete_list_with_contacts_permanently_deletes_numbers(client, db):
+    contact_list, first, second = await _list_and_contacts(db)
+    stay = Contact(phone_number="+2348031234570", first_name="Ngozi")
+    db.add(stay)
+    await db.flush()
+    await client.post(
+        f"/api/v1/lists/{contact_list.id}/contacts", json=[first.id, second.id]
+    )
+
+    response = await client.delete(f"/api/v1/lists/{contact_list.id}", params={"delete_contacts": "true"})
+    assert response.status_code == 204
+    assert (await db.execute(select(ContactList))).scalars().first() is None
+    assert (await db.execute(select(Contact).where(Contact.id.in_([first.id, second.id])))).scalars().all() == []
+    # Contacts outside the deleted list survive.
+    assert (await db.execute(select(Contact).where(Contact.id == stay.id))).scalar_one() is not None
