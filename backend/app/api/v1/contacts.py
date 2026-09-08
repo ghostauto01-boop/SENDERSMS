@@ -114,6 +114,29 @@ async def list_contacts(
     return ContactListOut(total=total, items=items)
 
 
+@router.get("/tags/", response_model=dict)
+async def list_tags(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Every tag in use, with contact counts — powers tag pickers app-wide.
+
+    Declared before ``/{contact_id}`` so the literal path wins over the
+    parameter route.
+    """
+    rows = (
+        await db.execute(
+            select(Tag.name, func.count(ContactTag.id))
+            .outerjoin(ContactTag, ContactTag.tag_id == Tag.id)
+            .group_by(Tag.id, Tag.name)
+            .order_by(Tag.name.asc())
+        )
+    ).all()
+    return {
+        "items": [{"name": name, "count": count} for name, count in rows],
+    }
+
+
 @router.get("/{contact_id}", response_model=ContactOut)
 async def get_contact(
     contact_id: int,
@@ -284,6 +307,7 @@ async def bulk_action(
 async def import_csv(
     file: UploadFile = File(...),
     list_id: Optional[int] = Form(None),
+    new_list_name: Optional[str] = Form(None),
     skip_duplicates: bool = Form(True),
     column_mapping: Optional[str] = Form(None),
     tags: Optional[str] = Form(None),
@@ -297,17 +321,27 @@ async def import_csv(
     declared with ``Form`` -- previously ``list_id`` was a query parameter and
     the browser's form field never reached it, so imports always landed with
     no list attached.
+
+    ``new_list_name`` creates the destination list as part of the same upload,
+    so an import never has to be interrupted to go and create a list first.
     """
     from app.services.csv_service import CSVImportService, detect_column_mapping
 
     content = await file.read()
 
+    target_list: ContactList | None = None
     # Fail fast with a clean 404 if the target list does not exist, instead of
     # importing the contacts and silently dropping the list attachment.
     if list_id is not None:
         list_result = await db.execute(select(ContactList).where(ContactList.id == list_id))
-        if not list_result.scalar_one_or_none():
+        target_list = list_result.scalar_one_or_none()
+        if not target_list:
             raise HTTPException(status_code=404, detail="List not found")
+    elif new_list_name and new_list_name.strip():
+        target_list = ContactList(name=new_list_name.strip()[:255])
+        db.add(target_list)
+        await db.flush()
+        list_id = target_list.id
 
     # Auto-detect column mapping from the real CSV headers (case-insensitive).
     text = content.decode("utf-8-sig", errors="replace")
@@ -359,6 +393,15 @@ async def import_csv(
         "total_rows": result.total_rows,
         "errors": result.errors[:50],  # Limit error report
         "imported_ids": result.imported_contact_ids,
+        "list": (
+            {
+                "id": target_list.id,
+                "name": target_list.name,
+                "contact_count": target_list.contact_count,
+            }
+            if target_list
+            else None
+        ),
     }
 
 

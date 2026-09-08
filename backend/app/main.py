@@ -96,6 +96,7 @@ async def _poll():
         await _launch_scheduled_campaigns()
         await _process_due_followups()
         await _process_campaign_followups()
+        await _process_meeting_reminders()
         # Fallback inline sender for running campaigns when Celery worker is
         # asleep (free tier) or Redis unreachable — otherwise campaigns stay
         # “running” with pending contacts forever.
@@ -215,6 +216,25 @@ async def _process_campaign_followups():
             )
     except Exception as exc:
         logger.warning("Campaign follow-ups: %s", exc)
+
+
+async def _process_meeting_reminders():
+    """Fire calendar reminders whose window has opened.
+
+    Runs in the same inline poller as the other sweeps so meeting reminders go
+    out on deployments with no awake Celery worker.
+    """
+    try:
+        from app.services.meeting_service import process_due_meeting_reminders
+
+        totals = await process_due_meeting_reminders()
+        if totals.get("sent") or totals.get("skipped"):
+            logger.info(
+                "MEETING REMINDERS: sent %s, skipped %s across %s meeting(s)",
+                totals["sent"], totals["skipped"], totals["checked"],
+            )
+    except Exception as exc:
+        logger.warning("Meeting reminders: %s", exc)
 
 
 async def _process_running_campaigns_inline():
@@ -532,7 +552,7 @@ async def health():
     """
     return JSONResponse({"status":"ok","app":settings.APP_NAME,"version":"1.0.0"})
 
-from app.api.v1 import ads, auth, contacts, lists, campaigns, sequences, followups, inbox, templates, analytics, settings as settings_api, webhooks, dashboard, send, autoreply, automations, ai, variables, campaign_followups
+from app.api.v1 import ads, auth, calendar, contacts, lists, campaigns, sequences, followups, inbox, templates, analytics, settings as settings_api, webhooks, dashboard, send, autoreply, automations, ai, variables, campaign_followups
 app.include_router(auth.router, prefix="/api/v1/auth")
 app.include_router(dashboard.router, prefix="/api/v1/dashboard")
 app.include_router(contacts.router, prefix="/api/v1/contacts")
@@ -551,6 +571,7 @@ app.include_router(automations.router, prefix="/api/v1/automations")
 app.include_router(ai.router, prefix="/api/v1/ai")
 app.include_router(variables.router, prefix="/api/v1/variables")
 app.include_router(campaign_followups.router, prefix="/api/v1/campaign-followups")
+app.include_router(calendar.router, prefix="/api/v1/calendar")
 # SMS Ads Manager (additive; the legacy campaign routes above are untouched).
 app.include_router(ads.router, prefix="/api/v1/ads")
 

@@ -386,3 +386,55 @@ export interface CampaignFollowUpPreview {
   waiting: CampaignFollowUpPreviewRow[];
   already_processed: Array<{ contact_id: number; name: string; status: string; reason: string | null }>;
 }
+
+export interface MeetingAttendee {
+  id: number;
+  contact_id: number;
+  status: string;
+  notified: boolean;
+  name: string;
+  phone: string;
+}
+
+export interface Meeting {
+  id: number;
+  title: string;
+  description: string | null;
+  event_type: string;
+  status: string;
+  starts_at: string;
+  ends_at: string;
+  all_day: boolean;
+  location: string | null;
+  meeting_link: string | null;
+  contact_id: number | null;
+  contact_name: string | null;
+  conversation_id: number | null;
+  campaign_id: number | null;
+  tags: string[];
+  send_invite_sms: boolean;
+  invite_template_id: number | null;
+  invite_body: string | null;
+  invite_sent: boolean;
+  send_sms_reminder: boolean;
+  reminder_minutes: number[];
+  reminder_template_id: number | null;
+  reminder_body: string | null;
+  reminders_sent: Record<string, string>;
+  outcome_notes: string | null;
+  attendees: MeetingAttendee[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TagCount {
+  name: string;
+  count: number;
+}
+
+export interface ContactListSummary {
+  id: number;
+  name: string;
+  description: string | null;
+  contact_count: number;
+}

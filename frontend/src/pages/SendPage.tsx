@@ -3,12 +3,13 @@ import api from "../api/client";
 import toast from "react-hot-toast";
 import { Send, UserPlus, Search, X, Users, Phone, List, Clock, AlertCircle, CheckCircle2, Hourglass, RotateCcw, Trash2, Eye, Calendar, MessageSquare } from "lucide-react";
 import ShortcodePicker from "../components/ShortcodePicker";
+import ListPicker from "../components/ListPicker";
+import TemplatePicker from "../components/TemplatePicker";
 
 export default function SendPage() {
   const [mode, setMode] = useState<"contact" | "number" | "list">("contact");
   const [sendType, setSendType] = useState<"now" | "scheduled">("now");
   const [contacts, setContacts] = useState<any[]>([]);
-  const [lists, setLists] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [selectedContacts, setSelectedContacts] = useState<any[]>([]);
   const [phoneNumber, setPhoneNumber] = useState("");
@@ -34,7 +35,6 @@ export default function SendPage() {
 
   useEffect(() => {
     api.get("/contacts/", { params: { per_page: 100 } }).then(r => setContacts(r.data.items)).catch(()=>{});
-    api.get("/lists/").then(r => setLists(r.data.items)).catch(()=>{});
     const now = new Date(); now.setMinutes(now.getMinutes() + 10);
     setScheduleDate(now.toISOString().split("T")[0]);
     setScheduleTime(now.toTimeString().split(" ")[0].substring(0, 5));
@@ -215,10 +215,23 @@ export default function SendPage() {
               <h2 className="font-semibold text-[#111b21] dark:text-white flex items-center gap-2"><Users size={16} className="text-[#00a884]"/> Recipients</h2>
               {mode==="contact"&&(<><div className="relative"><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#667781]"/><input className="w-full pl-9 pr-3 py-2.5 bg-[#f0f2f5] dark:bg-[#111b21] rounded-full text-sm placeholder:text-[#667781] focus:outline-none focus:ring-2 focus:ring-[#00a884]/20" placeholder="Search contacts… e.g. Chicken Republic" value={search} onChange={e=>setSearch(e.target.value)}/></div><div className="max-h-64 overflow-y-auto space-y-1 border border-gray-100 dark:border-[#2a3942] rounded-xl p-1.5 bg-[#f0f2f5]/50 dark:bg-[#111b21]/50">{filtered.slice(0,50).map(c=>(<label key={c.id} className={`flex items-center gap-2.5 p-2.5 rounded-xl cursor-pointer ${selectedContacts.find(x=>x.id===c.id)?"bg-[#d9fdd3] dark:bg-[#0a332c] border border-[#00a884]/20":"hover:bg-white dark:hover:bg-[#202c33] border border-transparent"}`}><input type="checkbox" checked={!!selectedContacts.find(x=>x.id===c.id)} onChange={()=>toggleContact(c)} className="rounded accent-[#00a884] w-4 h-4"/><span className="text-sm font-medium text-[#111b21] dark:text-white truncate">{c.first_name} {c.last_name} {c.business_name?`• ${c.business_name}`:""}</span><span className="text-xs text-[#667781] ml-auto font-mono">{c.phone_number}</span></label>))}{filtered.length===0&&<p className="text-xs text-center py-4 text-[#667781]">No contacts found</p>}</div>{selectedContacts.length>0&&(<div className="flex flex-wrap gap-1.5">{selectedContacts.map(c=>(<span key={c.id} className="bg-[#e7f3ff] dark:bg-[#182533] text-[#008069] dark:text-[#53bdeb] text-xs px-2.5 py-1 rounded-full flex items-center gap-1.5 font-medium">{c.first_name||c.phone_number}<button onClick={()=>toggleContact(c)} className="hover:text-red-500"><X size={12}/></button></span>))}</div>)}</>)}
               {mode==="number"&&(<div><label className="text-xs font-medium text-[#54656f]">Phone Number</label><input className="mt-1 w-full px-3 py-3 bg-[#f0f2f5] dark:bg-[#111b21] rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#00a884]/20" placeholder="08012345678" value={phoneNumber} onChange={e=>setPhoneNumber(e.target.value)}/><p className="text-xs text-[#667781] mt-1">International format auto-normalized to +234...</p></div>)}
-              {mode==="list"&&(<div><label className="text-xs font-medium text-[#54656f]">Contact List</label><select className="mt-1 w-full px-3 py-3 bg-[#f0f2f5] dark:bg-[#111b21] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#00a884]/20" value={selectedListId} onChange={e=>setSelectedListId(e.target.value)}><option value="">Select a list…</option>{lists.map((l:any)=>(<option key={l.id} value={l.id}>{l.name} ({l.contact_count} contacts)</option>))}</select><p className="text-xs text-[#667781] mt-1">All contacts in list get the same personalized message.</p></div>)}
+              {mode==="list"&&(<div><label className="text-xs font-medium text-[#54656f]">Contact List</label><div className="mt-1"><ListPicker value={selectedListId} onChange={setSelectedListId} placeholder="Select a list… (or create one)" allowNone={false} /></div><p className="text-xs text-[#667781] mt-1">All contacts in list get the same personalized message.</p></div>)}
             </div>
             <div className="bg-white dark:bg-[#202c33] rounded-xl p-4 space-y-3 shadow-sm border border-gray-100 dark:border-[#2a3942]">
               <h2 className="font-semibold text-[#111b21] dark:text-white flex items-center gap-2"><MessageSquare size={16} className="text-[#00a884]"/> Message</h2>
+              <TemplatePicker
+                value=""
+                onChange={async (id) => {
+                  if (!id) return;
+                  try {
+                    const { data } = await api.get(`/templates/${id}`);
+                    setMessage(data.body || "");
+                    toast.success(`Filled from "${data.name}" — edit freely before sending`);
+                  } catch { toast.error("Could not load that template"); }
+                }}
+                placeholder="Fill from a template… (optional)"
+                showPreview={false}
+              />
               <div className="relative">
                 <textarea ref={msgRef} className="w-full px-3 py-3 bg-[#f0f2f5] dark:bg-[#111b21] rounded-xl text-[15px] placeholder:text-[#667781] focus:outline-none focus:ring-2 focus:ring-[#00a884]/20 resize-none" rows={6} placeholder="Hi {{first_name}}, craving something tasty? 🍗 At Chicken Republic… Reply STOP to opt out" value={message} onChange={e=>setMessage(e.target.value)} maxLength={1600}/>
                 <span className="absolute bottom-2 right-2 text-[11px] bg-white dark:bg-[#2a3942] px-2 py-0.5 rounded-full text-[#667781] shadow-sm">{charCount} chars</span>

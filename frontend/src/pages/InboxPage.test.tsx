@@ -228,6 +228,18 @@ describe("InboxPage — WhatsApp-style inbox", () => {
     expect(screen.queryByPlaceholderText("Type a message")).not.toBeInTheDocument();
   });
 
+  it("offers Book a meeting from the chat header and opens the booking form", async () => {
+    renderInbox();
+    await waitFor(() => expect(screen.getByText("Ada Obi")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("Ada Obi"));
+    await waitFor(() => expect(screen.getByPlaceholderText("Type a message")).toBeInTheDocument());
+
+    // Header booking button (title tooltip) opens the shared meeting form.
+    fireEvent.click(screen.getByTitle("Book a meeting"));
+    await waitFor(() => expect(screen.getByText("Book a meeting", { selector: "h2" })).toBeInTheDocument());
+    expect(screen.getByText("SMS invite & reminders")).toBeInTheDocument();
+  });
+
   it("shows a failed-outgoing error banner inside the bubble", async () => {
     apiGet.mockImplementation((url: string) => {
       if (url === "/inbox/conversations") {
