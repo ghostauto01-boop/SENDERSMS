@@ -161,6 +161,37 @@ class SMSService:
             if cc is not None:
                 cc.last_reply_at=received_at
                 if cc.status in("pending","queued","sent","delivered"):cc.status="replied"
+        # Associate the reply with the SMS Ads Manager assignment too, so ads
+        # analytics (reply rate per creative) are accurate. Best-effort: a
+        # failure here must never lose the inbound message.
+        try:
+            from app.services import ads_service as _ads
+            assignment = await _ads.associate_reply(self.db, c.id, body)
+            if assignment is not None and ai:
+                sentiment = (ai.get("sentiment") or "").lower()
+                if sentiment in ("positive", "negative"):
+                    assignment.reply_status = sentiment
+        except Exception as exc:
+            logger.warning("ADS reply association: %s", exc)
+        if kw:
+            # An opt-out must also stop everything queued in the ads manager,
+            # not just sequences -- a message already in the queue would
+            # otherwise still go out.
+            try:
+                from app.models.ads import AdsAssignment as _AA, AdsFollowUpTask as _AT
+                from sqlalchemy import update as _update
+                await self.db.execute(
+                    _update(_AA)
+                    .where(_AA.contact_id == c.id, _AA.send_status == "pending")
+                    .values(send_status="skipped", skip_reason="opted_out")
+                )
+                await self.db.execute(
+                    _update(_AT)
+                    .where(_AT.contact_id == c.id, _AT.status == "pending")
+                    .values(status="cancelled", note="Contact opted out")
+                )
+            except Exception as exc:
+                logger.warning("ADS opt-out cancel: %s", exc)
         if not kw:await self._stop_seq(c.id)
         cr.sequence_paused=True;await self.db.flush()
         await self._notify_inbound(c,body[:160])

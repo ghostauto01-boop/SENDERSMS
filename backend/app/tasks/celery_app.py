@@ -29,6 +29,7 @@ celery_app = Celery(
         "app.tasks.sms_tasks",
         "app.tasks.campaign_tasks",
         "app.tasks.notification_tasks",
+        "app.tasks.ads_tasks",
     ],
 )
 
@@ -96,6 +97,11 @@ celery_app.conf.beat_schedule = {
     },
     "process-due-followups": {
         "task": "app.tasks.campaign_tasks.process_due_followups",
+        "schedule": timedelta(minutes=1),
+    },
+    # SMS Ads Manager: dispatch, follow-ups and always-on audience refresh.
+    "process-ads-manager": {
+        "task": "app.tasks.ads_tasks.process_ads_manager",
         "schedule": timedelta(minutes=1),
     },
     "process-scheduled-messages": {
