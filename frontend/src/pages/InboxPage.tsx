@@ -6,10 +6,11 @@ import { useAuth } from "../hooks/useAuth";
 import {
   Send, Star, ThumbsDown, Archive, ChevronLeft, CheckCheck, MessageCircle,
   Bug, Search as SearchIcon, MoreVertical, Phone, Video, Paperclip, Smile,
-  Mic, LogOut, Settings as SettingsIcon, Users, Megaphone, Home, FileText,
+  Mic, LogOut, Settings as SettingsIcon, Users, Megaphone, Home, FileText, CalendarPlus,
 } from "lucide-react";
-import type { Template } from "../types";
+import type { Meeting, Template } from "../types";
 import ShortcodePicker from "../components/ShortcodePicker";
+import MeetingModal from "../components/MeetingModal";
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
@@ -104,6 +105,9 @@ export default function InboxPage() {
   const [showActions, setShowActions] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [templates, setTemplates] = useState<Template[]>([]);
+  const [showBooking, setShowBooking] = useState(false);
+  const [editingMeetingId, setEditingMeetingId] = useState<number | null>(null);
+  const [contactMeetings, setContactMeetings] = useState<Meeting[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [templateLoading, setTemplateLoading] = useState(false);
 
@@ -156,6 +160,14 @@ export default function InboxPage() {
   // loadMessages() refreshes the object (to pick up status changes), and an
   // object-keyed effect would re-fire forever in a tight async loop.
   useEffect(() => { if (selected) loadMessages(selected.id); }, [selected?.id]);
+  useEffect(() => {
+    if (!selected?.contact_id) { setContactMeetings([]); return; }
+    let cancelled = false;
+    api.get("/calendar/upcoming", { params: { contact_id: selected.contact_id, limit: 5 } })
+      .then(({ data }) => { if (!cancelled) setContactMeetings(data.items || []); })
+      .catch(() => { if (!cancelled) setContactMeetings([]); });
+    return () => { cancelled = true; };
+  }, [selected?.id]);  
   useEffect(() => {
     if (selected && nearBottomRef.current) chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, selected?.id]);
@@ -588,6 +600,13 @@ export default function InboxPage() {
                 <div className="flex items-center gap-0.5">
                   <button className="hidden sm:flex w-10 h-10 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-[#54656f] dark:text-[#aebac1]"><Video size={19} /></button>
                   <button className="hidden sm:flex w-10 h-10 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-[#54656f] dark:text-[#aebac1]"><Phone size={19} /></button>
+                  <button
+                    onClick={() => setShowBooking(true)}
+                    title="Book a meeting"
+                    className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-[#00a884]"
+                  >
+                    <CalendarPlus size={19} />
+                  </button>
                   <div className="relative">
                     <button onClick={() => setShowActions(!showActions)} className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-[#54656f] dark:text-[#aebac1]">
                       <MoreVertical size={19} />
@@ -596,6 +615,7 @@ export default function InboxPage() {
                       <>
                         <div className="fixed inset-0 z-40" onClick={() => setShowActions(false)} />
                         <div className="absolute right-0 top-11 bg-white dark:bg-[#233138] rounded-lg shadow-xl border border-gray-200 dark:border-[#222d34] py-1.5 w-52 z-50">
+                          <button onClick={() => { setShowBooking(true); setShowActions(false); }} className="w-full text-left px-3 py-2.5 text-[14px] text-[#111b21] dark:text-[#e9edef] hover:bg-[#f0f2f5] dark:hover:bg-[#182533] flex items-center gap-2.5"><CalendarPlus size={16} className="text-[#00a884]" /> Book a meeting</button>
                           <button onClick={() => { markAs("interested"); setShowActions(false); }} className="w-full text-left px-3 py-2.5 text-[14px] text-[#111b21] dark:text-[#e9edef] hover:bg-[#f0f2f5] dark:hover:bg-[#182533] flex items-center gap-2.5"><Star size={16} className="text-[#f7c948]" /> Mark interested</button>
                           <button onClick={() => { markAs("not-interested"); setShowActions(false); }} className="w-full text-left px-3 py-2.5 text-[14px] text-[#111b21] dark:text-[#e9edef] hover:bg-[#f0f2f5] dark:hover:bg-[#182533] flex items-center gap-2.5"><ThumbsDown size={16} className="text-[#667781]" /> Not interested</button>
                           <button onClick={() => { markAs("close"); setShowActions(false); }} className="w-full text-left px-3 py-2.5 text-[14px] text-[#111b21] dark:text-[#e9edef] hover:bg-[#f0f2f5] dark:hover:bg-[#182533] flex items-center gap-2.5"><Archive size={16} className="text-[#667781]" /> Close chat</button>
@@ -620,6 +640,38 @@ export default function InboxPage() {
                       {String(value)}
                     </p>
                   ))}
+                </div>
+              )}
+              {showInfo && (
+                <div className="px-4 py-3 bg-white dark:bg-[#111b21] border-b border-[#e9edef] dark:border-[#222d34] z-10">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <p className="text-[13px] font-semibold text-[#111b21] dark:text-[#e9edef]">Upcoming meetings</p>
+                    <button
+                      onClick={() => setShowBooking(true)}
+                      className="text-[12px] font-medium text-[#00a884] hover:underline flex items-center gap-1"
+                    >
+                      <CalendarPlus size={13} /> Book
+                    </button>
+                  </div>
+                  {contactMeetings.length === 0 ? (
+                    <p className="text-[12px] text-[#667781] dark:text-[#8696a0]">None booked yet.</p>
+                  ) : (
+                    <div className="space-y-1">
+                      {contactMeetings.map(m => (
+                        <button
+                          key={m.id}
+                          onClick={() => setEditingMeetingId(m.id)}
+                          className="w-full text-left text-[12px] px-2.5 py-1.5 rounded-lg bg-[#f0f2f5] dark:bg-[#202c33] hover:bg-[#e9edef] dark:hover:bg-[#2a3942] flex items-center justify-between gap-2"
+                        >
+                          <span className="font-medium text-[#111b21] dark:text-[#e9edef] truncate">{m.title}</span>
+                          <span className="text-[#667781] dark:text-[#8696a0] flex-shrink-0">
+                            {new Date(m.starts_at).toLocaleDateString([], { day: "numeric", month: "short" })}{" "}
+                            {new Date(m.starts_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -793,6 +845,30 @@ export default function InboxPage() {
           )}
         </div>
       </div>
+      {showBooking && selected && (
+        <MeetingModal
+          initial={{ contactIds: selected.contact_id ? [selected.contact_id] : [], conversationId: selected.id }}
+          onClose={() => setShowBooking(false)}
+          onSaved={(m) => {
+            setShowBooking(false);
+            if ((m as Meeting).starts_at) setContactMeetings(prev => [...prev, m as Meeting]);
+          }}
+        />
+      )}
+      {editingMeetingId !== null && (
+        <MeetingModal
+          meetingId={editingMeetingId}
+          onClose={() => setEditingMeetingId(null)}
+          onSaved={() => {
+            setEditingMeetingId(null);
+            if (selected?.contact_id) {
+              api.get("/calendar/upcoming", { params: { contact_id: selected.contact_id, limit: 5 } })
+                .then(({ data }) => setContactMeetings(data.items || []))
+                .catch(() => {});
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

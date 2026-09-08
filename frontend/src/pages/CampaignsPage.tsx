@@ -1,8 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import api from "../api/client";
 import { Campaign } from "../types";
 import toast from "react-hot-toast";
-import { Plus, Play, Pause, Square, Trash2, Copy, Megaphone, Pencil, CalendarClock } from "lucide-react";
+import { Plus, Play, Pause, Square, Trash2, Copy, Megaphone, Pencil, CalendarClock, Upload } from "lucide-react";
+import ListPicker from "../components/ListPicker";
+import TemplatePicker from "../components/TemplatePicker";
+import ShortcodePicker from "../components/ShortcodePicker";
+import ImportContactsModal from "../components/ImportContactsModal";
 
 const statusBadge = (status: string) => {
   const map: Record<string, string> = {
@@ -313,21 +317,16 @@ function CampaignModal({ campaign, onClose }: { campaign?: Campaign | null; onCl
   const [messageBody, setMessageBody] = useState(campaign?.message_body ?? "");
   const [templateId, setTemplateId] = useState(campaign?.template_id ? String(campaign.template_id) : "");
   const [sequenceId, setSequenceId] = useState(campaign?.sequence_id ? String(campaign.sequence_id) : "");
-  const [lists, setLists] = useState<any[]>([]);
-  const [templates, setTemplates] = useState<any[]>([]);
   const [sequences, setSequences] = useState<any[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const messageRef = useRef<HTMLTextAreaElement>(null);
 
+  // Lists and templates are loaded by their pickers; only sequences need a fetch here.
   useEffect(() => {
-    Promise.all([
-      api.get("/lists/"),
-      api.get("/templates/"),
-      api.get("/sequences/"),
-    ]).then(([l, t, s]) => {
-      setLists(l.data.items);
-      setTemplates(t.data.items);
+    api.get("/sequences/").then((s) => {
       setSequences(s.data.items);
-    }).catch(() => toast.error("Could not load lists and templates"));
+    }).catch(() => toast.error("Could not load sequences"));
   }, []);
 
   // GSM-7 vs UCS-2: one emoji or curly quote drops the limit from 160 to 70,
@@ -337,8 +336,6 @@ function CampaignModal({ campaign, onClose }: { campaign?: Campaign | null; onCl
   const perMulti = unicode ? 67 : 153;
   const len = messageBody.length;
   const segments = len === 0 ? 0 : len <= per ? 1 : Math.ceil(len / perMulti);
-
-  const insertVar = (v: string) => setMessageBody((b) => b + "{{" + v + "}}");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -406,11 +403,25 @@ function CampaignModal({ campaign, onClose }: { campaign?: Campaign | null; onCl
             <textarea className="input" rows={2} value={description} onChange={(e) => setDescription(e.target.value)} />
           </div>
           <div>
-            <label className="label">Contact List</label>
-            <select className="input" value={listId} onChange={(e) => setListId(e.target.value)}>
-              <option value="">Select list...</option>
-              {lists.map((l: any) => <option key={l.id} value={l.id}>{l.name} ({l.contact_count})</option>)}
-            </select>
+            <div className="flex items-center justify-between mb-1">
+              <label className="label !mb-0">Contact List</label>
+              <button
+                type="button"
+                onClick={() => setShowImport(true)}
+                className="text-xs font-medium text-primary-600 hover:underline flex items-center gap-1"
+              >
+                <Upload size={12} /> Import contacts
+              </button>
+            </div>
+            <ListPicker
+              value={listId}
+              onChange={setListId}
+              placeholder="Select list... (or create one)"
+              noneLabel="No list yet"
+            />
+            <p className="text-[11px] text-gray-400 mt-1">
+              Missing a list? Search it, or create it inline — no detour needed.
+            </p>
           </div>
 
           {/* Message: write from scratch, or reuse a saved template. */}
@@ -430,6 +441,7 @@ function CampaignModal({ campaign, onClose }: { campaign?: Campaign | null; onCl
             {mode === "write" ? (
               <>
                 <textarea
+                  ref={messageRef}
                   className="input font-mono text-sm"
                   rows={5}
                   value={messageBody}
@@ -438,12 +450,12 @@ function CampaignModal({ campaign, onClose }: { campaign?: Campaign | null; onCl
                 />
                 <div className="flex flex-wrap items-center gap-1.5 mt-2">
                   <span className="text-xs text-gray-500 mr-1">Insert:</span>
-                  {["first_name", "last_name", "business_name", "city"].map((v) => (
-                    <button key={v} type="button" onClick={() => insertVar(v)}
-                      className="px-2 py-1 text-xs rounded-md bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 font-mono">
-                      {"{{" + v + "}}"}
-                    </button>
-                  ))}
+                  <ShortcodePicker
+                    targetRef={messageRef}
+                    value={messageBody}
+                    onChange={setMessageBody}
+                    label="Shortcode"
+                  />
                 </div>
                 <p className="text-xs text-gray-400 mt-2">
                   {len} chars · {segments} SMS{segments === 1 ? "" : "s"}
@@ -453,20 +465,12 @@ function CampaignModal({ campaign, onClose }: { campaign?: Campaign | null; onCl
               </>
             ) : (
               <>
-                <select className="input" value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
-                  <option value="">Select template...</option>
-                  {templates.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                </select>
-                {templates.length === 0 && (
-                  <p className="text-xs text-gray-400 mt-1">
-                    No saved templates yet — switch to "Write message".
-                  </p>
-                )}
-                {templateId && (
-                  <p className="text-xs text-gray-500 mt-2 whitespace-pre-wrap break-words">
-                    {templates.find((t: any) => String(t.id) === templateId)?.body}
-                  </p>
-                )}
+                <TemplatePicker
+                  value={templateId}
+                  onChange={setTemplateId}
+                  allowNone={false}
+                  placeholder="Select template..."
+                />
               </>
             )}
           </div>
@@ -495,6 +499,18 @@ function CampaignModal({ campaign, onClose }: { campaign?: Campaign | null; onCl
           </div>
         </form>
       </div>
+      {showImport && (
+        <ImportContactsModal
+          defaultListId={listId}
+          onClose={() => setShowImport(false)}
+          onDone={(result) => {
+            // An import from inside a campaign lands straight on the audience:
+            // the (possibly just-created) list is selected automatically.
+            if (result.list) setListId(String(result.list.id));
+            setShowImport(false);
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
-import Papa from "papaparse";
 import api from "../api/client";
 import { Contact, PaginatedResponse } from "../types";
 import toast from "react-hot-toast";
 import { Plus, Search, Trash2, Upload, Download, ChevronLeft, ChevronRight, X, ListPlus, MessageSquare, Phone, MapPin, Building2, User, CheckSquare, Square, IdCard } from "lucide-react";
 import ContactProfileModal from "../components/ContactProfileModal";
+import ImportContactsModal from "../components/ImportContactsModal";
+import ListPicker from "../components/ListPicker";
 
 const LEAD_STATUSES = ["new","contacted","replied","interested","follow-up","meeting","customer","not_interested","closed"];
 const statusBadge = (s:string) => { const m:Record<string,string>={new:"bg-[#e7f3ff] text-[#008069]",contacted:"bg-[#fff8c4] text-[#9a6f00]",replied:"bg-[#d9fdd3] text-[#008069]",interested:"bg-[#d9fdd3] text-[#075e54]", "follow-up":"bg-[#ffecb3] text-[#8d5100]",meeting:"bg-[#e7f3ff] text-[#0066cc]",customer:"bg-[#d9fdd3] text-[#008069]",not_interested:"bg-[#fce8e6] text-[#c5221f]",closed:"bg-[#f0f2f5] text-[#54656f]"}; return m[s]||"bg-[#f0f2f5] text-[#54656f]"; };
@@ -20,56 +21,7 @@ const initials = (c:Contact) => {
   return c.phone_number.slice(-2);
 };
 
-/** Turn an arbitrary CSV heading into a template-safe custom-field key. */
-export const customKey = (header: string): string => {
-  let key = header.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
-  if (!key) key = "custom_field";
-  if (/^\d/.test(key)) key = `field_${key}`;
-  return key;
-};
-
-/**
- * Auto-detect a CSV header -> Contact field mapping shown in the "map columns"
- * step and sent to the server. Unknown columns become template-ready custom
- * fields instead of being dropped.
- *
- * The phone-column rule is deliberately precise: a loose `/number/` substring
- * match treated any column containing "number" — e.g. "Number of Guests",
- * "Table Number", "Order Number", "Invoice Number" — as the phone column.
- * Because the full mapping is applied in header order, a later non-phone
- * "… number" column then overwrote the real phone number and every row was
- * rejected as "Invalid phone number" (0 contacts imported). Only columns that
- * really look like a phone are mapped to `phone_number`.
- */
-export const detectColumns = (headers: string[]): Record<string,string> => {
-  const map: Record<string,string> = {};
-  headers.forEach(h => {
-    const l = h.toLowerCase().replace(/[^a-z0-9 ]/g," ").replace(/\s+/g, " ").trim();
-    const isPhone =
-      (/\b(phone|mobile|telephone|tel(?:ephone)?|cell(?:ular)?|sms|whats ?app|handphone|gsm)\b/.test(l) ||
-       /^(number|no\.?|contact)$/.test(l) ||
-       /\bcontact\s*(no\.?|number|#)/.test(l)) &&
-      !/(name|person|email|fax)/.test(l);
-    if(isPhone) map[h] = "phone_number";
-    else if(/(first name|firstname|given name)/.test(l)) map[h] = "first_name";
-    else if(/(last name|lastname|surname|family name)/.test(l)) map[h] = "last_name";
-    else if(/(business|company|brand|organization|organisation|restaurant|shop|store)/.test(l)) map[h] = "business_name";
-    else if(/(email|e mail|mail)/.test(l)) map[h] = "email";
-    else if(/(city|town)/.test(l)) map[h] = "city";
-    else if(/(state|region|province)/.test(l)) map[h] = "state";
-    else if(/country|nation/.test(l)) map[h] = "country";
-    else if(/(website|web|url|site)/.test(l)) map[h] = "website";
-    else if(/(industry|sector|category)/.test(l)) map[h] = "industry";
-    else if(/(source|channel|origin)/.test(l)) map[h] = "source";
-    else if(/(lead status|pipeline status|^status$)/.test(l)) map[h] = "lead_status";
-    else if(/(notes|note|comments|comment)/.test(l)) map[h] = "notes";
-    else if(/^(tags?|labels?|groups?)$/.test(l)) map[h] = "tags";
-    else if(/(name|person|contact)/.test(l)) map[h] = "first_name";
-    else map[h] = `custom:${customKey(h)}`;
-  });
-  return map;
-};
+export { customKey, detectColumns } from "../utils/csv";
 
 export default function ContactsPage() {
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -79,7 +31,7 @@ export default function ContactsPage() {
   const [loading, setLoading] = useState(true); const [error, setError] = useState<string|null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [showAdd, setShowAdd] = useState(false); const [showImport, setShowImport] = useState(false);
-  const [showListModal, setShowListModal] = useState(false); const [availableLists, setAvailableLists] = useState<any[]>([]);
+  const [showListModal, setShowListModal] = useState(false);
   const [selectedListId, setSelectedListId] = useState("");
   const [quickMsg, setQuickMsg] = useState(""); const [quickSendId, setQuickSendId] = useState<number|null>(null);
   const [quickSending, setQuickSending] = useState(false);
@@ -171,7 +123,7 @@ export default function ContactsPage() {
               <select className="bg-white text-[#111b21] px-2 py-1.5 rounded-full text-xs font-medium" onChange={e=>{if(e.target.value)handleBulkStatus(e.target.value); e.target.value=""}} value="">
                 <option value="">Status…</option>{LEAD_STATUSES.map(s=><option key={s} value={s}>{s}</option>)}
               </select>
-              <button onClick={async()=>{const{data}=await api.get("/lists/");setAvailableLists(data.items);setShowListModal(true)}} className="bg-white text-[#008069] px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1"><ListPlus size={12}/><span className="hidden sm:inline">List</span></button>
+              <button onClick={()=>setShowListModal(true)} className="bg-white text-[#008069] px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1"><ListPlus size={12}/><span className="hidden sm:inline">List</span></button>
             </div>
           </div>
         )}
@@ -332,10 +284,10 @@ export default function ContactsPage() {
         {totalPages>1 && (<div className="flex items-center justify-between px-4 py-3 bg-[#f0f2f5] dark:bg-[#111b21] border-t border-gray-100 dark:border-[#2a3942]"><span className="text-[13px] text-[#667781]">{total} contacts</span><div className="flex gap-2"><button onClick={()=>setPage(p=>Math.max(1,p-1))} disabled={page===1} className="btn-secondary btn-sm"><ChevronLeft size={14}/></button><span className="text-sm self-center px-2">{page}/{totalPages}</span><button onClick={()=>setPage(p=>Math.min(totalPages,p+1))} disabled={page===totalPages} className="btn-secondary btn-sm"><ChevronRight size={14}/></button></div></div>)}
       </div>
 
-      {showAdd && <AddContactModal lists={availableLists} onClose={()=>{setShowAdd(false);loadContacts()}} />}
-      {showImport && <ImportModal onClose={()=>setShowImport(false)} onDone={()=>{setShowImport(false);loadContacts()}}/>}
+      {showAdd && <AddContactModal lists={[]} onClose={()=>{setShowAdd(false);loadContacts()}} />}
+      {showImport && <ImportContactsModal onClose={()=>setShowImport(false)} onDone={()=>{setShowImport(false);loadContacts()}}/>}
       {profileId !== null && <ContactProfileModal contactId={profileId} onClose={()=>setProfileId(null)}/>}
-      {showListModal && <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4"><div className="bg-white dark:bg-[#202c33] w-full sm:max-w-md rounded-t-2xl sm:rounded-xl p-4 sm:p-6 max-h-[92vh] overflow-y-auto"><div className="flex justify-between mb-4"><h2 className="text-lg font-semibold text-[#111b21] dark:text-white">Add to List</h2><button onClick={()=>setShowListModal(false)} className="w-8 h-8 rounded-full bg-[#f0f2f5] dark:bg-[#111b21] flex items-center justify-center"><X size={16}/></button></div><p className="text-sm text-[#667781] mb-3">{selected.size} contacts</p><select className="w-full px-3 py-3 bg-[#f0f2f5] dark:bg-[#111b21] rounded-xl text-sm" value={selectedListId} onChange={e=>setSelectedListId(e.target.value)}><option value="">Select list...</option>{availableLists.map((l:any)=><option key={l.id} value={l.id}>{l.name} ({l.contact_count})</option>)}</select><button onClick={async()=>{if(!selectedListId){toast.error("Select a list");return};try{await api.post(`/lists/${selectedListId}/contacts`,[...selected]);toast.success("Added to list");setShowListModal(false);setSelected(new Set());setSelectedListId("");loadContacts();}catch{toast.error("Failed")}}} className="bg-[#00a884] text-white w-full rounded-full py-3 mt-4 font-semibold">Add to List</button></div></div>}
+      {showListModal && <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4"><div className="bg-white dark:bg-[#202c33] w-full sm:max-w-md rounded-t-2xl sm:rounded-xl p-4 sm:p-6 max-h-[92vh] overflow-y-auto"><div className="flex justify-between mb-4"><h2 className="text-lg font-semibold text-[#111b21] dark:text-white">Add to List</h2><button onClick={()=>setShowListModal(false)} className="w-8 h-8 rounded-full bg-[#f0f2f5] dark:bg-[#111b21] flex items-center justify-center"><X size={16}/></button></div><p className="text-sm text-[#667781] mb-3">{selected.size} contacts</p><ListPicker value={selectedListId} onChange={setSelectedListId} placeholder="Select list... (or create one)" allowNone={false} /><button onClick={async()=>{if(!selectedListId){toast.error("Select a list");return};try{await api.post(`/lists/${selectedListId}/contacts`,[...selected]);toast.success("Added to list");setShowListModal(false);setSelected(new Set());setSelectedListId("");loadContacts();}catch{toast.error("Failed")}}} className="bg-[#00a884] text-white w-full rounded-full py-3 mt-4 font-semibold">Add to List</button></div></div>}
 
       {/* WhatsApp-style Quick Send - bottom sheet */}
       {quickSendId && (
@@ -398,11 +350,9 @@ export default function ContactsPage() {
   );
 }
 
-function AddContactModal({ lists, onClose }: { lists: any[]; onClose: () => void }) {
+function AddContactModal({ onClose }: { lists: any[]; onClose: () => void }) {
   const [f, setF] = useState({ first_name:"",last_name:"",business_name:"",phone_number:"",email:"",city:"",state:"",website:"",industry:"",source:"",lead_status:"new",list_id:"" });
   const [sub, setSub] = useState(false);
-  const [loadedLists, setLoadedLists] = useState<any[]>(lists||[]);
-  useEffect(() => { api.get("/lists/").then(r=>setLoadedLists(r.data.items)); }, []);
 
   const handle = async (e:React.FormEvent) => { e.preventDefault(); if(!f.phone_number){toast.error("Phone required");return;} setSub(true);
     try { const res = await api.post("/contacts/", f);
@@ -422,115 +372,8 @@ function AddContactModal({ lists, onClose }: { lists: any[]; onClose: () => void
       <div><label className="text-xs font-medium text-[#54656f]">Industry</label><input className="w-full mt-1 px-3 py-2.5 bg-[#f0f2f5] dark:bg-[#111b21] rounded-xl text-sm" placeholder="Restaurant, Fast Food, etc." value={f.industry} onChange={e=>setF({...f,industry:e.target.value})}/></div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div><label className="text-xs font-medium text-[#54656f]">Lead Status</label><select className="w-full mt-1 px-3 py-2.5 bg-[#f0f2f5] dark:bg-[#111b21] rounded-xl text-sm" value={f.lead_status} onChange={e=>setF({...f,lead_status:e.target.value})}>{LEAD_STATUSES.map(s=><option key={s} value={s}>{s}</option>)}</select></div>
-        <div><label className="text-xs font-medium text-[#54656f]">Add to List</label><select className="w-full mt-1 px-3 py-2.5 bg-[#f0f2f5] dark:bg-[#111b21] rounded-xl text-sm" value={f.list_id} onChange={e=>setF({...f,list_id:e.target.value})}><option value="">No list</option>{loadedLists.map((l:any)=><option key={l.id} value={l.id}>{l.name}</option>)}</select></div>
+        <div><label className="text-xs font-medium text-[#54656f]">Add to List</label><div className="mt-1"><ListPicker value={f.list_id} onChange={v=>setF({...f,list_id:v})} placeholder="No list — pick or create one" /></div></div>
       </div>
       <div className="flex gap-2 pt-2"><button type="button" onClick={onClose} className="flex-1 py-3 rounded-full bg-[#f0f2f5] dark:bg-[#111b21] text-[#54656f] dark:text-white font-medium">Cancel</button><button type="submit" disabled={sub} className="flex-1 py-3 rounded-full bg-[#00a884] text-white font-semibold disabled:opacity-50">{sub?"Creating...":"Create Contact"}</button></div>
     </form></div></div>);
-}
-
-function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
-  const [file, setFile] = useState<File|null>(null);
-  const [preview, setPreview] = useState<any>(null);
-  const [step, setStep] = useState<"upload"|"map"|"importing"|"done">("upload");
-  const [mapping, setMapping] = useState<Record<string,string>>({});
-  const [selectedListId, setSelectedListId] = useState("");
-  const [tags, setTags] = useState("");
-  const [lists, setLists] = useState<any[]>([]);
-  const [result, setResult] = useState<any>(null);
-  const [impErrors, setImpErrors] = useState<any[]>([]);
-
-  useEffect(() => { api.get("/lists/").then(r=>setLists(r.data.items)); }, []);
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0]; if(!f)return; setFile(f);
-    setStep("map");
-    Papa.parse<string[]>(f, {
-      complete: (res) => {
-        const rows = res.data.filter((r: string[]) => r && r.some((c: string) => c && c.trim() !== ""));
-        const headers = (rows[0] || []).map((h: string) => (h || "").trim());
-        const previewRows = rows.slice(1, 6);
-        setPreview({ headers, rows: previewRows });
-        const map = detectColumns(headers);
-        setMapping(map);
-      },
-    });
-  };
-
-  const doImport = async () => {
-    if(!file)return; setStep("importing");
-    const fd = new FormData(); fd.append("file",file);
-    // Send the complete visible mapping. This preserves explicit Ignore
-    // choices and gives every otherwise-unknown column a custom field target.
-    fd.append("column_mapping", JSON.stringify(mapping));
-    if(selectedListId) fd.append("list_id",selectedListId);
-    // Tags typed in the import box are applied to every imported contact.
-    if(tags.trim()) fd.append("tags", tags.trim());
-    try {
-      const { data } = await api.post("/contacts/import/csv",fd,{headers:{"Content-Type":"multipart/form-data"}});
-      setResult(data); setImpErrors(data.errors||[]); setStep("done");
-    } catch { toast.error("Import failed"); setStep("upload"); }
-  };
-
-  return (<div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4"><div className="bg-white dark:bg-[#202c33] w-full sm:max-w-xl max-h-[92vh] overflow-y-auto rounded-t-[20px] sm:rounded-2xl">
-    <div className="sticky top-0 bg-[#008069] dark:bg-[#202c33] px-4 py-3 flex items-center justify-between"><h2 className="text-white font-semibold">Import CSV</h2><button onClick={onClose} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white"><X size={16}/></button></div>
-    <div className="p-4 sm:p-6">
-    {step==="upload" && (<div className="space-y-3">
-      <div className="border-2 border-dashed border-[#00a884]/30 bg-[#f0f9f6] dark:bg-[#0a332c]/30 rounded-2xl p-6 text-center">
-        <Upload size={32} className="mx-auto text-[#00a884] mb-2"/>
-        <p className="font-medium text-[#111b21] dark:text-white">Drop CSV here</p>
-        <p className="text-xs text-[#667781] mt-1">Every column is imported — including your own custom fields</p>
-        <input type="file" accept=".csv" onChange={handleFileChange} className="mt-3 block w-full text-sm"/>
-      </div>
-      <p className="text-xs text-[#667781] text-center">Columns are auto-detected. Unknown columns become template-ready custom fields.</p>
-    </div>)}
-    {step==="map" && preview && (<div className="space-y-3">
-      <p className="text-sm font-semibold text-[#111b21] dark:text-white">Map columns (auto-detected)</p>
-      <div className="max-h-40 overflow-auto text-xs border rounded-xl">
-        <table className="w-full"><thead><tr className="bg-[#f0f2f5] dark:bg-[#111b21]">{preview.headers.map((h:string)=><th key={h} className="px-2 py-2 text-left text-[#54656f]">{h}</th>)}</tr></thead>
-        <tbody>{preview.rows.map((r:string[],i:number)=><tr key={i} className="border-t border-gray-100 dark:border-[#2a3942]">{r.map((c:string,j:number)=><td key={j} className="px-2 py-1.5 truncate max-w-[100px]">{c}</td>)}</tr>)}</tbody></table>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto">
-        {preview.headers.map((h:string) => (
-          <div key={h}><label className="text-xs font-medium text-[#54656f]">{h}</label>
-            <select className="w-full mt-1 px-2 py-2 bg-[#f0f2f5] dark:bg-[#111b21] rounded-xl text-xs" value={mapping[h]||""} onChange={e=>setMapping({...mapping,[h]:e.target.value})}>
-              <option value="">Ignore</option>
-              <option value={`custom:${customKey(h)}`}>Custom field · {customKey(h)}</option>
-              <option value="phone_number">Phone</option>
-              <option value="first_name">First Name</option>
-              <option value="last_name">Last Name</option>
-              <option value="business_name">Restaurant / Business</option>
-              <option value="email">Email</option>
-              <option value="city">City</option>
-              <option value="state">State</option>
-              <option value="country">Country</option>
-              <option value="website">Website</option>
-              <option value="industry">Industry</option>
-              <option value="source">Source</option>
-              <option value="lead_status">Lead Status</option>
-              <option value="notes">Notes</option>
-              <option value="tags">Tags</option>
-            </select></div>
-        ))}
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div><label className="text-xs font-medium text-[#54656f]">Import to List</label><select className="w-full mt-1 px-3 py-2.5 bg-[#f0f2f5] dark:bg-[#111b21] rounded-xl text-sm" value={selectedListId} onChange={e=>setSelectedListId(e.target.value)}><option value="">No list</option>{lists.map((l:any)=><option key={l.id} value={l.id}>{l.name}</option>)}</select></div>
-        <div><label className="text-xs font-medium text-[#54656f]">Tag all imported contacts</label><input className="w-full mt-1 px-3 py-2.5 bg-[#f0f2f5] dark:bg-[#111b21] rounded-xl text-sm" placeholder="restaurants, cold-leads" value={tags} onChange={e=>setTags(e.target.value)}/></div>
-      </div>
-      <p className="text-xs text-[#667781]">Tags are comma-separated and applied to every contact in this file. Use them in Automations to react to replies from a specific tag.</p>
-      <button onClick={doImport} className="w-full py-3 rounded-full bg-[#00a884] text-white font-semibold">Import Contacts</button>
-    </div>)}
-    {step==="importing" && <div className="text-center py-8"><div className="w-10 h-10 border-4 border-[#00a884] border-t-transparent rounded-full animate-spin mx-auto"/><p className="text-sm mt-4 text-[#667781]">Importing restaurants…</p></div>}
-    {step==="done" && result && (<div className="space-y-3 text-center">
-      <p className="text-4xl">✅</p>
-      <p className="font-semibold text-[#111b21] dark:text-white">Import Complete</p>
-      <div className="grid grid-cols-3 gap-2 text-sm">
-        <div className="bg-[#d9fdd3] rounded-xl p-3"><p className="text-2xl font-bold text-[#008069]">{result.imported}</p><p className="text-xs text-[#54656f]">Imported</p></div>
-        <div className="bg-[#ffecb3] rounded-xl p-3"><p className="text-2xl font-bold text-[#8d5100]">{result.duplicates}</p><p className="text-xs">Duplicates</p></div>
-        <div className="bg-[#fce8e6] rounded-xl p-3"><p className="text-2xl font-bold text-[#c5221f]">{result.invalid}</p><p className="text-xs">Invalid</p></div>
-      </div>
-      {impErrors.length>0 && <details className="text-xs text-left"><summary className="cursor-pointer text-[#667781]">{impErrors.length} errors</summary><pre className="mt-1 max-h-32 overflow-auto bg-[#f0f2f5] p-2 rounded">{JSON.stringify(impErrors.slice(0,20),null,2)}</pre></details>}
-      <button onClick={()=>{setStep("upload");setResult(null);setFile(null);setPreview(null);onDone()}} className="w-full py-3 rounded-full bg-[#00a884] text-white font-semibold">Done</button>
-    </div>)}
-    </div>
-  </div></div>);
 }
