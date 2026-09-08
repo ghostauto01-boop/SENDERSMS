@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useLocation, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import {
-  LayoutDashboard, Users, List, Megaphone, GitBranch,
+  LayoutDashboard, Users, List, Megaphone, GitBranch, Sparkles,
   Inbox, Send, Clock, FileText, BarChart3, Settings, MessageSquareReply,
   Zap, Moon, Sun, Menu, X, LogOut, Search, Braces, Repeat,
 } from "lucide-react";
@@ -14,6 +14,7 @@ const navItems = [
   { to: "/contacts", label: "Contacts", icon: Users },
   { to: "/lists", label: "Lists", icon: List },
   { to: "/campaigns", label: "Campaigns", icon: Megaphone },
+  { to: "/sms-manager", label: "SMS Manager", icon: Sparkles },
   { to: "/sequences", label: "Sequences", icon: GitBranch },
   { to: "/inbox", label: "Inbox", icon: Inbox },
   { to: "/auto-reply", label: "Auto-Reply", icon: MessageSquareReply },

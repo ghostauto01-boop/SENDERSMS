@@ -68,7 +68,7 @@ def send_push_notification(self, event_id: int):
                     import json
                     config = json.loads(provider_config.config_json or "{}")
                     provider = PushoverProvider(
-                        app_token=config.get("app_token"),
+                        app_token=decrypt_value(config.get("app_token_encrypted", "")),
                         user_key=decrypt_value(config.get("user_key_encrypted", "")),
                     )
                     if provider.is_configured():
