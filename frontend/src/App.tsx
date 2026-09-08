@@ -10,6 +10,7 @@ const DashboardPage = lazy(() => import("./pages/DashboardPage"));
 const ContactsPage = lazy(() => import("./pages/ContactsPage"));
 const ListsPage = lazy(() => import("./pages/ListsPage"));
 const CampaignsPage = lazy(() => import("./pages/CampaignsPage"));
+const SMSManagerPage = lazy(() => import("./pages/SMSManagerPage"));
 const SequencesPage = lazy(() => import("./pages/SequencesPage"));
 const InboxPage = lazy(() => import("./pages/InboxPage"));
 const FollowUpsPage = lazy(() => import("./pages/FollowUpsPage"));
@@ -74,6 +75,7 @@ function AppRoutes() {
         <Route path="/contacts" element={<ContactsPage />} />
         <Route path="/lists" element={<ListsPage />} />
         <Route path="/campaigns" element={<CampaignsPage />} />
+        <Route path="/sms-manager" element={<SMSManagerPage />} />
         <Route path="/sequences" element={<SequencesPage />} />
         <Route path="/follow-ups" element={<FollowUpsPage />} />
         <Route path="/templates" element={<TemplatesPage />} />
