@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import StreamingResponse
+from fastapi.responses import RedirectResponse, StreamingResponse
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,6 +19,7 @@ from app.database import get_db
 from app.models.ads import (
     AdsActivityLog,
     AdsAssignment,
+    AdsAudience,
     AdsCalendarEvent,
     AdsCampaign,
     AdsCreative,
@@ -35,6 +36,10 @@ from app.models.suppression import SuppressionEntry
 from app.models.user import User
 from app.schemas.ads import (
     AddContactsIn,
+    AttachAudienceIn,
+    AudienceIn,
+    AudienceOut,
+    AudiencePatch,
     BulkActionIn,
     CalendarEventIn,
     CampaignIn,
@@ -46,10 +51,13 @@ from app.schemas.ads import (
     CreativePatch,
     FollowUpStepIn,
     FollowUpTaskIn,
+    OptimizeIn,
     SetIn,
     SetOut,
     SetPatch,
     SuppressionIn,
+    TargetingPreviewIn,
+    TrackClickIn,
 )
 from app.security.auth import get_current_user
 from app.services import ads_service as svc
@@ -79,6 +87,15 @@ async def _get_creative(db: AsyncSession, creative_id: int) -> AdsCreative:
     ).scalar_one_or_none()
     if row is None or row.is_deleted:
         raise HTTPException(404, "Creative not found")
+    return row
+
+
+async def _get_audience(db: AsyncSession, audience_id: int) -> AdsAudience:
+    row = (
+        await db.execute(select(AdsAudience).where(AdsAudience.id == audience_id))
+    ).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(404, "Audience not found")
     return row
 
 
@@ -176,7 +193,9 @@ async def list_campaigns(
     )
     items = []
     for c in rows:
-        stats = await svc._counts_for(db, [AdsAssignment.campaign_id == c.id])
+        stats = await svc._counts_for(
+            db, [AdsAssignment.campaign_id == c.id], campaign_id=c.id
+        )
         items.append(
             {
                 **CampaignOut.model_validate(c).model_dump(),
@@ -274,6 +293,12 @@ async def update_campaign(
         "draft", "scheduled", "active", "paused", "completed", "archived", "error",
     ):
         raise HTTPException(400, "Invalid status")
+    if "optimize_metric" in payload and payload["optimize_metric"] not in svc.OPTIMIZE_METRICS:
+        raise HTTPException(400, f"Invalid optimize_metric, expected one of {svc.OPTIMIZE_METRICS}")
+    if "optimize_action" in payload and payload["optimize_action"] not in svc.OPTIMIZE_ACTIONS:
+        raise HTTPException(400, f"Invalid optimize_action, expected one of {svc.OPTIMIZE_ACTIONS}")
+    if "optimize_min_sends" in payload and (payload["optimize_min_sends"] or 0) < 1:
+        raise HTTPException(400, "optimize_min_sends must be at least 1")
     for key, value in payload.items():
         setattr(campaign, key, value)
     campaign.updated_at = svc.now_utc()
@@ -541,6 +566,80 @@ async def analytics(
     return await svc.campaign_analytics(db, await _get_campaign(db, campaign_id))
 
 
+@router.delete("/campaigns/{campaign_id}/audience/{assignment_id}", status_code=204)
+async def remove_audience_contact(
+    campaign_id: int,
+    assignment_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Remove one contact from a campaign's audience (unsent only).
+
+    Contacts that already received the message cannot be removed -- that would
+    rewrite analytics history. Suppress them instead.
+    """
+    await _get_campaign(db, campaign_id)
+    try:
+        await svc.remove_assignment(db, assignment_id, campaign_id=campaign_id)
+    except ValueError as e:
+        if str(e) == "already_sent":
+            raise HTTPException(
+                409,
+                "This contact was already sent the message, so it cannot be removed. "
+                "Add it to the suppression list to block future sends.",
+            )
+        raise HTTPException(404, "Audience row not found")
+    svc.log_activity(
+        db, "contact_removed", campaign_id=campaign_id, entity_type="assignment",
+        entity_id=assignment_id, actor=user.username,
+    )
+    await db.commit()
+
+
+@router.post("/campaigns/{campaign_id}/audience/bulk-remove")
+async def bulk_remove_audience(
+    campaign_id: int,
+    data: BulkActionIn,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Remove several unsent contacts at once. Already-sent rows are skipped
+    (reported, not deleted) so analytics history stays intact."""
+    await _get_campaign(db, campaign_id)
+    result = await svc.bulk_remove_assignments(db, campaign_id, data.ids, actor=user.username)
+    await db.commit()
+    return result
+
+
+@router.get("/campaigns/{campaign_id}/optimization")
+async def optimization_status(
+    campaign_id: int, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)
+):
+    """Andromeda status: master switch, per-set toggles and what it would do."""
+    return await svc.optimization_plan(db, await _get_campaign(db, campaign_id))
+
+
+@router.post("/campaigns/{campaign_id}/optimize")
+async def run_optimization_now(
+    campaign_id: int,
+    data: OptimizeIn,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Run one Andromeda pass. A real pass requires the master auto-optimize
+    switch to be ON; dry runs always work for previewing."""
+    campaign = await _get_campaign(db, campaign_id)
+    result = await svc.run_optimization(db, campaign, actor=user.username, dry_run=data.dry_run)
+    if not result.get("ok"):
+        raise HTTPException(
+            409,
+            "Auto-optimization is turned OFF for this campaign. Turn it on first -- "
+            "nothing automatic runs without your explicit opt-in.",
+        )
+    await db.commit()
+    return result
+
+
 @router.get("/campaigns/{campaign_id}/activity")
 async def campaign_activity(
     campaign_id: int,
@@ -592,7 +691,9 @@ async def list_sets(
     )
     out = []
     for s in rows:
-        stats = await svc._counts_for(db, [AdsAssignment.set_id == s.id])
+        stats = await svc._counts_for(
+            db, [AdsAssignment.set_id == s.id], campaign_id=campaign_id, set_id=s.id
+        )
         out.append({**SetOut.model_validate(s).model_dump(), "stats": stats})
     return {"items": out}
 
@@ -605,7 +706,10 @@ async def create_set(
     user: User = Depends(get_current_user),
 ):
     await _get_campaign(db, campaign_id)
-    ads_set = AdsSet(campaign_id=campaign_id, **data.model_dump())
+    payload = data.model_dump()
+    if payload.get("audience_id"):
+        await _get_audience(db, payload["audience_id"])
+    ads_set = AdsSet(campaign_id=campaign_id, **payload)
     db.add(ads_set)
     await db.flush()
     svc.log_activity(
@@ -622,7 +726,10 @@ async def update_set(
     set_id: int, data: SetPatch, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)
 ):
     ads_set = await _get_set(db, set_id)
-    for key, value in data.model_dump(exclude_unset=True).items():
+    payload = data.model_dump(exclude_unset=True)
+    if payload.get("audience_id"):
+        await _get_audience(db, payload["audience_id"])
+    for key, value in payload.items():
         setattr(ads_set, key, value)
     svc.log_activity(
         db, "set_updated", campaign_id=ads_set.campaign_id, entity_type="set", entity_id=set_id,
@@ -631,6 +738,52 @@ async def update_set(
     await db.commit()
     await db.refresh(ads_set)
     return SetOut.model_validate(ads_set)
+
+
+@router.post("/sets/{set_id}/duplicate", status_code=201)
+async def duplicate_set(
+    set_id: int, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)
+):
+    """Clone an SMS set with its creatives. The copy starts with a fresh
+    audience (no contacts carried over)."""
+    ads_set = await _get_set(db, set_id)
+    clone = await svc.duplicate_set(db, ads_set, actor=user.username)
+    await db.commit()
+    await db.refresh(clone)
+    return SetOut.model_validate(clone)
+
+
+@router.post("/sets/{set_id}/pause-losers")
+async def pause_losers(
+    set_id: int,
+    min_sends: int = Query(10, ge=1, le=10000),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """One click: keep the winning creative, pause the rest, move their pending
+    contacts onto the winner."""
+    try:
+        result = await svc.pause_losing_creatives(db, set_id, min_sends=min_sends, actor=user.username)
+    except ValueError as e:
+        detail = {
+            "not_found": "SMS set not found",
+            "need_two_creatives": "Need at least 2 active creatives to pick a winner",
+            "not_enough_data": f"No creative has {min_sends} sends yet -- too early to call a winner",
+        }.get(str(e), "Could not pause losers")
+        raise HTTPException(400 if str(e) != "not_found" else 404, detail)
+    await db.commit()
+    return result
+
+
+@router.post("/sets/preview")
+async def preview_unsaved_targeting(
+    data: TargetingPreviewIn,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Live size estimate for targeting that has not been saved yet (set and
+    audience editors). Touches nothing."""
+    return await svc.preview_filters(db, data.model_dump())
 
 
 @router.delete("/sets/{set_id}", status_code=204)
@@ -700,7 +853,13 @@ async def list_creatives(
     )
     out = []
     for c in rows:
-        stats = await svc._counts_for(db, [AdsAssignment.creative_id == c.id])
+        stats = await svc._counts_for(
+            db,
+            [AdsAssignment.creative_id == c.id],
+            campaign_id=c.campaign_id,
+            set_id=c.set_id,
+            creative_id=c.id,
+        )
         out.append({**CreativeOut.model_validate(c).model_dump(), "stats": stats})
     return {"items": out}
 
@@ -883,6 +1042,300 @@ async def promote_winner(
     )
     await db.commit()
     return {"ok": True}
+
+
+@router.get("/creatives/{creative_id}/analytics")
+async def creative_analytics(
+    creative_id: int, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)
+):
+    """Full metrics for one creative: delivery / reply / click / open rates,
+    score, winner status within its set, and per-version sends."""
+    creative = await _get_creative(db, creative_id)
+    campaign = await _get_campaign(db, creative.campaign_id)
+    stats = await svc._counts_for(
+        db,
+        [AdsAssignment.creative_id == creative.id],
+        campaign_id=creative.campaign_id,
+        set_id=creative.set_id,
+        creative_id=creative.id,
+    )
+    stats["score"] = svc.performance_score(campaign.objective, stats)
+
+    # Winner status within the set.
+    peers = list(
+        (
+            await db.execute(
+                select(AdsCreative).where(
+                    AdsCreative.set_id == creative.set_id,
+                    AdsCreative.is_deleted.is_(False),
+                )
+            )
+        ).scalars().all()
+    )
+    peer_stats = []
+    for p in peers:
+        s = await svc._counts_for(
+            db,
+            [AdsAssignment.creative_id == p.id],
+            campaign_id=creative.campaign_id,
+            set_id=creative.set_id,
+            creative_id=p.id,
+        )
+        s["score"] = svc.performance_score(campaign.objective, s)
+        peer_stats.append({"id": p.id, "name": p.name, "set_id": p.set_id, **s})
+    winners = svc.pick_winners(peer_stats, min_sends=svc.DISPLAY_WINNER_MIN_SENDS)
+
+    versions = list(
+        (
+            await db.execute(
+                select(AdsCreativeVersion)
+                .where(AdsCreativeVersion.creative_id == creative_id)
+                .order_by(AdsCreativeVersion.version.desc())
+            )
+        ).scalars().all()
+    )
+    version_rows = []
+    for v in versions:
+        sent = (
+            await db.execute(
+                select(func.count()).select_from(AdsAssignment).where(
+                    AdsAssignment.creative_version_id == v.id, AdsAssignment.sent_at.is_not(None)
+                )
+            )
+        ).scalar() or 0
+        version_rows.append(
+            {"id": v.id, "version": v.version, "body": v.body, "cta": v.cta,
+             "sent": sent, "created_at": svc.as_utc(v.created_at)}
+        )
+    return {
+        **CreativeOut.model_validate(creative).model_dump(),
+        "stats": stats,
+        "is_winner": winners.get(creative.set_id) == creative.id,
+        "needs_more_data": (stats.get("sent") or 0) < svc.DISPLAY_WINNER_MIN_SENDS,
+        "peers": [
+            {"id": p["id"], "name": p["name"], "sent": p["sent"], "score": p["score"],
+             "reply_rate": p["reply_rate"], "is_winner": winners.get(creative.set_id) == p["id"]}
+            for p in peer_stats
+        ],
+        "versions": version_rows,
+    }
+
+
+# ==========================================================================
+# Saved Audiences (Meta-style reusable audiences)
+# ==========================================================================
+
+
+@router.get("/audiences")
+async def list_audiences(
+    search: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    query = select(AdsAudience).order_by(AdsAudience.updated_at.desc())
+    if search:
+        query = query.where(AdsAudience.name.ilike(f"%{search}%"))
+    rows = list((await db.execute(query)).scalars().all())
+    items = []
+    for a in rows:
+        contacts = await svc.resolve_audience_contacts(db, a)
+        items.append(
+            {
+                **AudienceOut.model_validate(a).model_dump(),
+                "match_count": len(contacts),
+                "list_count": len(a.csv("list_ids")),
+                "explicit_contacts": len(a.csv("contact_ids")),
+            }
+        )
+    return {"total": len(items), "items": items}
+
+
+@router.post("/audiences", status_code=201)
+async def create_audience(
+    data: AudienceIn, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)
+):
+    audience = AdsAudience(**data.model_dump(), owner_id=user.id)
+    db.add(audience)
+    await db.flush()
+    svc.log_activity(
+        db, "audience_created", actor=user.username, entity_type="audience",
+        entity_id=audience.id, detail=audience.name,
+    )
+    await db.commit()
+    await db.refresh(audience)
+    return AudienceOut.model_validate(audience)
+
+
+@router.get("/audiences/{audience_id}")
+async def get_audience(
+    audience_id: int, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)
+):
+    audience = await _get_audience(db, audience_id)
+    preview = await svc.preview_saved_audience(db, audience)
+    return {**AudienceOut.model_validate(audience).model_dump(), "preview": preview}
+
+
+@router.patch("/audiences/{audience_id}")
+async def update_audience(
+    audience_id: int,
+    data: AudiencePatch,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    audience = await _get_audience(db, audience_id)
+    for key, value in data.model_dump(exclude_unset=True).items():
+        setattr(audience, key, value)
+    svc.log_activity(
+        db, "audience_updated", actor=user.username, entity_type="audience",
+        entity_id=audience.id, detail=audience.name,
+    )
+    await db.commit()
+    await db.refresh(audience)
+    return AudienceOut.model_validate(audience)
+
+
+@router.delete("/audiences/{audience_id}", status_code=204)
+async def delete_audience(
+    audience_id: int, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)
+):
+    audience = await _get_audience(db, audience_id)
+    # Unlink sets (their copied targeting stays -- only the link is dropped).
+    await db.execute(
+        update(AdsSet).where(AdsSet.audience_id == audience_id).values(audience_id=None)
+    )
+    await db.delete(audience)
+    await db.commit()
+
+
+@router.get("/audiences/{audience_id}/preview")
+async def preview_audience(
+    audience_id: int, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)
+):
+    return await svc.preview_saved_audience(db, await _get_audience(db, audience_id))
+
+
+@router.post("/audiences/{audience_id}/duplicate", status_code=201)
+async def duplicate_audience(
+    audience_id: int, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)
+):
+    audience = await _get_audience(db, audience_id)
+    names = set((await db.execute(select(AdsAudience.name))).scalars().all())
+    base = f"{audience.name} (Copy)"
+    candidate, n = base, 2
+    while candidate in names:
+        candidate = f"{base} ({n})"
+        n += 1
+    clone = AdsAudience(
+        name=candidate[:255],
+        description=audience.description,
+        owner_id=user.id,
+        list_ids=audience.list_ids,
+        contact_ids=audience.contact_ids,
+        include_tags=audience.include_tags,
+        exclude_tags=audience.exclude_tags,
+        include_statuses=audience.include_statuses,
+        exclude_statuses=audience.exclude_statuses,
+        city=audience.city,
+        state=audience.state,
+        industry=audience.industry,
+        activity_filter=audience.activity_filter,
+        exclude_campaign_ids=audience.exclude_campaign_ids,
+    )
+    db.add(clone)
+    await db.commit()
+    await db.refresh(clone)
+    return AudienceOut.model_validate(clone)
+
+
+@router.post("/audiences/{audience_id}/attach")
+async def attach_audience(
+    audience_id: int,
+    data: AttachAudienceIn,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Use a saved audience in a campaign: either point an existing SMS set at
+    it (replacing that set's targeting) or create a new set from it."""
+    audience = await _get_audience(db, audience_id)
+    campaign = await _get_campaign(db, data.campaign_id)
+    if data.set_id:
+        ads_set = await _get_set(db, data.set_id)
+        if ads_set.campaign_id != campaign.id:
+            raise HTTPException(400, "That SMS set belongs to a different campaign")
+        svc._copy_audience_onto_set(audience, ads_set)
+        svc.log_activity(
+            db, "audience_attached", campaign_id=campaign.id, entity_type="set",
+            entity_id=ads_set.id, actor=user.username, detail=audience.name,
+        )
+    else:
+        ads_set = await svc.create_set_from_audience(
+            db, campaign, audience, name=data.new_set_name, actor=user.username
+        )
+    await db.commit()
+    await db.refresh(ads_set)
+    contacts = await svc.resolve_audience(db, ads_set)
+    eligible, skipped = await svc.screen_contacts(db, campaign, contacts)
+    return {
+        **SetOut.model_validate(ads_set).model_dump(),
+        "matched": len(contacts),
+        "eligible": len(eligible),
+        "skipped": skipped,
+    }
+
+
+# ==========================================================================
+# Click tracking (powers click rate + open rate)
+# ==========================================================================
+
+
+@router.post("/track/click")
+async def track_click(
+    data: TrackClickIn, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)
+):
+    """Record a tracked-link tap (used by tests, manual logging and the
+    redirect below when called with credentials)."""
+    await svc.record_link_click(
+        db,
+        campaign_id=data.campaign_id,
+        creative_id=data.creative_id,
+        contact_id=data.contact_id,
+        set_id=data.set_id,
+        assignment_id=data.assignment_id,
+    )
+    await db.commit()
+    return {"ok": True}
+
+
+@router.get("/r/{assignment_id}")
+async def click_redirect(assignment_id: int, db: AsyncSession = Depends(get_db)):
+    """Public tracked-link redirect. The creative's tracking_link is wrapped
+    with this URL at send time in a future release; for now any tap on
+    /ads/r/<assignment_id> is recorded and bounced to the creative's link.
+
+    No login required -- link taps come from phones, not browsers.
+    """
+    assignment = (
+        await db.execute(select(AdsAssignment).where(AdsAssignment.id == assignment_id))
+    ).scalar_one_or_none()
+    if assignment is None:
+        raise HTTPException(404, "Link not found")
+    creative = (
+        await db.execute(select(AdsCreative).where(AdsCreative.id == assignment.creative_id))
+    ).scalar_one_or_none()
+    await svc.record_link_click(
+        db,
+        campaign_id=assignment.campaign_id,
+        creative_id=assignment.creative_id,
+        contact_id=assignment.contact_id,
+        set_id=assignment.set_id,
+        assignment_id=assignment.id,
+        detail="redirect",
+    )
+    await db.commit()
+    target = (creative.tracking_link if creative else None) or "https://example.com"
+    if not target.startswith(("http://", "https://")):
+        target = f"https://{target}"
+    return RedirectResponse(target, status_code=302)
 
 
 # ==========================================================================
@@ -1549,21 +2002,36 @@ async def export(
     if kind == "campaigns":
         writer.writerow(["id", "name", "status", "objective", "assigned", "sent", "replies", "score"])
         for c in (await db.execute(select(AdsCampaign))).scalars().all():
-            s = await svc._counts_for(db, [AdsAssignment.campaign_id == c.id])
+            s = await svc._counts_for(
+                db, [AdsAssignment.campaign_id == c.id], campaign_id=c.id
+            )
             writer.writerow(
                 [c.id, c.name, c.status, c.objective, s["assigned"], s["sent"], s["replies"],
                  svc.performance_score(c.objective, s)]
             )
     elif kind == "creatives":
-        writer.writerow(["id", "campaign_id", "name", "status", "assigned", "sent", "replies", "positive", "opt_outs"])
+        writer.writerow(["id", "campaign_id", "name", "status", "assigned", "sent", "delivered",
+                         "delivery_rate", "replies", "reply_rate", "positive", "clicks",
+                         "click_rate", "opens", "open_rate", "opt_outs", "opt_out_rate", "score"])
         query = select(AdsCreative).where(AdsCreative.is_deleted.is_(False))
         if campaign_id:
             query = query.where(AdsCreative.campaign_id == campaign_id)
+        objectives: dict[int, str] = dict(
+            (await db.execute(select(AdsCampaign.id, AdsCampaign.objective))).all()
+        )
         for c in (await db.execute(query)).scalars().all():
-            s = await svc._counts_for(db, [AdsAssignment.creative_id == c.id])
+            s = await svc._counts_for(
+                db,
+                [AdsAssignment.creative_id == c.id],
+                campaign_id=c.campaign_id,
+                set_id=c.set_id,
+                creative_id=c.id,
+            )
             writer.writerow(
-                [c.id, c.campaign_id, c.name, c.status, s["assigned"], s["sent"], s["replies"],
-                 s["positive_replies"], s["opt_outs"]]
+                [c.id, c.campaign_id, c.name, c.status, s["assigned"], s["sent"], s["delivered"],
+                 s["delivery_rate"], s["replies"], s["reply_rate"], s["positive_replies"],
+                 s["clicks"], s["click_rate"], s["opens"], s["open_rate"], s["opt_outs"],
+                 s["opt_out_rate"], svc.performance_score(objectives.get(c.campaign_id, "replies"), s)]
             )
     elif kind == "suppression":
         writer.writerow(["phone_number", "reason", "source", "suppressed_at"])

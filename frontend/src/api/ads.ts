@@ -21,12 +21,20 @@ export type AdsStats = {
   conversion_rate: number;
   opt_out_rate: number;
   failure_rate: number;
+  clicks?: number;
+  click_rate?: number;
+  opens?: number;
+  open_rate?: number;
+  engagement_rate?: number;
   credits_used?: number;
   score?: number;
   followups_due?: number;
   meetings?: number;
   meeting_rate?: number;
   state?: string;
+  is_winner?: boolean;
+  needs_more_data?: boolean;
+  winner_id?: number | null;
 };
 
 export type AdsCampaign = {
@@ -55,6 +63,12 @@ export type AdsCampaign = {
   queued_edit_policy: string;
   priority: string;
   test_mode: boolean;
+  auto_optimize?: boolean;
+  optimize_metric?: string;
+  optimize_min_sends?: number;
+  optimize_min_gap_pct?: number;
+  optimize_action?: string;
+  optimize_last_run_at?: string | null;
   sent_count: number;
   last_state?: string | null;
   last_activity_at?: string | null;
@@ -71,6 +85,8 @@ export type AdsSet = {
   name: string;
   status: string;
   list_ids?: string | null;
+  contact_ids?: string | null;
+  audience_id?: number | null;
   include_tags?: string | null;
   exclude_tags?: string | null;
   include_statuses?: string | null;
@@ -82,7 +98,30 @@ export type AdsSet = {
   exclude_campaign_ids?: string | null;
   daily_limit?: number | null;
   split_mode: string;
+  auto_optimize?: boolean;
   stats?: AdsStats;
+};
+
+export type AdsAudience = {
+  id: number;
+  name: string;
+  description?: string | null;
+  list_ids?: string | null;
+  contact_ids?: string | null;
+  include_tags?: string | null;
+  exclude_tags?: string | null;
+  include_statuses?: string | null;
+  exclude_statuses?: string | null;
+  city?: string | null;
+  state?: string | null;
+  industry?: string | null;
+  activity_filter?: string | null;
+  exclude_campaign_ids?: string | null;
+  created_at: string;
+  updated_at: string;
+  match_count?: number;
+  list_count?: number;
+  explicit_contacts?: number;
 };
 
 export type AdsCreative = {
@@ -153,6 +192,10 @@ export const adsApi = {
   updateSet: (id: number, body: any) => unwrap<AdsSet>(api.patch(`/ads/sets/${id}`, body)),
   deleteSet: (id: number) => unwrap<void>(api.delete(`/ads/sets/${id}`)),
   previewSet: (id: number) => unwrap<any>(api.get(`/ads/sets/${id}/preview`)),
+  previewTargeting: (body: any) => unwrap<any>(api.post("/ads/sets/preview", body)),
+  duplicateSet: (id: number) => unwrap<AdsSet>(api.post(`/ads/sets/${id}/duplicate`)),
+  pauseLosers: (setId: number, minSends = 10) =>
+    unwrap<any>(api.post(`/ads/sets/${setId}/pause-losers`, null, { params: { min_sends: minSends } })),
 
   listCreatives: (setId: number) => unwrap<{ items: AdsCreative[] }>(api.get(`/ads/sets/${setId}/creatives`)),
   createCreative: (setId: number, body: any) => unwrap<AdsCreative>(api.post(`/ads/sets/${setId}/creatives`, body)),
@@ -161,6 +204,27 @@ export const adsApi = {
   duplicateCreative: (id: number) => unwrap<AdsCreative>(api.post(`/ads/creatives/${id}/duplicate`)),
   promoteCreative: (id: number) => unwrap<any>(api.post(`/ads/creatives/${id}/promote`)),
   creativeVersions: (id: number) => unwrap<any>(api.get(`/ads/creatives/${id}/versions`)),
+  creativeAnalytics: (id: number) => unwrap<any>(api.get(`/ads/creatives/${id}/analytics`)),
+
+  removeAudienceContact: (campaignId: number, assignmentId: number) =>
+    unwrap<void>(api.delete(`/ads/campaigns/${campaignId}/audience/${assignmentId}`)),
+  bulkRemoveAudience: (campaignId: number, ids: number[]) =>
+    unwrap<any>(api.post(`/ads/campaigns/${campaignId}/audience/bulk-remove`, { ids, action: "remove" })),
+
+  optimizationStatus: (campaignId: number) => unwrap<any>(api.get(`/ads/campaigns/${campaignId}/optimization`)),
+  runOptimization: (campaignId: number, dryRun = false) =>
+    unwrap<any>(api.post(`/ads/campaigns/${campaignId}/optimize`, { dry_run: dryRun })),
+
+  listAudiences: (search = "") =>
+    unwrap<{ total: number; items: AdsAudience[] }>(api.get("/ads/audiences", { params: search ? { search } : {} })),
+  createAudience: (body: any) => unwrap<AdsAudience>(api.post("/ads/audiences", body)),
+  getAudience: (id: number) => unwrap<any>(api.get(`/ads/audiences/${id}`)),
+  updateAudience: (id: number, body: any) => unwrap<AdsAudience>(api.patch(`/ads/audiences/${id}`, body)),
+  deleteAudience: (id: number) => unwrap<void>(api.delete(`/ads/audiences/${id}`)),
+  duplicateAudience: (id: number) => unwrap<AdsAudience>(api.post(`/ads/audiences/${id}/duplicate`)),
+  previewAudience: (id: number) => unwrap<any>(api.get(`/ads/audiences/${id}/preview`)),
+  attachAudience: (id: number, body: { campaign_id: number; set_id?: number | null; new_set_name?: string }) =>
+    unwrap<any>(api.post(`/ads/audiences/${id}/attach`, body)),
 
   createStep: (campaignId: number, body: any) => unwrap<any>(api.post(`/ads/campaigns/${campaignId}/followup-steps`, body)),
   updateStep: (id: number, body: any) => unwrap<any>(api.patch(`/ads/followup-steps/${id}`, body)),

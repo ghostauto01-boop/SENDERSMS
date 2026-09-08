@@ -23,6 +23,7 @@ from app.models.variable import ContactVariable
 from app.models.campaign_followup import CampaignFollowUp, CampaignFollowUpLog
 from app.models.meeting import Meeting, MeetingAttendee
 from app.models.ads import (
+    AdsAudience,
     AdsCampaign,
     AdsSet,
     AdsCreative,
@@ -69,6 +70,7 @@ __all__ = [
     "CampaignFollowUpLog",
     "Meeting",
     "MeetingAttendee",
+    "AdsAudience",
     "AdsCampaign",
     "AdsSet",
     "AdsCreative",

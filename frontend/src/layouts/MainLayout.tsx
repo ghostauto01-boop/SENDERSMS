@@ -4,7 +4,7 @@ import { useAuth } from "../hooks/useAuth";
 import {
   LayoutDashboard, Users, List, Megaphone, GitBranch, Sparkles,
   Inbox, Send, Clock, FileText, BarChart3, Settings, MessageSquareReply,
-  Zap, Moon, Sun, Menu, X, LogOut, Search, Braces, Repeat, Calendar,
+  Zap, Moon, Sun, Menu, X, LogOut, Search, Braces, Repeat, Calendar, Target,
 } from "lucide-react";
 import BrandMark from "../components/BrandMark";
 
@@ -13,6 +13,7 @@ const navItems = [
   { to: "/send", label: "Send SMS", icon: Send },
   { to: "/contacts", label: "Contacts", icon: Users },
   { to: "/lists", label: "Lists", icon: List },
+  { to: "/audiences", label: "Audiences", icon: Target },
   { to: "/campaigns", label: "Campaigns", icon: Megaphone },
   { to: "/sms-manager", label: "SMS Manager", icon: Sparkles },
   { to: "/sequences", label: "Sequences", icon: GitBranch },
