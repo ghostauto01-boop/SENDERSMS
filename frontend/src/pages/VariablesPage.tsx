@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import type { ContactVariable, MessageAnalysis } from "../types";
+import { notifyDataChange } from "../utils/syncEvents";
 
 const SAMPLE_BODY =
   "Hi {{first_name}}, I noticed {{business_name}} still struggles with {{pain_point}}. Worth a chat?";
@@ -62,6 +63,7 @@ export default function VariablesPage() {
           : "No new variables — everything is already listed"
       );
       await loadVariables(false);
+      notifyDataChange("variables-changed");
     } catch (err: any) {
       toast.error(err.response?.data?.detail || "Sync failed");
     } finally {
@@ -93,9 +95,10 @@ export default function VariablesPage() {
         fallback_text: draft.fallback_text.trim() || null,
         description: draft.description.trim() || null,
       });
-      toast.success("Variable saved");
+      toast.success("Variable saved — every composer's picker is updated");
       setEditing(null);
       await loadVariables(false);
+      notifyDataChange("variables-changed");
     } catch (err: any) {
       toast.error(err.response?.data?.detail || "Could not save this variable");
     } finally {
@@ -107,6 +110,7 @@ export default function VariablesPage() {
     try {
       await api.put(`/variables/${variable.id}`, { is_active: !variable.is_active });
       await loadVariables(false);
+      notifyDataChange("variables-changed");
     } catch (err: any) {
       toast.error(err.response?.data?.detail || "Could not update");
     }
@@ -119,6 +123,7 @@ export default function VariablesPage() {
       await api.delete(`/variables/${variable.id}`);
       toast.success("Variable removed");
       await loadVariables(false);
+      notifyDataChange("variables-changed");
     } catch (err: any) {
       toast.error(err.response?.data?.detail || "Could not remove");
     }

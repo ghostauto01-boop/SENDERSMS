@@ -2111,6 +2111,7 @@ async def duplicate_campaign(
                 cta=creative.cta,
                 tracking_link=creative.tracking_link,
                 allocation=creative.allocation,
+                template_id=creative.template_id,
                 current_version=1,
             )
             db.add(new_creative)
@@ -2202,6 +2203,7 @@ async def duplicate_set(
             cta=creative.cta,
             tracking_link=creative.tracking_link,
             allocation=creative.allocation,
+            template_id=creative.template_id,
             current_version=1,
         )
         db.add(new_creative)

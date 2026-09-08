@@ -9,10 +9,11 @@
  * columns appear on their own) and splices the chosen one in at the cursor,
  * leaving the caret after the insertion so typing simply continues.
  */
-import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { Braces, Search } from "lucide-react";
 import api from "../api/client";
 import type { ContactVariable } from "../types";
+import { onDataChange } from "../utils/syncEvents";
 
 interface Props {
   /** The field to insert into. */
@@ -28,6 +29,9 @@ interface Props {
 
 /** Module-level cache: the registry is small and shared by every composer. */
 let cache: ContactVariable[] | null = null;
+/** When the cache was filled; the registry can change on the Variables page. */
+let cacheAge = 0;
+const CACHE_MAX_AGE_MS = 60_000;
 
 export default function ShortcodePicker({
   targetRef,
@@ -75,20 +79,41 @@ export default function ShortcodePicker({
     };
   }, [open]);
 
-  const load = async () => {
-    if (cache) { setVars(cache); return; }
+  const load = useCallback(async (force = false) => {
+    // The registry is small; keep the fast path but never let it go stale.
+    // Anything that mutates variables (rename, deactivate, delete, CSV
+    // import) fires "variables-changed", which clears the cache below, and
+    // an open picker silently refetches if the cache is older than a minute.
+    if (!force && cache && Date.now() - cacheAge < CACHE_MAX_AGE_MS) {
+      setVars(cache);
+      return;
+    }
     setLoading(true);
     try {
       const { data } = await api.get("/variables/", { params: { active_only: true } });
       const items: ContactVariable[] = data.items ?? data ?? [];
       cache = items;
+      cacheAge = Date.now();
       setVars(items);
     } catch {
-      setVars([]);
+      if (!cache) setVars([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  // Stay in sync with the Variables page: mutations there invalidate the
+  // shared cache so the next open (or this one, if visible) shows the truth.
+  useEffect(() => {
+    const unsubscribe = onDataChange("variables-changed", () => {
+      cache = null;
+      cacheAge = 0;
+      if (open) load(true);
+    });
+    return () => {
+      unsubscribe();
+    };
+  }, [open, load]);
 
   const toggle = () => {
     const next = !open;
@@ -198,4 +223,7 @@ export default function ShortcodePicker({
 }
 
 /** Let a fresh CSV import show up without a page reload. */
-export function clearShortcodeCache() { cache = null; }
+export function clearShortcodeCache() {
+  cache = null;
+  cacheAge = 0;
+}

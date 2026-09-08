@@ -34,7 +34,6 @@ export default function SendPage() {
   const segmentCount = charCount <= 160 ? 1 : Math.ceil(charCount / 153);
 
   useEffect(() => {
-    api.get("/contacts/", { params: { per_page: 100 } }).then(r => setContacts(r.data.items)).catch(()=>{});
     const now = new Date(); now.setMinutes(now.getMinutes() + 10);
     setScheduleDate(now.toISOString().split("T")[0]);
     setScheduleTime(now.toTimeString().split(" ")[0].substring(0, 5));
@@ -95,7 +94,37 @@ export default function SendPage() {
     }
   };
 
-  const filtered = contacts.filter(c => !search || (c.first_name||"").toLowerCase().includes(search.toLowerCase()) || (c.last_name||"").toLowerCase().includes(search.toLowerCase()) || (c.business_name||"").toLowerCase().includes(search.toLowerCase()) || c.phone_number.includes(search));
+  // The contact chooser searches the SERVER as you type (the API only returns
+  // the first page of matches). Searching client-side over one early fetch of
+  // 100 contacts used to make every contact past #100 unreachable no matter
+  // what you typed — invisible on big contact books.
+  const [contactsLoading, setContactsLoading] = useState(false);
+  const [contactsTotal, setContactsTotal] = useState(0);
+  useEffect(() => {
+    if (mode !== "contact") return;
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      setContactsLoading(true);
+      try {
+        const { data } = await api.get("/contacts/", {
+          params: { per_page: 50, search: search.trim() || undefined },
+        });
+        if (cancelled) return;
+        setContacts(data.items || []);
+        setContactsTotal(data.total ?? (data.items || []).length);
+      } catch {
+        if (!cancelled) setContacts([]);
+      } finally {
+        if (!cancelled) setContactsLoading(false);
+      }
+    }, 250);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(t);
+    };
+  }, [search, mode]);
+  // Kept as an alias so the list markup below only thinks about "results".
+  const filtered = contacts;
   const toggleContact = (c: any) => setSelectedContacts(prev => prev.find(x=>x.id===c.id) ? prev.filter(x=>x.id!==c.id) : [...prev,c]);
 
   const handleSend = async () => {
@@ -213,7 +242,10 @@ export default function SendPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
             <div className="bg-white dark:bg-[#202c33] rounded-xl p-4 space-y-3 shadow-sm border border-gray-100 dark:border-[#2a3942]">
               <h2 className="font-semibold text-[#111b21] dark:text-white flex items-center gap-2"><Users size={16} className="text-[#00a884]"/> Recipients</h2>
-              {mode==="contact"&&(<><div className="relative"><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#667781]"/><input className="w-full pl-9 pr-3 py-2.5 bg-[#f0f2f5] dark:bg-[#111b21] rounded-full text-sm placeholder:text-[#667781] focus:outline-none focus:ring-2 focus:ring-[#00a884]/20" placeholder="Search contacts… e.g. Chicken Republic" value={search} onChange={e=>setSearch(e.target.value)}/></div><div className="max-h-64 overflow-y-auto space-y-1 border border-gray-100 dark:border-[#2a3942] rounded-xl p-1.5 bg-[#f0f2f5]/50 dark:bg-[#111b21]/50">{filtered.slice(0,50).map(c=>(<label key={c.id} className={`flex items-center gap-2.5 p-2.5 rounded-xl cursor-pointer ${selectedContacts.find(x=>x.id===c.id)?"bg-[#d9fdd3] dark:bg-[#0a332c] border border-[#00a884]/20":"hover:bg-white dark:hover:bg-[#202c33] border border-transparent"}`}><input type="checkbox" checked={!!selectedContacts.find(x=>x.id===c.id)} onChange={()=>toggleContact(c)} className="rounded accent-[#00a884] w-4 h-4"/><span className="text-sm font-medium text-[#111b21] dark:text-white truncate">{c.first_name} {c.last_name} {c.business_name?`• ${c.business_name}`:""}</span><span className="text-xs text-[#667781] ml-auto font-mono">{c.phone_number}</span></label>))}{filtered.length===0&&<p className="text-xs text-center py-4 text-[#667781]">No contacts found</p>}</div>{selectedContacts.length>0&&(<div className="flex flex-wrap gap-1.5">{selectedContacts.map(c=>(<span key={c.id} className="bg-[#e7f3ff] dark:bg-[#182533] text-[#008069] dark:text-[#53bdeb] text-xs px-2.5 py-1 rounded-full flex items-center gap-1.5 font-medium">{c.first_name||c.phone_number}<button onClick={()=>toggleContact(c)} className="hover:text-red-500"><X size={12}/></button></span>))}</div>)}</>)}
+              {mode==="contact"&&(<><div className="relative"><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#667781]"/><input className="w-full pl-9 pr-3 py-2.5 bg-[#f0f2f5] dark:bg-[#111b21] rounded-full text-sm placeholder:text-[#667781] focus:outline-none focus:ring-2 focus:ring-[#00a884]/20" placeholder="Search contacts… e.g. Chicken Republic" value={search} onChange={e=>setSearch(e.target.value)}/></div><div className="max-h-64 overflow-y-auto space-y-1 border border-gray-100 dark:border-[#2a3942] rounded-xl p-1.5 bg-[#f0f2f5]/50 dark:bg-[#111b21]/50">{contactsLoading&&filtered.length===0?<p className="text-xs text-center py-4 text-[#667781]">Searching…</p>:<>{filtered.slice(0,50).map(c=>(<label key={c.id} className={`flex items-center gap-2.5 p-2.5 rounded-xl cursor-pointer ${selectedContacts.find(x=>x.id===c.id)?"bg-[#d9fdd3] dark:bg-[#0a332c] border border-[#00a884]/20":"hover:bg-white dark:hover:bg-[#202c33] border border-transparent"}`}><input type="checkbox" checked={!!selectedContacts.find(x=>x.id===c.id)} onChange={()=>toggleContact(c)} className="rounded accent-[#00a884] w-4 h-4"/><span className="text-sm font-medium text-[#111b21] dark:text-white truncate">{c.first_name} {c.last_name} {c.business_name?`• ${c.business_name}`:""}</span><span className="text-xs text-[#667781] ml-auto font-mono">{c.phone_number}</span></label>))}
+{filtered.length===0&&!contactsLoading&&<p className="text-xs text-center py-4 text-[#667781]">{search.trim()?"No contacts match your search":"No contacts yet — import a CSV first"}</p>}
+{filtered.length>0&&contactsTotal>filtered.length&&<p className="text-xs text-center py-2 text-[#667781] border-t border-gray-100 dark:border-[#2a3942]">Showing {filtered.length} of {contactsTotal} — keep typing to narrow the search</p>}</>}
+</div>{selectedContacts.length>0&&(<div className="flex flex-wrap gap-1.5">{selectedContacts.map(c=>(<span key={c.id} className="bg-[#e7f3ff] dark:bg-[#182533] text-[#008069] dark:text-[#53bdeb] text-xs px-2.5 py-1 rounded-full flex items-center gap-1.5 font-medium">{c.first_name||c.phone_number}<button onClick={()=>toggleContact(c)} className="hover:text-red-500"><X size={12}/></button></span>))}</div>)}</>)}
               {mode==="number"&&(<div><label className="text-xs font-medium text-[#54656f]">Phone Number</label><input className="mt-1 w-full px-3 py-3 bg-[#f0f2f5] dark:bg-[#111b21] rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#00a884]/20" placeholder="08012345678" value={phoneNumber} onChange={e=>setPhoneNumber(e.target.value)}/><p className="text-xs text-[#667781] mt-1">International format auto-normalized to +234...</p></div>)}
               {mode==="list"&&(<div><label className="text-xs font-medium text-[#54656f]">Contact List</label><div className="mt-1"><ListPicker value={selectedListId} onChange={setSelectedListId} placeholder="Select a list… (or create one)" allowNone={false} /></div><p className="text-xs text-[#667781] mt-1">All contacts in list get the same personalized message.</p></div>)}
             </div>

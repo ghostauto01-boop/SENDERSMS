@@ -1,14 +1,17 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import {
   ArrowLeft,
   BarChart3,
   Bot,
+  CheckCircle2,
   Copy,
   Download,
+  FileText,
   Pause,
   Play,
   Plus,
+  RefreshCw,
   Rocket,
   Trash2,
   TrendingUp,
@@ -18,8 +21,12 @@ import {
   X,
   Zap,
 } from "lucide-react";
+import api from "../../api/client";
 import adsApi, { AdsCreative, AdsSet, CampaignDetail as Detail } from "../../api/ads";
+import ShortcodePicker from "../../components/ShortcodePicker";
+import TemplatePicker from "../../components/TemplatePicker";
 import ContactPicker from "../../components/ContactPicker";
+import { smsCount } from "../../utils/sms";
 import { Badge, Bar, Empty, Field, Metric, Modal, Stat, Tabs, Toggle, WinnerBadge, fmtDate } from "./ui";
 import CampaignBuilder from "./CampaignBuilder";
 
@@ -824,6 +831,88 @@ function SetEditor({
 
 /* --------------------------------------------------------------- creatives */
 
+/** Current template bodies, fetched once when any creative is template-bound.
+ *  Lets the creatives list show "synced" vs "template changed" without an
+ *  extra request per creative. */
+function useTemplateLibrary(creatives: AdsCreative[]) {
+  const bound = creatives.some((c) => c.template_id);
+  // Refetch when the set of bound creatives changes (add/sync/edit), not just
+  // on first mount — a body change in the editor must re-derive the chips.
+  const signature = creatives
+    .filter((c) => c.template_id)
+    .map((c) => `${c.id}:${c.template_id}:${c.body.length}`)
+    .join("|");
+  const [library, setLibrary] = useState<Record<number, { name: string; body: string }> | null>(null);
+  useEffect(() => {
+    if (!bound) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const all: any[] = [];
+        let page = 1;
+        let total = 0;
+        do {
+          const { data } = await api.get("/templates/", { params: { page, per_page: 100 } });
+          all.push(...(data.items || []));
+          total = data.total ?? all.length;
+          page += 1;
+        } while (all.length < total);
+        if (!cancelled) {
+          const map: Record<number, { name: string; body: string }> = {};
+          all.forEach((t) => (map[t.id] = { name: t.name, body: t.body }));
+          setLibrary(map);
+        }
+      } catch {
+        if (!cancelled) setLibrary({});
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [bound, signature]);
+  return library;
+}
+
+function TemplateSyncChip({
+  creative,
+  library,
+  onClick,
+}: {
+  creative: AdsCreative;
+  library: Record<number, { name: string; body: string }> | null;
+  onClick: () => void;
+}) {
+  if (!creative.template_id) return null;
+  const tpl = library?.[creative.template_id];
+  if (!tpl) {
+    return (
+      <span className="badge-gray inline-flex items-center gap-1" title="The saved template this creative started from was deleted. Open the creative to unbind or keep the text as-is.">
+        template deleted
+      </span>
+    );
+  }
+  const synced = tpl.body === creative.body;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={
+        synced
+          ? `Uses template “${tpl.name}” — its text is current.`
+          : `Template “${tpl.name}” has been edited since this creative was saved. Open it and press “Sync to template” to re-apply the new text as a new version.`
+      }
+      className={
+        synced
+          ? "badge-green inline-flex items-center gap-1"
+          : "badge-yellow inline-flex items-center gap-1 hover:ring-1 hover:ring-amber-400"
+      }
+    >
+      <FileText size={11} />
+      {synced ? `✓ ${tpl.name}` : `${tpl.name} · update available`}
+    </button>
+  );
+}
+
 function CreativesTab({ detail, analytics, reload }: { detail: Detail; analytics: any; reload: () => void }) {
   const [editing, setEditing] = useState<AdsCreative | null>(null);
   const [creatingFor, setCreatingFor] = useState<number | null>(null);
@@ -835,6 +924,9 @@ function CreativesTab({ detail, analytics, reload }: { detail: Detail; analytics
     return map;
   }, [analytics]);
   const maxScore = Math.max(1, ...(analytics?.creatives || []).map((c: any) => c.score || 0));
+  // Template bodies for the "synced / update available" chips on bound
+  // creatives — fetched once per tab visit, shared by every card.
+  const templateLibrary = useTemplateLibrary(detail.creatives);
 
   if (detail.sets.length === 0)
     return <Empty title="Create an SMS set first" body="Creatives live inside an SMS set." />;
@@ -910,6 +1002,15 @@ function CreativesTab({ detail, analytics, reload }: { detail: Detail; analytics
                             </span>
                           )}
                         </div>
+                        {c.template_id && templateLibrary !== null && (
+                          <div className="mt-1.5">
+                            <TemplateSyncChip
+                              creative={c}
+                              library={templateLibrary}
+                              onClick={() => setEditing(c)}
+                            />
+                          </div>
+                        )}
                         <p className="text-sm text-gray-600 dark:text-gray-300 mt-2 whitespace-pre-wrap break-words">
                           {c.body || <span className="text-gray-400">No message yet</span>}
                         </p>
@@ -1092,19 +1193,121 @@ function CreativeEditor({
     allocation: creative?.allocation ?? 0,
     status: creative?.status || "active",
   });
+  // Which saved template this creative is written against ("" = none). The
+  // message box below is the editor; the template is the "sync" source that
+  // can re-fill it in one click when the template changes.
+  const [templateId, setTemplateId] = useState(
+    creative?.template_id ? String(creative.template_id) : ""
+  );
+  // Current template metadata once fetched; drives the synced/update banner.
+  const [templateMeta, setTemplateMeta] = useState<{
+    id: string;
+    name: string;
+    body: string;
+    deleted: boolean;
+  } | null>(null);
+  const [templateBusy, setTemplateBusy] = useState(false);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
   const set = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }));
-  const chars = form.body.length;
-  const segments = chars === 0 ? 0 : Math.ceil(chars / 160);
+  const count = smsCount(form.body);
+
+  // Existing binding: fetch the template's CURRENT text and compare it with
+  // the body this creative was last saved with, so edits made on the
+  // Templates page surface here as "sync available".
+  useEffect(() => {
+    if (!creative?.template_id) return;
+    let cancelled = false;
+    setTemplateBusy(true);
+    api
+      .get(`/templates/${creative.template_id}`)
+      .then(({ data }) => {
+        if (cancelled) return;
+        setTemplateId(String(data.id));
+        setTemplateMeta({ id: String(data.id), name: data.name, body: data.body, deleted: false });
+      })
+      .catch(() => {
+        // Template was deleted: the pointer is stale. The save below unbinds
+        // so the creative never gets stuck on a template that does not exist.
+        if (!cancelled)
+          setTemplateMeta({
+            id: creative.template_id ? String(creative.template_id) : "",
+            name: "",
+            body: "",
+            deleted: true,
+          });
+      })
+      .finally(() => {
+        if (!cancelled) setTemplateBusy(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // Loaded once when the editor opens; creative is fixed for the modal's
+    // lifetime (the modal itself is keyed by creative).
+  }, []);
+
+  const chooseTemplate = async (id: string) => {
+    if (!id) {
+      setTemplateId("");
+      setTemplateMeta(null);
+      return;
+    }
+    if (id === templateId && templateMeta) return; // reselected — nothing to do
+    setTemplateBusy(true);
+    try {
+      const { data } = await api.get(`/templates/${id}`);
+      const existingText = (form.body || "").trim().length > 0;
+      // Only ask when applying the template would overwrite text the user
+      // typed (a fresh message or a re-pick of the same template is silent).
+      if (existingText && form.body !== data.body) {
+        if (!window.confirm("Replace the current message text with this template?")) {
+          return;
+        }
+      }
+      setForm((f: any) => ({
+        ...f,
+        body: data.body,
+        // Auto-fill the name from the template, but never clobber a name the
+        // user already typed.
+        name: (f.name || "").trim() ? f.name : data.name,
+      }));
+      setTemplateMeta({ id: String(data.id), name: data.name, body: data.body, deleted: false });
+      setTemplateId(String(data.id));
+      toast.success(`Template “${data.name}” loaded — edit freely or sync later`);
+    } catch {
+      toast.error("Could not load that template");
+    } finally {
+      setTemplateBusy(false);
+    }
+  };
+
+  // One-click re-sync after the template changed on the Templates page.
+  const syncFromTemplate = () => {
+    if (!templateMeta || templateMeta.deleted) return;
+    setForm((f: any) => ({ ...f, body: templateMeta.body }));
+    toast.success(`Synced to “${templateMeta.name}” — save to create a new version`);
+  };
+
+  // Banner logic: the template's live text vs. the text in the composer.
+  const originalBody = creative?.body ?? null;
+  const editedSinceSave =
+    originalBody !== null && templateMeta !== null && !templateMeta.deleted && form.body !== originalBody;
+  const templateChanged =
+    originalBody !== null && templateMeta !== null && !templateMeta.deleted && originalBody !== templateMeta.body;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim() || !form.body.trim()) return toast.error("Add a name and message");
-    const payload = {
+    const payload: any = {
       ...form,
       name: form.name.trim(),
       allocation: Number(form.allocation) || 0,
       cta: form.cta || null,
       tracking_link: form.tracking_link || null,
+      // The template the composer is bound to. A binding whose template was
+      // deleted (or a cleared picker) saves as null so nothing dangles.
+      template_id:
+        templateMeta && !templateMeta.deleted && templateId ? Number(templateId) : null,
     };
     try {
       if (creative) await adsApi.updateCreative(creative.id, payload);
@@ -1117,23 +1320,117 @@ function CreativeEditor({
   };
 
   return (
-    <Modal title={creative ? "Edit creative" : "New creative"} close={close}>
+    <Modal title={creative ? "Edit creative" : "New creative"} close={close} wide>
       <form onSubmit={submit} className="space-y-4">
         <Field label="Creative name">
           <input className="input" value={form.name} onChange={(e) => set("name", e.target.value)} autoFocus />
         </Field>
-        <Field
-          label="Message"
-          hint={`${chars} characters · ${segments} SMS segment(s). Use {{first_name}}, {{business_name}} and any other variable.`}
-        >
+
+        {/* Template + variables live with the message: pick a saved template
+            to start from, insert variables at the caret, count segments. */}
+        <div>
+          <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1">
+            <label className="label !mb-0">Start from a saved template</label>
+            <span className="text-[11px] text-gray-400">
+              optional — the message below stays fully editable
+            </span>
+          </div>
+          <TemplatePicker
+            value={templateId}
+            onChange={chooseTemplate}
+            allowNone
+            noneLabel="No template — write from scratch"
+            placeholder="Choose a template…"
+            showPreview={false}
+          />
+          {templateBusy && (
+            <p className="text-xs text-gray-500 mt-1.5 flex items-center gap-1.5">
+              <RefreshCw size={12} className="animate-spin" /> Loading template…
+            </p>
+          )}
+
+          {templateMeta && templateMeta.deleted && (
+            <p className="mt-2 text-xs rounded-lg px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 flex items-start gap-2">
+              <Trash2 size={13} className="mt-0.5 flex-shrink-0" />
+              The template this creative started from was deleted. Saving keeps your current text and
+              removes the binding.
+            </p>
+          )}
+          {templateMeta && !templateMeta.deleted && templateChanged && !editedSinceSave && (
+            <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg px-3 py-2 bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-200 text-xs">
+              <span className="flex-1 min-w-[180px]">
+                Template “{templateMeta.name}” was updated after this creative was saved.
+              </span>
+              <button
+                type="button"
+                onClick={syncFromTemplate}
+                className="px-2.5 py-1 rounded-full bg-amber-500 text-white font-semibold hover:bg-amber-600 flex items-center gap-1"
+              >
+                <RefreshCw size={12} /> Sync to template
+              </button>
+            </div>
+          )}
+          {templateMeta && !templateMeta.deleted && !templateChanged && !editedSinceSave && originalBody !== null && (
+            <p className="mt-1.5 text-xs text-gray-500 flex items-center gap-1.5">
+              <CheckCircle2 size={13} className="text-green-600" />
+              Synced to template “{templateMeta.name}” — the card on the Creatives tab shows the same.
+            </p>
+          )}
+          {editedSinceSave && (
+            <p className="mt-1.5 text-xs text-gray-500">
+              ✎ Customized copy — your edits only change this creative (a new version on save), never
+              the template itself.
+            </p>
+          )}
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1">
+            <label className="label !mb-0">Message</label>
+            <span className="text-xs text-gray-500">
+              {count.chars} chars · {count.segments} SMS{count.segments === 1 ? "" : "s"}
+              {count.unicode && " · unicode (70/SMS)"}
+              {count.segments > 3 && " · long messages cost more"}
+            </span>
+          </div>
           <textarea
-            className="input"
-            rows={5}
+            ref={bodyRef}
+            className="input font-mono text-sm"
+            rows={6}
             value={form.body}
             onChange={(e) => set("body", e.target.value)}
             placeholder="Hi {{first_name}}, I came across {{business_name}} and had a quick question…"
           />
-        </Field>
+          <div className="flex flex-wrap items-center gap-1.5 mt-2">
+            <ShortcodePicker
+              targetRef={bodyRef}
+              value={form.body}
+              onChange={(v) => set("body", v)}
+              label="Insert variable"
+            />
+            {[
+              "{{first_name}}",
+              "{{last_name}}",
+              "{{business_name}}",
+              "{{phone_number}}",
+              "{{city}}",
+              "{{state}}",
+              "{{website}}",
+              "{{industry}}",
+            ].map((v) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => set("body", (form.body ? form.body + " " : "") + v)}
+                className="text-xs px-2 py-0.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded font-mono text-gray-600 dark:text-gray-300"
+                title={`Insert ${v} at the end`}
+              >
+                {v}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="grid sm:grid-cols-2 gap-3">
           <Field label="Call to action">
             <input className="input" value={form.cta} onChange={(e) => set("cta", e.target.value)} />
@@ -1173,7 +1470,9 @@ function CreativeEditor({
           <button type="button" className="btn-secondary flex-1" onClick={close}>
             Cancel
           </button>
-          <button className="btn-primary flex-1">Save creative</button>
+          <button className="btn-primary flex-1" disabled={templateBusy}>
+            {creative ? "Save creative" : "Add creative"}
+          </button>
         </div>
       </form>
     </Modal>

@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.contact import Contact, Tag, ContactTag
-from app.models.contact_list import ContactList
+from app.models.contact_list import ContactList, ContactListMember
 from app.models.user import User
 from app.schemas.contact import ContactCreate, ContactUpdate, ContactOut, ContactListOut, BulkAction
 from app.security.auth import get_current_user
@@ -87,11 +87,23 @@ async def list_contacts(
     tag: Optional[str] = None,
     sort_by: str = "created_at",
     sort_dir: str = "desc",
+    exclude_list_id: Optional[int] = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """List contacts with pagination, search, filter, and sort."""
+    """List contacts with pagination, search, filter, and sort.
+
+    ``exclude_list_id`` hides every contact that already belongs to the given
+    list — used by the list editor's "add contacts" search so it only ever
+    offers numbers the list does not have yet, no matter how large either set
+    is.
+    """
     query = _apply_contact_filters(select(Contact), search, lead_status, tag)
+    if exclude_list_id is not None:
+        member_ids = select(ContactListMember.contact_id).where(
+            ContactListMember.list_id == exclude_list_id
+        )
+        query = query.where(Contact.id.not_in(member_ids))
 
     # Count
     count_query = select(func.count()).select_from(query.subquery())
@@ -231,12 +243,16 @@ def _is_missing_table_error(exc: BaseException) -> bool:
 
 
 async def _safe_delete(db: AsyncSession, statement):
-    """Delete rows, tolerating a table that was never created in this DB."""
+    """Delete rows, tolerating a table that was never created in this DB.
+
+    Returns the statement result (or None when the table does not exist here),
+    so callers can count affected rows.
+    """
     try:
-        await db.execute(statement)
+        return await db.execute(statement)
     except (OperationalError, ProgrammingError) as exc:
         if _is_missing_table_error(exc):
-            return
+            return None
         raise
 
 
@@ -248,6 +264,161 @@ async def _safe_update(db: AsyncSession, statement):
         if _is_missing_table_error(exc):
             return
         raise
+
+
+def _chunked(values: list[int], size: int = 400) -> list[list[int]]:
+    """Split id lists into query-sized batches.
+
+    SQLite (used by the test suite) allows at most 999 bound parameters per
+    statement, so ``IN (... )`` clauses must stay well below that.
+    """
+    return [values[i : i + size] for i in range(0, len(values), size)]
+
+
+async def _delete_contacts_bulk(db: AsyncSession, contact_ids: list[int]) -> int:
+    """Permanently delete many contacts with set-based statements.
+
+    This is the scalable version of ``_delete_contact_permanently``. Deleting
+    one contact at a time issued ~15 statements per contact inside a single
+    transaction — deleting a 10,000-contact list ran ~150,000 queries and
+    could take minutes or time out. Here every cleanup table is cleared in a
+    handful of ``IN (... )`` statements (batched for SQLite's parameter
+    limit) and the rows themselves are removed in bulk, so deleting 10,000
+    contacts takes the same few dozen queries as deleting one.
+
+    Returns the number of contact rows actually deleted.
+    """
+    from app.models.ads import AdsAssignment, AdsCalendarEvent, AdsEvent, AdsFollowUpTask
+    from app.models.campaign import CampaignContact
+    from app.models.campaign_followup import CampaignFollowUpLog
+    from app.models.conversation import Conversation, Message
+    from app.models.followup import FollowUp
+    from app.models.meeting import Meeting, MeetingAttendee
+    from app.models.scheduled import ScheduledMessage
+    from app.models.suppression import SuppressionEntry
+
+    ids = sorted({int(cid) for cid in contact_ids if cid is not None})
+    if not ids:
+        return 0
+    total_deleted = 0
+
+    # List membership rows are about to disappear; remember which lists were
+    # affected so their cached member counts can be repaired in one sweep.
+    affected_lists = set()
+    for chunk in _chunked(ids):
+        rows = (
+            await db.execute(
+                select(ContactListMember.list_id).where(
+                    ContactListMember.contact_id.in_(chunk)
+                )
+            )
+        ).scalars().all()
+        affected_lists.update(rows)
+
+    # Meetings/calendar: an attendee link dies with the contact; a meeting is
+    # deleted only when its primary contact goes AND no other attendee keeps
+    # it alive; otherwise the primary contact is detached so the record (and
+    # any other attendees) survives.
+    for chunk in _chunked(ids):
+        await _safe_delete(
+            db,
+            sa_delete(MeetingAttendee).where(MeetingAttendee.contact_id.in_(chunk)),
+        )
+    for chunk in _chunked(ids):
+        await _safe_delete(
+            db,
+            sa_delete(Meeting).where(
+                Meeting.contact_id.in_(chunk),
+                Meeting.id.notin_(
+                    select(MeetingAttendee.meeting_id).where(
+                        MeetingAttendee.contact_id.in_(chunk)
+                    )
+                ),
+            ),
+        )
+        await _safe_update(
+            db,
+            sa_update(Meeting)
+            .where(Meeting.contact_id.in_(chunk))
+            .values(contact_id=None),
+        )
+
+    # Plain "belongs to the contact" rows — cleared with one statement per
+    # table, in dependency order (messages before the conversation rows they
+    # point at, etc.).
+    for chunk in _chunked(ids):
+        await _safe_delete(
+            db, sa_delete(ScheduledMessage).where(ScheduledMessage.contact_id.in_(chunk))
+        )
+        await _safe_delete(db, sa_delete(Message).where(Message.contact_id.in_(chunk)))
+        await _safe_delete(
+            db, sa_delete(Conversation).where(Conversation.contact_id.in_(chunk))
+        )
+        await _safe_delete(db, sa_delete(FollowUp).where(FollowUp.contact_id.in_(chunk)))
+        await _safe_delete(
+            db, sa_delete(CampaignContact).where(CampaignContact.contact_id.in_(chunk))
+        )
+        await _safe_delete(
+            db,
+            sa_delete(CampaignFollowUpLog).where(
+                CampaignFollowUpLog.contact_id.in_(chunk)
+            ),
+        )
+        await _safe_delete(
+            db,
+            sa_delete(SuppressionEntry).where(SuppressionEntry.contact_id.in_(chunk)),
+        )
+        await _safe_delete(
+            db, sa_delete(AdsAssignment).where(AdsAssignment.contact_id.in_(chunk))
+        )
+        await _safe_delete(
+            db, sa_delete(AdsFollowUpTask).where(AdsFollowUpTask.contact_id.in_(chunk))
+        )
+        await _safe_delete(
+            db, sa_delete(AdsCalendarEvent).where(AdsCalendarEvent.contact_id.in_(chunk))
+        )
+        await _safe_update(
+            db,
+            sa_update(AdsEvent).where(AdsEvent.contact_id.in_(chunk)).values(contact_id=None),
+        )
+        # Tag links and list memberships used to rely on the ORM's
+        # delete-orphan cascade; bulk deletes bypass the ORM, so they are
+        # removed explicitly here (no FK surprises on Postgres).
+        await _safe_delete(
+            db, sa_delete(ContactTag).where(ContactTag.contact_id.in_(chunk))
+        )
+        await _safe_delete(
+            db,
+            sa_delete(ContactListMember).where(ContactListMember.contact_id.in_(chunk)),
+        )
+        result = await _safe_delete(
+            db, sa_delete(Contact).where(Contact.id.in_(chunk))
+        )
+        if result is not None and result.rowcount:
+            total_deleted += result.rowcount
+
+    if affected_lists:
+        await _refresh_list_counts(db, affected_lists)
+    await db.flush()
+    return total_deleted
+
+
+async def _refresh_list_counts(db: AsyncSession, list_ids) -> None:
+    """Repair ``contact_lists.contact_count`` after membership deletions."""
+    ids = list({int(list_id) for list_id in list_ids})
+    if not ids:
+        return
+    count_subq = (
+        select(func.count(ContactListMember.id))
+        .where(ContactListMember.list_id == ContactList.id)
+        .correlate(ContactList)
+        .scalar_subquery()
+    )
+    await db.execute(
+        sa_update(ContactList)
+        .where(ContactList.id.in_(ids))
+        .values(contact_count=count_subq)
+    )
 
 
 async def _delete_contact_permanently(db: AsyncSession, contact: Contact) -> None:
@@ -262,64 +433,11 @@ async def _delete_contact_permanently(db: AsyncSession, contact: Contact) -> Non
     (broken inbox threads, stale campaign state, dangling calendar events).
     This removes/clears them all in dependency order so a delete is truly
     permanent.
+
+    Backed by the same set-based cleanup as bulk deletes, so a single contact
+    and 10,000 contacts behave identically.
     """
-    from app.models.conversation import Conversation, Message
-    from app.models.followup import FollowUp
-    from app.models.campaign import CampaignContact
-    from app.models.campaign_followup import CampaignFollowUpLog
-    from app.models.scheduled import ScheduledMessage
-    from app.models.suppression import SuppressionEntry
-    from app.models.meeting import Meeting, MeetingAttendee
-    from app.models.ads import AdsAssignment, AdsFollowUpTask, AdsCalendarEvent, AdsEvent
-
-    contact_id = contact.id
-
-    # Scheduled messages first: they can point at outgoing Message rows via
-    # ``message_id`` as well as at the contact / list themselves.
-    await _safe_delete(db, sa_delete(ScheduledMessage).where(ScheduledMessage.contact_id == contact_id))
-    # Outgoing/incoming messages reference both the contact and its threads;
-    # conversations are unique per contact.
-    await _safe_delete(db, sa_delete(Message).where(Message.contact_id == contact_id))
-    await _safe_delete(db, sa_delete(Conversation).where(Conversation.contact_id == contact_id))
-    # Follow-up / campaign state.
-    await _safe_delete(db, sa_delete(FollowUp).where(FollowUp.contact_id == contact_id))
-    await _safe_delete(db, sa_delete(CampaignContact).where(CampaignContact.contact_id == contact_id))
-    await _safe_delete(db, sa_delete(CampaignFollowUpLog).where(CampaignFollowUpLog.contact_id == contact_id))
-    await _safe_delete(db, sa_delete(SuppressionEntry).where(SuppressionEntry.contact_id == contact_id))
-
-    # Calendar / meetings: remove the attendee link and detach the primary
-    # contact so the meeting record (and any other attendees) survives.
-    await _safe_delete(db, sa_delete(MeetingAttendee).where(MeetingAttendee.contact_id == contact_id))
-    await _safe_delete(
-        db,
-        sa_delete(Meeting).where(Meeting.contact_id == contact_id, Meeting.id.notin_(
-            select(MeetingAttendee.meeting_id)
-        )),
-    )
-    await _safe_update(
-        db,
-        sa_update(Meeting)
-        .where(Meeting.contact_id == contact_id)
-        .values(contact_id=None),
-    )
-
-    # SMS Ads Manager: assignments and follow-up tasks belong to this contact
-    # and must go; calendar/analytics rows keep their history with the contact
-    # detached (they have no FK, so this is what makes them safe to delete).
-    await _safe_delete(db, sa_delete(AdsAssignment).where(AdsAssignment.contact_id == contact_id))
-    await _safe_delete(db, sa_delete(AdsFollowUpTask).where(AdsFollowUpTask.contact_id == contact_id))
-    await _safe_delete(db, sa_delete(AdsCalendarEvent).where(AdsCalendarEvent.contact_id == contact_id))
-    await _safe_update(
-        db,
-        sa_update(AdsEvent)
-        .where(AdsEvent.contact_id == contact_id)
-        .values(contact_id=None),
-    )
-
-    # Tag links and list memberships are removed by the ORM's own
-    # delete-orphan cascade when the contact row is deleted below.
-    await db.delete(contact)
-    await db.flush()
+    await _delete_contacts_bulk(db, [contact.id])
 
 
 @router.delete("/{contact_id}", status_code=204)
@@ -362,23 +480,28 @@ async def bulk_action(
         id_query = _apply_contact_filters(
             select(Contact.id), data.search, data.lead_status, data.tag
         )
-        matching_ids = (await db.execute(id_query)).scalars().all()
+        matching_ids = list((await db.execute(id_query)).scalars().all())
         if matching_ids:
-            contacts = (
-                await db.execute(select(Contact).where(Contact.id.in_(matching_ids)))
-            ).scalars().all()
-            for c in contacts:
-                await _delete_contact_permanently(db, c)
-            await db.flush()
+            # Set-based cleanup: one batch of statements, however many rows.
+            await _delete_contacts_bulk(db, matching_ids)
         return {"success": True, "affected": len(matching_ids), "scope": "all"}
 
-    result = await db.execute(select(Contact).where(Contact.id.in_(data.contact_ids)))
-    contacts = result.scalars().all()
+    requested_ids = list({int(cid) for cid in data.contact_ids if cid is not None})
+    if not requested_ids:
+        return {"success": True, "affected": 0}
 
     if data.action == "delete":
-        for c in contacts:
-            await _delete_contact_permanently(db, c)
-    elif data.action == "status":
+        result = await db.execute(select(Contact.id).where(Contact.id.in_(requested_ids)))
+        existing_ids = list(result.scalars().all())
+        if existing_ids:
+            await _delete_contacts_bulk(db, existing_ids)
+        await db.flush()
+        return {"success": True, "affected": len(existing_ids)}
+
+    result = await db.execute(select(Contact).where(Contact.id.in_(requested_ids)))
+    contacts = result.scalars().all()
+
+    if data.action == "status":
         for c in contacts:
             c.lead_status = data.value or "new"
     elif data.action == "tag":

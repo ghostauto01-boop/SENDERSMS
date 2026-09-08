@@ -1,12 +1,18 @@
 """Contact Lists API routes."""
 
-from typing import Optional
+from typing import Literal, Optional
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy import delete as sa_delete, func, select, update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.v1.contacts import _safe_delete, _safe_update
+from app.api.v1.contacts import (
+    _apply_contact_filters,
+    _delete_contacts_bulk,
+    _safe_delete,
+    _safe_update,
+)
 from app.database import get_db
 from app.models.contact import Contact
 from app.models.contact_list import ContactList, ContactListMember
@@ -14,6 +20,19 @@ from app.models.user import User
 from app.security.auth import get_current_user
 
 router = APIRouter()
+
+
+class ListContactsAction(BaseModel):
+    """Body for removing / permanently deleting list members.
+
+    ``scope="all"`` acts on every member of the list (optionally narrowed by
+    ``search``) on the server — the client never has to enumerate thousands of
+    ids across pages, which is what made bulk actions time out on big lists.
+    """
+
+    contact_ids: list[int] = []
+    scope: Literal["ids", "all"] = "ids"
+    search: Optional[str] = None
 
 
 async def _find_list(db: AsyncSession, list_id: int) -> ContactList:
@@ -32,6 +51,23 @@ async def _sync_contact_count(db: AsyncSession, contact_list: ContactList) -> in
     count = result.scalar() or 0
     contact_list.contact_count = count
     return count
+
+
+async def _matching_member_ids(
+    db: AsyncSession, list_id: int, search: Optional[str]
+) -> list[int]:
+    """Ids of every contact in a list that matches the shared contact search.
+
+    Used by ``scope="all"`` actions so deleting "everyone matching" stays on
+    the server even when the list holds tens of thousands of contacts.
+    """
+    member_ids = select(ContactListMember.contact_id).where(
+        ContactListMember.list_id == list_id
+    )
+    query = _apply_contact_filters(select(Contact.id), search, None, None).where(
+        Contact.id.in_(member_ids)
+    )
+    return list((await db.execute(query)).scalars().all())
 
 
 @router.get("/")
@@ -146,7 +182,6 @@ async def delete_list(
     themselves stay. With ``delete_contacts=true`` every phone number in the
     list is also permanently deleted before the list is removed.
     """
-    from app.api.v1.contacts import _delete_contact_permanently
     from app.models.campaign import Campaign
     from app.models.scheduled import ScheduledMessage
 
@@ -166,17 +201,19 @@ async def delete_list(
     )
 
     if delete_contacts:
-        member_ids = (
-            await db.execute(
-                select(ContactListMember.contact_id).where(ContactListMember.list_id == list_id)
-            )
-        ).scalars().all()
-        if member_ids:
-            contacts = (
-                await db.execute(select(Contact).where(Contact.id.in_(member_ids)))
+        member_ids = list(
+            (
+                await db.execute(
+                    select(ContactListMember.contact_id).where(
+                        ContactListMember.list_id == list_id
+                    )
+                )
             ).scalars().all()
-            for contact in contacts:
-                await _delete_contact_permanently(db, contact)
+        )
+        if member_ids:
+            # Set-based cleanup — deleting every number in a 10k-contact list
+            # runs a handful of statements instead of one per contact.
+            await _delete_contacts_bulk(db, member_ids)
 
     await db.delete(contact_list)
     await db.flush()
@@ -187,16 +224,19 @@ async def get_list_contacts(
     list_id: int,
     page: int = Query(default=1, ge=1),
     per_page: int = Query(default=25, ge=1, le=100),
+    search: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Get contacts in a list."""
+    """Get contacts in a list (paginated; optionally narrowed by search)."""
     await _find_list(db, list_id)
     query = (
         select(Contact)
         .join(ContactListMember, Contact.id == ContactListMember.contact_id)
         .where(ContactListMember.list_id == list_id)
     )
+    if search:
+        query = _apply_contact_filters(query, search, None, None)
 
     count_query = select(func.count()).select_from(query.subquery())
     total = (await db.execute(count_query)).scalar() or 0
@@ -206,6 +246,8 @@ async def get_list_contacts(
 
     return {
         "total": total,
+        "page": page,
+        "per_page": per_page,
         "items": [
             {
                 "id": contact.id,
@@ -264,22 +306,44 @@ async def add_contacts_to_list(
 @router.post("/{list_id}/contacts/remove")
 async def remove_contacts_from_list(
     list_id: int,
-    contact_ids: list[int] = Body(..., embed=True),
+    data: ListContactsAction = Body(...),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Remove contacts from a list without deleting the contacts themselves."""
+    """Remove contacts from a list without deleting the contacts themselves.
+
+    ``scope="all"`` removes every matching member on the server (narrowed by
+    the optional ``search`` the list view is showing), so "remove all N"
+    works no matter how large the list is.
+    """
     contact_list = await _find_list(db, list_id)
-    requested_ids = set(contact_ids)
     removed = 0
-    if requested_ids:
-        result = await db.execute(
-            sa_delete(ContactListMember).where(
-                ContactListMember.list_id == list_id,
-                ContactListMember.contact_id.in_(requested_ids),
-            )
-        )
-        removed = result.rowcount or 0
+    if data.scope == "all":
+        member_ids = await _matching_member_ids(db, list_id, data.search)
+        if member_ids:
+            for chunk in _chunked_ids(member_ids):
+                result = await _safe_delete(
+                    db,
+                    sa_delete(ContactListMember).where(
+                        ContactListMember.list_id == list_id,
+                        ContactListMember.contact_id.in_(chunk),
+                    ),
+                )
+                if result is not None:
+                    removed += result.rowcount or 0
+    else:
+        requested_ids = {int(cid) for cid in data.contact_ids}
+        if requested_ids:
+            for chunk in _chunked_ids(list(requested_ids)):
+                result = await _safe_delete(
+                    db,
+                    sa_delete(ContactListMember).where(
+                        ContactListMember.list_id == list_id,
+                        ContactListMember.contact_id.in_(chunk),
+                    ),
+                )
+                if result is not None:
+                    removed += result.rowcount or 0
 
     count = await _sync_contact_count(db, contact_list)
     await db.flush()
@@ -289,39 +353,58 @@ async def remove_contacts_from_list(
 @router.post("/{list_id}/contacts/delete")
 async def delete_contacts_from_list_permanently(
     list_id: int,
-    contact_ids: list[int] = Body(..., embed=True),
+    data: ListContactsAction = Body(...),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Permanently delete ticked phone numbers while viewing a list.
+    """Permanently delete phone numbers while viewing a list.
 
     This is the destructive action requested from the List editor: unlike
     ``/contacts/remove`` it hard-deletes the selected contacts (and their
     messages, conversations, follow-ups, tags, and list memberships) instead
     of only removing them from this list.
-    """
-    from app.api.v1.contacts import _delete_contact_permanently
 
+    ``scope="all"`` deletes every matching member on the server (narrowed by
+    the optional ``search``) — the scalable path for "delete all N matching"
+    on lists with thousands of members.
+    """
     contact_list = await _find_list(db, list_id)
-    requested_ids = set(contact_ids)
+
+    if data.scope == "all":
+        member_ids = await _matching_member_ids(db, list_id, data.search)
+        if member_ids:
+            await _delete_contacts_bulk(db, member_ids)
+        count = await _sync_contact_count(db, contact_list)
+        await db.flush()
+        return {"success": True, "deleted": len(member_ids), "contact_count": count}
+
+    requested_ids = {int(cid) for cid in data.contact_ids}
     if not requested_ids:
-        return {"success": True, "deleted": 0, "contact_count": await _sync_contact_count(db, contact_list)}
+        count = await _sync_contact_count(db, contact_list)
+        await db.flush()
+        return {"success": True, "deleted": 0, "contact_count": count}
 
     result = await db.execute(
-        select(Contact)
+        select(Contact.id)
         .join(ContactListMember, Contact.id == ContactListMember.contact_id)
         .where(
             ContactListMember.list_id == list_id,
             Contact.id.in_(requested_ids),
         )
     )
-    contacts = result.scalars().all()
-    for contact in contacts:
-        await _delete_contact_permanently(db, contact)
+    member_contact_ids = list(result.scalars().all())
+    deleted = 0
+    if member_contact_ids:
+        deleted = await _delete_contacts_bulk(db, member_contact_ids)
 
     count = await _sync_contact_count(db, contact_list)
     await db.flush()
-    return {"success": True, "deleted": len(contacts), "contact_count": count}
+    return {"success": True, "deleted": deleted, "contact_count": count}
+
+
+def _chunked_ids(ids: list[int], size: int = 400) -> list[list[int]]:
+    """Batch id lists so ``IN (...)`` stays under SQLite's parameter cap."""
+    return [ids[i : i + size] for i in range(0, len(ids), size)]
 
 
 @router.get("/{list_id}/stats")

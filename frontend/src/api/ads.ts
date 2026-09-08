@@ -136,6 +136,8 @@ export type AdsCreative = {
   allocation: number;
   current_version: number;
   is_deleted: boolean;
+  /** Saved template this creative was started from (sync anchor). */
+  template_id?: number | null;
   stats?: AdsStats;
 };
 

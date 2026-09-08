@@ -316,6 +316,9 @@ function CampaignModal({ campaign, onClose }: { campaign?: Campaign | null; onCl
   );
   const [messageBody, setMessageBody] = useState(campaign?.message_body ?? "");
   const [templateId, setTemplateId] = useState(campaign?.template_id ? String(campaign.template_id) : "");
+  // "Start from template" fill inside Write mode: copies the body in so the
+  // user can tweak it; the campaign keeps its own copy (mode stays "write").
+  const [fillTemplateId, setFillTemplateId] = useState("");
   const [sequenceId, setSequenceId] = useState(campaign?.sequence_id ? String(campaign.sequence_id) : "");
   const [sequences, setSequences] = useState<any[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -336,6 +339,20 @@ function CampaignModal({ campaign, onClose }: { campaign?: Campaign | null; onCl
   const perMulti = unicode ? 67 : 153;
   const len = messageBody.length;
   const segments = len === 0 ? 0 : len <= per ? 1 : Math.ceil(len / perMulti);
+
+  const fillFromTemplate = async (id: string) => {
+    if (!id) { setFillTemplateId(""); return; }
+    try {
+      const { data } = await api.get(`/templates/${id}`);
+      if (messageBody.trim() && messageBody !== data.body) {
+        if (!window.confirm("Replace the current message with this template's text?")) return;
+      }
+      setMessageBody(data.body);
+      setFillTemplateId(id);
+    } catch {
+      toast.error("Could not load that template");
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -440,6 +457,20 @@ function CampaignModal({ campaign, onClose }: { campaign?: Campaign | null; onCl
 
             {mode === "write" ? (
               <>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-2">
+                  <span className="text-xs text-gray-500">
+                    Start from a saved template — it fills the box below and stays editable:
+                  </span>
+                  <TemplatePicker
+                    value={fillTemplateId}
+                    onChange={fillFromTemplate}
+                    allowNone
+                    noneLabel="None — typing from scratch"
+                    placeholder="Choose a template to fill…"
+                    showPreview={false}
+                    className="flex-1 min-w-[220px]"
+                  />
+                </div>
                 <textarea
                   ref={messageRef}
                   className="input font-mono text-sm"
@@ -456,11 +487,22 @@ function CampaignModal({ campaign, onClose }: { campaign?: Campaign | null; onCl
                     onChange={setMessageBody}
                     label="Shortcode"
                   />
+                  {["{{first_name}}", "{{business_name}}", "{{city}}", "{{state}}"].map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => setMessageBody((prev) => (prev ? prev + " " + v : v))}
+                      className="text-xs px-2 py-0.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded font-mono text-gray-600 dark:text-gray-300"
+                    >
+                      {v}
+                    </button>
+                  ))}
                 </div>
                 <p className="text-xs text-gray-400 mt-2">
                   {len} chars · {segments} SMS{segments === 1 ? "" : "s"}
                   {unicode && " · unicode (70/SMS)"}
                   {segments > 3 && " · long messages cost more"}
+                  {fillTemplateId && " · template text was copied in — this campaign keeps its own copy"}
                 </p>
               </>
             ) : (
@@ -471,6 +513,11 @@ function CampaignModal({ campaign, onClose }: { campaign?: Campaign | null; onCl
                   allowNone={false}
                   placeholder="Select template..."
                 />
+                <p className="text-xs text-gray-400 mt-2">
+                  This campaign references the saved template live — edits made on the Templates page
+                  later apply to what it sends. Choose “Write message” to paste the text in and keep
+                  your own copy instead.
+                </p>
               </>
             )}
           </div>
