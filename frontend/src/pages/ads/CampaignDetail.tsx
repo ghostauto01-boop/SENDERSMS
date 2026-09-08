@@ -1208,23 +1208,43 @@ function VersionsModal({ creative, close }: { creative: AdsCreative; close: () =
 const REMOVABLE = new Set(["pending", "skipped", "cancelled", "blocked"]);
 
 function AudienceTab({ detail, reference, reload }: { detail: Detail; reference: any; reload: () => void }) {
-  const [rows, setRows] = useState<any>({ items: [], total: 0 });
+  const [rows, setRows] = useState<any>({ items: [], total: 0, removable: 0 });
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState("");
   const [adding, setAdding] = useState(false);
   const [selected, setSelected] = useState<number[]>([]);
+  // "Select all unsent" mode: every removable row of the current view
+  // (all pages, not just this page) is part of the delete.
+  const [allRemovable, setAllRemovable] = useState(false);
 
   const load = useCallback(async () => {
-    setRows(await adsApi.audience(detail.id, { page, per_page: 50, status: status || undefined }));
+    const data = await adsApi.audience(detail.id, { page, per_page: 50, status: status || undefined });
+    setRows(data);
     setSelected([]);
+    setAllRemovable(false);
   }, [detail.id, page, status]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  const toggle = (id: number) =>
+  const removableOnPage = rows.items.filter((r: any) => REMOVABLE.has(r.send_status));
+  const pageRemovableAll =
+    removableOnPage.length > 0 && removableOnPage.every((r: any) => selected.includes(r.id));
+  const removableTotal: number = rows.removable ?? 0;
+  const bulkCount = allRemovable ? removableTotal : selected.length;
+
+  // Tapping a row while in "all unsent" mode drops out of that mode and keeps
+  // the removable rows on this page (minus the tapped one) as the selection.
+  const toggle = (id: number) => {
+    if (allRemovable) {
+      const pageIds: number[] = removableOnPage.map((r: any) => r.id);
+      setAllRemovable(false);
+      setSelected(pageIds.includes(id) ? pageIds.filter((x) => x !== id) : pageIds);
+      return;
+    }
     setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+  };
 
   const removeOne = async (row: any) => {
     if (!REMOVABLE.has(row.send_status)) {
@@ -1243,10 +1263,12 @@ function AudienceTab({ detail, reference, reload }: { detail: Detail; reference:
   };
 
   const bulkRemove = async () => {
-    if (selected.length === 0) return;
-    if (!confirm(`Remove ${selected.length} contact(s) from this campaign's audience?`)) return;
+    if (bulkCount === 0) return;
+    if (!confirm(`Remove ${bulkCount} unsent contact(s) from this campaign's audience?`)) return;
     try {
-      const r = await adsApi.bulkRemoveAudience(detail.id, selected);
+      // allRemovable = server-side scope ("all" + the current status filter),
+      // so it covers every page without enumerating ids.
+      const r = await adsApi.bulkRemoveAudience(detail.id, selected, allRemovable, status || undefined);
       toast.success(
         `Removed ${r.removed}${r.skipped_sent ? `, skipped ${r.skipped_sent} already sent` : ""}`
       );
@@ -1257,12 +1279,15 @@ function AudienceTab({ detail, reference, reload }: { detail: Detail; reference:
     }
   };
 
-  const allOnPage = rows.items.length > 0 && rows.items.every((r: any) => selected.includes(r.id));
+  const clearSelection = () => {
+    setSelected([]);
+    setAllRemovable(false);
+  };
 
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap gap-2 justify-between items-center">
-        <div className="flex gap-2 items-center">
+        <div className="flex gap-2 items-center flex-wrap">
           <select className="input !py-2 !w-auto" value={status} onChange={(e) => setStatus(e.target.value)}>
             <option value="">All statuses</option>
             {["pending", "sent", "delivered", "failed", "skipped", "cancelled"].map((s) => (
@@ -1271,10 +1296,16 @@ function AudienceTab({ detail, reference, reload }: { detail: Detail; reference:
               </option>
             ))}
           </select>
-          <span className="text-sm text-gray-500">{rows.total} contacts</span>
-          {selected.length > 0 && (
-            <button className="btn-danger btn-sm" onClick={bulkRemove}>
-              <Trash2 size={14} className="mr-1" /> Remove {selected.length}
+          <span className="text-sm text-gray-500">
+            {rows.total} contacts{removableTotal > 0 ? ` · ${removableTotal} unsent` : ""}
+          </span>
+          {removableTotal > 0 && !allRemovable && selected.length === 0 && (
+            <button
+              className="text-xs font-semibold text-primary-600 hover:underline"
+              title="Ticks every contact that has not been sent to yet, across all pages of this view"
+              onClick={() => setAllRemovable(true)}
+            >
+              Select all {removableTotal} unsent
             </button>
           )}
         </div>
@@ -1299,6 +1330,33 @@ function AudienceTab({ detail, reference, reload }: { detail: Detail; reference:
         </div>
       </div>
 
+      {/* Bulk-remove bar: ticked contacts, or every unsent contact (all pages) */}
+      {(selected.length > 0 || allRemovable) && (
+        <div className="flex flex-wrap items-center gap-2 justify-between rounded-lg border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 px-3 py-2">
+          <span className="text-sm font-semibold text-red-700 dark:text-red-300 flex items-center gap-2 flex-wrap">
+            <button onClick={clearSelection} className="w-6 h-6 rounded-full bg-red-100 dark:bg-red-900/40 flex items-center justify-center">
+              <X size={13} />
+            </button>
+            {allRemovable
+              ? `${bulkCount} unsent contact${bulkCount === 1 ? "" : "s"} selected (all pages)`
+              : `${selected.length} selected`}
+          </span>
+          <div className="flex items-center gap-2 flex-wrap">
+            {!allRemovable && selected.length > 0 && removableTotal > selected.length && (
+              <button
+                className="btn-secondary btn-sm"
+                onClick={() => setAllRemovable(true)}
+              >
+                Select all {removableTotal} unsent
+              </button>
+            )}
+            <button className="btn-danger btn-sm" onClick={bulkRemove}>
+              <Trash2 size={14} className="mr-1" /> Remove {bulkCount}
+            </button>
+          </div>
+        </div>
+      )}
+
       {rows.items.length === 0 ? (
         <Empty
           title="No contacts in this campaign yet"
@@ -1312,10 +1370,28 @@ function AudienceTab({ detail, reference, reload }: { detail: Detail; reference:
                 <th className="p-3">
                   <input
                     type="checkbox"
-                    checked={allOnPage}
-                    onChange={() =>
-                      setSelected(allOnPage ? [] : rows.items.map((r: any) => r.id))
+                    title={
+                      allRemovable
+                        ? "Clear selection"
+                        : pageRemovableAll && removableTotal > removableOnPage.length
+                          ? `Select all ${removableTotal} unsent contacts (every page)`
+                          : "Select the unsent contacts on this page"
                     }
+                    checked={allRemovable || pageRemovableAll}
+                    onChange={() => {
+                      if (allRemovable) {
+                        clearSelection();
+                        return;
+                      }
+                      if (pageRemovableAll) {
+                        // Second click on "select all" escalates to every
+                        // unsent contact in this view, on every page.
+                        if (removableTotal > removableOnPage.length) setAllRemovable(true);
+                        else setSelected([]);
+                      } else {
+                        setSelected(removableOnPage.map((r: any) => r.id));
+                      }
+                    }}
                   />
                 </th>
                 <th className="p-3">Contact</th>
@@ -1328,12 +1404,16 @@ function AudienceTab({ detail, reference, reload }: { detail: Detail; reference:
               </tr>
             </thead>
             <tbody>
-              {rows.items.map((r: any) => (
+              {rows.items.map((r: any) => {
+                const canRemove = REMOVABLE.has(r.send_status);
+                return (
                 <tr key={r.id} className="border-b border-gray-50 dark:border-gray-700/50">
                   <td className="p-3">
                     <input
                       type="checkbox"
-                      checked={selected.includes(r.id)}
+                      disabled={!canRemove}
+                      title={canRemove ? "Select to remove from this campaign" : "Already sent — locked history"}
+                      checked={allRemovable || selected.includes(r.id)}
                       onChange={() => toggle(r.id)}
                     />
                   </td>
@@ -1364,7 +1444,8 @@ function AudienceTab({ detail, reference, reload }: { detail: Detail; reference:
                     )}
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>

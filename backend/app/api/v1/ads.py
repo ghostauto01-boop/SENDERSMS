@@ -61,6 +61,7 @@ from app.schemas.ads import (
 )
 from app.security.auth import get_current_user
 from app.services import ads_service as svc
+from app.services.ads_service import removable_audience_filter
 
 router = APIRouter()
 
@@ -507,13 +508,35 @@ async def campaign_audience(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
     status: Optional[str] = None,
+    # Only rows that can still be removed (never sent to). The Audience tab
+    # uses this with per_page=1 to learn "how many unsent contacts are left"
+    # for its "select all unsent" affordance.
+    removable: bool = Query(False),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
     query = select(AdsAssignment).where(AdsAssignment.campaign_id == campaign_id)
     if status:
         query = query.where(AdsAssignment.send_status == status)
+    if removable:
+        query = query.where(removable_audience_filter())
     total = (await db.execute(select(func.count()).select_from(query.subquery()))).scalar() or 0
+    # How many rows of this view may still be removed (never sent to). The
+    # Audience tab shows "N unsent" and uses it for "select all unsent" —
+    # computed server-side so the browser never has to page through the list.
+    removable_total = (
+        await db.execute(
+            select(func.count()).select_from(
+                select(AdsAssignment.id)
+                .where(
+                    AdsAssignment.campaign_id == campaign_id,
+                    *([AdsAssignment.send_status == status] if status else []),
+                    removable_audience_filter(),
+                )
+                .subquery()
+            )
+        )
+    ).scalar() or 0
     rows = list(
         (
             await db.execute(
@@ -556,7 +579,7 @@ async def campaign_audience(
                 "sent_at": svc.as_utc(r.sent_at),
             }
         )
-    return {"total": total, "items": items}
+    return {"total": total, "removable": removable_total, "items": items}
 
 
 @router.get("/campaigns/{campaign_id}/analytics")
@@ -604,9 +627,21 @@ async def bulk_remove_audience(
     user: User = Depends(get_current_user),
 ):
     """Remove several unsent contacts at once. Already-sent rows are skipped
-    (reported, not deleted) so analytics history stays intact."""
+    (reported, not deleted) so analytics history stays intact.
+
+    With ``scope="all"`` every removable (unsent) row of the campaign is
+    removed — the "select all unsent and remove from campaign" action. Sent
+    rows are still protected.
+    """
     await _get_campaign(db, campaign_id)
-    result = await svc.bulk_remove_assignments(db, campaign_id, data.ids, actor=user.username)
+    result = await svc.bulk_remove_assignments(
+        db,
+        campaign_id,
+        data.ids,
+        actor=user.username,
+        remove_all=(data.scope == "all"),
+        status=data.status,
+    )
     await db.commit()
     return result
 

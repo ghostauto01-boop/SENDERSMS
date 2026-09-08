@@ -84,9 +84,20 @@ class ContactListOut(BaseModel):
 
 
 class BulkAction(BaseModel):
-    contact_ids: list[int]
+    contact_ids: list[int] = Field(default_factory=list)
     action: str  # tag, status, delete
     value: Optional[str] = None  # tag name or status value
+    # "ids" (default) applies the action to contact_ids; "all" applies it to
+    # every contact matching the search/status/tag filters instead (the
+    # Contacts page "select all N matching" mass-delete). Only delete supports
+    # scope="all" — status/tag updates still need explicit ids.
+    scope: str = "ids"
+    # Filters that select the target set when scope == "all". They mirror the
+    # GET /contacts/ list filters so what the user sees is exactly what is
+    # deleted.
+    search: Optional[str] = None
+    lead_status: Optional[str] = None
+    tag: Optional[str] = None
 
 
 class CSVImportRequest(BaseModel):

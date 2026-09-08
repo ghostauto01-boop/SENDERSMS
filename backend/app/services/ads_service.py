@@ -2221,6 +2221,24 @@ async def duplicate_set(
     return clone
 
 
+#: send_status values that mean the message already went out. Rows in these
+#: states (or with a sent_at timestamp) are analytics history and must never be
+#: removed from a campaign's audience; the UI shows them as "locked".
+SENT_STATUSES = ("sent", "delivered", "failed", "sending")
+
+
+def removable_audience_filter():
+    """Where-clause fragment: audience rows that may still be removed.
+
+    Mirrors remove_assignment's guard so "remove all unsent" and per-row
+    removal can never disagree about which rows are deletable.
+    """
+    return and_(
+        AdsAssignment.sent_at.is_(None),
+        AdsAssignment.send_status.notin_(SENT_STATUSES),
+    )
+
+
 async def remove_assignment(
     db: AsyncSession, assignment_id: int, *, campaign_id: int | None = None
 ) -> AdsAssignment:
@@ -2235,12 +2253,7 @@ async def remove_assignment(
     ).scalar_one_or_none()
     if assignment is None or (campaign_id is not None and assignment.campaign_id != campaign_id):
         raise ValueError("not_found")
-    if assignment.sent_at is not None or assignment.send_status in (
-        "sent",
-        "delivered",
-        "failed",
-        "sending",
-    ):
+    if assignment.sent_at is not None or assignment.send_status in SENT_STATUSES:
         raise ValueError("already_sent")
     await db.delete(assignment)
     await db.flush()
@@ -2248,12 +2261,41 @@ async def remove_assignment(
 
 
 async def bulk_remove_assignments(
-    db: AsyncSession, campaign_id: int, ids: list[int], *, actor: str = "user"
+    db: AsyncSession,
+    campaign_id: int,
+    ids: list[int] | None = None,
+    *,
+    actor: str = "user",
+    remove_all: bool = False,
+    status: str | None = None,
 ) -> dict:
+    """Remove unsent audience rows in bulk.
+
+    With ``remove_all`` the ids argument is ignored and every removable row of
+    the campaign is removed instead (the UI's "select all & remove from
+    campaign"). ``status`` additionally limits a remove-all to one
+    send_status, matching the Audience tab's status filter. Already-sent rows
+    are skipped (reported, not deleted) so analytics history stays intact.
+    """
+    if remove_all:
+        filters = [AdsAssignment.campaign_id == campaign_id, removable_audience_filter()]
+        if status:
+            filters.append(AdsAssignment.send_status == status)
+        target_ids = (
+            (
+                await db.execute(
+                    select(AdsAssignment.id).where(*filters)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        ids = list(target_ids)
+
     removed = 0
     skipped_sent = 0
     missing = 0
-    for assignment_id in ids:
+    for assignment_id in ids or []:
         try:
             await remove_assignment(db, assignment_id, campaign_id=campaign_id)
             removed += 1
