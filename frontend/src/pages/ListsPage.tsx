@@ -60,6 +60,10 @@ export default function ListsPage() {
   const [selectedToAdd, setSelectedToAdd] = useState<Set<number>>(new Set());
   const [addSearch, setAddSearch] = useState("");
   const [removingId, setRemovingId] = useState<number | null>(null);
+  const [selectedInList, setSelectedInList] = useState<Set<number>>(new Set());
+  const [deletingPermanently, setDeletingPermanently] = useState(false);
+  const [removingBulk, setRemovingBulk] = useState(false);
+  const [deletingList, setDeletingList] = useState(false);
 
   useEffect(() => { loadLists(); }, []);
 
@@ -138,6 +142,7 @@ export default function ListsPage() {
     setShowAddContacts(false);
     setSelectedToAdd(new Set());
     setAddSearch("");
+    setSelectedInList(new Set());
     await loadListContacts(list.id);
   };
 
@@ -146,6 +151,72 @@ export default function ListsPage() {
     setShowAddContacts(false);
     setSelectedToAdd(new Set());
     setAddSearch("");
+    setSelectedInList(new Set());
+  };
+
+  const toggleInList = (contactId: number) => {
+    const next = new Set(selectedInList);
+    next.has(contactId) ? next.delete(contactId) : next.add(contactId);
+    setSelectedInList(next);
+  };
+
+  const toggleAllInList = () => {
+    if (listContacts.length === 0) return;
+    if (selectedInList.size === listContacts.length) {
+      setSelectedInList(new Set());
+    } else {
+      setSelectedInList(new Set(listContacts.map((contact) => contact.id)));
+    }
+  };
+
+  const handleBulkRemoveFromList = async () => {
+    if (!viewListId || selectedInList.size === 0) return;
+    const count = selectedInList.size;
+    if (!window.confirm(`Remove ${count} contact${count === 1 ? "" : "s"} from ${viewListName}? The numbers will NOT be deleted.`)) return;
+    try {
+      setRemovingBulk(true);
+      await api.post(`/lists/${viewListId}/contacts/remove`, { contact_ids: [...selectedInList] });
+      toast.success(`${count} removed from list`);
+      setSelectedInList(new Set());
+      await Promise.all([loadListContacts(viewListId), loadLists()]);
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || "Failed to remove contacts");
+    } finally {
+      setRemovingBulk(false);
+    }
+  };
+
+  const handlePermanentDeleteInList = async () => {
+    if (!viewListId || selectedInList.size === 0) return;
+    const count = selectedInList.size;
+    if (!window.confirm(`Permanently delete ${count} phone number${count === 1 ? "" : "s"} from ${viewListName}?\n\nThis permanently deletes the contacts, their messages and all related history. This cannot be undone.`)) return;
+    try {
+      setDeletingPermanently(true);
+      const { data } = await api.post(`/lists/${viewListId}/contacts/delete`, { contact_ids: [...selectedInList] });
+      toast.success(`${data.deleted ?? count} phone number${(data.deleted ?? count) === 1 ? "" : "s"} permanently deleted`);
+      setSelectedInList(new Set());
+      await Promise.all([loadListContacts(viewListId), loadLists()]);
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || "Failed to delete contacts");
+    } finally {
+      setDeletingPermanently(false);
+    }
+  };
+
+  const handleDeleteListWithContacts = async () => {
+    if (!viewListId) return;
+    if (!window.confirm(`Delete "${viewListName}" AND permanently delete all ${listTotal} phone number${listTotal === 1 ? "" : "s"} in it?\n\nThis cannot be undone.`)) return;
+    try {
+      setDeletingList(true);
+      await api.delete(`/lists/${viewListId}`, { params: { delete_contacts: true } });
+      toast.success("List and its numbers permanently deleted");
+      closeListEditor();
+      loadLists();
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || "Failed to delete list");
+    } finally {
+      setDeletingList(false);
+    }
   };
 
   const handleAddContacts = async () => {
@@ -273,6 +344,31 @@ export default function ListsPage() {
             </div>
 
             <div className="p-4 sm:p-6 space-y-4">
+              <div className="rounded-xl border border-red-200 bg-red-50/60 dark:border-red-900/40 dark:bg-red-950/20 p-3 flex flex-col sm:flex-row items-center gap-2">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-red-700 dark:text-red-300">Delete this list</p>
+                  <p className="text-xs text-red-600/80 dark:text-red-400/80">
+                    Delete the list only, or also permanently delete every phone number in it.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2 flex-shrink-0">
+                  <button
+                    onClick={() => handleDelete(viewListId)}
+                    disabled={deletingList}
+                    className="px-3 py-1.5 rounded-full text-xs font-semibold bg-white dark:bg-[#2a3942] text-red-600 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/30 disabled:opacity-50"
+                  >
+                    Delete list only
+                  </button>
+                  <button
+                    onClick={handleDeleteListWithContacts}
+                    disabled={deletingList}
+                    className="px-3 py-1.5 rounded-full text-xs font-semibold text-white bg-red-600 hover:bg-red-500 disabled:opacity-50"
+                  >
+                    {deletingList ? "Deleting…" : "Delete list & all numbers"}
+                  </button>
+                </div>
+              </div>
+
               {showAddContacts && (
                 <div className="border border-[#00a884]/30 bg-[#f0f9f6] dark:bg-[#0a332c]/20 rounded-xl p-3 space-y-3">
                   <div className="flex items-center justify-between gap-2">
@@ -348,10 +444,52 @@ export default function ListsPage() {
               )}
 
               <div>
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
                   <h3 className="font-semibold text-sm">Contacts in this list</h3>
-                  <span className="text-xs text-gray-500">Removing here does not delete the contact</span>
+                  <div className="flex items-center gap-3">
+                    {listContacts.length > 0 && !listLoading && (
+                      <label className="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={selectedInList.size === listContacts.length && listContacts.length > 0}
+                          onChange={toggleAllInList}
+                          className="rounded accent-[#00a884]"
+                        />
+                        Select all
+                      </label>
+                    )}
+                    <span className="text-xs text-gray-500">Tick numbers to permanently delete them</span>
+                  </div>
                 </div>
+
+                {selectedInList.size > 0 && (
+                  <div className="mb-2 rounded-xl border border-[#00a884]/30 bg-[#f0f9f6] dark:bg-[#0a332c]/20 p-2.5 flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-semibold text-[#008069] dark:text-[#00a884] flex-1 min-w-[80px]">
+                      {selectedInList.size} selected
+                    </span>
+                    <button
+                      onClick={handleBulkRemoveFromList}
+                      disabled={removingBulk || deletingPermanently}
+                      className="px-3 py-1.5 rounded-full text-xs font-semibold bg-white dark:bg-[#2a3942] text-[#54656f] dark:text-[#aebac1] hover:bg-gray-100 disabled:opacity-50"
+                    >
+                      {removingBulk ? "Removing…" : "Remove from list"}
+                    </button>
+                    <button
+                      onClick={handlePermanentDeleteInList}
+                      disabled={removingBulk || deletingPermanently}
+                      className="px-3 py-1.5 rounded-full text-xs font-semibold text-white bg-red-600 hover:bg-red-500 disabled:opacity-50"
+                    >
+                      {deletingPermanently ? "Deleting…" : "Delete permanently"}
+                    </button>
+                    <button
+                      onClick={() => setSelectedInList(new Set())}
+                      className="px-3 py-1.5 rounded-full text-xs font-semibold text-gray-500 hover:bg-gray-100 dark:hover:bg-[#2a3942]"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                )}
+
                 <div className="border dark:border-[#2a3942] rounded-xl overflow-hidden">
                   {listLoading ? (
                     <div className="py-10 text-center text-sm text-gray-500">
@@ -366,24 +504,37 @@ export default function ListsPage() {
                     </div>
                   ) : (
                     <div className="divide-y dark:divide-[#2a3942]">
-                      {listContacts.map((contact) => (
-                        <div key={contact.id} className="flex items-center justify-between gap-3 p-3 hover:bg-gray-50 dark:hover:bg-[#111b21]">
-                          <div className="min-w-0">
-                            <p className="font-medium text-sm truncate">{displayName(contact)}</p>
-                            <p className="text-xs text-gray-500 truncate">
-                              {contact.phone_number}{contact.business_name && displayName(contact) !== contact.business_name ? ` · ${contact.business_name}` : ""}
-                            </p>
-                          </div>
-                          <button
-                            onClick={() => handleRemoveContact(contact)}
-                            disabled={removingId === contact.id}
-                            className="px-3 py-1.5 rounded-full text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 flex items-center gap-1.5 disabled:opacity-50 flex-shrink-0"
-                            title="Remove from this list"
+                      {listContacts.map((contact) => {
+                        const isSelected = selectedInList.has(contact.id);
+                        return (
+                          <div
+                            key={contact.id}
+                            className={`flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-[#111b21] ${isSelected ? "bg-[#f0f9f6] dark:bg-[#0a332c]/20" : ""}`}
                           >
-                            <Trash2 size={13} /> {removingId === contact.id ? "Removing…" : "Remove"}
-                          </button>
-                        </div>
-                      ))}
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleInList(contact.id)}
+                              className="rounded accent-[#00a884] flex-shrink-0"
+                              title="Select this phone number"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <p className="font-medium text-sm truncate">{displayName(contact)}</p>
+                              <p className="text-xs text-gray-500 truncate">
+                                {contact.phone_number}{contact.business_name && displayName(contact) !== contact.business_name ? ` · ${contact.business_name}` : ""}
+                              </p>
+                            </div>
+                            <button
+                              onClick={() => handleRemoveContact(contact)}
+                              disabled={removingId === contact.id}
+                              className="px-3 py-1.5 rounded-full text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 flex items-center gap-1.5 disabled:opacity-50 flex-shrink-0"
+                              title="Remove from this list (keep the number)"
+                            >
+                              <Trash2 size={13} /> {removingId === contact.id ? "Removing…" : "Remove"}
+                            </button>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>

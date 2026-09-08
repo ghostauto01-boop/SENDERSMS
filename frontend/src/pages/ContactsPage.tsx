@@ -65,8 +65,8 @@ export default function ContactsPage() {
     } catch { toast.error("Failed to export"); }
   };
 
-  const handleDelete = async (id:number) => { if(!confirm("Delete this contact? This cannot be undone."))return; try { await api.delete(`/contacts/${id}`); toast.success("Contact deleted"); loadContacts(); } catch { toast.error("Failed to delete"); } };
-  const handleBulkDelete = async () => { if(selected.size===0||!confirm(`Delete ${selected.size} contacts?`))return; try { await api.post("/contacts/bulk",{contact_ids:[...selected],action:"delete"}); toast.success(`${selected.size} deleted`); setSelected(new Set()); loadContacts(); } catch { toast.error("Failed"); } };
+  const handleDelete = async (id:number) => { if(!confirm("Permanently delete this phone number? This cannot be undone."))return; try { await api.delete(`/contacts/${id}`); toast.success("Contact permanently deleted"); loadContacts(); } catch { toast.error("Failed to delete"); } };
+  const handleBulkDelete = async () => { if(selected.size===0||!confirm(`Permanently delete ${selected.size} phone numbers? This cannot be undone.`))return; try { await api.post("/contacts/bulk",{contact_ids:[...selected],action:"delete"}); toast.success(`${selected.size} phone numbers permanently deleted`); setSelected(new Set()); loadContacts(); } catch { toast.error("Failed"); } };
   const handleBulkStatus = async (status:string) => { if(selected.size===0)return; try { await api.post("/contacts/bulk",{contact_ids:[...selected],action:"status",value:status}); toast.success(`Updated ${selected.size} contacts`); setSelected(new Set()); loadContacts(); } catch { toast.error("Failed"); } };
 
   const doQuickSend = async () => { if(!quickMsg.trim()||!quickSendId)return; setQuickSending(true);
@@ -119,7 +119,7 @@ export default function ContactsPage() {
               {selected.size} selected
             </span>
             <div className="flex items-center gap-1.5">
-              <button onClick={handleBulkDelete} className="bg-white text-[#c5221f] px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1"><Trash2 size={12}/>Delete</button>
+              <button onClick={handleBulkDelete} className="bg-white text-[#c5221f] px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1"><Trash2 size={12}/>Delete permanently</button>
               <select className="bg-white text-[#111b21] px-2 py-1.5 rounded-full text-xs font-medium" onChange={e=>{if(e.target.value)handleBulkStatus(e.target.value); e.target.value=""}} value="">
                 <option value="">Status…</option>{LEAD_STATUSES.map(s=><option key={s} value={s}>{s}</option>)}
               </select>

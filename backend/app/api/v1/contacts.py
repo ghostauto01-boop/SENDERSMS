@@ -10,7 +10,8 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form, status
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select, func, or_, delete as sa_delete
+from sqlalchemy import select, func, or_, delete as sa_delete, update as sa_update
+from sqlalchemy.exc import OperationalError, ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -213,33 +214,107 @@ async def update_contact(
     return await _serialize_contact(db, contact)
 
 
+def _is_missing_table_error(exc: BaseException) -> bool:
+    """True when a cleanup statement hit a table that is not in this DB.
+
+    Tests create a minimal SQLite schema, and some optional tables (meetings,
+    ads, campaign follow-up logs, ...) are only registered once their model
+    module is imported. A permanent delete must still be able to run there; in
+    production every table is created by ``init_db`` so nothing is skipped.
+    """
+    message = str(exc).lower()
+    return (
+        "no such table" in message
+        or "does not exist" in message
+        or "relation does not exist" in message
+    )
+
+
+async def _safe_delete(db: AsyncSession, statement):
+    """Delete rows, tolerating a table that was never created in this DB."""
+    try:
+        await db.execute(statement)
+    except (OperationalError, ProgrammingError) as exc:
+        if _is_missing_table_error(exc):
+            return
+        raise
+
+
+async def _safe_update(db: AsyncSession, statement):
+    """Update rows, tolerating a table that was never created in this DB."""
+    try:
+        await db.execute(statement)
+    except (OperationalError, ProgrammingError) as exc:
+        if _is_missing_table_error(exc):
+            return
+        raise
+
+
 async def _delete_contact_permanently(db: AsyncSession, contact: Contact) -> None:
     """Hard-delete a contact and every row that references it.
 
     The ORM only cascades ``Contact.tags`` and ``Contact.list_memberships``.
-    Messages, conversations, follow-ups, campaign rows and scheduled messages
-    all hold a raw ``contacts.id`` foreign key with no ORM relationship, so on
-    Postgres a bare ``db.delete(contact)`` raised a foreign-key violation and
-    on SQLite it silently left orphan rows behind (broken inbox threads). This
-    removes them all in dependency order so a delete is truly permanent.
+    Messages, conversations, follow-ups, campaign rows, scheduled messages,
+    meetings, campaign follow-up logs and SMS Ads rows all hold a raw
+    ``contacts.id`` value with no ORM relationship (or no ``ondelete``
+    cascade), so on Postgres a bare ``db.delete(contact)`` raised a
+    foreign-key violation and on SQLite it silently left orphan rows behind
+    (broken inbox threads, stale campaign state, dangling calendar events).
+    This removes/clears them all in dependency order so a delete is truly
+    permanent.
     """
     from app.models.conversation import Conversation, Message
     from app.models.followup import FollowUp
     from app.models.campaign import CampaignContact
+    from app.models.campaign_followup import CampaignFollowUpLog
     from app.models.scheduled import ScheduledMessage
     from app.models.suppression import SuppressionEntry
+    from app.models.meeting import Meeting, MeetingAttendee
+    from app.models.ads import AdsAssignment, AdsFollowUpTask, AdsCalendarEvent, AdsEvent
 
     contact_id = contact.id
 
-    # Outgoing/incoming messages reference both the contact and its threads.
-    await db.execute(sa_delete(Message).where(Message.contact_id == contact_id))
-    # Conversations are unique per contact.
-    await db.execute(sa_delete(Conversation).where(Conversation.contact_id == contact_id))
-    # Scheduled / follow-up / campaign state.
-    await db.execute(sa_delete(ScheduledMessage).where(ScheduledMessage.contact_id == contact_id))
-    await db.execute(sa_delete(FollowUp).where(FollowUp.contact_id == contact_id))
-    await db.execute(sa_delete(CampaignContact).where(CampaignContact.contact_id == contact_id))
-    await db.execute(sa_delete(SuppressionEntry).where(SuppressionEntry.contact_id == contact_id))
+    # Scheduled messages first: they can point at outgoing Message rows via
+    # ``message_id`` as well as at the contact / list themselves.
+    await _safe_delete(db, sa_delete(ScheduledMessage).where(ScheduledMessage.contact_id == contact_id))
+    # Outgoing/incoming messages reference both the contact and its threads;
+    # conversations are unique per contact.
+    await _safe_delete(db, sa_delete(Message).where(Message.contact_id == contact_id))
+    await _safe_delete(db, sa_delete(Conversation).where(Conversation.contact_id == contact_id))
+    # Follow-up / campaign state.
+    await _safe_delete(db, sa_delete(FollowUp).where(FollowUp.contact_id == contact_id))
+    await _safe_delete(db, sa_delete(CampaignContact).where(CampaignContact.contact_id == contact_id))
+    await _safe_delete(db, sa_delete(CampaignFollowUpLog).where(CampaignFollowUpLog.contact_id == contact_id))
+    await _safe_delete(db, sa_delete(SuppressionEntry).where(SuppressionEntry.contact_id == contact_id))
+
+    # Calendar / meetings: remove the attendee link and detach the primary
+    # contact so the meeting record (and any other attendees) survives.
+    await _safe_delete(db, sa_delete(MeetingAttendee).where(MeetingAttendee.contact_id == contact_id))
+    await _safe_delete(
+        db,
+        sa_delete(Meeting).where(Meeting.contact_id == contact_id, Meeting.id.notin_(
+            select(MeetingAttendee.meeting_id)
+        )),
+    )
+    await _safe_update(
+        db,
+        sa_update(Meeting)
+        .where(Meeting.contact_id == contact_id)
+        .values(contact_id=None),
+    )
+
+    # SMS Ads Manager: assignments and follow-up tasks belong to this contact
+    # and must go; calendar/analytics rows keep their history with the contact
+    # detached (they have no FK, so this is what makes them safe to delete).
+    await _safe_delete(db, sa_delete(AdsAssignment).where(AdsAssignment.contact_id == contact_id))
+    await _safe_delete(db, sa_delete(AdsFollowUpTask).where(AdsFollowUpTask.contact_id == contact_id))
+    await _safe_delete(db, sa_delete(AdsCalendarEvent).where(AdsCalendarEvent.contact_id == contact_id))
+    await _safe_update(
+        db,
+        sa_update(AdsEvent)
+        .where(AdsEvent.contact_id == contact_id)
+        .values(contact_id=None),
+    )
 
     # Tag links and list memberships are removed by the ORM's own
     # delete-orphan cascade when the contact row is deleted below.
