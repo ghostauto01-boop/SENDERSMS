@@ -125,6 +125,24 @@ class AdsCampaign(Base):
     #: manual | recommend | auto
     optimization_mode: Mapped[str] = mapped_column(String(20), default="manual", nullable=False)
 
+    # --- Andromeda auto-optimization (OPT-IN master switch) ---
+    #: OFF by default: nothing automatic ever happens until the user turns it
+    #: on. When ON, winning creatives automatically receive the remaining
+    #: contacts (spend) and losers are deprioritised, per the strategy below.
+    auto_optimize: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    #: score | reply_rate | positive_reply_rate | conversion_rate
+    optimize_metric: Mapped[str] = mapped_column(String(30), default="score", nullable=False)
+    #: Minimum sends a creative needs before it can win or lose automatically.
+    optimize_min_sends: Mapped[int] = mapped_column(Integer, default=30, nullable=False)
+    #: Winner must beat the loser by at least this percent on the metric.
+    optimize_min_gap_pct: Mapped[float] = mapped_column(Float, default=25.0, nullable=False)
+    #: shift | shift_and_pause -- move pending contacts to the winner, and
+    #: optionally pause the losing creatives as well.
+    optimize_action: Mapped[str] = mapped_column(String(20), default="shift", nullable=False)
+    optimize_last_run_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
     # --- Safety / behaviour switches ---
     test_mode: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     #: keep | update -- what happens to already-queued messages when a creative
@@ -175,8 +193,19 @@ class AdsSet(Base):
     status: Mapped[str] = mapped_column(String(20), default="active", nullable=False, index=True)
 
     # --- Targeting. All reference EXISTING contact/list/tag tables. ---
-    #: CSV of contact_lists.id. Empty means "all contacts".
-    list_ids: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    #: CSV of contact_lists.id. Empty selects NOTHING -- a set with no lists,
+    #: no contacts, no saved audience and no filters matches zero contacts.
+    #: (This used to mean "all contacts", which pulled entire databases into
+    #: campaigns by accident.)
+    list_ids: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    #: CSV of explicitly picked contact ids. Unioned with the list members,
+    #: then filtered by the rules below.
+    contact_ids: Mapped[str | None] = mapped_column(Text, nullable=True)
+    #: Optional saved (Meta-style) audience this set is built from. The
+    #: audience's lists/contacts/filters are merged with the set's own.
+    audience_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("ads_audiences.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     include_tags: Mapped[str | None] = mapped_column(Text, nullable=True)  # CSV of tag names
     exclude_tags: Mapped[str | None] = mapped_column(Text, nullable=True)
     include_statuses: Mapped[str | None] = mapped_column(String(500), nullable=True)
@@ -193,6 +222,12 @@ class AdsSet(Base):
     #: equal | percentage | weighted | random
     split_mode: Mapped[str] = mapped_column(String(20), default="equal", nullable=False)
 
+    #: Per-set placement toggle for Andromeda auto-optimization. Only takes
+    #: effect when the campaign's master ``auto_optimize`` switch is ON, so a
+    #: set can be excluded from automatic traffic shifts while the rest of the
+    #: campaign keeps optimising.
+    auto_optimize: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_now, onupdate=_now, nullable=False
@@ -206,6 +241,56 @@ class AdsSet(Base):
     def csv(self, field: str) -> list[str]:
         raw = getattr(self, field) or ""
         return [p.strip() for p in raw.split(",") if p.strip()]
+
+
+# --------------------------------------------------------------------------
+# Saved Audience (Meta-style reusable audience)
+# --------------------------------------------------------------------------
+
+
+class AdsAudience(Base):
+    """A named, reusable audience: lists + contacts + filters in one place.
+
+    Created on the Audiences page, then attached to any campaign's SMS set.
+    Attaching copies the definition onto the set (and links it via
+    ``AdsSet.audience_id``), so later edits of the saved audience can be
+    re-attached without rebuilding the targeting by hand.
+    """
+
+    __tablename__ = "ads_audiences"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    owner_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    #: CSV of contact_lists.id.
+    list_ids: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    #: CSV of explicitly picked contact ids.
+    contact_ids: Mapped[str | None] = mapped_column(Text, nullable=True)
+    include_tags: Mapped[str | None] = mapped_column(Text, nullable=True)
+    exclude_tags: Mapped[str | None] = mapped_column(Text, nullable=True)
+    include_statuses: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    exclude_statuses: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    city: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    state: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    industry: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    #: never_contacted | contacted | replied | not_replied | any
+    activity_filter: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    #: Exclude anyone who is already in these ads campaigns (CSV of ids).
+    exclude_campaign_ids: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, onupdate=_now, nullable=False
+    )
+
+    def csv(self, field: str) -> list[str]:
+        raw = getattr(self, field) or ""
+        return [p.strip() for p in raw.split(",") if p.strip()]
+
+    def __repr__(self):  # pragma: no cover
+        return f"<AdsAudience(id={self.id}, name={self.name})>"
 
 
 # --------------------------------------------------------------------------

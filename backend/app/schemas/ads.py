@@ -3,12 +3,31 @@
 from datetime import datetime, timezone
 from typing import Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, ValidationInfo, field_validator
 
 
 def _utc(v: Optional[datetime]) -> Optional[datetime]:
     if v is not None and v.tzinfo is None:
         return v.replace(tzinfo=timezone.utc)
+    return v
+
+
+#: Defaults used when a legacy database row predates a column. The startup
+#: schema repair backfills most new columns with their defaults, but a column
+#: it had to add as nullable (or a repair that has not run yet) reads back as
+#: NULL -- coercing here keeps every response valid instead of 500ing.
+_OPTIMIZE_DEFAULTS = {
+    "auto_optimize": False,
+    "optimize_metric": "score",
+    "optimize_min_sends": 30,
+    "optimize_min_gap_pct": 25.0,
+    "optimize_action": "shift",
+}
+
+
+def _fill_optimize_default(v, info: ValidationInfo):
+    if v is None:
+        return _OPTIMIZE_DEFAULTS.get(info.field_name)
     return v
 
 
@@ -36,6 +55,11 @@ class CampaignIn(BaseModel):
     queued_edit_policy: str = "keep"
     priority: str = "normal"
     test_mode: bool = False
+    auto_optimize: bool = False
+    optimize_metric: str = "score"
+    optimize_min_sends: int = 30
+    optimize_min_gap_pct: float = 25.0
+    optimize_action: str = "shift"
 
 
 class CampaignPatch(BaseModel):
@@ -63,6 +87,11 @@ class CampaignPatch(BaseModel):
     queued_edit_policy: Optional[str] = None
     priority: Optional[str] = None
     test_mode: Optional[bool] = None
+    auto_optimize: Optional[bool] = None
+    optimize_metric: Optional[str] = None
+    optimize_min_sends: Optional[int] = None
+    optimize_min_gap_pct: Optional[float] = None
+    optimize_action: Optional[str] = None
 
 
 class CampaignOut(BaseModel):
@@ -91,6 +120,12 @@ class CampaignOut(BaseModel):
     queued_edit_policy: str
     priority: str
     test_mode: bool
+    auto_optimize: bool = False
+    optimize_metric: str = "score"
+    optimize_min_sends: int = 30
+    optimize_min_gap_pct: float = 25.0
+    optimize_action: str = "shift"
+    optimize_last_run_at: Optional[datetime] = None
     sent_count: int
     last_state: Optional[str]
     last_activity_at: Optional[datetime]
@@ -98,8 +133,14 @@ class CampaignOut(BaseModel):
     updated_at: datetime
 
     _tz = field_validator(
-        "start_date", "end_date", "last_activity_at", "created_at", "updated_at", mode="after"
+        "start_date", "end_date", "last_activity_at", "created_at", "updated_at",
+        "optimize_last_run_at", mode="after"
     )(lambda v: _utc(v))
+
+    _fill = field_validator(
+        "auto_optimize", "optimize_metric", "optimize_min_sends", "optimize_min_gap_pct",
+        "optimize_action", mode="before",
+    )(_fill_optimize_default)
 
     model_config = {"from_attributes": True}
 
@@ -108,6 +149,8 @@ class SetIn(BaseModel):
     name: str = Field(..., max_length=255)
     status: str = "active"
     list_ids: Optional[str] = None
+    contact_ids: Optional[str] = None
+    audience_id: Optional[int] = None
     include_tags: Optional[str] = None
     exclude_tags: Optional[str] = None
     include_statuses: Optional[str] = None
@@ -119,12 +162,14 @@ class SetIn(BaseModel):
     exclude_campaign_ids: Optional[str] = None
     daily_limit: Optional[int] = None
     split_mode: str = "equal"
+    auto_optimize: bool = True
 
 
 class SetPatch(SetIn):
-    name: Optional[str] = None
-    status: Optional[str] = None
-    split_mode: Optional[str] = None
+    name: Optional[str] = None  # type: ignore[assignment]
+    status: Optional[str] = None  # type: ignore[assignment]
+    split_mode: Optional[str] = None  # type: ignore[assignment]
+    auto_optimize: Optional[bool] = None  # type: ignore[assignment]
 
 
 class SetOut(BaseModel):
@@ -133,6 +178,8 @@ class SetOut(BaseModel):
     name: str
     status: str
     list_ids: Optional[str]
+    contact_ids: Optional[str] = None
+    audience_id: Optional[int] = None
     include_tags: Optional[str]
     exclude_tags: Optional[str]
     include_statuses: Optional[str]
@@ -144,9 +191,102 @@ class SetOut(BaseModel):
     exclude_campaign_ids: Optional[str]
     daily_limit: Optional[int]
     split_mode: str
+    auto_optimize: bool = True
     created_at: datetime
 
+    _fill = field_validator("auto_optimize", mode="before")(
+        lambda v: True if v is None else v
+    )
+
     model_config = {"from_attributes": True}
+
+
+class AudienceIn(BaseModel):
+    name: str = Field(..., max_length=255)
+    description: Optional[str] = None
+    list_ids: Optional[str] = None
+    contact_ids: Optional[str] = None
+    include_tags: Optional[str] = None
+    exclude_tags: Optional[str] = None
+    include_statuses: Optional[str] = None
+    exclude_statuses: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    industry: Optional[str] = None
+    activity_filter: Optional[str] = None
+    exclude_campaign_ids: Optional[str] = None
+
+
+class AudiencePatch(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    list_ids: Optional[str] = None
+    contact_ids: Optional[str] = None
+    include_tags: Optional[str] = None
+    exclude_tags: Optional[str] = None
+    include_statuses: Optional[str] = None
+    exclude_statuses: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    industry: Optional[str] = None
+    activity_filter: Optional[str] = None
+    exclude_campaign_ids: Optional[str] = None
+
+
+class AudienceOut(BaseModel):
+    id: int
+    name: str
+    description: Optional[str]
+    list_ids: Optional[str]
+    contact_ids: Optional[str]
+    include_tags: Optional[str]
+    exclude_tags: Optional[str]
+    include_statuses: Optional[str]
+    exclude_statuses: Optional[str]
+    city: Optional[str]
+    state: Optional[str]
+    industry: Optional[str]
+    activity_filter: Optional[str]
+    exclude_campaign_ids: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class TargetingPreviewIn(BaseModel):
+    """Unsaved targeting filters for a live size estimate (set/audience editors)."""
+
+    list_ids: Optional[str] = None
+    contact_ids: Optional[str] = None
+    audience_id: Optional[int] = None
+    include_tags: Optional[str] = None
+    exclude_tags: Optional[str] = None
+    include_statuses: Optional[str] = None
+    exclude_statuses: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    industry: Optional[str] = None
+    activity_filter: Optional[str] = None
+    exclude_campaign_ids: Optional[str] = None
+
+
+class AttachAudienceIn(BaseModel):
+    campaign_id: int
+    set_id: Optional[int] = None
+    new_set_name: Optional[str] = None
+
+
+class OptimizeIn(BaseModel):
+    dry_run: bool = False
+
+
+class TrackClickIn(BaseModel):
+    campaign_id: int
+    creative_id: int
+    contact_id: int
+    set_id: Optional[int] = None
+    assignment_id: Optional[int] = None
 
 
 class CreativeIn(BaseModel):

@@ -360,13 +360,44 @@ function CampaignsSection({
 
 function AudienceSection({ reference, campaigns }: { reference: any; campaigns: AdsCampaign[] }) {
   const totalAssigned = campaigns.reduce((a, c) => a + (c.stats?.assigned || 0), 0);
+  const [audiences, setAudiences] = useState<any[]>([]);
+  useEffect(() => {
+    adsApi.listAudiences().then((r) => setAudiences(r.items)).catch(() => {});
+  }, []);
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Stat label="Contacts in CRM" value={reference?.total_contacts ?? 0} />
         <Stat label="Lists" value={reference?.lists?.length ?? 0} />
-        <Stat label="Tags" value={reference?.tags?.length ?? 0} />
+        <Stat label="Saved audiences" value={audiences.length} />
         <Stat label="Assigned across campaigns" value={totalAssigned} />
+      </div>
+      <div className="card p-5">
+        <div className="flex flex-wrap justify-between items-center gap-2 mb-3">
+          <h3 className="font-semibold">Saved audiences</h3>
+          <a className="btn-primary btn-sm" href="/audiences">
+            <Plus size={15} className="mr-1" /> Build audience
+          </a>
+        </div>
+        {audiences.length === 0 ? (
+          <p className="text-sm text-gray-500">
+            No saved audiences yet. Combine lists and contacts into a reusable audience — like a Meta saved
+            audience — then attach it to any campaign with one click.
+          </p>
+        ) : (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            {audiences.map((a) => (
+              <a
+                key={a.id}
+                href="/audiences"
+                className="p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50 flex justify-between text-sm hover:ring-1 hover:ring-primary-500"
+              >
+                <span className="truncate mr-2">{a.name}</span>
+                <b className="shrink-0">{a.match_count ?? "—"}</b>
+              </a>
+            ))}
+          </div>
+        )}
       </div>
       <div className="card p-5">
         <h3 className="font-semibold mb-3">Lists available for targeting</h3>
@@ -379,8 +410,8 @@ function AudienceSection({ reference, campaigns }: { reference: any; campaigns: 
           ))}
         </div>
         <p className="text-xs text-gray-500 mt-3">
-          These are your existing contact lists — the Ads Manager targets them directly, it never creates a
-          second copy of your contacts.
+          SMS sets stay empty until you add at least one list, contact, audience or filter — nothing is ever
+          pulled in automatically.
         </p>
       </div>
       <div className="card p-5">

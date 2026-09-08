@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import { Trophy, X } from "lucide-react";
 import React from "react";
 
 /** Shared primitives for the SMS Ads Manager. Mobile-first by default. */
@@ -42,6 +42,58 @@ export const STATE_LABEL: Record<string, string> = {
 export function Badge({ value }: { value?: string | null }) {
   if (!value) return null;
   return <span className={STATUS_BADGE[value] || "badge-gray"}>{STATE_LABEL[value] || value}</span>;
+}
+
+export function WinnerBadge({ label = "Winner" }: { label?: string }) {
+  return (
+    <span className="badge-green inline-flex items-center gap-1">
+      <Trophy size={12} /> {label}
+    </span>
+  );
+}
+
+/** Accessible on/off switch used for placement + optimizer toggles. */
+export function Toggle({
+  checked,
+  onChange,
+  label,
+  hint,
+  disabled,
+}: {
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  label?: string;
+  hint?: string;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className={`flex items-center gap-3 text-left ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+    >
+      <span
+        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+          checked ? "bg-primary-600" : "bg-gray-300 dark:bg-gray-600"
+        }`}
+      >
+        <span
+          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+            checked ? "translate-x-6" : "translate-x-1"
+          }`}
+        />
+      </span>
+      {(label || hint) && (
+        <span>
+          {label && <span className="block text-sm font-medium">{label}</span>}
+          {hint && <span className="block text-xs text-gray-500">{hint}</span>}
+        </span>
+      )}
+    </button>
+  );
 }
 
 export function Stat({

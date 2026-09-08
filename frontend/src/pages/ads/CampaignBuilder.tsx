@@ -42,6 +42,11 @@ export default function CampaignBuilder({
     queued_edit_policy: "keep",
     priority: "normal",
     test_mode: false,
+    auto_optimize: false,
+    optimize_metric: "score",
+    optimize_min_sends: 30,
+    optimize_min_gap_pct: 25,
+    optimize_action: "shift",
     ...(campaign || {}),
   });
   const [saving, setSaving] = useState(false);
@@ -88,6 +93,11 @@ export default function CampaignBuilder({
       queued_edit_policy: form.queued_edit_policy,
       priority: form.priority,
       test_mode: !!form.test_mode,
+      auto_optimize: !!form.auto_optimize,
+      optimize_metric: form.optimize_metric || "score",
+      optimize_min_sends: Number(form.optimize_min_sends) || 30,
+      optimize_min_gap_pct: Number(form.optimize_min_gap_pct) || 0,
+      optimize_action: form.optimize_action || "shift",
     };
     setSaving(true);
     try {
@@ -328,6 +338,46 @@ export default function CampaignBuilder({
                 <option value="auto">Automatic</option>
               </select>
             </Field>
+            <Field label="Winning metric" hint="What decides the winning creative.">
+              <select
+                className="input"
+                value={form.optimize_metric}
+                onChange={(e) => set("optimize_metric", e.target.value)}
+              >
+                <option value="score">Performance score</option>
+                <option value="reply_rate">Reply rate</option>
+                <option value="positive_reply_rate">Positive reply rate</option>
+                <option value="conversion_rate">Conversion rate</option>
+              </select>
+            </Field>
+            <Field label="Min sends before auto-decisions">
+              <input
+                type="number"
+                min={1}
+                className="input"
+                value={form.optimize_min_sends}
+                onChange={(e) => set("optimize_min_sends", e.target.value)}
+              />
+            </Field>
+            <Field label="Min winning gap %">
+              <input
+                type="number"
+                min={0}
+                className="input"
+                value={form.optimize_min_gap_pct}
+                onChange={(e) => set("optimize_min_gap_pct", e.target.value)}
+              />
+            </Field>
+            <Field label="Action on losing creatives">
+              <select
+                className="input"
+                value={form.optimize_action}
+                onChange={(e) => set("optimize_action", e.target.value)}
+              >
+                <option value="shift">Shift spend, keep learning</option>
+                <option value="shift_and_pause">Shift spend + pause losers</option>
+              </select>
+            </Field>
             <Field
               label="If a creative is edited mid-flight"
               hint="Default keeps the version each queued contact was assigned."
@@ -349,6 +399,17 @@ export default function CampaignBuilder({
               </select>
             </Field>
           </div>
+          <label className="flex items-center gap-2 text-sm p-3 rounded-lg bg-primary-50 dark:bg-primary-900/20">
+            <input
+              type="checkbox"
+              checked={!!form.auto_optimize}
+              onChange={(e) => set("auto_optimize", e.target.checked)}
+            />
+            <span>
+              <b>Andromeda auto-optimization</b> — automatically shift remaining spend to the winning
+              creative. OFF by default; nothing automatic runs unless you turn this on.
+            </span>
+          </label>
           <label className="flex items-center gap-2 text-sm p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20">
             <input type="checkbox" checked={!!form.test_mode} onChange={(e) => set("test_mode", e.target.checked)} />
             <span>

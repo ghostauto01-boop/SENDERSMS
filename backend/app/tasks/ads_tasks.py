@@ -50,7 +50,7 @@ async def activate_due_campaigns() -> list[int]:
 
 async def run_ads_cycle(*, send_inline: bool = False, batch: int = 25) -> dict:
     """One full cycle: activate, refresh always-on audiences, dispatch, follow up."""
-    totals = {"activated": 0, "added": 0, "sent": 0, "followups": 0, "campaigns": 0}
+    totals = {"activated": 0, "added": 0, "sent": 0, "followups": 0, "campaigns": 0, "optimized": 0}
 
     totals["activated"] = len(await activate_due_campaigns())
 
@@ -106,6 +106,40 @@ async def run_ads_cycle(*, send_inline: bool = False, batch: int = 25) -> dict:
         except Exception as exc:  # noqa: BLE001
             logger.error("Ads follow-up processing failed: %s", exc)
             await db.rollback()
+
+    # Andromeda auto-optimization: ONLY for campaigns whose master switch is
+    # ON. run_optimization enforces the opt-in again, so a missed filter here
+    # can never cause an unwanted automatic shift.
+    async with async_session_factory() as db:
+        try:
+            opt_ids = list(
+                (
+                    await db.execute(
+                        select(AdsCampaign.id).where(
+                            AdsCampaign.status == "active",
+                            AdsCampaign.auto_optimize.is_(True),
+                        )
+                    )
+                ).scalars().all()
+            )
+        except Exception as exc:  # noqa: BLE001 - column may predate migration
+            logger.warning("Ads optimization lookup failed: %s", exc)
+            opt_ids = []
+    for campaign_id in opt_ids:
+        async with async_session_factory() as db:
+            try:
+                campaign = (
+                    await db.execute(select(AdsCampaign).where(AdsCampaign.id == campaign_id))
+                ).scalar_one_or_none()
+                if campaign is None:
+                    continue
+                result = await svc.run_optimization(db, campaign, actor="andromeda")
+                if result.get("ok") and (result.get("moved") or result.get("paused")):
+                    totals["optimized"] += 1
+                await db.commit()
+            except Exception as exc:  # noqa: BLE001
+                logger.error("Ads optimization for campaign %s failed: %s", campaign_id, exc)
+                await db.rollback()
 
     return totals
 

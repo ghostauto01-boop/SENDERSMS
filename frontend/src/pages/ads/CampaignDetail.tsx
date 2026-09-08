@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import {
   ArrowLeft,
+  BarChart3,
+  Bot,
   Copy,
   Download,
   Pause,
@@ -13,10 +15,12 @@ import {
   Trophy,
   Users,
   Wand2,
+  X,
   Zap,
 } from "lucide-react";
 import adsApi, { AdsCreative, AdsSet, CampaignDetail as Detail } from "../../api/ads";
-import { Badge, Bar, Empty, Field, Metric, Modal, Stat, Tabs, fmtDate } from "./ui";
+import ContactPicker from "../../components/ContactPicker";
+import { Badge, Bar, Empty, Field, Metric, Modal, Stat, Tabs, Toggle, WinnerBadge, fmtDate } from "./ui";
 import CampaignBuilder from "./CampaignBuilder";
 
 const TABS = [
@@ -26,6 +30,7 @@ const TABS = [
   "Audience",
   "Sending",
   "Automation",
+  "Optimization",
   "Analytics",
   "Activity",
   "Settings",
@@ -99,6 +104,11 @@ export default function CampaignDetail({
               <Badge value={detail.status} />
               {detail.state && detail.state !== detail.status && <Badge value={detail.state} />}
               {detail.test_mode && <span className="badge-yellow">Test mode</span>}
+              {detail.auto_optimize && (
+                <span className="badge-green inline-flex items-center gap-1">
+                  <Bot size={12} /> Andromeda ON
+                </span>
+              )}
               <span className="text-xs text-gray-500">{detail.objective}</span>
             </div>
           </div>
@@ -170,11 +180,16 @@ export default function CampaignDetail({
         <Tabs tabs={TABS} active={tab} onChange={setTab} />
 
         {tab === "Overview" && <OverviewTab detail={detail} stats={stats} />}
-        {tab === "SMS Sets" && <SetsTab detail={detail} reference={reference} reload={load} />}
+        {tab === "SMS Sets" && (
+          <SetsTab detail={detail} reference={reference} reload={load} onChanged={onChanged} />
+        )}
         {tab === "Creatives" && <CreativesTab detail={detail} analytics={analytics} reload={load} />}
         {tab === "Audience" && <AudienceTab detail={detail} reference={reference} reload={load} />}
         {tab === "Sending" && <SendingTab detail={detail} stats={stats} />}
         {tab === "Automation" && <AutomationTab detail={detail} reload={load} />}
+        {tab === "Optimization" && (
+          <OptimizationTab detail={detail} reference={reference} reload={load} onChanged={onChanged} />
+        )}
         {tab === "Analytics" && <AnalyticsTab analytics={analytics} campaignId={campaignId} />}
         {tab === "Activity" && <ActivityTab campaignId={campaignId} />}
         {tab === "Settings" && (
@@ -221,6 +236,8 @@ function OverviewTab({ detail, stats }: { detail: Detail; stats: any }) {
         <Stat label="SMS sent" value={stats.sent} />
         <Stat label="Delivery rate" value={`${stats.delivery_rate}%`} />
         <Stat label="Reply rate" value={`${stats.reply_rate}%`} />
+        <Stat label="Open rate" value={`${stats.open_rate ?? 0}%`} hint="Replied or tapped the link" />
+        <Stat label="Click rate" value={`${stats.click_rate ?? 0}%`} />
         <Stat label="Positive replies" value={stats.positive_replies} />
         <Stat label="Follow-ups due" value={stats.followups_due} />
         <Stat label="Meetings" value={stats.meetings} />
@@ -240,11 +257,27 @@ function OverviewTab({ detail, stats }: { detail: Detail; stats: any }) {
   );
 }
 
-function SetsTab({ detail, reference, reload }: { detail: Detail; reference: any; reload: () => void }) {
+/* --------------------------------------------------------------- SMS sets */
+
+const csvList = (raw?: string | null) => (raw || "").split(",").map((x) => x.trim()).filter(Boolean);
+
+function SetsTab({
+  detail,
+  reference,
+  reload,
+  onChanged,
+}: {
+  detail: Detail;
+  reference: any;
+  reload: () => void;
+  onChanged: () => void;
+}) {
   const [editing, setEditing] = useState<AdsSet | null>(null);
   const [creating, setCreating] = useState(false);
   const [previews, setPreviews] = useState<Record<number, any>>({});
+  const [audiences, setAudiences] = useState<any[]>([]);
 
+  const setIdsKey = detail.sets.map((s) => s.id).join(",");
   useEffect(() => {
     detail.sets.forEach(async (s) => {
       try {
@@ -254,7 +287,51 @@ function SetsTab({ detail, reference, reload }: { detail: Detail; reference: any
         /* preview is best-effort */
       }
     });
-  }, [detail.sets.map((s) => s.id).join(",")]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setIdsKey]);
+  useEffect(() => {
+    adsApi.listAudiences().then((r) => setAudiences(r.items)).catch(() => {});
+  }, []);
+
+  const listName = (id: string) =>
+    reference?.lists?.find((l: any) => String(l.id) === String(id))?.name || `List ${id}`;
+  const audienceName = (id?: number | null) =>
+    audiences.find((a) => a.id === id)?.name || (id ? `Audience ${id}` : null);
+
+  const removeList = async (s: AdsSet, listId: string) => {
+    const next = csvList(s.list_ids).filter((x) => x !== listId).join(",") || null;
+    try {
+      await adsApi.updateSet(s.id, { list_ids: next });
+      toast.success(`“${listName(listId)}” removed from “${s.name}”`);
+      reload();
+      onChanged();
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || "Could not remove list");
+    }
+  };
+
+  const toggleStatus = async (s: AdsSet) => {
+    const next = s.status === "active" ? "paused" : "active";
+    try {
+      await adsApi.updateSet(s.id, { status: next });
+      toast.success(next === "active" ? `“${s.name}” resumed` : `“${s.name}” paused`);
+      reload();
+      onChanged();
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || "Could not update set");
+    }
+  };
+
+  const toggleAuto = async (s: AdsSet, next: boolean) => {
+    try {
+      await adsApi.updateSet(s.id, { auto_optimize: next });
+      toast.success(next ? `Andromeda placement ON for “${s.name}”` : `Andromeda placement OFF for “${s.name}”`);
+      reload();
+      onChanged();
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || "Could not update set");
+    }
+  };
 
   return (
     <div className="space-y-3">
@@ -279,39 +356,130 @@ function SetsTab({ detail, reference, reload }: { detail: Detail; reference: any
         detail.sets.map((s) => {
           const preview = previews[s.id];
           const creatives = detail.creatives.filter((c) => c.set_id === s.id);
+          const lists = csvList(s.list_ids);
+          const explicit = csvList(s.contact_ids);
+          const audName = audienceName(s.audience_id);
+          const filters: string[] = [];
+          if (s.include_tags) filters.push(`tags: ${s.include_tags}`);
+          if (s.city) filters.push(s.city);
+          if (s.state) filters.push(s.state);
+          if (s.industry) filters.push(s.industry);
+          if (s.include_statuses) filters.push(`status: ${s.include_statuses}`);
+          if (s.activity_filter && s.activity_filter !== "any")
+            filters.push(s.activity_filter.replace(/_/g, " "));
           return (
             <div className="card p-4" key={s.id}>
               <div className="flex flex-wrap gap-3 items-start justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="font-semibold">{s.name}</h3>
                     <Badge value={s.status} />
+                    {s.auto_optimize === false && <span className="badge-gray">Andromeda off</span>}
                   </div>
                   <p className="text-sm text-gray-500 mt-1">
                     {preview
                       ? `${preview.matched} matched · ${preview.eligible} eligible · ${creatives.length} creative(s)`
                       : `${creatives.length} creative(s)`}
                   </p>
+                  {/* Audience sources with inline remove */}
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {lists.map((lid) => (
+                      <span
+                        key={lid}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-200"
+                      >
+                        {listName(lid)}
+                        <button
+                          type="button"
+                          title={`Remove ${listName(lid)} from this set`}
+                          className="hover:text-red-600"
+                          onClick={() => removeList(s, lid)}
+                        >
+                          <X size={12} />
+                        </button>
+                      </span>
+                    ))}
+                    {audName && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-200">
+                        ⦿ {audName}
+                      </span>
+                    )}
+                    {explicit.length > 0 && (
+                      <span className="px-2 py-0.5 rounded-full text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
+                        {explicit.length} picked contact{explicit.length === 1 ? "" : "s"}
+                      </span>
+                    )}
+                    {filters.map((f) => (
+                      <span
+                        key={f}
+                        className="px-2 py-0.5 rounded-full text-xs bg-gray-100 dark:bg-gray-700 text-gray-500"
+                      >
+                        {f}
+                      </span>
+                    ))}
+                    {lists.length === 0 && !audName && explicit.length === 0 && filters.length === 0 && (
+                      <span className="px-2 py-0.5 rounded-full text-xs bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-200">
+                        No audience yet — edit targeting to add lists or contacts
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2 items-center">
+                  <button
+                    className="btn-secondary btn-sm"
+                    title={s.status === "active" ? "Pause this set" : "Resume this set"}
+                    onClick={() => toggleStatus(s)}
+                  >
+                    {s.status === "active" ? <Pause size={14} /> : <Play size={14} />}
+                  </button>
                   <button className="btn-secondary btn-sm" onClick={() => setEditing(s)}>
                     Edit targeting
                   </button>
                   <button
+                    className="btn-secondary btn-sm"
+                    title="Duplicate this set (targeting + creatives, fresh audience)"
+                    onClick={async () => {
+                      try {
+                        await adsApi.duplicateSet(s.id);
+                        toast.success(`“${s.name}” duplicated`);
+                        reload();
+                        onChanged();
+                      } catch (err: any) {
+                        toast.error(err.response?.data?.detail || "Could not duplicate set");
+                      }
+                    }}
+                  >
+                    <Copy size={14} />
+                  </button>
+                  <button
                     className="btn-ghost btn-sm text-red-600"
                     onClick={async () => {
-                      if (!confirm(`Remove set "${s.name}"?`)) return;
+                      if (!confirm(`Remove set “${s.name}”?`)) return;
                       await adsApi.deleteSet(s.id);
                       toast.success("Set removed");
                       reload();
+                      onChanged();
                     }}
                   >
                     <Trash2 size={15} />
                   </button>
                 </div>
               </div>
+              {/* Per-set Andromeda placement toggle */}
+              <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+                <Toggle
+                  checked={s.auto_optimize !== false}
+                  onChange={(next) => toggleAuto(s, next)}
+                  label="Andromeda placement"
+                  hint={
+                    detail.auto_optimize
+                      ? "This set takes part in automatic winner traffic shifts."
+                      : "Only takes effect when the campaign master switch is ON (Optimization tab)."
+                  }
+                />
+              </div>
               {preview && Object.keys(preview.skipped || {}).length > 0 && (
-                <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 flex flex-wrap gap-3 text-xs text-gray-500">
+                <div className="mt-2 flex flex-wrap gap-3 text-xs text-gray-500">
                   {Object.entries(preview.skipped).map(([k, v]: any) => (
                     <span key={k}>
                       {k.replace(/_/g, " ")}: <b>{v}</b>
@@ -336,6 +504,7 @@ function SetsTab({ detail, reference, reload }: { detail: Detail; reference: any
             setCreating(false);
             setEditing(null);
             reload();
+            onChanged();
           }}
         />
       )}
@@ -360,19 +529,91 @@ function SetEditor({
     name: adsSet?.name || "",
     status: adsSet?.status || "active",
     list_ids: adsSet?.list_ids || "",
+    contact_ids: adsSet?.contact_ids || "",
+    audience_id: adsSet?.audience_id ?? "",
     include_tags: adsSet?.include_tags || "",
     exclude_tags: adsSet?.exclude_tags || "",
     include_statuses: adsSet?.include_statuses || "",
-    exclude_statuses: adsSet?.exclude_statuses || "opted_out",
+    exclude_statuses: adsSet?.exclude_statuses || "",
     city: adsSet?.city || "",
     state: adsSet?.state || "",
     industry: adsSet?.industry || "",
     activity_filter: adsSet?.activity_filter || "any",
     daily_limit: adsSet?.daily_limit ?? "",
     split_mode: adsSet?.split_mode || "equal",
+    auto_optimize: adsSet?.auto_optimize !== false,
   });
+  const [audiences, setAudiences] = useState<any[]>([]);
+  const [estimate, setEstimate] = useState<any>(null);
   const set = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }));
-  const selectedLists = (form.list_ids || "").split(",").filter(Boolean);
+  const selectedLists = csvList(form.list_ids);
+  const selectedContacts: number[] = useMemo(
+    () => csvList(form.contact_ids).map(Number).filter((n) => Number.isFinite(n) && n > 0),
+    [form.contact_ids]
+  );
+
+  useEffect(() => {
+    adsApi.listAudiences().then((r) => setAudiences(r.items)).catch(() => {});
+  }, []);
+
+  // Live size estimate as targeting changes.
+  const estimateKey = JSON.stringify({
+    l: form.list_ids,
+    c: form.contact_ids,
+    a: form.audience_id,
+    t: form.include_tags,
+    e: form.exclude_tags,
+    s: form.include_statuses,
+    x: form.exclude_statuses,
+    city: form.city,
+    st: form.state,
+    ind: form.industry,
+    act: form.activity_filter,
+  });
+  useEffect(() => {
+    const t = setTimeout(async () => {
+      try {
+        const r = await adsApi.previewTargeting({
+          list_ids: form.list_ids || null,
+          contact_ids: form.contact_ids || null,
+          audience_id: form.audience_id ? Number(form.audience_id) : null,
+          include_tags: form.include_tags || null,
+          exclude_tags: form.exclude_tags || null,
+          include_statuses: form.include_statuses || null,
+          exclude_statuses: form.exclude_statuses || null,
+          city: form.city || null,
+          state: form.state || null,
+          industry: form.industry || null,
+          activity_filter: form.activity_filter || null,
+        });
+        setEstimate(r);
+      } catch {
+        setEstimate(null);
+      }
+    }, 400);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [estimateKey]);
+
+  const loadAudience = async (id: number) => {
+    try {
+      const a = await adsApi.getAudience(id);
+      set("list_ids", a.list_ids || "");
+      set("contact_ids", a.contact_ids || "");
+      set("include_tags", a.include_tags || "");
+      set("exclude_tags", a.exclude_tags || "");
+      set("include_statuses", a.include_statuses || "");
+      set("exclude_statuses", a.exclude_statuses || "");
+      set("city", a.city || "");
+      set("state", a.state || "");
+      set("industry", a.industry || "");
+      set("activity_filter", a.activity_filter || "any");
+      set("audience_id", a.id);
+      toast.success(`Loaded audience “${a.name}”`);
+    } catch {
+      toast.error("Could not load audience");
+    }
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -381,7 +622,9 @@ function SetEditor({
       ...form,
       name: form.name.trim(),
       daily_limit: form.daily_limit === "" ? null : Number(form.daily_limit),
+      audience_id: form.audience_id ? Number(form.audience_id) : null,
       list_ids: form.list_ids || null,
+      contact_ids: form.contact_ids || null,
       include_tags: form.include_tags || null,
       exclude_tags: form.exclude_tags || null,
       include_statuses: form.include_statuses || null,
@@ -389,6 +632,7 @@ function SetEditor({
       city: form.city || null,
       state: form.state || null,
       industry: form.industry || null,
+      activity_filter: form.activity_filter || null,
     };
     try {
       if (adsSet) await adsApi.updateSet(adsSet.id, payload);
@@ -406,6 +650,41 @@ function SetEditor({
         <Field label="Set name">
           <input className="input" value={form.name} onChange={(e) => set("name", e.target.value)} autoFocus />
         </Field>
+
+        {estimate && (
+          <div className="p-3 rounded-lg bg-primary-50 dark:bg-primary-900/20 text-sm">
+            <b>{estimate.eligible}</b> eligible contacts
+            <span className="text-gray-500"> ({estimate.matched} matched before screening)</span>
+            {estimate.matched === 0 && (
+              <span className="block text-xs mt-1 text-amber-700 dark:text-amber-300">
+                Nothing selected yet — add at least one list, contact, audience or filter.
+              </span>
+            )}
+          </div>
+        )}
+
+        <Field label="Start from a saved audience" hint="Copies that audience's targeting into this set.">
+          <div className="flex gap-2">
+            <select
+              className="input flex-1"
+              value={form.audience_id}
+              onChange={(e) => set("audience_id", e.target.value)}
+            >
+              <option value="">No saved audience</option>
+              {audiences.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name} ({a.match_count ?? "?"} contacts)
+                </option>
+              ))}
+            </select>
+            {form.audience_id && (
+              <button type="button" className="btn-secondary" onClick={() => loadAudience(Number(form.audience_id))}>
+                Load
+              </button>
+            )}
+          </div>
+        </Field>
+
         <div>
           <span className="label">Contact lists</span>
           <div className="flex flex-wrap gap-2">
@@ -434,11 +713,26 @@ function SetEditor({
                 </button>
               );
             })}
+            {(reference?.lists || []).length === 0 && (
+              <p className="text-sm text-gray-500">No lists yet — create one under Lists first.</p>
+            )}
           </div>
           <p className="text-xs text-gray-500 mt-1">
-            Nothing selected targets all {reference?.total_contacts ?? 0} contacts.
+            Nothing selected matches <b>0 contacts</b> — a set stays empty until you add at least one
+            list, contact, audience or filter.
           </p>
         </div>
+
+        <div>
+          <span className="label">Picked contacts</span>
+          <ContactPicker
+            value={selectedContacts}
+            onChange={(ids) => set("contact_ids", ids.join(","))}
+            placeholder="Search and add individual contacts…"
+          />
+          <p className="text-xs text-gray-500 mt-1">Added on top of the lists above, then filtered.</p>
+        </div>
+
         <div className="grid sm:grid-cols-2 gap-3">
           <Field label="Include tags" hint="Comma separated.">
             <input className="input" value={form.include_tags} onChange={(e) => set("include_tags", e.target.value)} />
@@ -463,6 +757,9 @@ function SetEditor({
           </Field>
           <Field label="City">
             <input className="input" value={form.city} onChange={(e) => set("city", e.target.value)} />
+          </Field>
+          <Field label="State">
+            <input className="input" value={form.state} onChange={(e) => set("state", e.target.value)} />
           </Field>
           <Field label="Industry">
             <input className="input" value={form.industry} onChange={(e) => set("industry", e.target.value)} />
@@ -504,6 +801,16 @@ function SetEditor({
             </select>
           </Field>
         </div>
+
+        <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50">
+          <Toggle
+            checked={!!form.auto_optimize}
+            onChange={(v) => set("auto_optimize", v)}
+            label="Andromeda placement for this set"
+            hint="When the campaign master switch is ON, this set's traffic shifts to its winning creative automatically."
+          />
+        </div>
+
         <div className="flex gap-2">
           <button type="button" className="btn-secondary flex-1" onClick={close}>
             Cancel
@@ -515,10 +822,13 @@ function SetEditor({
   );
 }
 
+/* --------------------------------------------------------------- creatives */
+
 function CreativesTab({ detail, analytics, reload }: { detail: Detail; analytics: any; reload: () => void }) {
   const [editing, setEditing] = useState<AdsCreative | null>(null);
   const [creatingFor, setCreatingFor] = useState<number | null>(null);
   const [versionsFor, setVersionsFor] = useState<AdsCreative | null>(null);
+  const [analyticsFor, setAnalyticsFor] = useState<AdsCreative | null>(null);
   const perf = useMemo(() => {
     const map: Record<number, any> = {};
     (analytics?.creatives || []).forEach((c: any) => (map[c.id] = c));
@@ -529,17 +839,37 @@ function CreativesTab({ detail, analytics, reload }: { detail: Detail; analytics
   if (detail.sets.length === 0)
     return <Empty title="Create an SMS set first" body="Creatives live inside an SMS set." />;
 
+  const pauseLosers = async (setId: number, setName: string) => {
+    if (!confirm(`Pause every creative in “${setName}” except the winner? Pending contacts move to the winner.`))
+      return;
+    try {
+      const r = await adsApi.pauseLosers(setId);
+      toast.success(`Winner kept: ${r.winner_name} — ${r.moved} contact(s) moved`);
+      reload();
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || "Could not pause losers");
+    }
+  };
+
   return (
     <div className="space-y-5">
       {detail.sets.map((s) => {
         const creatives = detail.creatives.filter((c) => c.set_id === s.id);
+        const activeCount = creatives.filter((c) => c.status === "active").length;
         return (
           <div key={s.id} className="space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="font-semibold">{s.name}</h3>
-              <button className="btn-secondary btn-sm" onClick={() => setCreatingFor(s.id)}>
-                <Plus size={15} className="mr-1" /> Add creative
-              </button>
+              <div className="flex gap-2">
+                {activeCount >= 2 && (
+                  <button className="btn-secondary btn-sm" onClick={() => pauseLosers(s.id, s.name)}>
+                    <Trophy size={15} className="mr-1" /> Pause losers
+                  </button>
+                )}
+                <button className="btn-secondary btn-sm" onClick={() => setCreatingFor(s.id)}>
+                  <Plus size={15} className="mr-1" /> Add creative
+                </button>
+              </div>
             </div>
             {creatives.length === 0 ? (
               <Empty
@@ -555,20 +885,29 @@ function CreativesTab({ detail, analytics, reload }: { detail: Detail; analytics
               creatives.map((c) => {
                 const p = perf[c.id] || {};
                 return (
-                  <div className="card p-4" key={c.id}>
+                  <div
+                    className={`card p-4 ${p.is_winner ? "ring-2 ring-green-500" : ""}`}
+                    key={c.id}
+                  >
                     <div className="flex flex-wrap gap-3 items-start justify-between">
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <h4 className="font-semibold">{c.name}</h4>
                           <Badge value={c.status} />
+                          {p.is_winner && <WinnerBadge />}
+                          {p.needs_more_data && (p.sent ?? 0) > 0 && (
+                            <span className="badge-gray">Gathering data</span>
+                          )}
                           <button
                             className="text-xs text-primary-600"
                             onClick={() => setVersionsFor(c)}
                           >
                             v{c.current_version}
                           </button>
-                          {s.split_mode === "percentage" && (
-                            <span className="text-xs text-gray-500">{c.allocation}%</span>
+                          {(s.split_mode === "percentage" || s.split_mode === "weighted") && (
+                            <span className="text-xs text-gray-500">
+                              {s.split_mode === "percentage" ? `${c.allocation}%` : `weight ${c.allocation}`}
+                            </span>
                           )}
                         </div>
                         <p className="text-sm text-gray-600 dark:text-gray-300 mt-2 whitespace-pre-wrap break-words">
@@ -576,11 +915,19 @@ function CreativesTab({ detail, analytics, reload }: { detail: Detail; analytics
                         </p>
                       </div>
                       <div className="flex flex-wrap gap-2">
+                        <button
+                          className="btn-secondary btn-sm"
+                          title="Full analytics for this creative"
+                          onClick={() => setAnalyticsFor(c)}
+                        >
+                          <BarChart3 size={14} />
+                        </button>
                         <button className="btn-secondary btn-sm" onClick={() => setEditing(c)}>
                           Edit
                         </button>
                         <button
                           className="btn-secondary btn-sm"
+                          title={c.status === "active" ? "Turn this creative off" : "Turn this creative on"}
                           onClick={async () => {
                             await adsApi.updateCreative(c.id, {
                               status: c.status === "active" ? "paused" : "active",
@@ -626,15 +973,21 @@ function CreativesTab({ detail, analytics, reload }: { detail: Detail; analytics
                       </div>
                     </div>
                     <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 mt-4 pt-3 border-t border-gray-100 dark:border-gray-700 text-sm">
-                      <Metric label="Assigned" value={p.assigned ?? 0} />
                       <Metric label="Sent" value={p.sent ?? 0} />
+                      <Metric label="Delivery" value={`${p.delivery_rate ?? 0}%`} />
+                      <Metric label="Reply rate" value={`${p.reply_rate ?? 0}%`} />
+                      <Metric label="Open rate" value={`${p.open_rate ?? 0}%`} />
+                      <Metric label="Click rate" value={`${p.click_rate ?? 0}%`} />
+                      <Metric label="Score" value={p.score ?? 0} />
+                      <Metric label="Assigned" value={p.assigned ?? 0} />
                       <Metric label="Replies" value={p.replies ?? 0} />
                       <Metric label="Positive" value={p.positive_replies ?? 0} />
-                      <Metric label="Opt-outs" value={p.opt_outs ?? 0} />
-                      <Metric label="Score" value={p.score ?? 0} />
+                      <Metric label="Opt-outs" value={`${p.opt_outs ?? 0} (${p.opt_out_rate ?? 0}%)`} />
+                      <Metric label="Failed" value={`${p.failed ?? 0} (${p.failure_rate ?? 0}%)`} />
+                      <Metric label="Pending" value={p.pending ?? 0} />
                     </div>
                     <div className="mt-2">
-                      <Bar value={p.score || 0} max={maxScore} />
+                      <Bar value={p.score || 0} max={maxScore} tone={p.is_winner ? "success" : "primary"} />
                     </div>
                   </div>
                 );
@@ -659,7 +1012,64 @@ function CreativesTab({ detail, analytics, reload }: { detail: Detail; analytics
         />
       )}
       {versionsFor && <VersionsModal creative={versionsFor} close={() => setVersionsFor(null)} />}
+      {analyticsFor && <CreativeAnalyticsModal creative={analyticsFor} close={() => setAnalyticsFor(null)} />}
     </div>
+  );
+}
+
+function CreativeAnalyticsModal({ creative, close }: { creative: AdsCreative; close: () => void }) {
+  const [data, setData] = useState<any>(null);
+  useEffect(() => {
+    adsApi.creativeAnalytics(creative.id).then(setData).catch(() => {});
+  }, [creative.id]);
+  const maxScore = Math.max(1, ...(data?.peers || []).map((p: any) => p.score || 0));
+  return (
+    <Modal title={`${creative.name} — analytics`} close={close} wide>
+      {!data ? (
+        <p className="text-sm text-gray-500">Loading…</p>
+      ) : (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Badge value={data.status} />
+            {data.is_winner && <WinnerBadge />}
+            {data.needs_more_data && <span className="badge-gray">Needs more sends for a verdict</span>}
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <Stat label="Delivery rate" value={`${data.stats.delivery_rate}%`} />
+            <Stat label="Reply rate" value={`${data.stats.reply_rate}%`} />
+            <Stat label="Open rate" value={`${data.stats.open_rate}%`} hint="Replied or tapped the link" />
+            <Stat label="Click rate" value={`${data.stats.click_rate}%`} />
+            <Stat label="Positive reply rate" value={`${data.stats.positive_reply_rate}%`} />
+            <Stat label="Opt-out rate" value={`${data.stats.opt_out_rate}%`} />
+            <Stat label="Failure rate" value={`${data.stats.failure_rate}%`} />
+            <Stat label="Score" value={data.stats.score} icon={<TrendingUp size={17} />} />
+          </div>
+          <div className="card p-4 !shadow-none border border-gray-200 dark:border-gray-700">
+            <h4 className="font-semibold text-sm mb-3">Against the other creatives in this set</h4>
+            <div className="space-y-2">
+              {data.peers.map((p: any) => (
+                <div key={p.id}>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="flex items-center gap-2">
+                      {p.name} {p.is_winner && <WinnerBadge />}
+                    </span>
+                    <span className="text-gray-500">
+                      {p.sent} sent · {p.reply_rate}% replies · score {p.score}
+                    </span>
+                  </div>
+                  <Bar value={p.score} max={maxScore} tone={p.is_winner ? "success" : "primary"} />
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-3 text-sm">
+            <Metric label="Assigned" value={data.stats.assigned} />
+            <Metric label="Pending" value={data.stats.pending} />
+            <Metric label="Clicks" value={data.stats.clicks} />
+          </div>
+        </div>
+      )}
+    </Modal>
   );
 }
 
@@ -728,14 +1138,15 @@ function CreativeEditor({
           <Field label="Call to action">
             <input className="input" value={form.cta} onChange={(e) => set("cta", e.target.value)} />
           </Field>
-          <Field label="Tracking link">
+          <Field label="Tracking link" hint="Taps are counted into click rate and open rate.">
             <input
               className="input"
               value={form.tracking_link}
               onChange={(e) => set("tracking_link", e.target.value)}
+              placeholder="https://…"
             />
           </Field>
-          <Field label="Allocation %" hint="Used with percentage / weighted split.">
+          <Field label="Allocation % / weight" hint="Used with percentage / weighted split.">
             <input
               type="number"
               className="input"
@@ -792,19 +1203,61 @@ function VersionsModal({ creative, close }: { creative: AdsCreative; close: () =
   );
 }
 
+/* --------------------------------------------------------------- audience */
+
+const REMOVABLE = new Set(["pending", "skipped", "cancelled", "blocked"]);
+
 function AudienceTab({ detail, reference, reload }: { detail: Detail; reference: any; reload: () => void }) {
   const [rows, setRows] = useState<any>({ items: [], total: 0 });
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState("");
   const [adding, setAdding] = useState(false);
+  const [selected, setSelected] = useState<number[]>([]);
 
   const load = useCallback(async () => {
     setRows(await adsApi.audience(detail.id, { page, per_page: 50, status: status || undefined }));
+    setSelected([]);
   }, [detail.id, page, status]);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  const toggle = (id: number) =>
+    setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+
+  const removeOne = async (row: any) => {
+    if (!REMOVABLE.has(row.send_status)) {
+      toast.error("Already sent — this row is analytics history. Suppress the contact to block future sends.");
+      return;
+    }
+    if (!confirm(`Remove ${row.name || row.phone_number} from this campaign's audience?`)) return;
+    try {
+      await adsApi.removeAudienceContact(detail.id, row.id);
+      toast.success("Contact removed from audience");
+      load();
+      reload();
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || "Could not remove contact");
+    }
+  };
+
+  const bulkRemove = async () => {
+    if (selected.length === 0) return;
+    if (!confirm(`Remove ${selected.length} contact(s) from this campaign's audience?`)) return;
+    try {
+      const r = await adsApi.bulkRemoveAudience(detail.id, selected);
+      toast.success(
+        `Removed ${r.removed}${r.skipped_sent ? `, skipped ${r.skipped_sent} already sent` : ""}`
+      );
+      load();
+      reload();
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || "Could not remove contacts");
+    }
+  };
+
+  const allOnPage = rows.items.length > 0 && rows.items.every((r: any) => selected.includes(r.id));
 
   return (
     <div className="space-y-3">
@@ -819,6 +1272,11 @@ function AudienceTab({ detail, reference, reload }: { detail: Detail; reference:
             ))}
           </select>
           <span className="text-sm text-gray-500">{rows.total} contacts</span>
+          {selected.length > 0 && (
+            <button className="btn-danger btn-sm" onClick={bulkRemove}>
+              <Trash2 size={14} className="mr-1" /> Remove {selected.length}
+            </button>
+          )}
         </div>
         <div className="flex gap-2">
           <a className="btn-secondary btn-sm" href={adsApi.exportUrl("audience", detail.id)}>
@@ -842,23 +1300,43 @@ function AudienceTab({ detail, reference, reload }: { detail: Detail; reference:
       </div>
 
       {rows.items.length === 0 ? (
-        <Empty title="No contacts in this campaign yet" body="Add contacts or refresh the audience." />
+        <Empty
+          title="No contacts in this campaign yet"
+          body="Add a list to an SMS set (SMS Sets tab), attach a saved audience, or add contacts directly."
+        />
       ) : (
         <div className="card overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="text-left text-gray-500 border-b border-gray-100 dark:border-gray-700">
               <tr>
+                <th className="p-3">
+                  <input
+                    type="checkbox"
+                    checked={allOnPage}
+                    onChange={() =>
+                      setSelected(allOnPage ? [] : rows.items.map((r: any) => r.id))
+                    }
+                  />
+                </th>
                 <th className="p-3">Contact</th>
                 <th className="p-3">Phone</th>
                 <th className="p-3">Creative</th>
                 <th className="p-3">Status</th>
                 <th className="p-3">Reply</th>
                 <th className="p-3">Sent</th>
+                <th className="p-3" />
               </tr>
             </thead>
             <tbody>
               {rows.items.map((r: any) => (
                 <tr key={r.id} className="border-b border-gray-50 dark:border-gray-700/50">
+                  <td className="p-3">
+                    <input
+                      type="checkbox"
+                      checked={selected.includes(r.id)}
+                      onChange={() => toggle(r.id)}
+                    />
+                  </td>
                   <td className="p-3">{r.name || "—"}</td>
                   <td className="p-3 whitespace-nowrap">{r.phone_number}</td>
                   <td className="p-3">{r.creative || "—"}</td>
@@ -870,6 +1348,21 @@ function AudienceTab({ detail, reference, reload }: { detail: Detail; reference:
                   </td>
                   <td className="p-3">{r.reply_status || "—"}</td>
                   <td className="p-3 whitespace-nowrap">{r.sent_at ? fmtDate(r.sent_at) : "—"}</td>
+                  <td className="p-3">
+                    {REMOVABLE.has(r.send_status) ? (
+                      <button
+                        className="btn-ghost btn-sm text-red-600"
+                        title="Remove from audience (not sent yet)"
+                        onClick={() => removeOne(r)}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    ) : (
+                      <span className="text-xs text-gray-400" title="Already sent — protected history">
+                        locked
+                      </span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -920,18 +1413,23 @@ function AddContactsModal({
 }) {
   const [setId, setSetId] = useState<number | "">(detail.sets[0]?.id ?? "");
   const [lists, setLists] = useState<number[]>([]);
+  const [contactIds, setContactIds] = useState<number[]>([]);
   const [tags, setTags] = useState("");
   const [result, setResult] = useState<any>(null);
   const [busy, setBusy] = useState(false);
 
   const submit = async () => {
+    if (lists.length === 0 && contactIds.length === 0 && !tags.trim()) {
+      toast.error("Pick at least one list, contact or tag — nothing is added automatically.");
+      return;
+    }
     setBusy(true);
     try {
       const r = await adsApi.addContacts(detail.id, {
         set_id: setId || null,
         list_ids: lists,
         tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
-        contact_ids: [],
+        contact_ids: contactIds,
       });
       setResult(r);
     } catch (err: any) {
@@ -977,7 +1475,7 @@ function AddContactsModal({
             </select>
           </Field>
           <div>
-            <span className="label">Lists</span>
+            <span className="label">Lists — only what you pick is added</span>
             <div className="flex flex-wrap gap-2">
               {(reference?.lists || []).map((l: any) => {
                 const on = lists.includes(l.id);
@@ -996,14 +1494,22 @@ function AddContactsModal({
                   </button>
                 );
               })}
+              {(reference?.lists || []).length === 0 && (
+                <p className="text-sm text-gray-500">No lists yet.</p>
+              )}
             </div>
+          </div>
+          <div>
+            <span className="label">Individual contacts</span>
+            <ContactPicker value={contactIds} onChange={setContactIds} placeholder="Search contacts to add…" />
           </div>
           <Field label="Tags" hint="Comma separated. Contacts with any of these tags are considered.">
             <input className="input" value={tags} onChange={(e) => setTags(e.target.value)} />
           </Field>
           <p className="text-xs text-gray-500">
-            Duplicates, suppressed contacts, opt-outs and anyone already in this campaign are filtered out
-            automatically — you will see exactly why on the next screen.
+            Only the lists, contacts and tags you pick are evaluated. Duplicates, suppressed contacts,
+            opt-outs and anyone already in this campaign are filtered out automatically — you will see
+            exactly why on the next screen.
           </p>
           <div className="flex gap-2">
             <button className="btn-secondary flex-1" onClick={close}>
@@ -1281,6 +1787,286 @@ function StepEditor({
   );
 }
 
+/* ------------------------------------------------------------ optimization */
+
+const METRIC_LABELS: Record<string, string> = {
+  score: "Performance score",
+  reply_rate: "Reply rate",
+  positive_reply_rate: "Positive reply rate",
+  conversion_rate: "Conversion rate",
+};
+
+function OptimizationTab({
+  detail,
+  reference,
+  reload,
+  onChanged,
+}: {
+  detail: Detail;
+  reference: any;
+  reload: () => void;
+  onChanged: () => void;
+}) {
+  const [plan, setPlan] = useState<any>(null);
+  const [busy, setBusy] = useState(false);
+  const [form, setForm] = useState<any>({
+    optimize_metric: detail.optimize_metric || "score",
+    optimize_min_sends: detail.optimize_min_sends ?? 30,
+    optimize_min_gap_pct: detail.optimize_min_gap_pct ?? 25,
+    optimize_action: detail.optimize_action || "shift",
+  });
+
+  const loadPlan = useCallback(async () => {
+    try {
+      setPlan(await adsApi.optimizationStatus(detail.id));
+    } catch {
+      /* best-effort */
+    }
+  }, [detail.id]);
+
+  useEffect(() => {
+    loadPlan();
+  }, [loadPlan]);
+
+  const saveStrategy = async () => {
+    setBusy(true);
+    try {
+      await adsApi.updateCampaign(detail.id, {
+        optimize_metric: form.optimize_metric,
+        optimize_min_sends: Number(form.optimize_min_sends) || 30,
+        optimize_min_gap_pct: Number(form.optimize_min_gap_pct) || 0,
+        optimize_action: form.optimize_action,
+      });
+      toast.success("Optimization strategy saved");
+      reload();
+      onChanged();
+      loadPlan();
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || "Could not save strategy");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const toggleMaster = async (next: boolean) => {
+    try {
+      await adsApi.updateCampaign(detail.id, { auto_optimize: next });
+      toast.success(next ? "Andromeda auto-optimization is ON" : "Andromeda auto-optimization is OFF");
+      reload();
+      onChanged();
+      loadPlan();
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || "Could not update");
+    }
+  };
+
+  const runNow = async (dryRun: boolean) => {
+    setBusy(true);
+    try {
+      const r = await adsApi.runOptimization(detail.id, dryRun);
+      if (dryRun) {
+        setPlan(r.plan);
+        toast.success(
+          r.plan.total_moveable > 0
+            ? `Preview: ${r.plan.total_moveable} contact(s) would move to winner(s)`
+            : "Preview: nothing would move right now"
+        );
+      } else {
+        toast.success(`Optimized: ${r.moved} moved, ${r.paused.length} paused`);
+        reload();
+        onChanged();
+        loadPlan();
+      }
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || "Optimization failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="card p-5 space-y-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="font-semibold flex items-center gap-2">
+              <Bot size={18} className="text-primary-600" /> Andromeda auto-optimization
+            </h3>
+            <p className="text-sm text-gray-500 mt-1 max-w-2xl">
+              When ON, the winning creative in each participating set automatically receives the remaining
+              contacts (spend) while losers are left behind — like Meta's Andromeda. Nothing automatic ever
+              runs while this switch is OFF.
+            </p>
+          </div>
+          <Toggle
+            checked={!!detail.auto_optimize}
+            onChange={toggleMaster}
+            label={detail.auto_optimize ? "ON" : "OFF"}
+          />
+        </div>
+
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <Field label="Winning metric">
+            <select
+              className="input"
+              value={form.optimize_metric}
+              onChange={(e) => setForm({ ...form, optimize_metric: e.target.value })}
+            >
+              {Object.entries(METRIC_LABELS).map(([v, l]) => (
+                <option key={v} value={v}>
+                  {l}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Min sends per creative" hint="No decisions on noise.">
+            <input
+              type="number"
+              min={1}
+              className="input"
+              value={form.optimize_min_sends}
+              onChange={(e) => setForm({ ...form, optimize_min_sends: e.target.value })}
+            />
+          </Field>
+          <Field label="Min winning gap %" hint="Winner must beat losers by this much.">
+            <input
+              type="number"
+              min={0}
+              className="input"
+              value={form.optimize_min_gap_pct}
+              onChange={(e) => setForm({ ...form, optimize_min_gap_pct: e.target.value })}
+            />
+          </Field>
+          <Field label="Action on losers">
+            <select
+              className="input"
+              value={form.optimize_action}
+              onChange={(e) => setForm({ ...form, optimize_action: e.target.value })}
+            >
+              <option value="shift">Shift spend, keep learning</option>
+              <option value="shift_and_pause">Shift spend + pause losers</option>
+            </select>
+          </Field>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <button className="btn-secondary btn-sm" disabled={busy} onClick={saveStrategy}>
+            Save strategy
+          </button>
+          <button className="btn-secondary btn-sm" disabled={busy} onClick={() => runNow(true)}>
+            Preview what would happen
+          </button>
+          <button
+            className="btn-primary btn-sm"
+            disabled={busy || !detail.auto_optimize}
+            title={detail.auto_optimize ? "Run one optimization pass now" : "Turn the master switch ON first"}
+            onClick={() => runNow(false)}
+          >
+            <Zap size={15} className="mr-1" /> Optimize now
+          </button>
+        </div>
+        {plan?.last_run_at && (
+          <p className="text-xs text-gray-500">Last automatic run: {fmtDate(plan.last_run_at)}</p>
+        )}
+      </div>
+
+      <div className="card p-5">
+        <h3 className="font-semibold mb-2">The strategy</h3>
+        <ol className="text-sm text-gray-600 dark:text-gray-300 space-y-1 list-decimal list-inside">
+          <li>Every active creative is scored on <b>{METRIC_LABELS[plan?.metric || "score"]}</b>.</li>
+          <li>A creative can only win or lose after <b>{plan?.min_sends ?? 30} sends</b> — no verdicts on noise.</li>
+          <li>The winner must beat each loser by at least <b>{plan?.min_gap_pct ?? 25}%</b>.</li>
+          <li>Unsent contacts on losing creatives move to the winner — sent history is never touched.</li>
+          <li>
+            {plan?.action === "shift_and_pause"
+              ? "Losers are paused and future splits go 100% to the winner."
+              : "Nobody is paused: future splits rebalance toward the winner while losers keep a learning trickle."}
+          </li>
+          <li>Sets with their placement toggle OFF are skipped entirely.</li>
+        </ol>
+      </div>
+
+      {plan && (
+        <div className="space-y-3">
+          <h3 className="font-semibold">
+            Right now {plan.total_moveable > 0 ? `— ${plan.total_moveable} contact(s) would move` : "— nothing to move"}
+          </h3>
+          {plan.per_set.map((ps: any) => (
+            <div className="card p-4" key={ps.set_id}>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <h4 className="font-semibold">{ps.set_name}</h4>
+                  {!ps.set_auto_optimize && <span className="badge-gray">Placement off</span>}
+                </div>
+                {ps.winner_id ? (
+                  <WinnerBadge label={`${ps.winner_name} leads`} />
+                ) : (
+                  <span className="text-xs text-gray-500">{ps.reason}</span>
+                )}
+              </div>
+              {ps.eligible && ps.losers.length > 0 && (
+                <div className="mt-3 space-y-1.5 text-sm">
+                  {ps.losers.map((l: any) => (
+                    <div
+                      key={l.creative_id}
+                      className="flex flex-wrap justify-between gap-2 p-2 rounded-lg bg-gray-50 dark:bg-gray-700/50"
+                    >
+                      <span>
+                        {l.name} —{" "}
+                        <span className={l.action === "shift" ? "text-primary-600 font-medium" : "text-gray-500"}>
+                          {l.action === "shift" ? `would move ${l.pending} contact(s)` : "hold"}
+                        </span>
+                      </span>
+                      <span className="text-xs text-gray-500">{l.reason}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {ps.eligible && ps.set_auto_optimize && (
+                <div className="mt-3">
+                  <Toggle
+                    checked={true}
+                    onChange={async () => {
+                      const s = detail.sets.find((x) => x.id === ps.set_id);
+                      if (!s) return;
+                      await adsApi.updateSet(s.id, { auto_optimize: false });
+                      toast.success(`Andromeda placement OFF for “${s.name}”`);
+                      reload();
+                      loadPlan();
+                    }}
+                    label="Placement for this set"
+                    hint="Turn off to exclude this set from automatic shifts."
+                  />
+                </div>
+              )}
+              {ps.eligible === false && ps.set_auto_optimize && ps.reason?.includes("turned off") === false && ps.set_status === "active" && null}
+              {!ps.set_auto_optimize && (
+                <div className="mt-3">
+                  <button
+                    className="btn-secondary btn-sm"
+                    onClick={async () => {
+                      const s = detail.sets.find((x) => x.id === ps.set_id);
+                      if (!s) return;
+                      await adsApi.updateSet(s.id, { auto_optimize: true });
+                      toast.success(`Andromeda placement ON for “${s.name}”`);
+                      reload();
+                      loadPlan();
+                    }}
+                  >
+                    Turn placement on for this set
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* --------------------------------------------------------------- analytics */
+
 function AnalyticsTab({ analytics, campaignId }: { analytics: any; campaignId: number }) {
   if (!analytics) return null;
   const c = analytics.campaign;
@@ -1295,6 +2081,8 @@ function AnalyticsTab({ analytics, campaignId }: { analytics: any; campaignId: n
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Stat label="Delivery rate" value={`${c.delivery_rate}%`} />
         <Stat label="Reply rate" value={`${c.reply_rate}%`} />
+        <Stat label="Open rate" value={`${c.open_rate ?? 0}%`} hint="Replied or tapped the link" />
+        <Stat label="Click rate" value={`${c.click_rate ?? 0}%`} />
         <Stat label="Positive reply rate" value={`${c.positive_reply_rate}%`} />
         <Stat label="Conversion rate" value={`${c.conversion_rate}%`} />
         <Stat label="Meeting rate" value={`${c.meeting_rate}%`} />
@@ -1309,9 +2097,12 @@ function AnalyticsTab({ analytics, campaignId }: { analytics: any; campaignId: n
           {analytics.sets.map((s: any) => (
             <div key={s.id}>
               <div className="flex justify-between text-sm mb-1">
-                <span>{s.name}</span>
+                <span className="flex items-center gap-2">
+                  {s.name}
+                  {s.winner_id && <WinnerBadge label="has winner" />}
+                </span>
                 <span className="text-gray-500">
-                  {s.sent} sent · {s.reply_rate}% replies
+                  {s.sent} sent · {s.reply_rate}% replies · {s.open_rate ?? 0}% opened
                 </span>
               </div>
               <Bar value={s.score} max={maxSetScore} />
@@ -1326,9 +2117,11 @@ function AnalyticsTab({ analytics, campaignId }: { analytics: any; campaignId: n
           <thead className="text-left text-gray-500 border-b border-gray-100 dark:border-gray-700">
             <tr>
               <th className="p-3">Creative</th>
-              <th className="p-3">Assigned</th>
               <th className="p-3">Sent</th>
+              <th className="p-3">Delivery</th>
               <th className="p-3">Replies</th>
+              <th className="p-3">Open</th>
+              <th className="p-3">Click</th>
               <th className="p-3">Positive</th>
               <th className="p-3">Opt-outs</th>
               <th className="p-3">Score</th>
@@ -1336,11 +2129,24 @@ function AnalyticsTab({ analytics, campaignId }: { analytics: any; campaignId: n
           </thead>
           <tbody>
             {analytics.creatives.map((c2: any) => (
-              <tr key={c2.id} className="border-b border-gray-50 dark:border-gray-700/50">
-                <td className="p-3">{c2.name}</td>
-                <td className="p-3">{c2.assigned}</td>
+              <tr
+                key={c2.id}
+                className={`border-b border-gray-50 dark:border-gray-700/50 ${
+                  c2.is_winner ? "bg-green-50/60 dark:bg-green-900/10" : ""
+                }`}
+              >
+                <td className="p-3">
+                  <span className="flex items-center gap-2">
+                    {c2.name} {c2.is_winner && <WinnerBadge />}
+                  </span>
+                </td>
                 <td className="p-3">{c2.sent}</td>
-                <td className="p-3">{c2.replies}</td>
+                <td className="p-3">{c2.delivery_rate}%</td>
+                <td className="p-3">
+                  {c2.replies} ({c2.reply_rate}%)
+                </td>
+                <td className="p-3">{c2.open_rate ?? 0}%</td>
+                <td className="p-3">{c2.click_rate ?? 0}%</td>
                 <td className="p-3">{c2.positive_replies}</td>
                 <td className="p-3">{c2.opt_outs}</td>
                 <td className="p-3 font-semibold">{c2.score}</td>
