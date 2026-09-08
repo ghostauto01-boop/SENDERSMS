@@ -7,7 +7,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models.conversation import Conversation, Message
 from app.models.contact import Contact
-from app.models.template import Template
 from app.models.user import User
 from app.security.auth import get_current_user
 from app.utils.phone import normalize_nigerian_number
@@ -90,9 +89,8 @@ async def preview_reply_template(
     contact = (await db.execute(
         select(Contact).where(Contact.id == conv.contact_id)
     )).scalar_one_or_none()
-    template = (await db.execute(
-        select(Template).where(Template.id == template_id, Template.is_active == True)  # noqa: E712
-    )).scalar_one_or_none()
+    from app.services.template_service import get_active_template
+    template = await get_active_template(db, template_id)
     if not template:
         raise HTTPException(404, "Template not found or inactive")
     from app.utils.phone import count_sms_segments
@@ -122,9 +120,8 @@ async def send_reply(
     conv = await _get_conv(db, conversation_id)
     template = None
     if template_id is not None:
-        template = (await db.execute(
-            select(Template).where(Template.id == template_id, Template.is_active == True)  # noqa: E712
-        )).scalar_one_or_none()
+        from app.services.template_service import get_active_template
+        template = await get_active_template(db, template_id)
         if not template:
             raise HTTPException(404, "Template not found or inactive")
 

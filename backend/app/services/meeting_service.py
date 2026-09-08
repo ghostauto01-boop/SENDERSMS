@@ -125,11 +125,8 @@ async def resolve_message_body(
     db: AsyncSession, *, template_id: int | None, custom_body: str | None, fallback: str
 ) -> tuple[str, Template | None]:
     """Pick the message text: custom body wins, then template, then default."""
-    template = None
-    if template_id is not None:
-        template = (await db.execute(
-            select(Template).where(Template.id == template_id, Template.is_active == True)  # noqa: E712
-        )).scalar_one_or_none()
+    from app.services.template_service import get_active_template
+    template = await get_active_template(db, template_id)
     if custom_body and custom_body.strip():
         return custom_body, template
     if template is not None:
@@ -358,7 +355,9 @@ async def process_due_meeting_reminders() -> dict:
         rows = (await db.execute(
             select(Meeting).where(
                 Meeting.status.in_(("scheduled", "confirmed")),
-                Meeting.send_sms_reminder == True,  # noqa: E712
+                # Integer-backed boolean: compare with 1, never `== True`
+                # (PostgreSQL rejects `integer = boolean`; see template_service).
+                Meeting.send_sms_reminder == 1,
                 Meeting.starts_at > now,
             ).order_by(Meeting.starts_at.asc()).limit(100)
         )).scalars().all()
