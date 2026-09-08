@@ -208,8 +208,13 @@ export const adsApi = {
 
   removeAudienceContact: (campaignId: number, assignmentId: number) =>
     unwrap<void>(api.delete(`/ads/campaigns/${campaignId}/audience/${assignmentId}`)),
-  bulkRemoveAudience: (campaignId: number, ids: number[]) =>
-    unwrap<any>(api.post(`/ads/campaigns/${campaignId}/audience/bulk-remove`, { ids, action: "remove" })),
+  bulkRemoveAudience: (campaignId: number, ids: number[] = [], all = false, status?: string) =>
+    unwrap<any>(api.post(`/ads/campaigns/${campaignId}/audience/bulk-remove`, {
+      ids,
+      action: "remove",
+      scope: all ? "all" : "ids",
+      status: status || undefined,
+    })),
 
   optimizationStatus: (campaignId: number) => unwrap<any>(api.get(`/ads/campaigns/${campaignId}/optimization`)),
   runOptimization: (campaignId: number, dryRun = false) =>

@@ -379,6 +379,13 @@ class FollowUpTaskIn(BaseModel):
 
 
 class BulkActionIn(BaseModel):
-    ids: list[int]
+    ids: list[int] = Field(default_factory=list)
     action: str
     value: Optional[str] = None
+    # "ids" (default) targets the explicit ids. "all" makes the audience
+    # bulk-remove act on every removable (unsent) row of the campaign, so the
+    # UI can offer "remove all unsent contacts" without enumerating every id.
+    scope: str = "ids"
+    # When scope == "all", restricts the removal to rows whose send_status
+    # matches, so the remove-all matches the Audience tab's status filter.
+    status: Optional[str] = None

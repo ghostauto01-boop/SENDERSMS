@@ -343,7 +343,35 @@ async def bulk_action(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Perform bulk action on contacts."""
+    """Perform bulk action on contacts.
+
+    Two scopes are supported:
+
+    - ``scope="ids"`` (default): act on ``contact_ids``.
+    - ``scope="all"`` (delete only): act on *every* contact matching the
+      ``search`` / ``lead_status`` / ``tag`` filters — the same filters the
+      Contacts list is showing. This powers "select all N matching" in the
+      UI without the client having to enumerate every id across pages.
+    """
+    if data.scope == "all":
+        if data.action != "delete":
+            raise HTTPException(
+                status_code=400,
+                detail="scope='all' is only supported for action='delete'",
+            )
+        id_query = _apply_contact_filters(
+            select(Contact.id), data.search, data.lead_status, data.tag
+        )
+        matching_ids = (await db.execute(id_query)).scalars().all()
+        if matching_ids:
+            contacts = (
+                await db.execute(select(Contact).where(Contact.id.in_(matching_ids)))
+            ).scalars().all()
+            for c in contacts:
+                await _delete_contact_permanently(db, c)
+            await db.flush()
+        return {"success": True, "affected": len(matching_ids), "scope": "all"}
+
     result = await db.execute(select(Contact).where(Contact.id.in_(data.contact_ids)))
     contacts = result.scalars().all()
 

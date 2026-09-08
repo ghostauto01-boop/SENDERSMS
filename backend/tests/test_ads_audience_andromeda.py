@@ -285,6 +285,43 @@ async def test_bulk_remove_skips_sent(db):
     assert result == {"removed": 2, "skipped_sent": 1, "missing": 0}
 
 
+@pytest.mark.asyncio
+async def test_bulk_remove_all_deletes_only_unsent_rows(db):
+    contacts = await make_contacts(db, 3)
+    lst = await make_list(db, contacts)
+    campaign = await make_campaign(db)
+    ads_set = await make_set(db, campaign, lst)
+    await make_creatives(db, ads_set, ["A"])
+    await svc.build_audience(db, campaign)
+
+    rows = list((await db.execute(select(AdsAssignment))).scalars().all())
+    assert len(rows) == 3
+    # One row already went out — it must survive the remove-all.
+    rows[0].send_status = "delivered"
+    from datetime import datetime, timezone
+
+    rows[0].sent_at = datetime.now(timezone.utc)
+    await db.flush()
+
+    result = await svc.bulk_remove_assignments(
+        db, campaign.id, ids=[], actor="user", remove_all=True
+    )
+    # Only the two unsent rows were removable; the sent one was never targeted.
+    assert result == {"removed": 2, "skipped_sent": 0, "missing": 0}
+
+    remaining = (await db.execute(select(AdsAssignment))).scalars().all()
+    assert [r.id for r in remaining] == [rows[0].id]
+
+
+@pytest.mark.asyncio
+async def test_bulk_remove_all_empty_audience_is_a_noop(db):
+    campaign = await make_campaign(db)
+    result = await svc.bulk_remove_assignments(
+        db, campaign.id, ids=[], actor="user", remove_all=True
+    )
+    assert result == {"removed": 0, "skipped_sent": 0, "missing": 0}
+
+
 # ------------------------------------------------------------- winners
 
 

@@ -30,6 +30,9 @@ export default function ContactsPage() {
   const [search, setSearch] = useState(""); const [leadStatus, setLeadStatus] = useState("");
   const [loading, setLoading] = useState(true); const [error, setError] = useState<string|null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  // "Select all N matching" — the selection covers every contact matching the
+  // current search/status across ALL pages, not just the 25 on screen.
+  const [allMatching, setAllMatching] = useState(false);
   const [showAdd, setShowAdd] = useState(false); const [showImport, setShowImport] = useState(false);
   const [showListModal, setShowListModal] = useState(false);
   const [selectedListId, setSelectedListId] = useState("");
@@ -66,8 +69,28 @@ export default function ContactsPage() {
   };
 
   const handleDelete = async (id:number) => { if(!confirm("Permanently delete this phone number? This cannot be undone."))return; try { await api.delete(`/contacts/${id}`); toast.success("Contact permanently deleted"); loadContacts(); } catch { toast.error("Failed to delete"); } };
-  const handleBulkDelete = async () => { if(selected.size===0||!confirm(`Permanently delete ${selected.size} phone numbers? This cannot be undone.`))return; try { await api.post("/contacts/bulk",{contact_ids:[...selected],action:"delete"}); toast.success(`${selected.size} phone numbers permanently deleted`); setSelected(new Set()); loadContacts(); } catch { toast.error("Failed"); } };
-  const handleBulkStatus = async (status:string) => { if(selected.size===0)return; try { await api.post("/contacts/bulk",{contact_ids:[...selected],action:"status",value:status}); toast.success(`Updated ${selected.size} contacts`); setSelected(new Set()); loadContacts(); } catch { toast.error("Failed"); } };
+  const clearSelection = () => { setSelected(new Set()); setAllMatching(false); };
+  const handleBulkDelete = async () => {
+    const count = allMatching ? total : selected.size;
+    if (count === 0) return;
+    const label = allMatching ? `${count} matching phone numbers` : `${count} phone numbers`;
+    if(!confirm(`Permanently delete ${label}? This cannot be undone.`))return;
+    try {
+      if (allMatching) {
+        // Server-side scope: delete everything matching the current filters
+        // across every page — no need to enumerate thousands of ids.
+        await api.post("/contacts/bulk",{contact_ids:[],action:"delete",scope:"all",search:search||undefined,lead_status:leadStatus||undefined});
+      } else {
+        await api.post("/contacts/bulk",{contact_ids:[...selected],action:"delete"});
+      }
+      toast.success(`${count} phone numbers permanently deleted`);
+      clearSelection(); loadContacts();
+    } catch { toast.error("Failed"); }
+  };
+  const handleBulkStatus = async (status:string) => {
+    if (selected.size===0 || allMatching) return;
+    try { await api.post("/contacts/bulk",{contact_ids:[...selected],action:"status",value:status}); toast.success(`Updated ${selected.size} contacts`); clearSelection(); loadContacts(); } catch { toast.error("Failed"); }
+  };
 
   const doQuickSend = async () => { if(!quickMsg.trim()||!quickSendId)return; setQuickSending(true);
     try { await api.post("/send/",null,{params:{contact_id:quickSendId,body:quickMsg}}); toast.success("SMS sent!"); setQuickSendId(null); setQuickMsg(""); setQuickContact(null); }
@@ -75,12 +98,28 @@ export default function ContactsPage() {
     finally { setQuickSending(false); }
   };
 
+  const pageAll = contacts.length>0 && selected.size===contacts.length && !allMatching;
+  const selectedCount = allMatching ? total : selected.size;
+
+  // Tapping a row while in "all matching" mode drops out of that mode and
+  // keeps the visible page (minus the tapped contact) as the new selection,
+  // so what the checkboxes show always matches what will be deleted.
   const toggleSelect = (id:number) => {
+    if (allMatching) {
+      const n=new Set(contacts.map(c=>c.id)); n.delete(id);
+      setSelected(n); setAllMatching(false);
+      return;
+    }
     const n=new Set(selected); n.has(id)?n.delete(id):n.add(id); setSelected(n);
   };
+  // Three states: select the 25 on this page -> "select all N matching"
+  // (every page of the current search/status view) -> clear everything.
   const toggleSelectAll = () => {
-    if (selected.size===contacts.length && contacts.length>0) setSelected(new Set());
-    else setSelected(new Set(contacts.map(c=>c.id)));
+    if (allMatching) { clearSelection(); return; }
+    if (pageAll) {
+      if (total > contacts.length) setAllMatching(true);
+      else setSelected(new Set());
+    } else setSelected(new Set(contacts.map(c=>c.id)));
   };
 
   const totalPages = Math.ceil(total/25);
@@ -112,19 +151,37 @@ export default function ContactsPage() {
         </div>
 
         {/* Selected bar - sticky like WhatsApp */}
-        {selected.size>0 && (
-          <div className="bg-[#00a884] text-white rounded-xl px-3 lg:px-4 py-2.5 flex items-center justify-between shadow-sm">
-            <span className="text-sm font-medium flex items-center gap-2">
-              <button onClick={()=>setSelected(new Set())} className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center"><X size={14}/></button>
-              {selected.size} selected
-            </span>
-            <div className="flex items-center gap-1.5">
-              <button onClick={handleBulkDelete} className="bg-white text-[#c5221f] px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1"><Trash2 size={12}/>Delete permanently</button>
-              <select className="bg-white text-[#111b21] px-2 py-1.5 rounded-full text-xs font-medium" onChange={e=>{if(e.target.value)handleBulkStatus(e.target.value); e.target.value=""}} value="">
-                <option value="">Status…</option>{LEAD_STATUSES.map(s=><option key={s} value={s}>{s}</option>)}
-              </select>
-              <button onClick={()=>setShowListModal(true)} className="bg-white text-[#008069] px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1"><ListPlus size={12}/><span className="hidden sm:inline">List</span></button>
+        {selectedCount>0 && (
+          <div className="bg-[#00a884] text-white rounded-xl px-3 lg:px-4 py-2.5 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-sm font-medium flex items-center gap-2 flex-wrap">
+                <button onClick={clearSelection} className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center"><X size={14}/></button>
+                {allMatching
+                  ? <span>All {total} matching selected</span>
+                  : <span>{selected.size} selected</span>}
+                {!allMatching && selected.size>0 && total>selected.size && (
+                  <button onClick={()=>setAllMatching(true)} className="bg-white/20 hover:bg-white/30 px-2.5 py-1 rounded-full text-xs font-semibold">
+                    Select all {total} matching
+                  </button>
+                )}
+              </span>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {!allMatching && (
+                  <>
+                    <select className="bg-white text-[#111b21] px-2 py-1.5 rounded-full text-xs font-medium" onChange={e=>{if(e.target.value)handleBulkStatus(e.target.value); e.target.value=""}} value="">
+                      <option value="">Status…</option>{LEAD_STATUSES.map(s=><option key={s} value={s}>{s}</option>)}
+                    </select>
+                    <button onClick={()=>setShowListModal(true)} className="bg-white text-[#008069] px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1"><ListPlus size={12}/><span className="hidden sm:inline">List</span></button>
+                  </>
+                )}
+                <button onClick={handleBulkDelete} className="bg-white text-[#c5221f] px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1"><Trash2 size={12}/>Delete permanently</button>
+              </div>
             </div>
+            {allMatching && (
+              <p className="text-[11px] text-white/80 mt-1.5 leading-snug">
+                Delete permanently will remove all {total} phone numbers matching your current search &amp; status — across every page, not just this one.
+              </p>
+            )}
           </div>
         )}
       </div>
@@ -133,15 +190,29 @@ export default function ContactsPage() {
       <div className="bg-white dark:bg-[#202c33] rounded-xl p-2.5 flex gap-2 shadow-sm border border-gray-100 dark:border-[#2a3942]">
         <div className="relative flex-1">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#667781] dark:text-[#8696a0]"/>
-          <input type="text" className="w-full pl-9 pr-3 py-2.5 bg-[#f0f2f5] dark:bg-[#111b21] rounded-full text-[15px] placeholder:text-[#667781] focus:outline-none focus:ring-2 focus:ring-[#00a884]/20 text-[#111b21] dark:text-white border border-transparent" placeholder="Search name, business or phone…" value={search} onChange={e=>{setSearch(e.target.value);setPage(1)}}/>
+          <input type="text" className="w-full pl-9 pr-3 py-2.5 bg-[#f0f2f5] dark:bg-[#111b21] rounded-full text-[15px] placeholder:text-[#667781] focus:outline-none focus:ring-2 focus:ring-[#00a884]/20 text-[#111b21] dark:text-white border border-transparent" placeholder="Search name, business or phone…" value={search} onChange={e=>{setSearch(e.target.value);setPage(1);clearSelection();}}/>
         </div>
-        <select className="bg-[#f0f2f5] dark:bg-[#111b21] text-[#54656f] dark:text-[#aebac1] rounded-full px-3 py-2.5 text-sm font-medium border-0 focus:ring-2 focus:ring-[#00a884]/20 outline-none" value={leadStatus} onChange={e=>{setLeadStatus(e.target.value);setPage(1)}}>
+        <select className="bg-[#f0f2f5] dark:bg-[#111b21] text-[#54656f] dark:text-[#aebac1] rounded-full px-3 py-2.5 text-sm font-medium border-0 focus:ring-2 focus:ring-[#00a884]/20 outline-none" value={leadStatus} onChange={e=>{setLeadStatus(e.target.value);setPage(1);clearSelection();}}>
           <option value="">All</option>{LEAD_STATUSES.map(s=><option key={s} value={s}>{s}</option>)}
         </select>
       </div>
 
       {/* MOBILE CARDS - WhatsApp style list */}
       <div className="block lg:hidden space-y-2">
+        {!loading && contacts.length>0 && (
+          <div className="flex items-center justify-between px-1">
+            <span className="text-[12px] text-[#667781] dark:text-[#8696a0]">{total} contacts</span>
+            <button
+              onClick={toggleSelectAll}
+              className="flex items-center gap-1.5 text-[13px] font-semibold text-[#00a884] dark:text-[#00dfa2] py-1 px-1"
+              title={allMatching ? "Clear selection" : pageAll && total > contacts.length ? "Select every matching contact, on every page" : "Select all on this page"}
+            >
+              {allMatching
+                ? <><X size={14}/> Clear</>
+                : <><CheckSquare size={15}/>{pageAll ? (total > contacts.length ? `Select all ${total} matching` : "Clear") : "Select all"}</>}
+            </button>
+          </div>
+        )}
         {loading ? [...Array(5)].map((_,i)=>(
           <div key={i} className="bg-white dark:bg-[#202c33] rounded-xl p-3 flex gap-3 animate-pulse">
             <div className="w-12 h-12 rounded-full bg-gray-200 dark:bg-gray-700"/>
@@ -157,7 +228,7 @@ export default function ContactsPage() {
           </div>
         )
         : contacts.map(c => {
-          const isSelected = selected.has(c.id);
+          const isSelected = allMatching || selected.has(c.id);
           const name = `${c.first_name||""} ${c.last_name||""}`.trim() || c.business_name || "Unnamed";
           return (
             <div key={c.id} className={`bg-white dark:bg-[#202c33] rounded-xl overflow-hidden shadow-sm border ${isSelected?"border-[#00a884] ring-1 ring-[#00a884]":"border-gray-100 dark:border-[#2a3942]"} transition-all`}>
@@ -238,7 +309,16 @@ export default function ContactsPage() {
           <table className="w-full">
             <thead className="bg-[#f0f2f5] dark:bg-[#111b21] text-left">
               <tr>
-                <th className="px-4 py-3 w-10"><input type="checkbox" onChange={toggleSelectAll} checked={selected.size===contacts.length&&contacts.length>0} className="rounded accent-[#00a884]"/></th>
+                <th className="px-4 py-3 w-10">
+                  <input
+                    type="checkbox"
+                    ref={(el)=>{ if (el) el.indeterminate = !allMatching && selected.size>0 && selected.size<contacts.length; }}
+                    onChange={toggleSelectAll}
+                    checked={allMatching || pageAll}
+                    title={allMatching ? "Clear selection" : pageAll && total > contacts.length ? `Select all ${total} matching contacts (every page)` : "Select all on this page"}
+                    className="rounded accent-[#00a884]"
+                  />
+                </th>
                 <th className="px-3 py-3 text-[11px] font-semibold text-[#667781] uppercase tracking-wider">Contact</th>
                 <th className="px-3 py-3 text-[11px] font-semibold text-[#667781] uppercase">Phone</th>
                 <th className="px-3 py-3 text-[11px] font-semibold text-[#667781] uppercase">Business</th>
@@ -250,8 +330,8 @@ export default function ContactsPage() {
               {loading ? [...Array(5)].map((_,i)=>(<tr key={i}>{[...Array(6)].map((_,j)=>(<td key={j} className="px-4 py-3"><div className="h-4 bg-gray-100 dark:bg-gray-700 rounded animate-pulse"/></td>))}</tr>))
               : contacts.length===0 ? (<tr><td colSpan={6} className="px-4 py-12 text-center text-[#667781]">{search||leadStatus?"No matches":"No contacts. Import or add one."}</td></tr>)
               : contacts.map(c => (
-                <tr key={c.id} className={`hover:bg-[#f5f6f6] dark:hover:bg-[#111b21] ${selected.has(c.id)?"bg-[#f0f9f6] dark:bg-[#0a332c]":""}`}>
-                  <td className="px-4 py-3"><input type="checkbox" checked={selected.has(c.id)} onChange={()=>toggleSelect(c.id)} className="rounded accent-[#00a884]"/></td>
+                <tr key={c.id} className={`hover:bg-[#f5f6f6] dark:hover:bg-[#111b21] ${allMatching||selected.has(c.id)?"bg-[#f0f9f6] dark:bg-[#0a332c]":""}`}>
+                  <td className="px-4 py-3"><input type="checkbox" checked={allMatching||selected.has(c.id)} onChange={()=>toggleSelect(c.id)} title={allMatching?"Tap to keep this contact":"Select"} className="rounded accent-[#00a884]"/></td>
                   <td className="px-3 py-3">
                     <div className="flex items-center gap-2.5">
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-semibold ${avatarColor(`${c.first_name||""} ${c.last_name||""}`.trim()||c.business_name||c.phone_number)}`}>{initials(c)}</div>
