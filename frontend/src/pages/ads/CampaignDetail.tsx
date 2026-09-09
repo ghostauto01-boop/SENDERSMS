@@ -124,11 +124,27 @@ export default function CampaignDetail({
               <button
                 className="btn-primary btn-sm"
                 onClick={async () => {
-                  const check = await adsApi.validate(campaignId);
-                  setLaunching(check);
+                  try {
+                    const check = await adsApi.validate(campaignId);
+                    // Keep the review flow usable even when an older backend
+                    // returns an incomplete validation payload.
+                    setLaunching({
+                      ok: Boolean(check?.ok),
+                      errors: Array.isArray(check?.errors) ? check.errors : ["The campaign could not be validated. Try again."],
+                      warnings: Array.isArray(check?.warnings) ? check.warnings : [],
+                      summary: check?.summary || {
+                        audience: 0, eligible: 0, already_queued: 0, followup_steps: 0,
+                        daily_limit: detail.daily_limit, estimated_days: 0,
+                        drip: { mode: detail.drip_mode, batch: detail.drip_batch_size, interval_minutes: detail.drip_interval_minutes },
+                        test_mode: detail.test_mode, skipped: {}, per_set: [],
+                      },
+                    });
+                  } catch (err: any) {
+                    toast.error(err.response?.data?.detail || "Could not validate campaign");
+                  }
                 }}
               >
-                <Rocket size={15} className="mr-1" /> Review &amp; launch
+                <Rocket size={15} className="mr-1" /> Review &amp; publish
               </button>
             )}
             {detail.status === "active" && (
@@ -139,6 +155,24 @@ export default function CampaignDetail({
             {detail.status === "paused" && (
               <button className="btn-primary btn-sm" onClick={() => act(() => adsApi.resume(campaignId), "Resumed")}>
                 <Play size={15} className="mr-1" /> Resume
+              </button>
+            )}
+            {(detail.status === "draft" || detail.status === "paused" || detail.status === "active") && (
+              <button
+                className="btn-danger btn-sm"
+                onClick={async () => {
+                  if (!confirm(`Delete “${detail.name}” permanently? Its contacts and message history will remain.`)) return;
+                  try {
+                    await adsApi.deleteCampaign(campaignId);
+                    toast.success("Campaign deleted");
+                    onChanged();
+                    onClose();
+                  } catch (err: any) {
+                    toast.error(err.response?.data?.detail || "Could not delete campaign");
+                  }
+                }}
+              >
+                <Trash2 size={15} className="mr-1" /> Delete
               </button>
             )}
             {detail.status === "active" && (
@@ -159,7 +193,11 @@ export default function CampaignDetail({
             </button>
             <button
               className="btn-secondary btn-sm"
-              onClick={() => act(() => adsApi.duplicate(campaignId), "Campaign duplicated")}
+              onClick={() => {
+                if (confirm(`Duplicate “${detail.name}” with all SMS sets, creatives and audience targeting?`)) {
+                  act(() => adsApi.duplicate(campaignId, true), "Campaign duplicated");
+                }
+              }}}
             >
               <Copy size={15} />
             </button>
@@ -2647,20 +2685,27 @@ function LaunchModal({
   launched: () => void;
 }) {
   const [busy, setBusy] = useState(false);
-  const s = check.summary;
+  const s = check.summary || {
+    audience: 0, eligible: 0, already_queued: 0, followup_steps: 0,
+    daily_limit: null, estimated_days: 0,
+    drip: { mode: "off", batch: 1, interval_minutes: 0 },
+    test_mode: false, skipped: {}, per_set: [],
+  };
+  const errors = Array.isArray(check.errors) ? check.errors : [];
+  const warnings = Array.isArray(check.warnings) ? check.warnings : [];
   return (
     <Modal title="Pre-launch check" close={close} wide>
       <div className="space-y-4">
-        {check.errors.length > 0 && (
+        {errors.length > 0 && (
           <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-sm text-red-800 dark:text-red-200 space-y-1">
-            {check.errors.map((e: string, i: number) => (
+            {errors.map((e: string, i: number) => (
               <p key={i}>✕ {e}</p>
             ))}
           </div>
         )}
-        {check.warnings.length > 0 && (
+        {warnings.length > 0 && (
           <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-sm text-amber-800 dark:text-amber-200 space-y-1">
-            {check.warnings.map((w: string, i: number) => (
+            {warnings.map((w: string, i: number) => (
               <p key={i}>⚠ {w}</p>
             ))}
           </div>
