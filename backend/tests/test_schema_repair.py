@@ -176,3 +176,109 @@ def test_literal_default_ignores_callables_and_none():
     """Callable defaults (e.g. datetime.utcnow) have no safe SQL literal."""
     assert _literal_default(Column("c", String(10))) is None
     assert _literal_default(Column("c", String(10), default=lambda: "x")) is None
+
+
+def _indexes(db_path: str, table: str) -> set[str]:
+    con = sqlite3.connect(db_path)
+    try:
+        return {r[1] for r in con.execute(f"PRAGMA index_list({table})")}
+    finally:
+        con.close()
+
+
+def test_creates_missing_index_for_a_repaired_column(tmp_path):
+    """A restored column must get its index too, not just the column.
+
+    ``create_all`` skips an existing table, and that skip takes the table's
+    indexes with it. Without this the campaign-attribution columns would be
+    added on upgrade but never indexed, and every campaign-filtered inbox
+    query would silently degrade into a table scan.
+    """
+    from app.database import Base
+    import app.models  # noqa: F401
+
+    db = str(tmp_path / "idx.db")
+    engine = create_async_engine(f"sqlite+aiosqlite:///{db}")
+
+    async def _create_full():
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        await engine.dispose()
+
+    asyncio.run(_create_full())
+
+    # Roll the schema back to before campaign attribution existed.
+    con = sqlite3.connect(db)
+    con.execute("DROP INDEX IF EXISTS ix_conversations_ads_campaign_id")
+    con.execute("ALTER TABLE conversations DROP COLUMN ads_campaign_id")
+    con.commit()
+    con.close()
+    assert "ads_campaign_id" not in _columns(db, "conversations")
+    assert "ix_conversations_ads_campaign_id" not in _indexes(db, "conversations")
+
+    applied = asyncio.run(_run_repair(db, Base.metadata))
+
+    assert "conversations.ads_campaign_id" in applied
+    assert "index ix_conversations_ads_campaign_id" in applied
+    assert "ads_campaign_id" in _columns(db, "conversations")
+    assert "ix_conversations_ads_campaign_id" in _indexes(db, "conversations")
+
+
+def test_index_repair_is_idempotent(tmp_path):
+    """A healthy database must be left completely alone on every boot."""
+    from app.database import Base
+    import app.models  # noqa: F401
+
+    db = str(tmp_path / "healthy.db")
+    engine = create_async_engine(f"sqlite+aiosqlite:///{db}")
+
+    async def _create_full():
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        await engine.dispose()
+
+    asyncio.run(_create_full())
+
+    assert asyncio.run(_run_repair(db, Base.metadata)) == []
+    assert asyncio.run(_run_repair(db, Base.metadata)) == []
+
+
+def test_index_over_a_still_missing_column_is_skipped(tmp_path):
+    """Never emit CREATE INDEX for a column that could not be added.
+
+    The column ADD is what can fail (permissions, a locked table). If it does,
+    the index over it must be skipped quietly rather than throwing a second,
+    more confusing error.
+    """
+    md = MetaData()
+    Table(
+        "widgets",
+        md,
+        Column("id", Integer, primary_key=True),
+        Column("name", String(50)),
+    )
+    db = str(tmp_path / "partial.db")
+    con = sqlite3.connect(db)
+    con.execute("CREATE TABLE widgets (id INTEGER PRIMARY KEY, name VARCHAR(50))")
+    con.commit()
+    con.close()
+
+    # Model gains an indexed column, but pretend the ADD COLUMN is impossible
+    # by asking for the index against a table whose column never arrives.
+    md2 = MetaData()
+    Table(
+        "widgets",
+        md2,
+        Column("id", Integer, primary_key=True),
+        Column("name", String(50)),
+        Column("owner_id", Integer, index=True),
+    )
+
+    from app.schema_repair import _pending_indexes
+    from sqlalchemy import create_engine
+
+    sync_engine = create_engine(f"sqlite:///{db}")
+    with sync_engine.connect() as conn:
+        # owner_id does not exist in the database yet -> its index is not pending.
+        assert _pending_indexes(conn, md2) == []
+    sync_engine.dispose()

@@ -30,7 +30,22 @@ def _custom_fields(contact: Optional[Contact]) -> dict:
 
 
 @router.get("/conversations")
-async def list_conversations(page:int=1,per_page:int=500,status:Optional[str]=None,search:Optional[str]=None,db:AsyncSession=Depends(get_db),cu:User=Depends(get_current_user)):
+async def list_conversations(
+    page:int=1,
+    per_page:int=500,
+    status:Optional[str]=None,
+    search:Optional[str]=None,
+    # Filter the inbox down to the leads a single campaign produced. The
+    # Campaigns page links here with these set, so "see the replies" is one
+    # click from the campaign card.
+    campaign_id:Optional[int]=None,
+    ads_campaign_id:Optional[int]=None,
+    # replied = only threads where the lead actually wrote back. This is what
+    # "show me the replies to this campaign" means in practice.
+    replied_only:bool=False,
+    db:AsyncSession=Depends(get_db),
+    cu:User=Depends(get_current_user),
+):
     query = select(Conversation)
     # "all" is what the UI sends for the default tab; treat it as no filter
     # rather than as a literal status nothing will ever match.
@@ -39,6 +54,32 @@ async def list_conversations(page:int=1,per_page:int=500,status:Optional[str]=No
             query = query.where(or_(Conversation.status == "unread", Conversation.unread_count > 0))
         else:
             query = query.where(Conversation.status == status)
+    if campaign_id is not None:
+        # Either the campaign sourced this lead (first touch) or it is the
+        # most recent campaign to message them (last touch). Matching both
+        # means a lead re-targeted by a later campaign still shows up under
+        # the campaign that originally found them.
+        query = query.where(
+            or_(
+                Conversation.campaign_id == campaign_id,
+                Conversation.last_campaign_id == campaign_id,
+            )
+        )
+    if ads_campaign_id is not None:
+        query = query.where(
+            or_(
+                Conversation.ads_campaign_id == ads_campaign_id,
+                Conversation.last_ads_campaign_id == ads_campaign_id,
+            )
+        )
+    if replied_only:
+        replied = (
+            select(Message.conversation_id)
+            .where(Message.direction == "incoming")
+            .distinct()
+            .scalar_subquery()
+        )
+        query = query.where(Conversation.id.in_(replied))
     if search:
         # Phone numbers are stored as +234..., but users type 0803... -- match
         # every equivalent spelling so searching by the number people actually
@@ -55,12 +96,93 @@ async def list_conversations(page:int=1,per_page:int=500,status:Optional[str]=No
         query = query.join(Contact, Conversation.contact_id == Contact.id).where(or_(*_clauses))
     total = (await db.execute(select(func.count()).select_from(query.subquery()))).scalar() or 0
     query = query.order_by(Conversation.last_message_at.desc().nullslast()).offset((page-1)*per_page).limit(per_page)
+    convs = list((await db.execute(query)).scalars().all())
+
+    # Repair attribution for threads created before it was recorded, so the
+    # campaign badge is right for existing data with no migration step.
+    from app.services.attribution import (
+        backfill_conversation, campaign_label_map, conversation_campaign,
+        conversation_last_campaign,
+    )
+    healed = False
+    for conv in convs:
+        if await backfill_conversation(db, conv):
+            healed = True
+    if healed:
+        await db.flush()
+
+    # Two queries for the whole page, not one per row.
+    labels = await campaign_label_map(db, convs)
+    contacts = {}
+    contact_ids = [c.contact_id for c in convs]
+    if contact_ids:
+        contacts = {
+            c.id: c
+            for c in (await db.execute(select(Contact).where(Contact.id.in_(contact_ids)))).scalars().all()
+        }
+
     items = []
-    for conv in (await db.execute(query)).scalars().all():
-        cr = await db.execute(select(Contact).where(Contact.id == conv.contact_id)); contact = cr.scalar_one_or_none()
+    for conv in convs:
+        contact = contacts.get(conv.contact_id)
         name = contact_display_name(contact)
-        items.append({"id":conv.id,"contact_id":conv.contact_id,"contact_name":name,"contact_phone":contact.phone_number if contact else"","contact_lead_status":contact.lead_status if contact else"","status":conv.status,"message_count":conv.message_count,"unread_count":conv.unread_count,"last_message_preview":conv.last_message_preview,"last_message_at":conv.last_message_at.isoformat()if conv.last_message_at else None,"created_at":conv.created_at.isoformat(),"contact":{"phone_number":contact.phone_number if contact else"","lead_status":contact.lead_status if contact else"","business_name":contact.business_name if contact else"","first_name":contact.first_name if contact else"","last_name":contact.last_name if contact else"","city":contact.city if contact else"","state":contact.state if contact else"","custom_fields":_custom_fields(contact)}if contact else None})
+        items.append({"id":conv.id,"contact_id":conv.contact_id,"contact_name":name,"contact_phone":contact.phone_number if contact else"","contact_lead_status":contact.lead_status if contact else"","status":conv.status,"message_count":conv.message_count,"unread_count":conv.unread_count,"last_message_preview":conv.last_message_preview,"last_message_at":conv.last_message_at.isoformat()if conv.last_message_at else None,"created_at":conv.created_at.isoformat(),
+            # Which campaign this lead came from (first touch), plus the most
+            # recent campaign to message them. The inbox renders the first as
+            # a coloured chip on the row.
+            "campaign":conversation_campaign(conv, labels),
+            "last_campaign":conversation_last_campaign(conv, labels),
+            "contact":{"phone_number":contact.phone_number if contact else"","lead_status":contact.lead_status if contact else"","business_name":contact.business_name if contact else"","first_name":contact.first_name if contact else"","last_name":contact.last_name if contact else"","city":contact.city if contact else"","state":contact.state if contact else"","custom_fields":_custom_fields(contact)}if contact else None})
     return {"total":total,"items":items}
+
+
+@router.get("/campaign-filters")
+async def campaign_filters(db:AsyncSession=Depends(get_db),cu:User=Depends(get_current_user)):
+    """Campaigns that have leads in the inbox, with their lead/reply counts.
+
+    Powers the inbox's "filter by campaign" control. Only campaigns that
+    actually produced a conversation are listed, so the filter never offers a
+    choice that returns nothing.
+    """
+    from app.services.attribution import campaign_label_map
+
+    convs = list((await db.execute(select(Conversation))).scalars().all())
+    labels = await campaign_label_map(db, convs)
+
+    replied_ids = set(
+        (await db.execute(
+            select(Message.conversation_id).where(Message.direction == "incoming").distinct()
+        )).scalars().all()
+    )
+
+    buckets: dict = {}
+    unattributed = {"leads": 0, "replies": 0, "unread": 0}
+    for conv in convs:
+        key = None
+        if conv.campaign_id:
+            key = ("campaign", conv.campaign_id)
+        elif conv.ads_campaign_id:
+            key = ("ads", conv.ads_campaign_id)
+        target = buckets.setdefault(
+            key, {"leads": 0, "replies": 0, "unread": 0}
+        ) if key else unattributed
+        target["leads"] += 1
+        if conv.id in replied_ids:
+            target["replies"] += 1
+        if conv.unread_count or conv.status == "unread":
+            target["unread"] += 1
+
+    items = []
+    for key, counts in buckets.items():
+        label = labels.get(key)
+        if not label:
+            continue
+        items.append({**label, **counts})
+    items.sort(key=lambda i: (-i["leads"], i["name"]))
+    return {
+        "items": items,
+        "unattributed": unattributed,
+        "total_conversations": len(convs),
+    }
 
 @router.get("/conversations/{conversation_id}")
 async def get_conversation(conversation_id:int,db:AsyncSession=Depends(get_db),cu:User=Depends(get_current_user)):
@@ -74,8 +196,18 @@ async def get_conversation(conversation_id:int,db:AsyncSession=Depends(get_db),c
     if conv.status in(None,"","unread"):conv.status="read"
     cr=await db.execute(select(Contact).where(Contact.id==conv.contact_id));contact=cr.scalar_one_or_none()
     mr=await db.execute(select(Message).where(Message.conversation_id==conversation_id).order_by(Message.created_at.asc()))
+    # Attribution, self-healing for threads that predate it.
+    from app.services.attribution import (
+        backfill_conversation, campaign_label_map, conversation_campaign,
+        conversation_last_campaign,
+    )
+    await backfill_conversation(db, conv)
+    _labels = await campaign_label_map(db, [conv])
     await db.flush()
-    return {"id":conv.id,"contact":{"id":contact.id if contact else None,"phone_number":contact.phone_number if contact else"","first_name":contact.first_name if contact else"","last_name":contact.last_name if contact else"","business_name":contact.business_name if contact else"","lead_status":contact.lead_status if contact else"","city":contact.city if contact else"","state":contact.state if contact else"","email":contact.email if contact else"","website":contact.website if contact else"","notes":contact.notes if contact else"","custom_fields":_custom_fields(contact)}if contact else None,"status":conv.status,"sequence_paused":conv.sequence_paused,"messages":[{"id":m.id,"direction":m.direction,"body":m.body,"status":m.status,"created_at":m.created_at.isoformat(),"sent_at":m.sent_at.isoformat()if m.sent_at else None,"delivered_at":m.delivered_at.isoformat()if m.delivered_at else None,"failed_at":m.failed_at.isoformat()if m.failed_at else None,"last_error":m.last_error,"segment_count":m.segment_count,"provider_message_id":m.provider_message_id,"ai_sentiment":m.ai_sentiment,"ai_intent":m.ai_intent,"ai_confidence":m.ai_confidence}for m in mr.scalars().all()]}
+    return {"id":conv.id,
+        "campaign":conversation_campaign(conv,_labels),
+        "last_campaign":conversation_last_campaign(conv,_labels),
+        "contact":{"id":contact.id if contact else None,"phone_number":contact.phone_number if contact else"","first_name":contact.first_name if contact else"","last_name":contact.last_name if contact else"","business_name":contact.business_name if contact else"","lead_status":contact.lead_status if contact else"","city":contact.city if contact else"","state":contact.state if contact else"","email":contact.email if contact else"","website":contact.website if contact else"","notes":contact.notes if contact else"","custom_fields":_custom_fields(contact)}if contact else None,"status":conv.status,"sequence_paused":conv.sequence_paused,"messages":[{"id":m.id,"direction":m.direction,"body":m.body,"status":m.status,"created_at":m.created_at.isoformat(),"sent_at":m.sent_at.isoformat()if m.sent_at else None,"delivered_at":m.delivered_at.isoformat()if m.delivered_at else None,"failed_at":m.failed_at.isoformat()if m.failed_at else None,"last_error":m.last_error,"segment_count":m.segment_count,"provider_message_id":m.provider_message_id,"ai_sentiment":m.ai_sentiment,"ai_intent":m.ai_intent,"ai_confidence":m.ai_confidence}for m in mr.scalars().all()]}
 
 @router.get("/conversations/{conversation_id}/templates/{template_id}/preview")
 async def preview_reply_template(

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import api from "../api/client";
 import toast from "react-hot-toast";
 import { useAuth } from "../hooks/useAuth";
@@ -7,10 +7,12 @@ import {
   Send, Star, ThumbsDown, Archive, ChevronLeft, CheckCheck, MessageCircle,
   Bug, Search as SearchIcon, MoreVertical, Phone, Video, Paperclip, Smile,
   Mic, LogOut, Settings as SettingsIcon, Users, Megaphone, Home, FileText, CalendarPlus,
+  Filter, X as XIcon, BarChart3,
 } from "lucide-react";
 import type { Meeting, Template } from "../types";
 import ShortcodePicker from "../components/ShortcodePicker";
 import MeetingModal from "../components/MeetingModal";
+import CampaignChip from "../components/CampaignChip";
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
@@ -111,6 +113,25 @@ export default function InboxPage() {
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [templateLoading, setTemplateLoading] = useState(false);
 
+  /* ---- Campaign filtering ------------------------------------------
+     The Campaigns page deep-links here with ?campaign_id=… (optionally
+     &replied=1), which is what "see the replies from this campaign" does.
+     The URL is the source of truth so the link is shareable and Back works. */
+  const [searchParams, setSearchParams] = useSearchParams();
+  const campaignId = searchParams.get("campaign_id");
+  const adsCampaignId = searchParams.get("ads_campaign_id");
+  const repliedOnly = searchParams.get("replied") === "1";
+  const focusContactId = searchParams.get("contact_id");
+  const [campaignOptions, setCampaignOptions] = useState<any[]>([]);
+  const [showCampaignPicker, setShowCampaignPicker] = useState(false);
+
+  const activeCampaign = useMemo(() => {
+    if (!campaignId && !adsCampaignId) return null;
+    const kind = adsCampaignId ? "ads" : "campaign";
+    const id = Number(adsCampaignId || campaignId);
+    return campaignOptions.find((c) => c.kind === kind && c.id === id) || { id, kind, name: `Campaign #${id}`, status: "" };
+  }, [campaignId, adsCampaignId, campaignOptions]);
+
   const chatEndRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<any>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
@@ -149,13 +170,56 @@ export default function InboxPage() {
     return () => { cancelled = true; };
   }, []);
 
+  // Campaigns that actually have leads in the inbox, for the filter menu.
+  useEffect(() => {
+    let cancelled = false;
+    api.get("/inbox/campaign-filters")
+      .then(({ data }) => { if (!cancelled) setCampaignOptions(data.items || []); })
+      .catch(() => { if (!cancelled) setCampaignOptions([]); });
+    return () => { cancelled = true; };
+  }, []);
+
   const filterRef = useRef(filter);
   const searchRef = useRef(search);
+  const campaignRef = useRef({ campaignId, adsCampaignId, repliedOnly });
   useEffect(() => { filterRef.current = filter; }, [filter]);
   useEffect(() => { searchRef.current = search; }, [search]);
+  useEffect(() => {
+    campaignRef.current = { campaignId, adsCampaignId, repliedOnly };
+  }, [campaignId, adsCampaignId, repliedOnly]);
 
-  useEffect(() => { loadConvs(); }, [filter]);
+  useEffect(() => { loadConvs(); }, [filter, campaignId, adsCampaignId, repliedOnly]);
   useEffect(() => { const t = setTimeout(loadConvs, 350); return () => clearTimeout(t); }, [search]);
+
+  // Deep link into one person's chat: /inbox?contact_id=42 (what a campaign's
+  // lead list links to). Runs once per target, after the list has loaded, and
+  // then drops the param so the chat is not force-reopened on every poll.
+  const openedContactRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!focusContactId || loading) return;
+    if (openedContactRef.current === focusContactId) return;
+
+    const clearParam = () => {
+      const next = new URLSearchParams(searchParams);
+      next.delete("contact_id");
+      setSearchParams(next, { replace: true });
+    };
+
+    const match = convs.find((c) => String(c.contact_id) === focusContactId);
+    if (match) {
+      openedContactRef.current = focusContactId;
+      openChat(match);
+      clearParam();
+      return;
+    }
+
+    // The list finished loading and the person is not in it — a status filter
+    // is hiding them, or they fell outside the page. Say so and drop the
+    // param, rather than leaving a dead link that silently does nothing.
+    openedContactRef.current = focusContactId;
+    toast("That chat isn't in the current view — try clearing the filters.", { icon: "🔍" });
+    clearParam();
+  }, [focusContactId, convs, loading, searchParams, setSearchParams]);
   // Key the effects on the stable conversation id, NOT the `selected` object:
   // loadMessages() refreshes the object (to pick up status changes), and an
   // object-keyed effect would re-fire forever in a tight async loop.
@@ -197,18 +261,42 @@ export default function InboxPage() {
       const params: any = { per_page: 500 };
       if (filterRef.current && filterRef.current !== "all") params.status = filterRef.current;
       if (searchRef.current.trim()) params.search = searchRef.current.trim();
+      const c = campaignRef.current;
+      if (c.campaignId) params.campaign_id = c.campaignId;
+      if (c.adsCampaignId) params.ads_campaign_id = c.adsCampaignId;
+      if (c.repliedOnly) params.replied_only = true;
       const { data } = await api.get("/inbox/conversations", { params });
       setConvs(data.items || []);
     } catch {} finally { setLoading(false); }
   }, []);
+
+  /** Point the inbox at one campaign (or clear it). Drives the URL. */
+  const applyCampaignFilter = useCallback((option: any | null, onlyReplies = false) => {
+    const next = new URLSearchParams();
+    if (option) {
+      next.set(option.kind === "ads" ? "ads_campaign_id" : "campaign_id", String(option.id));
+      if (onlyReplies) next.set("replied", "1");
+    }
+    setSearchParams(next, { replace: false });
+    setSelected(null);
+    setShowCampaignPicker(false);
+  }, [setSearchParams]);
 
   const loadMessages = useCallback(async (convId: number) => {
     try {
       const { data } = await api.get(`/inbox/conversations/${convId}`);
       setMessages(data.messages || []);
       // Only replace the object when something actually changed, so effects
-      // keyed on `selected?.id` stay calm.
-      setSelected((s: any) => s && s.id === convId && s.status !== data.status ? { ...s, status: data.status } : s);
+      // keyed on `selected?.id` stay calm. The campaign badge is picked up
+      // here too: the detail endpoint backfills attribution for old threads,
+      // so a chat opened from a list row that had no chip still gets one.
+      setSelected((s: any) => {
+        if (!s || s.id !== convId) return s;
+        const statusChanged = s.status !== data.status;
+        const campaignChanged = (s.campaign?.id ?? null) !== (data.campaign?.id ?? null);
+        if (!statusChanged && !campaignChanged) return s;
+        return { ...s, status: data.status, campaign: data.campaign, last_campaign: data.last_campaign };
+      });
     } catch {}
   }, []);
 
@@ -419,6 +507,79 @@ export default function InboxPage() {
             })}
           </div>
 
+          {/* Campaign filter — "which campaign are these leads from?" */}
+          <div className="px-2 md:px-3 pb-2 bg-white dark:bg-[#111b21] flex-shrink-0 relative">
+            {activeCampaign ? (
+              <div className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-[#e7f8f3] dark:bg-[#182533] border border-[#00a884]/30">
+                <CampaignChip campaign={activeCampaign} />
+                <span className="text-[11px] text-[#54656f] dark:text-[#8696a0] truncate">
+                  {repliedOnly ? "replies only" : "all leads"} · {convs.length}
+                </span>
+                <div className="ml-auto flex items-center gap-1">
+                  <button
+                    onClick={() => applyCampaignFilter(activeCampaign, !repliedOnly)}
+                    className="text-[11px] font-medium text-[#00a884] hover:underline px-1.5"
+                    title={repliedOnly ? "Show every lead from this campaign" : "Show only leads who replied"}
+                  >
+                    {repliedOnly ? "All leads" : "Replies"}
+                  </button>
+                  <button
+                    onClick={() => applyCampaignFilter(null)}
+                    className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-[#54656f] dark:text-[#8696a0]"
+                    title="Clear campaign filter"
+                  >
+                    <XIcon size={13} />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowCampaignPicker((v) => !v)}
+                className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg bg-[#f0f2f5] dark:bg-[#202c33] text-[13px] text-[#54656f] dark:text-[#8696a0] hover:bg-[#e9edef] dark:hover:bg-[#2a3942]"
+              >
+                <Filter size={14} className="text-[#00a884]" />
+                Filter by campaign
+                {campaignOptions.length > 0 && (
+                  <span className="ml-auto text-[11px] text-[#667781]">{campaignOptions.length}</span>
+                )}
+              </button>
+            )}
+
+            {showCampaignPicker && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowCampaignPicker(false)} />
+                <div className="absolute left-2 right-2 md:left-3 md:right-3 top-full mt-1 z-50 bg-white dark:bg-[#233138] rounded-lg shadow-xl border border-gray-200 dark:border-[#222d34] py-1.5 max-h-[320px] overflow-y-auto wa-scrollbar">
+                  {campaignOptions.length === 0 ? (
+                    <p className="px-3 py-3 text-[12px] text-[#667781] dark:text-[#8696a0]">
+                      No campaign has produced leads yet.
+                    </p>
+                  ) : (
+                    campaignOptions.map((c) => (
+                      <button
+                        key={`${c.kind}-${c.id}`}
+                        onClick={() => applyCampaignFilter(c)}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-[#f0f2f5] dark:hover:bg-[#182533]"
+                      >
+                        <CampaignChip campaign={c} />
+                        <span className="ml-auto text-[11px] text-[#667781] dark:text-[#8696a0] flex-shrink-0">
+                          {c.leads} lead{c.leads === 1 ? "" : "s"} · {c.replies} replied
+                        </span>
+                      </button>
+                    ))
+                  )}
+                  <div className="border-t border-gray-100 dark:border-[#222d34] my-1" />
+                  <Link
+                    to="/overview"
+                    onClick={() => setShowCampaignPicker(false)}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-[#00a884] hover:bg-[#f0f2f5] dark:hover:bg-[#182533]"
+                  >
+                    <BarChart3 size={14} /> Open campaign overview
+                  </Link>
+                </div>
+              </>
+            )}
+          </div>
+
           {/* Archive-style row */}
           <div className="px-3 md:px-4 py-2.5 bg-white dark:bg-[#111b21] flex items-center justify-between border-b border-[#f0f2f5] dark:border-[#222d34] flex-shrink-0">
             <button onClick={doPoll} className="text-[13px] text-[#00a884] font-medium hover:underline flex items-center gap-1.5">
@@ -487,6 +648,24 @@ export default function InboxPage() {
                         ) : null}
                       </div>
                     </div>
+                    {/* Campaign source: the indicator that tells you at a
+                        glance which campaign this lead came from. Tapping it
+                        filters the whole inbox to that campaign. */}
+                    {c.campaign && (
+                      <div className="mt-1 flex items-center gap-1">
+                        <CampaignChip
+                          campaign={c.campaign}
+                          size="xs"
+                          onClick={() => applyCampaignFilter(c.campaign)}
+                          title={`Lead from "${c.campaign.name}" — tap to see every lead from it`}
+                        />
+                        {c.last_campaign && c.last_campaign.id !== c.campaign.id && (
+                          <span className="text-[9px] text-[#667781] dark:text-[#8696a0]" title={`Last messaged by "${c.last_campaign.name}"`}>
+                            → {c.last_campaign.name}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </button>
               );
@@ -590,10 +769,19 @@ export default function InboxPage() {
                     <h2 className="font-semibold text-[16px] leading-5 text-[#111b21] dark:text-[#e9edef] truncate">
                       {selected.contact_name || selected.contact_phone}
                     </h2>
-                    <p className="text-[12px] text-[#667781] dark:text-[#8696a0] truncate flex items-center gap-1">
+                    <p className="text-[12px] text-[#667781] dark:text-[#8696a0] truncate flex items-center gap-1.5">
                       {selected.contact_phone}
                       {selected.unread_count > 0 && <span className="bg-[#00a884] text-white text-[10px] px-1.5 py-px rounded-full ml-1">{selected.unread_count} new</span>}
                       {selected.status === "interested" && <span className="text-[#f7c948]">★ interested</span>}
+                      {/* Where this lead came from, right in the chat header. */}
+                      {selected.campaign && (
+                        <CampaignChip
+                          campaign={selected.campaign}
+                          size="xs"
+                          onClick={() => applyCampaignFilter(selected.campaign)}
+                          title={`This lead came from "${selected.campaign.name}" — tap to see every lead from it`}
+                        />
+                      )}
                     </p>
                   </div>
                 </div>

@@ -378,6 +378,269 @@ async def get_campaign_analytics(
     return stats
 
 
+@router.get("/{campaign_id}/conversations")
+async def get_campaign_conversations(
+    campaign_id: int,
+    replied_only: bool = Query(default=False),
+    page: int = Query(default=1, ge=1),
+    per_page: int = Query(default=50, ge=1, le=200),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Every inbox thread this campaign produced, newest reply first.
+
+    This is the "see the replies" drill-down: the Campaigns page lists the
+    leads a campaign generated, and each row deep-links into the inbox chat
+    with that contact. ``replied_only`` narrows it to leads who actually
+    wrote back.
+    """
+    from sqlalchemy import or_
+
+    from app.models.contact import Contact
+    from app.models.conversation import Conversation, Message
+    from app.services.attribution import backfill_conversation
+    from app.utils.naming import contact_display_name
+
+    campaign = (
+        await db.execute(select(Campaign).where(Campaign.id == campaign_id))
+    ).scalar_one_or_none()
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+
+    # Threads this campaign either sourced (first touch) or last messaged.
+    query = select(Conversation).where(
+        or_(
+            Conversation.campaign_id == campaign_id,
+            Conversation.last_campaign_id == campaign_id,
+        )
+    )
+    if replied_only:
+        replied = (
+            select(Message.conversation_id)
+            .where(Message.direction == "incoming")
+            .distinct()
+            .scalar_subquery()
+        )
+        query = query.where(Conversation.id.in_(replied))
+
+    total = (await db.execute(select(func.count()).select_from(query.subquery()))).scalar() or 0
+    rows = list(
+        (
+            await db.execute(
+                query.order_by(Conversation.last_message_at.desc().nullslast())
+                .offset((page - 1) * per_page)
+                .limit(per_page)
+            )
+        ).scalars().all()
+    )
+
+    contact_ids = [r.contact_id for r in rows]
+    contacts = (
+        {
+            c.id: c
+            for c in (
+                await db.execute(select(Contact).where(Contact.id.in_(contact_ids)))
+            ).scalars().all()
+        }
+        if contact_ids
+        else {}
+    )
+
+    # Last inbound message per thread, so the list shows what they actually said.
+    last_reply: dict[int, Message] = {}
+    if rows:
+        inbound = (
+            await db.execute(
+                select(Message)
+                .where(
+                    Message.conversation_id.in_([r.id for r in rows]),
+                    Message.direction == "incoming",
+                )
+                .order_by(Message.created_at.desc())
+            )
+        ).scalars().all()
+        for m in inbound:
+            last_reply.setdefault(m.conversation_id, m)
+
+    items = []
+    for conv in rows:
+        contact = contacts.get(conv.contact_id)
+        reply = last_reply.get(conv.id)
+        items.append(
+            {
+                "conversation_id": conv.id,
+                "contact_id": conv.contact_id,
+                "contact_name": contact_display_name(contact),
+                "contact_phone": contact.phone_number if contact else "",
+                "lead_status": contact.lead_status if contact else "",
+                "status": conv.status,
+                "unread_count": conv.unread_count,
+                "message_count": conv.message_count,
+                "last_message_preview": conv.last_message_preview,
+                "last_message_at": (
+                    conv.last_message_at.isoformat() if conv.last_message_at else None
+                ),
+                "has_replied": reply is not None,
+                "last_reply": (
+                    {
+                        "body": reply.body,
+                        "created_at": reply.created_at.isoformat(),
+                        "ai_sentiment": reply.ai_sentiment,
+                        "ai_intent": reply.ai_intent,
+                    }
+                    if reply
+                    else None
+                ),
+            }
+        )
+
+    return {"total": total, "items": items, "page": page, "per_page": per_page}
+
+
+@router.get("/{campaign_id}/performance")
+async def get_campaign_performance(
+    campaign_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Live, message-derived metrics for one campaign.
+
+    The counters on the ``campaigns`` row are incremented by webhooks and can
+    drift (a webhook that never arrived, a database restored from backup).
+    These numbers are computed from ``messages`` and ``conversations``, so
+    they always reconcile with what the inbox shows.
+    """
+    from sqlalchemy import or_
+
+    from app.models.contact import Contact
+    from app.models.conversation import Conversation, Message
+
+    campaign = (
+        await db.execute(select(Campaign).where(Campaign.id == campaign_id))
+    ).scalar_one_or_none()
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+
+    async def count(*where):
+        return (
+            await db.execute(select(func.count()).select_from(select(Message).where(*where).subquery()))
+        ).scalar() or 0
+
+    outgoing = Message.campaign_id == campaign_id, Message.direction == "outgoing"
+    sent = await count(*outgoing, Message.status.in_(("sent", "delivered")))
+    delivered = await count(*outgoing, Message.status == "delivered")
+    failed = await count(*outgoing, Message.status.in_(("failed", "cancelled")))
+    queued = await count(*outgoing, Message.status.in_(("queued", "sending")))
+
+    conv_filter = or_(
+        Conversation.campaign_id == campaign_id,
+        Conversation.last_campaign_id == campaign_id,
+    )
+    leads = (
+        await db.execute(
+            select(func.count()).select_from(select(Conversation).where(conv_filter).subquery())
+        )
+    ).scalar() or 0
+
+    replied_conv_ids = list(
+        (
+            await db.execute(
+                select(Conversation.id).where(
+                    conv_filter,
+                    Conversation.id.in_(
+                        select(Message.conversation_id)
+                        .where(Message.direction == "incoming")
+                        .distinct()
+                        .scalar_subquery()
+                    ),
+                )
+            )
+        ).scalars().all()
+    )
+    replied = len(replied_conv_ids)
+
+    unread = (
+        await db.execute(
+            select(func.count()).select_from(
+                select(Conversation)
+                .where(conv_filter, or_(Conversation.unread_count > 0, Conversation.status == "unread"))
+                .subquery()
+            )
+        )
+    ).scalar() or 0
+
+    interested = (
+        await db.execute(
+            select(func.count()).select_from(
+                select(Conversation)
+                .where(conv_filter, Conversation.status == "interested")
+                .subquery()
+            )
+        )
+    ).scalar() or 0
+
+    # Sentiment of the replies, straight from the keyless classifier that
+    # already runs on every inbound message.
+    sentiment = {"positive": 0, "negative": 0, "neutral": 0}
+    if replied_conv_ids:
+        rows = (
+            await db.execute(
+                select(Message.ai_sentiment, func.count(Message.id))
+                .where(
+                    Message.conversation_id.in_(replied_conv_ids),
+                    Message.direction == "incoming",
+                )
+                .group_by(Message.ai_sentiment)
+            )
+        ).all()
+        for value, n in rows:
+            key = (value or "neutral").lower()
+            if key in sentiment:
+                sentiment[key] += n
+
+    opted_out = (
+        await db.execute(
+            select(func.count()).select_from(
+                select(Contact)
+                .where(
+                    Contact.is_opted_out.is_(True),
+                    Contact.id.in_(
+                        select(CampaignContact.contact_id)
+                        .where(CampaignContact.campaign_id == campaign_id)
+                        .scalar_subquery()
+                    ),
+                )
+                .subquery()
+            )
+        )
+    ).scalar() or 0
+
+    def rate(part: int, whole: int) -> float:
+        return round(part / whole * 100, 1) if whole else 0.0
+
+    return {
+        "campaign_id": campaign_id,
+        "name": campaign.name,
+        "status": campaign.status,
+        "audience": campaign.total_contacts,
+        "sent": sent,
+        "delivered": delivered,
+        "failed": failed,
+        "queued": queued,
+        "leads": leads,
+        "replied": replied,
+        "unread": unread,
+        "interested": interested,
+        "opted_out": opted_out,
+        "sentiment": sentiment,
+        "delivery_rate": rate(delivered, sent),
+        "reply_rate": rate(replied, sent),
+        "positive_rate": rate(sentiment["positive"], replied),
+        "failure_rate": rate(failed, sent + failed),
+        "opt_out_rate": rate(opted_out, sent),
+    }
+
+
 @router.post("/{campaign_id}/duplicate")
 async def duplicate_campaign(
     campaign_id: int,

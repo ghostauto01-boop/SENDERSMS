@@ -106,6 +106,18 @@ export interface SequenceData {
   updated_at: string;
 }
 
+/**
+ * Which campaign a lead came from. `kind` distinguishes the two campaign
+ * systems: "campaign" is the classic Campaigns page, "ads" is the SMS Ads
+ * Manager. They live in different tables, so the id alone is ambiguous.
+ */
+export interface CampaignRef {
+  id: number;
+  kind: "campaign" | "ads";
+  name: string;
+  status: string;
+}
+
 export interface Conversation {
   id: number;
   contact_id: number;
@@ -113,12 +125,106 @@ export interface Conversation {
   contact_phone: string;
   contact_lead_status: string;
   campaign_id: number | null;
+  /** First touch — the campaign that sourced this lead. Drives the inbox chip. */
+  campaign: CampaignRef | null;
+  /** Last touch — the most recent campaign to message them. */
+  last_campaign: CampaignRef | null;
   status: string;
   message_count: number;
   unread_count: number;
   last_message_preview: string | null;
   last_message_at: string | null;
   created_at: string;
+}
+
+/** One campaign in the unified overview (both systems share this shape). */
+export interface OverviewCampaign {
+  id: number;
+  kind: "campaign" | "ads";
+  name: string;
+  description: string | null;
+  status: string;
+  is_live: boolean;
+  objective?: string;
+  audience: number;
+  sent: number;
+  delivered: number;
+  failed: number;
+  queued: number;
+  leads: number;
+  replied: number;
+  unread: number;
+  interested: number;
+  delivery_rate: number;
+  reply_rate: number;
+  scheduled_start_at: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  updated_at: string | null;
+  inbox_url: string;
+  replies_url: string;
+}
+
+export interface OverviewTotals {
+  campaigns: number;
+  live: number;
+  audience: number;
+  sent: number;
+  delivered: number;
+  failed: number;
+  queued: number;
+  leads: number;
+  replied: number;
+  unread: number;
+  interested: number;
+  delivery_rate: number;
+  reply_rate: number;
+}
+
+export interface UnifiedMetrics {
+  period_days: number;
+  messaging: {
+    sent: number;
+    delivered: number;
+    failed: number;
+    queued: number;
+    replies: number;
+    delivery_rate: number;
+    reply_rate: number;
+    failure_rate: number;
+  };
+  inbox: {
+    conversations: number;
+    replied: number;
+    unread: number;
+    interested: number;
+    sentiment: { positive: number; negative: number; neutral: number };
+  };
+  audience: { contacts: number; opted_out: number; opt_out_rate: number };
+  campaigns: OverviewTotals;
+  top_campaigns: OverviewCampaign[];
+  series: { date: string; sent: number; replies: number; delivered: number; failed: number }[];
+}
+
+/** One inbox thread a campaign produced (campaign -> replies drill-down). */
+export interface CampaignConversation {
+  conversation_id: number;
+  contact_id: number;
+  contact_name: string;
+  contact_phone: string;
+  lead_status: string;
+  status: string;
+  unread_count: number;
+  message_count: number;
+  last_message_preview: string | null;
+  last_message_at: string | null;
+  has_replied: boolean;
+  last_reply: {
+    body: string;
+    created_at: string;
+    ai_sentiment: string | null;
+    ai_intent: string | null;
+  } | null;
 }
 
 export interface Message {
@@ -184,6 +290,9 @@ export interface ConversationDetail {
     is_opted_out: boolean;
   } | null;
   campaign_id: number | null;
+  /** First touch — shown as a chip in the chat header. */
+  campaign: CampaignRef | null;
+  last_campaign: CampaignRef | null;
   status: string;
   sequence_paused: boolean;
   messages: Message[];

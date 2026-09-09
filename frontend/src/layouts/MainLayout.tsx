@@ -5,10 +5,12 @@ import {
   LayoutDashboard, Users, List, Megaphone, GitBranch, Sparkles,
   Inbox, Send, Clock, FileText, BarChart3, Settings, MessageSquareReply,
   Zap, Moon, Sun, Menu, X, LogOut, Search, Braces, Repeat, Calendar, Target,
+  Activity,
 } from "lucide-react";
 import BrandMark from "../components/BrandMark";
 
 const navItems = [
+  { to: "/overview", label: "Overview", icon: Activity },
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/send", label: "Send SMS", icon: Send },
   { to: "/contacts", label: "Contacts", icon: Users },

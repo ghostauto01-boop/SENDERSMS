@@ -13,7 +13,15 @@ crash and no warning -- just a broken page. Exactly that happened with the
 scheduling/auto-reply release.
 
 This module closes the gap: it compares the models against the live database
-and issues ``ALTER TABLE ... ADD COLUMN`` for anything missing.
+and issues ``ALTER TABLE ... ADD COLUMN`` for anything missing, then
+``CREATE INDEX`` for any model index that is still absent.
+
+Indexes matter for the same reason columns do, just less loudly. ``create_all``
+skips a table it already knows, and that skip takes the table's indexes with
+it -- so a column added here would stay unindexed forever. The result is not
+an error page, it is a table scan on every filtered query, which only shows up
+as "the inbox got slow" once the table is large. Both halves of the model
+definition are restored so behaviour and performance match a fresh install.
 
 SAFETY RULES (deliberately conservative)
 ----------------------------------------
@@ -37,7 +45,7 @@ a missing column.
 import logging
 
 from sqlalchemy import inspect, text
-from sqlalchemy.schema import CreateColumn
+from sqlalchemy.schema import CreateColumn, CreateIndex
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +64,36 @@ def _pending_columns(sync_conn, metadata) -> list[tuple]:
         for column in table.columns:
             if column.name not in have:
                 pending.append((table.name, column))
+    return pending
+
+
+def _pending_indexes(sync_conn, metadata) -> list:
+    """Return every model Index missing from an existing table.
+
+    Called after the columns have been added, so an index over a
+    just-restored column is creatable.
+    """
+    inspector = inspect(sync_conn)
+    existing_tables = set(inspector.get_table_names())
+    pending = []
+
+    for table in metadata.sorted_tables:
+        if table.name not in existing_tables:
+            continue  # create_all builds new tables with their indexes.
+        have_indexes = {i["name"] for i in inspector.get_indexes(table.name)}
+        have_columns = {c["name"] for c in inspector.get_columns(table.name)}
+        # A unique constraint is often reported as an index; don't fight it.
+        have_indexes |= {
+            u["name"] for u in inspector.get_unique_constraints(table.name) if u.get("name")
+        }
+        for index in table.indexes:
+            if index.name in have_indexes:
+                continue
+            # Only build an index whose columns all actually exist, otherwise
+            # the statement fails and just adds noise to the log.
+            if not {c.name for c in index.columns}.issubset(have_columns):
+                continue
+            pending.append(index)
     return pending
 
 
@@ -109,11 +147,14 @@ def _add_column_sql(sync_conn, table_name: str, column) -> str:
 
 
 def repair_schema_sync(sync_conn, metadata) -> list[str]:
-    """Add every missing column. Returns a list of human-readable changes."""
-    pending = _pending_columns(sync_conn, metadata)
+    """Add every missing column, then every missing index.
+
+    Returns a list of human-readable changes, e.g.
+    ``["conversations.ads_campaign_id", "index ix_conversations_ads_campaign_id"]``.
+    """
     applied: list[str] = []
 
-    for table_name, column in pending:
+    for table_name, column in _pending_columns(sync_conn, metadata):
         stmt = _add_column_sql(sync_conn, table_name, column)
         try:
             sync_conn.execute(text(stmt))
@@ -127,4 +168,29 @@ def repair_schema_sync(sync_conn, metadata) -> list[str]:
                 column.name,
                 exc,
             )
+
+    # Indexes second: a column added above may be the one being indexed.
+    for index in _pending_indexes(sync_conn, metadata):
+        try:
+            # IF NOT EXISTS (SQLite and PostgreSQL both support it) so a name
+            # the inspector did not report -- a partial index, or a racing
+            # second worker booting at the same time -- is a no-op instead of
+            # an alarming error in the log.
+            stmt = (
+                CreateIndex(index, if_not_exists=True)
+                .compile(dialect=sync_conn.dialect)
+                .string.strip()
+            )
+            sync_conn.execute(text(stmt))
+            applied.append(f"index {index.name}")
+            logger.warning("schema_repair: created missing index %s", index.name)
+        except Exception as exc:  # noqa: BLE001 - an index is an optimisation, never fatal
+            logger.error(
+                "schema_repair: could not create index %s (%s). "
+                "Queries still work but may be slow; "
+                "run scripts/migrate_existing_db.sql by hand.",
+                index.name,
+                exc,
+            )
+
     return applied

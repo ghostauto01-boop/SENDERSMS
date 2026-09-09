@@ -507,6 +507,12 @@ async def _send_template_message(
         db.add(conversation)
         await db.flush()
 
+    # Stamp campaign attribution so the inbox can show which campaign this
+    # lead came from without replaying the thread's message history.
+    from app.services.attribution import stamp_conversation
+
+    stamp_conversation(conversation, campaign_id=campaign.id)
+
     message = Message(
         conversation_id=conversation.id,
         contact_id=contact.id,
