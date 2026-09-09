@@ -197,7 +197,7 @@ export default function CampaignDetail({
                 if (confirm(`Duplicate “${detail.name}” with all SMS sets, creatives and audience targeting?`)) {
                   act(() => adsApi.duplicate(campaignId, true), "Campaign duplicated");
                 }
-              }}}
+              }}
             >
               <Copy size={15} />
             </button>
