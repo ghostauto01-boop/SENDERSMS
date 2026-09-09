@@ -39,6 +39,11 @@ class SMSService:
         ch,sg=count_sms_segments(body);ik=f"send-{contact_id}-{uuid.uuid4().hex[:12]}"
         cr=(await self.db.execute(select(Conversation).where(Conversation.contact_id==contact_id).order_by(Conversation.id).limit(1))).scalars().first()
         if not cr:cr=Conversation(contact_id=contact_id,campaign_id=campaign_id,status="active");self.db.add(cr);await self.db.flush()
+        # Keep the thread's campaign attribution current (first touch + last
+        # touch), so the inbox badge and the campaign->replies drill-down agree.
+        if campaign_id:
+            from app.services.attribution import stamp_conversation
+            stamp_conversation(cr,campaign_id=campaign_id)
         msg=Message(conversation_id=cr.id,contact_id=contact_id,campaign_id=campaign_id,direction="outgoing",body=body,segment_count=sg,char_count=ch,status="sending",provider="smsgate",idempotency_key=ik)
         self.db.add(msg);await self.db.flush()
         # Respect the sending limits / pacing configured in Settings. When the
@@ -149,6 +154,16 @@ class SMSService:
         # the campaign reply rate stops reading 0. Count one reply per contact
         # per campaign: a chatty contact is still a single responder.
         last_out=(await self.db.execute(select(Message).where(Message.contact_id==c.id,Message.direction=="outgoing",Message.campaign_id.isnot(None)).order_by(Message.created_at.desc()).limit(1))).scalar_one_or_none()
+        # Attribute the inbound message to whichever campaign last messaged
+        # this contact, so "show me the replies to this campaign" is a single
+        # indexed lookup instead of a walk back through the thread.
+        try:
+            from app.services.attribution import backfill_conversation
+            await backfill_conversation(self.db,cr)
+            if cr.last_campaign_id:m.campaign_id=cr.last_campaign_id
+            elif cr.last_ads_campaign_id:m.ads_campaign_id=cr.last_ads_campaign_id
+        except Exception as exc:
+            logger.warning("Reply attribution: %s",exc)
         if last_out is not None and last_out.campaign_id:
             cc=(await self.db.execute(select(CampaignContact).where(CampaignContact.campaign_id==last_out.campaign_id,CampaignContact.contact_id==c.id))).scalar_one_or_none()
             # Dedup per campaign, not per contact: someone who replied to last

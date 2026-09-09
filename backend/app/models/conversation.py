@@ -20,7 +20,21 @@ class Conversation(Base):
     __table_args__ = (UniqueConstraint("contact_id", name="uq_conversation_contact"),)
 
     contact_id: Mapped[int] = mapped_column(Integer, ForeignKey("contacts.id"), nullable=False, index=True)
+
+    # ---- Campaign attribution -------------------------------------------
+    # "Which campaign is this lead from?" is answered by the FIRST campaign
+    # that ever messaged the contact (campaign_id for a classic campaign,
+    # ads_campaign_id for an SMS Ads Manager campaign -- exactly one of the
+    # two is set). The last_* pair tracks the most recent campaign to touch
+    # the thread, which is what a reply should be credited to.
+    #
+    # Stamped by app.services.attribution at send time, and self-healed for
+    # historical threads when the inbox reads them, so the badge is correct
+    # for data created before this existed.
     campaign_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("campaigns.id"), nullable=True, index=True)
+    ads_campaign_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    last_campaign_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    last_ads_campaign_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
 
     # Status: active, unread, read, interested, not_interested, closed
     status: Mapped[str] = mapped_column(String(50), default="active", nullable=False, index=True)
@@ -63,6 +77,10 @@ class Message(Base):
     )
     contact_id: Mapped[int] = mapped_column(Integer, ForeignKey("contacts.id"), nullable=False, index=True)
     campaign_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("campaigns.id"), nullable=True)
+    # Set when the SMS Ads Manager sent this message. Kept separate from
+    # campaign_id because the two live in different tables (campaigns /
+    # ads_campaigns) and a foreign key cannot point at both.
+    ads_campaign_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
 
     # Direction
     direction: Mapped[str] = mapped_column(String(10), nullable=False, index=True)  # incoming, outgoing

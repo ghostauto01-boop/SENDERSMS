@@ -1074,12 +1074,19 @@ async def dispatch_campaign(
             db.add(conversation)
             await db.flush()
 
+        # Attribute the thread to this ads campaign so the inbox shows which
+        # campaign the lead came from, and the campaign can list its replies.
+        from app.services.attribution import stamp_conversation
+
+        stamp_conversation(conversation, ads_campaign_id=campaign.id)
+
         from app.utils.phone import count_sms_segments
 
         char_count, segment_count = count_sms_segments(rendered)
         message = Message(
             conversation_id=conversation.id,
             contact_id=contact.id,
+            ads_campaign_id=campaign.id,
             direction="outgoing",
             body=rendered,
             segment_count=segment_count,
@@ -1300,7 +1307,9 @@ async def process_followups(db: AsyncSession, *, limit: int = 50, send_inline: b
         action = (step.action or "send_sms").lower()
         if action == "send_sms" and (step.body or task.body):
             body = step.body or task.body or ""
-            mid = await send_adhoc_sms(db, contact, body, test_mode=campaign.test_mode)
+            mid = await send_adhoc_sms(
+                db, contact, body, test_mode=campaign.test_mode, campaign_id=campaign.id
+            )
             if mid:
                 outbox.append(mid)
             task.status = "completed"
@@ -1359,10 +1368,23 @@ async def process_followups(db: AsyncSession, *, limit: int = 50, send_inline: b
     return totals
 
 
-async def send_adhoc_sms(db: AsyncSession, contact: Contact, body: str, *, test_mode: bool = False) -> int | None:
-    """Queue one personalised SMS through the existing message pipeline."""
+async def send_adhoc_sms(
+    db: AsyncSession,
+    contact: Contact,
+    body: str,
+    *,
+    test_mode: bool = False,
+    campaign_id: int | None = None,
+) -> int | None:
+    """Queue one personalised SMS through the existing message pipeline.
+
+    ``campaign_id`` is the *ads* campaign this send belongs to (a follow-up
+    step, normally). It attributes the conversation so the inbox badge and the
+    campaign's replies list stay correct for automated follow-ups too.
+    """
     if test_mode:
         return None
+    from app.services.attribution import stamp_conversation
     from app.services.variable_service import render_for_contact
     from app.utils.phone import count_sms_segments
 
@@ -1376,10 +1398,13 @@ async def send_adhoc_sms(db: AsyncSession, contact: Contact, body: str, *, test_
         conversation = Conversation(contact_id=contact.id, status="active")
         db.add(conversation)
         await db.flush()
+    if campaign_id is not None:
+        stamp_conversation(conversation, ads_campaign_id=campaign_id)
     char_count, segment_count = count_sms_segments(rendered)
     message = Message(
         conversation_id=conversation.id,
         contact_id=contact.id,
+        ads_campaign_id=campaign_id,
         direction="outgoing",
         body=rendered,
         segment_count=segment_count,

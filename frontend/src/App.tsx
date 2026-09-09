@@ -7,6 +7,7 @@ import LoginPage from "./pages/LoginPage";
 // Route-level code splitting: each page ships as its own chunk so the initial
 // load (the login screen) no longer pulls in the entire application.
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
+const OverviewPage = lazy(() => import("./pages/OverviewPage"));
 const ContactsPage = lazy(() => import("./pages/ContactsPage"));
 const ListsPage = lazy(() => import("./pages/ListsPage"));
 const CampaignsPage = lazy(() => import("./pages/CampaignsPage"));
@@ -74,6 +75,7 @@ function AppRoutes() {
         }
       >
         <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/overview" element={<OverviewPage />} />
         <Route path="/contacts" element={<ContactsPage />} />
         <Route path="/lists" element={<ListsPage />} />
         <Route path="/audiences" element={<AudiencesPage />} />

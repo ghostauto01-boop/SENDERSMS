@@ -2,11 +2,13 @@ import { useState, useEffect, useRef } from "react";
 import api from "../api/client";
 import { Campaign } from "../types";
 import toast from "react-hot-toast";
-import { Plus, Play, Pause, Square, Trash2, Copy, Megaphone, Pencil, CalendarClock, Upload } from "lucide-react";
+import { Plus, Play, Pause, Square, Trash2, Copy, Megaphone, Pencil, CalendarClock, Upload, MessageCircle, Users, Activity } from "lucide-react";
+import { Link } from "react-router-dom";
 import ListPicker from "../components/ListPicker";
 import TemplatePicker from "../components/TemplatePicker";
 import ShortcodePicker from "../components/ShortcodePicker";
 import ImportContactsModal from "../components/ImportContactsModal";
+import CampaignRepliesDrawer from "../components/CampaignRepliesDrawer";
 
 const statusBadge = (status: string) => {
   const map: Record<string, string> = {
@@ -116,6 +118,12 @@ export default function CampaignsPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<Campaign | null>(null);
   const [scheduling, setScheduling] = useState<Campaign | null>(null);
+  // Which campaign's leads/replies drawer is open, and which tab it opened on.
+  const [viewing, setViewing] = useState<{ campaign: Campaign; tab: "replies" | "leads" } | null>(null);
+  // Live, inbox-derived counts per campaign id. The counters on the campaign
+  // row are webhook-maintained and can drift; these come from the same tables
+  // the inbox renders, so the "N replies" button never lies.
+  const [live, setLive] = useState<Record<number, any>>({});
 
   useEffect(() => { loadCampaigns(); }, []);
 
@@ -125,6 +133,16 @@ export default function CampaignsPage() {
       setError(null);
       const { data } = await api.get("/campaigns/");
       setCampaigns(data.items);
+      // Best-effort: the page is fully usable without it.
+      api.get("/overview/campaigns")
+        .then(({ data: ov }) => {
+          const byId: Record<number, any> = {};
+          (ov.items || [])
+            .filter((i: any) => i.kind === "campaign")
+            .forEach((i: any) => { byId[i.id] = i; });
+          setLive(byId);
+        })
+        .catch(() => {});
     } catch (err: any) {
       const status = err.response?.status;
       const detail = err.response?.data?.detail;
@@ -192,9 +210,14 @@ export default function CampaignsPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <h1 className="text-xl sm:text-2xl font-bold">Campaigns</h1>
-        <button onClick={() => setShowCreate(true)} className="btn-primary btn-sm">
-          <Plus size={14} className="mr-1" /> New Campaign
-        </button>
+        <div className="flex gap-2">
+          <Link to="/overview" className="btn-secondary btn-sm" title="All campaigns and inbox activity in one view">
+            <Activity size={14} className="mr-1" /> Overview
+          </Link>
+          <button onClick={() => setShowCreate(true)} className="btn-primary btn-sm">
+            <Plus size={14} className="mr-1" /> New Campaign
+          </button>
+        </div>
       </div>
 
       <div className="space-y-3">
@@ -228,13 +251,58 @@ export default function CampaignsPage() {
                       Sends automatically on {formatWhen(camp.scheduled_start_at)}
                     </p>
                   )}
-                  <div className="flex gap-4 mt-2 text-sm text-gray-500">
-                    <span>Sent: {camp.messages_sent}</span>
-                    <span>Delivered: {camp.messages_delivered}</span>
-                    <span>Failed: {camp.messages_failed}</span>
-                    <span>Replies: {camp.replies}</span>
-                    <span>Interested: {camp.interested}</span>
-                  </div>
+                  {(() => {
+                    // Prefer the inbox-derived numbers when we have them.
+                    const l = live[camp.id];
+                    const sent = l?.sent ?? camp.messages_sent;
+                    const delivered = l?.delivered ?? camp.messages_delivered;
+                    const failed = l?.failed ?? camp.messages_failed;
+                    const replies = l?.replied ?? camp.replies;
+                    const interested = l?.interested ?? camp.interested;
+                    return (
+                      <>
+                        <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-sm text-gray-500">
+                          <span>Sent: {sent}</span>
+                          <span>Delivered: {delivered}</span>
+                          <span className={failed > 0 ? "text-red-600" : ""}>Failed: {failed}</span>
+                          <span>Replies: {replies}</span>
+                          <span>Interested: {interested}</span>
+                          {l?.reply_rate > 0 && <span>Reply rate: {l.reply_rate}%</span>}
+                        </div>
+
+                        {/* Drill-down: leads this campaign produced, and the
+                            replies. Each row inside opens that exact chat. */}
+                        <div className="flex flex-wrap gap-2 mt-3">
+                          <button
+                            onClick={() => setViewing({ campaign: camp, tab: "replies" })}
+                            disabled={!replies}
+                            className="btn-secondary btn-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                            title={replies ? "Read the replies and jump into any chat" : "No replies yet"}
+                          >
+                            <MessageCircle size={13} className="mr-1" />
+                            {replies} {replies === 1 ? "reply" : "replies"}
+                          </button>
+                          <button
+                            onClick={() => setViewing({ campaign: camp, tab: "leads" })}
+                            disabled={!(l?.leads ?? 0)}
+                            className="btn-ghost btn-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                            title="Every lead this campaign produced"
+                          >
+                            <Users size={13} className="mr-1" /> {l?.leads ?? 0} leads
+                          </button>
+                          {(l?.unread ?? 0) > 0 && (
+                            <Link
+                              to={`/inbox?campaign_id=${camp.id}`}
+                              className="btn-ghost btn-sm text-amber-600"
+                              title="Unread replies from this campaign"
+                            >
+                              {l.unread} unread
+                            </Link>
+                          )}
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
                 <div className="flex gap-1 flex-wrap">
                   {camp.status === "draft" && (
@@ -297,6 +365,15 @@ export default function CampaignsPage() {
           campaign={scheduling}
           onClose={() => setScheduling(null)}
           onSaved={loadCampaigns}
+        />
+      )}
+      {viewing && (
+        <CampaignRepliesDrawer
+          key={`replies-${viewing.campaign.id}`}
+          campaignId={viewing.campaign.id}
+          campaignName={viewing.campaign.name}
+          initialTab={viewing.tab}
+          onClose={() => setViewing(null)}
         />
       )}
     </div>

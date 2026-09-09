@@ -552,7 +552,7 @@ async def health():
     """
     return JSONResponse({"status":"ok","app":settings.APP_NAME,"version":"1.0.0"})
 
-from app.api.v1 import ads, auth, calendar, contacts, lists, campaigns, sequences, followups, inbox, templates, analytics, settings as settings_api, webhooks, dashboard, send, autoreply, automations, ai, variables, campaign_followups
+from app.api.v1 import ads, auth, calendar, contacts, lists, campaigns, sequences, followups, inbox, overview, templates, analytics, settings as settings_api, webhooks, dashboard, send, autoreply, automations, ai, variables, campaign_followups
 app.include_router(auth.router, prefix="/api/v1/auth")
 app.include_router(dashboard.router, prefix="/api/v1/dashboard")
 app.include_router(contacts.router, prefix="/api/v1/contacts")
@@ -561,6 +561,9 @@ app.include_router(campaigns.router, prefix="/api/v1/campaigns")
 app.include_router(sequences.router, prefix="/api/v1/sequences")
 app.include_router(followups.router, prefix="/api/v1/followups")
 app.include_router(inbox.router, prefix="/api/v1/inbox")
+# Unified campaign + inbox overview: joins the classic campaigns table and the
+# SMS Ads Manager into one shape so a single screen can show everything.
+app.include_router(overview.router, prefix="/api/v1/overview")
 app.include_router(templates.router, prefix="/api/v1/templates")
 app.include_router(analytics.router, prefix="/api/v1/analytics")
 app.include_router(settings_api.router, prefix="/api/v1/settings")

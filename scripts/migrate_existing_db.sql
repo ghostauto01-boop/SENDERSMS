@@ -144,6 +144,72 @@ CREATE TABLE IF NOT EXISTS auto_reply_rules (
 ALTER TABLE messages
     ADD COLUMN IF NOT EXISTS is_auto_reply BOOLEAN NOT NULL DEFAULT FALSE;
 
+-- ------------------------------------------------------------
+-- 7. Campaign attribution on conversations
+--
+-- Answers "which campaign is this lead from?" without replaying a thread's
+-- whole message history on every inbox render.
+--
+--   campaign_id / ads_campaign_id           -> FIRST touch (the source)
+--   last_campaign_id / last_ads_campaign_id -> LAST touch  (credits replies)
+--
+-- The classic and ads campaign systems live in different tables, so they get
+-- separate columns; exactly one side is ever populated on a given row.
+--
+-- These start NULL for existing threads. The app self-heals them from the
+-- messages table the first time a thread is listed or opened
+-- (app/services/attribution.py:backfill_conversation), so this migration is
+-- only about creating the columns and indexes up front -- no data backfill
+-- is required here.
+-- ------------------------------------------------------------
+ALTER TABLE conversations
+    ADD COLUMN IF NOT EXISTS ads_campaign_id INTEGER;
+ALTER TABLE conversations
+    ADD COLUMN IF NOT EXISTS last_campaign_id INTEGER;
+ALTER TABLE conversations
+    ADD COLUMN IF NOT EXISTS last_ads_campaign_id INTEGER;
+
+CREATE INDEX IF NOT EXISTS ix_conversations_ads_campaign_id
+    ON conversations (ads_campaign_id);
+CREATE INDEX IF NOT EXISTS ix_conversations_last_campaign_id
+    ON conversations (last_campaign_id);
+CREATE INDEX IF NOT EXISTS ix_conversations_last_ads_campaign_id
+    ON conversations (last_ads_campaign_id);
+
+-- Messages sent by the SMS Ads Manager. The classic campaign_id column
+-- already exists; this is its ads-side counterpart.
+ALTER TABLE messages
+    ADD COLUMN IF NOT EXISTS ads_campaign_id INTEGER;
+
+CREATE INDEX IF NOT EXISTS ix_messages_ads_campaign_id
+    ON messages (ads_campaign_id);
+
+-- Optional one-off backfill. The app does this lazily per thread, but running
+-- it here makes every badge correct immediately on a large existing inbox.
+UPDATE conversations c
+SET campaign_id = sub.campaign_id
+FROM (
+    SELECT DISTINCT ON (conversation_id) conversation_id, campaign_id
+    FROM messages
+    WHERE direction = 'outgoing' AND campaign_id IS NOT NULL
+    ORDER BY conversation_id, created_at ASC, id ASC
+) AS sub
+WHERE c.id = sub.conversation_id
+  AND c.campaign_id IS NULL
+  AND c.ads_campaign_id IS NULL;
+
+UPDATE conversations c
+SET last_campaign_id = sub.campaign_id
+FROM (
+    SELECT DISTINCT ON (conversation_id) conversation_id, campaign_id
+    FROM messages
+    WHERE direction = 'outgoing' AND campaign_id IS NOT NULL
+    ORDER BY conversation_id, created_at DESC, id DESC
+) AS sub
+WHERE c.id = sub.conversation_id
+  AND c.last_campaign_id IS NULL
+  AND c.last_ads_campaign_id IS NULL;
+
 COMMIT;
 
 -- ------------------------------------------------------------
