@@ -42,7 +42,8 @@ async def send_sms_direct(phone,body,sim=1):
     payload={"textMessage":{"text":body},"phoneNumbers":[phone],"simNumber":sim,"ttl":3600}
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(45)) as c:
-            r=await c.post(f"{_api()}?skipPhoneValidation=true",
+            # Never skipPhoneValidation: invalid numbers still debit the SIM.
+            r=await c.post(_api(),
                 headers={"Content-Type":"application/json","Authorization":f"Basic {auth}"},json=payload)
             d=r.json() if r.text else {}
             logger.info(f"SMS: HTTP {r.status_code} {json.dumps(d)[:200]}")

@@ -407,6 +407,32 @@ def _chunked_ids(ids: list[int], size: int = 400) -> list[list[int]]:
     return [ids[i : i + size] for i in range(0, len(ids), size)]
 
 
+@router.post("/{list_id}/clean")
+async def clean_list(
+    list_id: int,
+    remove_from_list: bool = Query(True, description="Unlink bad numbers from this list"),
+    delete_contacts: bool = Query(False, description="Permanently delete bad numbers"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Scan a list and drop numbers that will fail (and still bill the SIM).
+
+    Default: mark them undeliverable AND remove them from this list so the
+    next campaign never submits them. They stay in Contacts unless
+    ``delete_contacts=true``.
+    """
+    await _find_list(db, list_id)
+    from app.services.list_hygiene import clean_contacts
+
+    result = await clean_contacts(
+        db,
+        list_id=list_id,
+        remove_from_list=remove_from_list,
+        delete_contacts=delete_contacts,
+    )
+    return {"success": True, **result}
+
+
 @router.get("/{list_id}/stats")
 async def get_list_stats(
     list_id: int,

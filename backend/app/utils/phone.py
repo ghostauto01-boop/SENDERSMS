@@ -90,6 +90,16 @@ def normalize_nigerian_number(phone: str) -> Optional[str]:
         return None
 
 
+def is_sendable_nigerian_mobile(phone: str) -> bool:
+    """True only when we should actually hit the carrier for this number.
+
+    Invalid, landline, short-code and empty values must never leave the app:
+    SMS-Gate still bills the SIM for a failed attempt if we skip its own
+    phone validation.
+    """
+    return is_nigerian_mobile(phone)
+
+
 def is_nigerian_mobile(phone: str) -> bool:
     """Check if a phone number is a valid Nigerian mobile number."""
     normalized = normalize_nigerian_number(phone)

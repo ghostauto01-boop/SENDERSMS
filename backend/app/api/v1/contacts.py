@@ -48,7 +48,7 @@ async def _serialize_contact(db: AsyncSession, contact: Contact) -> dict:
     return ContactOut.model_validate(data).model_dump(mode="json")
 
 
-def _apply_contact_filters(query, search: Optional[str], lead_status: Optional[str], tag: Optional[str]):
+def _apply_contact_filters(query, search: Optional[str], lead_status: Optional[str], tag: Optional[str], undeliverable: Optional[str] = None):
     """Apply the shared search / status / tag filters to a contact query."""
     if search:
         search_term = f"%{search}%"
@@ -75,6 +75,11 @@ def _apply_contact_filters(query, search: Optional[str], lead_status: Optional[s
     if tag:
         query = query.join(ContactTag, Contact.id == ContactTag.contact_id).join(Tag, ContactTag.tag_id == Tag.id).where(Tag.name == tag)
 
+    if undeliverable in ("1", "true", "yes"):
+        query = query.where(Contact.is_undeliverable.is_(True))
+    elif undeliverable in ("0", "false", "no"):
+        query = query.where(Contact.is_undeliverable.is_(False))
+
     return query
 
 
@@ -85,6 +90,7 @@ async def list_contacts(
     search: Optional[str] = None,
     lead_status: Optional[str] = None,
     tag: Optional[str] = None,
+    undeliverable: Optional[str] = None,
     sort_by: str = "created_at",
     sort_dir: str = "desc",
     exclude_list_id: Optional[int] = None,
@@ -98,7 +104,7 @@ async def list_contacts(
     offers numbers the list does not have yet, no matter how large either set
     is.
     """
-    query = _apply_contact_filters(select(Contact), search, lead_status, tag)
+    query = _apply_contact_filters(select(Contact), search, lead_status, tag, undeliverable)
     if exclude_list_id is not None:
         member_ids = select(ContactListMember.contact_id).where(
             ContactListMember.list_id == exclude_list_id
@@ -125,6 +131,24 @@ async def list_contacts(
 
     items = [await _serialize_contact(db, c) for c in contacts]
     return ContactListOut(total=total, items=items)
+
+
+@router.post("/clean")
+async def clean_all_contacts(
+    delete_bad: bool = Query(False, description="Permanently delete invalid/failed numbers"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Quarantine numbers that would bill the carrier for a failed SMS.
+
+    Invalid Nigerian mobiles and numbers that already bounced are marked
+    ``is_undeliverable`` so send/campaigns skip them. Pass ``delete_bad=true``
+    to permanently delete those contacts instead of only skipping them.
+    """
+    from app.services.list_hygiene import clean_contacts
+
+    result = await clean_contacts(db, delete_contacts=delete_bad)
+    return {"success": True, **result}
 
 
 @router.get("/tags/", response_model=dict)

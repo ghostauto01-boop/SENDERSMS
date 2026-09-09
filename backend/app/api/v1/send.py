@@ -57,6 +57,8 @@ async def send_sms_now(
                 raise HTTPException(404, "Contact not found")
             if c.is_opted_out:
                 raise HTTPException(400, "Contact opted out")
+            if getattr(c, "is_undeliverable", False):
+                raise HTTPException(400, "Number is undeliverable — skipped to avoid carrier charges")
             sm = ScheduledMessage(
                 contact_id=c.id,
                 phone_number=c.phone_number,
@@ -85,7 +87,7 @@ async def send_sms_now(
             for m in members.scalars().all():
                 cr = await db.execute(select(Contact).where(Contact.id == m.contact_id))
                 cc = cr.scalar_one_or_none()
-                if cc and not cc.is_opted_out:
+                if cc and not cc.is_opted_out and not getattr(cc, "is_undeliverable", False):
                     sm = ScheduledMessage(
                         contact_id=cc.id,
                         phone_number=cc.phone_number,
@@ -121,6 +123,8 @@ async def send_sms_now(
             raise HTTPException(404, "Contact not found")
         if c.is_opted_out:
             raise HTTPException(400, "Contact opted out")
+        if getattr(c, "is_undeliverable", False):
+            raise HTTPException(400, "Number is undeliverable — skipped to avoid carrier charges")
         recipients.append(c)
     elif phone_number:
         norm = normalize_nigerian_number(phone_number)
@@ -140,7 +144,7 @@ async def send_sms_now(
         for m in members.scalars().all():
             cr = await db.execute(select(Contact).where(Contact.id == m.contact_id))
             cc = cr.scalar_one_or_none()
-            if cc and not cc.is_opted_out:
+            if cc and not cc.is_opted_out and not getattr(cc, "is_undeliverable", False):
                 recipients.append(cc)
         if not recipients:
             raise HTTPException(400, "List empty")
@@ -201,8 +205,12 @@ async def send_sms_now(
         conv.message_count = (conv.message_count or 0) + 1
         conv.last_message_preview = msg[:100]
         conv.last_message_at = datetime.now(timezone.utc)
-        contact.messages_sent = (contact.messages_sent or 0) + 1
-        contact.last_contacted_at = datetime.now(timezone.utc)
+        if r["success"]:
+            contact.messages_sent = (contact.messages_sent or 0) + 1
+            contact.last_contacted_at = datetime.now(timezone.utc)
+        else:
+            from app.services.list_hygiene import mark_undeliverable
+            await mark_undeliverable(contact, r.get("error") or "send_failed")
         results.append(
             {
                 "contact_id": contact.id,

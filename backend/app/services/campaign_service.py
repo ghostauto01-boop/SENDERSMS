@@ -269,6 +269,16 @@ class CampaignService:
             if existing.scalar_one_or_none():
                 continue
 
+            contact = (
+                await self.db.execute(select(Contact).where(Contact.id == member.contact_id))
+            ).scalar_one_or_none()
+            if not contact:
+                continue
+            from app.services.list_hygiene import contact_is_blocked_from_send
+
+            if contact_is_blocked_from_send(contact):
+                continue
+
             cc = CampaignContact(
                 campaign_id=campaign.id,
                 contact_id=member.contact_id,

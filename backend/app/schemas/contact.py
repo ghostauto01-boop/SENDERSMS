@@ -59,6 +59,9 @@ class ContactOut(BaseModel):
     consent_status: str
     has_consented: bool
     is_opted_out: bool
+    is_undeliverable: bool = False
+    undeliverable_reason: Optional[str] = None
+    delivery_fail_count: int = 0
     # Opt-out audit trail. These were recorded in the DB but never returned by
     # the API, so the UI could not show WHY or WHEN a contact opted out.
     opt_out_reason: Optional[str] = None

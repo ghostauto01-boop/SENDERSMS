@@ -143,6 +143,17 @@ export default function ContactsPage() {
             <p className="text-[13px] text-[#667781] dark:text-[#8696a0]">{total} contacts • Tap card to message</p>
           </div>
           <div className="flex gap-1.5">
+            <button onClick={async()=>{
+              if(!confirm("Scan all contacts and mark invalid / previously-failed numbers as undeliverable so they are never billed again?")) return;
+              try {
+                const {data}=await api.post("/contacts/clean");
+                toast.success(`Scanned ${data.scanned}. Quarantined ${data.quarantined} bad numbers (${data.invalid_format} invalid, ${data.previous_failures} bounced).`);
+                loadContacts();
+              } catch { toast.error("Clean failed"); }
+            }} className="w-10 h-10 lg:w-auto lg:px-3 lg:py-2 rounded-full lg:rounded-lg bg-[#f0f2f5] dark:bg-[#202c33] text-[#54656f] dark:text-[#aebac1] flex items-center justify-center gap-1.5 text-sm font-medium hover:bg-[#e9edef] dark:hover:bg-[#2a3942]" title="Quarantine numbers that fail delivery">
+              <span className="hidden lg:inline">Clean list</span>
+              <span className="lg:hidden">✓</span>
+            </button>
             <button onClick={()=>setShowImport(true)} className="w-10 h-10 lg:w-auto lg:px-3 lg:py-2 rounded-full lg:rounded-lg bg-[#f0f2f5] dark:bg-[#202c33] text-[#54656f] dark:text-[#aebac1] flex items-center justify-center gap-1.5 text-sm font-medium hover:bg-[#e9edef] dark:hover:bg-[#2a3942]">
               <Upload size={16}/> <span className="hidden lg:inline">Import</span>
             </button>
