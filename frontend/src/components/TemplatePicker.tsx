@@ -5,11 +5,12 @@
  * Searchable + scrollable, shows the message body so the choice is visible
  * without leaving the form, and links out to the Templates page.
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronDown, FileText, Search } from "lucide-react";
 import { Link } from "react-router-dom";
 import api from "../api/client";
 import type { Template } from "../types";
+import { onDataChange } from "../utils/syncEvents";
 
 interface Props {
   value: string;
@@ -38,32 +39,47 @@ export default function TemplatePicker({
   const [query, setQuery] = useState("");
   const rootRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      setLoading(true);
-      try {
-        const all: Template[] = [];
-        let page = 1;
-        let total = 0;
-        do {
-          const { data } = await api.get("/templates/", { params: { page, per_page: 100 } });
-          all.push(...(data.items || []));
-          total = data.total ?? all.length;
-          page += 1;
-        } while (all.length < total);
-        if (!cancelled) setTemplates(all.filter((t) => t.is_active));
-      } catch {
-        if (!cancelled) setTemplates([]);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    load();
-    return () => {
-      cancelled = true;
-    };
+  // Load once for the closed-state label, then again every time the dropdown
+  // opens and whenever templates change elsewhere — a template edited on the
+  // Templates page shows up here without a page reload (keeps every composer
+  // in sync with the template library).
+  const load = useCallback(async (quiet = false) => {
+    if (!quiet) setLoading(true);
+    try {
+      const all: Template[] = [];
+      let page = 1;
+      let total = 0;
+      do {
+        const { data } = await api.get("/templates/", { params: { page, per_page: 100 } });
+        all.push(...(data.items || []));
+        total = data.total ?? all.length;
+        page += 1;
+      } while (all.length < total);
+      setTemplates(all.filter((t) => t.is_active));
+    } catch {
+      // Keep the previous list when a refresh fails — a network blip while
+      // the dropdown is open should not wipe the user's choices.
+    } finally {
+      if (!quiet) setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    load();
+    const unsubscribe = onDataChange("templates-changed", () => load(true));
+    return () => {
+      unsubscribe();
+    };
+  }, [load]);
+
+  // Refresh when the user opens the dropdown so recently created/edited
+  // templates are there even if the change event was missed.
+  const openedOnce = useRef(false);
+  useEffect(() => {
+    if (!open) return;
+    if (openedOnce.current) load(true);
+    openedOnce.current = true;
+  }, [open, load]);
 
   useEffect(() => {
     if (!open) return;

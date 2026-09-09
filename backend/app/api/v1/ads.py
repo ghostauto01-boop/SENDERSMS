@@ -91,6 +91,20 @@ async def _get_creative(db: AsyncSession, creative_id: int) -> AdsCreative:
     return row
 
 
+async def _template_exists(db: AsyncSession, template_id: int) -> bool:
+    """True when the referenced saved template still exists.
+
+    Only used to reject typos at save time; a template deleted later leaves
+    the pointer dangling (harmlessly) rather than blocking the delete.
+    """
+    from app.models.template import Template
+
+    row = (
+        await db.execute(select(Template.id).where(Template.id == template_id))
+    ).scalar_one_or_none()
+    return row is not None
+
+
 async def _get_audience(db: AsyncSession, audience_id: int) -> AdsAudience:
     row = (
         await db.execute(select(AdsAudience).where(AdsAudience.id == audience_id))
@@ -907,6 +921,8 @@ async def create_creative(
     user: User = Depends(get_current_user),
 ):
     ads_set = await _get_set(db, set_id)
+    if data.template_id is not None and not await _template_exists(db, data.template_id):
+        raise HTTPException(status_code=404, detail="Template not found")
     creative = AdsCreative(set_id=set_id, campaign_id=ads_set.campaign_id, **data.model_dump())
     db.add(creative)
     await db.flush()
@@ -936,6 +952,8 @@ async def update_creative(
     payload = data.model_dump(exclude_unset=True)
     new_body = payload.pop("body", None)
     new_cta = payload.pop("cta", creative.cta)
+    if payload.get("template_id") is not None and not await _template_exists(db, payload["template_id"]):
+        raise HTTPException(status_code=404, detail="Template not found")
     for key, value in payload.items():
         setattr(creative, key, value)
     if new_body is not None and new_body != creative.body:
@@ -1000,6 +1018,7 @@ async def duplicate_creative(
         cta=creative.cta,
         tracking_link=creative.tracking_link,
         allocation=creative.allocation,
+        template_id=creative.template_id,
         status="draft",
     )
     db.add(clone)

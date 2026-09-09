@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import api from "../api/client";
 import { Contact, PaginatedResponse } from "../types";
 import toast from "react-hot-toast";
-import { Edit2, Plus, Search, Trash2, UserPlus, Users, X } from "lucide-react";
+import { Edit2, Plus, Search, Trash2, UserPlus, Users, X, ChevronLeft, ChevronRight, Minus } from "lucide-react";
 
 interface ListItem {
   id: number;
@@ -18,27 +18,7 @@ const displayName = (contact: Contact) =>
   contact.business_name ||
   contact.phone_number;
 
-async function fetchAllContactPages(path: string): Promise<{ items: Contact[]; total: number }> {
-  // The contacts API deliberately caps each page at 100. This page used to
-  // request 200, which FastAPI rejected with 422 and made Add Contacts look as
-  // if there were zero contacts. Fetch valid 100-contact pages instead.
-  const first = await api.get<PaginatedResponse<Contact>>(path, {
-    params: { page: 1, per_page: 100 },
-  });
-  const pages = Math.ceil(first.data.total / 100);
-  if (pages <= 1) return first.data;
-  const rest = await Promise.all(
-    Array.from({ length: pages - 1 }, (_, index) =>
-      api.get<PaginatedResponse<Contact>>(path, {
-        params: { page: index + 2, per_page: 100 },
-      })
-    )
-  );
-  return {
-    total: first.data.total,
-    items: [first.data.items, ...rest.map((response) => response.data.items)].flat(),
-  };
-}
+const PAGE_SIZE = 50;
 
 export default function ListsPage() {
   const [lists, setLists] = useState<ListItem[]>([]);
@@ -48,24 +28,48 @@ export default function ListsPage() {
   const [newName, setNewName] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
+
   const [viewListId, setViewListId] = useState<number | null>(null);
   const [viewListName, setViewListName] = useState("");
+
+  // Members view is server-paginated + searchable, so a list with 50k
+  // contacts renders the same 50 rows as one with 5.
   const [listContacts, setListContacts] = useState<Contact[]>([]);
   const [listTotal, setListTotal] = useState(0);
+  const [listMatchingTotal, setListMatchingTotal] = useState(0);
+  const [memberPage, setMemberPage] = useState(1);
+  const [memberSearch, setMemberSearch] = useState("");
+  const [memberSearchInput, setMemberSearchInput] = useState("");
   const [listLoading, setListLoading] = useState(false);
-  const [showAddContacts, setShowAddContacts] = useState(false);
-  const [allContacts, setAllContacts] = useState<Contact[]>([]);
-  const [allContactsTotal, setAllContactsTotal] = useState(0);
-  const [addContactsLoading, setAddContactsLoading] = useState(false);
-  const [selectedToAdd, setSelectedToAdd] = useState<Set<number>>(new Set());
-  const [addSearch, setAddSearch] = useState("");
-  const [removingId, setRemovingId] = useState<number | null>(null);
-  const [selectedInList, setSelectedInList] = useState<Set<number>>(new Set());
-  const [deletingPermanently, setDeletingPermanently] = useState(false);
-  const [removingBulk, setRemovingBulk] = useState(false);
-  const [deletingList, setDeletingList] = useState(false);
+  const searchTimer = useRef<number | null>(null);
 
-  useEffect(() => { loadLists(); }, []);
+  const [showAddContacts, setShowAddContacts] = useState(false);
+  // Add-contacts picker: searches the server, never loads every contact.
+  const [addItems, setAddItems] = useState<Contact[]>([]);
+  const [addTotal, setAddTotal] = useState(0);
+  const [addLoading, setAddLoading] = useState(false);
+  const [addPage, setAddPage] = useState(1);
+  const [addQuery, setAddQuery] = useState("");
+  const [selectedToAdd, setSelectedToAdd] = useState<Set<number>>(new Set());
+  const addTimer = useRef<number | null>(null);
+
+  const [selectedInList, setSelectedInList] = useState<Set<number>>(new Set());
+  // "All N matching selected": every member matching the current search
+  // across ALL pages is part of the action (server-scoped, no id listing).
+  const [allMatchingInList, setAllMatchingInList] = useState(false);
+  const [busyRow, setBusyRow] = useState<string | null>(null);
+  const [removingBulk, setRemovingBulk] = useState(false);
+  const [deletingPermanently, setDeletingPermanently] = useState(false);
+  const [deletingList, setDeletingList] = useState(false);
+  const [addingToList, setAddingToList] = useState(false);
+
+  useEffect(() => {
+    loadLists();
+    return () => {
+      if (searchTimer.current) window.clearTimeout(searchTimer.current);
+      if (addTimer.current) window.clearTimeout(addTimer.current);
+    };
+  }, []);
 
   const loadLists = async () => {
     try {
@@ -80,17 +84,120 @@ export default function ListsPage() {
     }
   };
 
-  const loadListContacts = async (listId: number) => {
+  // ---- Members of the open list ------------------------------------------
+
+  const loadListContacts = useCallback(async (listId: number, page: number, search: string, quiet = false) => {
+    if (!quiet) setListLoading(true);
     try {
-      setListLoading(true);
-      const data = await fetchAllContactPages(`/lists/${listId}/contacts`);
+      const { data } = await api.get<PaginatedResponse<Contact>>(`/lists/${listId}/contacts`, {
+        params: { page, per_page: PAGE_SIZE, search: search.trim() || undefined },
+      });
       setListContacts(data.items);
-      setListTotal(data.total);
+      // listTotal is the REAL size of the list (used for the header + the
+      // "delete list with all numbers" warning); the matching total can be
+      // smaller when a search is active.
+      if (!search.trim()) setListTotal(data.total);
+      setListMatchingTotal(data.total);
     } catch (err: any) {
       toast.error(err.response?.data?.detail || "Failed to load list contacts");
     } finally {
-      setListLoading(false);
+      if (!quiet) setListLoading(false);
     }
+  }, []);
+
+  const openListEditor = async (list: ListItem) => {
+    setViewListId(list.id);
+    setViewListName(list.name);
+    setListContacts([]);
+    setListTotal(list.contact_count);
+    setListMatchingTotal(list.contact_count);
+    setMemberPage(1);
+    setMemberSearch("");
+    setMemberSearchInput("");
+    setShowAddContacts(false);
+    setSelectedToAdd(new Set());
+    setSelectedInList(new Set());
+    setAllMatchingInList(false);
+    await loadListContacts(list.id, 1, "");
+  };
+
+  const closeListEditor = () => {
+    setViewListId(null);
+    setShowAddContacts(false);
+    setSelectedToAdd(new Set());
+    setSelectedInList(new Set());
+    setAllMatchingInList(false);
+  };
+
+  const applyMemberSearch = (q: string) => {
+    if (searchTimer.current) window.clearTimeout(searchTimer.current);
+    searchTimer.current = window.setTimeout(() => {
+      setMemberSearch(q);
+      setMemberPage(1);
+      setSelectedInList(new Set());
+      setAllMatchingInList(false);
+      if (viewListId) loadListContacts(viewListId, 1, q);
+    }, 300);
+  };
+
+  // Reload the current view after any change, snapping back a page when the
+  // last row of the last page was deleted.
+  const reloadMembers = async () => {
+    if (!viewListId) return;
+    const fetchPage = async (page: number) =>
+      api.get<PaginatedResponse<Contact>>(`/lists/${viewListId}/contacts`, {
+        params: { page, per_page: PAGE_SIZE, search: memberSearch.trim() || undefined },
+      });
+    let page = memberPage;
+    let { data } = await fetchPage(page);
+    if (data.items.length === 0 && page > 1) {
+      page -= 1;
+      setMemberPage(page);
+      data = (await fetchPage(page)).data;
+    }
+    setListContacts(data.items);
+    if (!memberSearch.trim()) setListTotal(data.total);
+    setListMatchingTotal(data.total);
+  };
+
+  const pageAllSelected =
+    listContacts.length > 0 && selectedInList.size === listContacts.length && !allMatchingInList;
+  const selectionCount = allMatchingInList ? listMatchingTotal : selectedInList.size;
+  const selectedLabel = allMatchingInList
+    ? `All ${listMatchingTotal} matching`
+    : `${selectedInList.size} selected`;
+
+  const toggleInList = (contactId: number) => {
+    if (allMatchingInList) {
+      const next = new Set(listContacts.map((c) => c.id));
+      next.delete(contactId);
+      setSelectedInList(next);
+      setAllMatchingInList(false);
+      return;
+    }
+    const next = new Set(selectedInList);
+    next.has(contactId) ? next.delete(contactId) : next.add(contactId);
+    setSelectedInList(next);
+  };
+
+  // Three states: 50 on this page -> all N matching (every page) -> clear.
+  const toggleAllInList = () => {
+    if (allMatchingInList) {
+      setSelectedInList(new Set());
+      setAllMatchingInList(false);
+      return;
+    }
+    if (pageAllSelected) {
+      if (listMatchingTotal > listContacts.length) setAllMatchingInList(true);
+      else setSelectedInList(new Set());
+    } else {
+      setSelectedInList(new Set(listContacts.map((c) => c.id)));
+    }
+  };
+
+  const clearSelection = () => {
+    setSelectedInList(new Set());
+    setAllMatchingInList(false);
   };
 
   const handleCreate = async () => {
@@ -134,51 +241,24 @@ export default function ListsPage() {
     }
   };
 
-  const openListEditor = async (list: ListItem) => {
-    setViewListId(list.id);
-    setViewListName(list.name);
-    setListContacts([]);
-    setListTotal(list.contact_count);
-    setShowAddContacts(false);
-    setSelectedToAdd(new Set());
-    setAddSearch("");
-    setSelectedInList(new Set());
-    await loadListContacts(list.id);
-  };
+  // ---- Removal / deletion (fast at any size: server-scoped) --------------
 
-  const closeListEditor = () => {
-    setViewListId(null);
-    setShowAddContacts(false);
-    setSelectedToAdd(new Set());
-    setAddSearch("");
-    setSelectedInList(new Set());
-  };
-
-  const toggleInList = (contactId: number) => {
-    const next = new Set(selectedInList);
-    next.has(contactId) ? next.delete(contactId) : next.add(contactId);
-    setSelectedInList(next);
-  };
-
-  const toggleAllInList = () => {
-    if (listContacts.length === 0) return;
-    if (selectedInList.size === listContacts.length) {
-      setSelectedInList(new Set());
-    } else {
-      setSelectedInList(new Set(listContacts.map((contact) => contact.id)));
-    }
-  };
+  const bulkPayload = () => ({
+    contact_ids: allMatchingInList ? [] : [...selectedInList],
+    scope: allMatchingInList ? "all" : "ids",
+    search: allMatchingInList && memberSearch.trim() ? memberSearch.trim() : undefined,
+  });
 
   const handleBulkRemoveFromList = async () => {
-    if (!viewListId || selectedInList.size === 0) return;
-    const count = selectedInList.size;
+    if (!viewListId || selectionCount === 0) return;
+    const count = selectionCount;
     if (!window.confirm(`Remove ${count} contact${count === 1 ? "" : "s"} from ${viewListName}? The numbers will NOT be deleted.`)) return;
     try {
       setRemovingBulk(true);
-      await api.post(`/lists/${viewListId}/contacts/remove`, { contact_ids: [...selectedInList] });
+      await api.post(`/lists/${viewListId}/contacts/remove`, bulkPayload());
       toast.success(`${count} removed from list`);
-      setSelectedInList(new Set());
-      await Promise.all([loadListContacts(viewListId), loadLists()]);
+      clearSelection();
+      await Promise.all([reloadMembers(), loadLists()]);
     } catch (err: any) {
       toast.error(err.response?.data?.detail || "Failed to remove contacts");
     } finally {
@@ -187,19 +267,53 @@ export default function ListsPage() {
   };
 
   const handlePermanentDeleteInList = async () => {
-    if (!viewListId || selectedInList.size === 0) return;
-    const count = selectedInList.size;
-    if (!window.confirm(`Permanently delete ${count} phone number${count === 1 ? "" : "s"} from ${viewListName}?\n\nThis permanently deletes the contacts, their messages and all related history. This cannot be undone.`)) return;
+    if (!viewListId || selectionCount === 0) return;
+    const count = selectionCount;
+    if (!window.confirm(
+      allMatchingInList && memberSearch.trim()
+        ? `Permanently delete all ${count} phone numbers matching “${memberSearch.trim()}” in ${viewListName}?\n\nThis deletes the contacts, their messages and all related history. It cannot be undone.`
+        : `Permanently delete ${count} phone number${count === 1 ? "" : "s"} from ${viewListName}?\n\nThis permanently deletes the contacts, their messages and all related history. This cannot be undone.`
+    )) return;
     try {
       setDeletingPermanently(true);
-      const { data } = await api.post(`/lists/${viewListId}/contacts/delete`, { contact_ids: [...selectedInList] });
+      const { data } = await api.post(`/lists/${viewListId}/contacts/delete`, bulkPayload());
       toast.success(`${data.deleted ?? count} phone number${(data.deleted ?? count) === 1 ? "" : "s"} permanently deleted`);
-      setSelectedInList(new Set());
-      await Promise.all([loadListContacts(viewListId), loadLists()]);
+      clearSelection();
+      await Promise.all([reloadMembers(), loadLists()]);
     } catch (err: any) {
       toast.error(err.response?.data?.detail || "Failed to delete contacts");
     } finally {
       setDeletingPermanently(false);
+    }
+  };
+
+  const handleRemoveContact = async (contact: Contact) => {
+    if (!viewListId) return;
+    if (!window.confirm(`Remove ${displayName(contact)} from ${viewListName}? The contact will not be deleted.`)) return;
+    try {
+      setBusyRow(`remove-${contact.id}`);
+      await api.post(`/lists/${viewListId}/contacts/remove`, { contact_ids: [contact.id] });
+      toast.success("Contact removed from list");
+      await Promise.all([reloadMembers(), loadLists()]);
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || "Failed to remove contact");
+    } finally {
+      setBusyRow(null);
+    }
+  };
+
+  const handleDeleteOneContact = async (contact: Contact) => {
+    if (!viewListId) return;
+    if (!window.confirm(`Permanently delete ${displayName(contact)} (${contact.phone_number})?\n\nThis deletes the contact, its messages and all related history. It cannot be undone.`)) return;
+    try {
+      setBusyRow(`delete-${contact.id}`);
+      const { data } = await api.post(`/lists/${viewListId}/contacts/delete`, { contact_ids: [contact.id] });
+      toast.success(`${data.deleted ?? 1} phone number permanently deleted`);
+      await Promise.all([reloadMembers(), loadLists()]);
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || "Failed to delete contact");
+    } finally {
+      setBusyRow(null);
     }
   };
 
@@ -219,72 +333,76 @@ export default function ListsPage() {
     }
   };
 
+  // ---- Add contacts: search-as-you-type against the server ----------------
+
+  const openAddContacts = () => {
+    setShowAddContacts(true);
+    setSelectedToAdd(new Set());
+    setAddPage(1);
+    setAddQuery("");
+    loadAddPage(1, "");
+  };
+
+  const loadAddPage = async (page: number, query: string, quiet = false) => {
+    if (!viewListId) return;
+    if (!quiet) setAddLoading(true);
+    try {
+      const { data } = await api.get<PaginatedResponse<Contact>>("/contacts/", {
+        params: {
+          page,
+          per_page: PAGE_SIZE,
+          search: query.trim() || undefined,
+          exclude_list_id: viewListId,
+        },
+      });
+      setAddItems(data.items);
+      setAddTotal(data.total);
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || "Failed to load contacts");
+      setAddItems([]);
+      setAddTotal(0);
+    } finally {
+      if (!quiet) setAddLoading(false);
+    }
+  };
+
+  const changeAddQuery = (q: string) => {
+    setAddQuery(q);
+    if (addTimer.current) window.clearTimeout(addTimer.current);
+    addTimer.current = window.setTimeout(() => {
+      setAddPage(1);
+      loadAddPage(1, q);
+    }, 300);
+  };
+
+  const toggleToAdd = (id: number) => {
+    const next = new Set(selectedToAdd);
+    next.has(id) ? next.delete(id) : next.add(id);
+    setSelectedToAdd(next);
+  };
+
   const handleAddContacts = async () => {
     if (!viewListId || selectedToAdd.size === 0) return;
     const count = selectedToAdd.size;
     try {
+      setAddingToList(true);
       const { data } = await api.post(`/lists/${viewListId}/contacts`, [...selectedToAdd]);
       toast.success(`${data.added ?? count} contact${(data.added ?? count) === 1 ? "" : "s"} added`);
       setSelectedToAdd(new Set());
       setShowAddContacts(false);
-      await Promise.all([loadListContacts(viewListId), loadLists()]);
+      setMemberPage(1);
+      await Promise.all([loadListContacts(viewListId, 1, memberSearch, true), loadLists()]);
     } catch (err: any) {
       toast.error(err.response?.data?.detail || "Failed to add contacts");
-    }
-  };
-
-  const handleRemoveContact = async (contact: Contact) => {
-    if (!viewListId) return;
-    if (!window.confirm(`Remove ${displayName(contact)} from ${viewListName}? The contact will not be deleted.`)) return;
-    try {
-      setRemovingId(contact.id);
-      await api.post(`/lists/${viewListId}/contacts/remove`, { contact_ids: [contact.id] });
-      toast.success("Contact removed from list");
-      await Promise.all([loadListContacts(viewListId), loadLists()]);
-    } catch (err: any) {
-      toast.error(err.response?.data?.detail || "Failed to remove contact");
     } finally {
-      setRemovingId(null);
+      setAddingToList(false);
     }
   };
 
-  const openAddContacts = async () => {
-    setShowAddContacts(true);
-    setSelectedToAdd(new Set());
-    setAddSearch("");
-    try {
-      setAddContactsLoading(true);
-      const data = await fetchAllContactPages("/contacts/");
-      setAllContacts(data.items);
-      setAllContactsTotal(data.total);
-    } catch (err: any) {
-      toast.error(err.response?.data?.detail || "Failed to load contacts");
-      setAllContacts([]);
-      setAllContactsTotal(0);
-    } finally {
-      setAddContactsLoading(false);
-    }
-  };
-
-  const availableContacts = useMemo(() => {
-    const members = new Set(listContacts.map((contact) => contact.id));
-    return allContacts.filter((contact) => !members.has(contact.id));
-  }, [allContacts, listContacts]);
-
-  const filteredAvailableContacts = useMemo(() => {
-    const needle = addSearch.trim().toLowerCase();
-    if (!needle) return availableContacts;
-    return availableContacts.filter((contact) =>
-      [
-        contact.first_name,
-        contact.last_name,
-        contact.business_name,
-        contact.phone_number,
-      ]
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(needle))
-    );
-  }, [availableContacts, addSearch]);
+  const addPages = Math.max(1, Math.ceil(addTotal / PAGE_SIZE));
+  const memberPages = Math.max(1, Math.ceil(listMatchingTotal / PAGE_SIZE));
+  const memberStart = listMatchingTotal === 0 ? 0 : (memberPage - 1) * PAGE_SIZE + 1;
+  const memberEnd = Math.min(memberPage * PAGE_SIZE, listMatchingTotal);
 
   if (error) {
     return (
@@ -301,7 +419,10 @@ export default function ListsPage() {
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold">Contact Lists</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Create a list, then add or remove contacts at any time.</p>
+          <p className="text-sm text-gray-500 mt-0.5">
+            Create a list, then add or remove contacts at any time — even lists with thousands of
+            members stay fast (rows are paged, actions run on the server).
+          </p>
         </div>
         <button onClick={() => setShowCreate(true)} className="btn-primary btn-sm">
           <Plus size={14} className="mr-1" /> Create List
@@ -364,81 +485,92 @@ export default function ListsPage() {
                     disabled={deletingList}
                     className="px-3 py-1.5 rounded-full text-xs font-semibold text-white bg-red-600 hover:bg-red-500 disabled:opacity-50"
                   >
-                    {deletingList ? "Deleting…" : "Delete list & all numbers"}
+                    {deletingList ? "Deleting…" : "Delete list + all numbers"}
                   </button>
                 </div>
               </div>
 
               {showAddContacts && (
-                <div className="border border-[#00a884]/30 bg-[#f0f9f6] dark:bg-[#0a332c]/20 rounded-xl p-3 space-y-3">
+                <div className="rounded-xl border border-gray-200 dark:border-[#2a3942] bg-gray-50 dark:bg-[#111b21] p-3 space-y-3">
                   <div className="flex items-center justify-between gap-2">
-                    <div>
-                      <h3 className="font-semibold text-sm">Add contacts</h3>
-                      {!addContactsLoading && (
-                        <p className="text-xs text-gray-500">
-                          {availableContacts.length} available · {allContactsTotal} total contacts
-                        </p>
-                      )}
-                    </div>
-                    <button onClick={() => { setShowAddContacts(false); setSelectedToAdd(new Set()); }} className="btn-ghost btn-sm"><X size={15} /></button>
+                    <h3 className="font-semibold text-sm">Add contacts to {viewListName}</h3>
+                    <button onClick={() => setShowAddContacts(false)} className="w-7 h-7 rounded-full bg-gray-200 dark:bg-[#2a3942] flex items-center justify-center text-gray-600 dark:text-gray-300"><X size={14} /></button>
                   </div>
-
+                  <p className="text-xs text-gray-500">
+                    Search your contacts — results load as you type, so this stays fast even with
+                    thousands of contacts. Numbers already in this list are hidden automatically.
+                  </p>
                   <div className="relative">
-                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                     <input
-                      className="input pl-9 py-2 text-sm"
-                      placeholder="Search name, business or phone..."
-                      value={addSearch}
-                      onChange={(event) => setAddSearch(event.target.value)}
+                      value={addQuery}
+                      onChange={(e) => changeAddQuery(e.target.value)}
+                      placeholder="Search name, business or phone…"
+                      className="w-full pl-9 pr-3 py-2.5 bg-white dark:bg-[#2a3942] rounded-xl text-sm border border-gray-200 dark:border-[#2a3942] focus:outline-none focus:ring-2 focus:ring-[#00a884]/30"
+                      autoFocus
                     />
                   </div>
-
-                  <div className="max-h-56 overflow-y-auto space-y-1 bg-white dark:bg-[#111b21] rounded-lg p-1">
-                    {addContactsLoading ? (
-                      <div className="py-8 text-center text-sm text-gray-500">
-                        <div className="w-6 h-6 border-2 border-[#00a884] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-                        Loading contacts…
+                  <div className="border dark:border-[#2a3942] rounded-xl overflow-hidden bg-white dark:bg-[#202c33] max-h-72 overflow-y-auto">
+                    {addLoading ? (
+                      <div className="py-8 text-center text-sm text-gray-500">Loading…</div>
+                    ) : addItems.length === 0 ? (
+                      <div className="py-8 text-center text-gray-500 text-sm">
+                        {addQuery.trim()
+                          ? "No contacts match — try a different search."
+                          : "No contacts left to add — every contact is already in this list."}
                       </div>
-                    ) : allContactsTotal === 0 ? (
-                      <p className="py-8 text-center text-sm text-gray-500">No contacts exist yet. Create a contact first.</p>
-                    ) : availableContacts.length === 0 ? (
-                      <p className="py-8 text-center text-sm text-gray-500">All contacts are already in this list.</p>
-                    ) : filteredAvailableContacts.length === 0 ? (
-                      <p className="py-8 text-center text-sm text-gray-500">No contacts match your search.</p>
                     ) : (
-                      filteredAvailableContacts.map((contact) => (
-                        <label
-                          key={contact.id}
-                          className={`flex items-center gap-3 p-2.5 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-[#202c33] ${selectedToAdd.has(contact.id) ? "bg-primary-50 dark:bg-primary-900/20" : ""}`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedToAdd.has(contact.id)}
-                            onChange={() => {
-                              const next = new Set(selectedToAdd);
-                              next.has(contact.id) ? next.delete(contact.id) : next.add(contact.id);
-                              setSelectedToAdd(next);
-                            }}
-                            className="rounded"
-                          />
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium truncate">{displayName(contact)}</p>
-                            <p className="text-xs text-gray-500">{contact.phone_number}</p>
-                          </div>
-                        </label>
-                      ))
+                      <div className="divide-y divide-gray-100 dark:divide-[#2a3942]">
+                        {addItems.map((contact) => (
+                          <label
+                            key={contact.id}
+                            className="flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-[#111b21] cursor-pointer"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedToAdd.has(contact.id)}
+                              onChange={() => toggleToAdd(contact.id)}
+                              className="rounded accent-[#00a884] flex-shrink-0"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-medium truncate">{displayName(contact)}</p>
+                              <p className="text-xs text-gray-500 truncate">{contact.phone_number}</p>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
                     )}
                   </div>
-
-                  {availableContacts.length > 0 && !addContactsLoading && (
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-xs text-gray-500">
-                        {selectedToAdd.size > 0 ? `${selectedToAdd.size} selected` : "Select one or more contacts"}
-                      </span>
-                      <button onClick={handleAddContacts} disabled={selectedToAdd.size === 0} className="btn-primary btn-sm">
-                        Add selected
-                      </button>
+                  {addTotal > PAGE_SIZE && (
+                    <div className="flex items-center justify-between text-xs text-gray-500">
+                      <span>{addTotal} available{addQuery.trim() ? ` · “${addQuery.trim()}”` : ""}</span>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => { const p = Math.max(1, addPage - 1); setAddPage(p); loadAddPage(p, addQuery, true); }}
+                          disabled={addPage <= 1 || addLoading}
+                          className="px-2 py-1 rounded-md bg-white dark:bg-[#2a3942] border disabled:opacity-40"
+                        >
+                          <ChevronLeft size={14} />
+                        </button>
+                        <span className="px-2 py-1">Page {addPage} / {addPages}</span>
+                        <button
+                          onClick={() => { const p = Math.min(addPages, addPage + 1); setAddPage(p); loadAddPage(p, addQuery, true); }}
+                          disabled={addPage >= addPages || addLoading}
+                          className="px-2 py-1 rounded-md bg-white dark:bg-[#2a3942] border disabled:opacity-40"
+                        >
+                          <ChevronRight size={14} />
+                        </button>
+                      </div>
                     </div>
+                  )}
+                  {selectedToAdd.size > 0 && (
+                    <button
+                      onClick={handleAddContacts}
+                      disabled={addingToList || addLoading}
+                      className="w-full py-2.5 rounded-full bg-[#00a884] hover:bg-[#06cf9c] text-white text-sm font-semibold disabled:opacity-50"
+                    >
+                      {addingToList ? "Adding…" : `Add ${selectedToAdd.size} selected contact${selectedToAdd.size === 1 ? "" : "s"}`}
+                    </button>
                   )}
                 </div>
               )}
@@ -446,43 +578,55 @@ export default function ListsPage() {
               <div>
                 <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
                   <h3 className="font-semibold text-sm">Contacts in this list</h3>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="relative">
+                      <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input
+                        value={memberSearchInput}
+                        onChange={(e) => { setMemberSearchInput(e.target.value); applyMemberSearch(e.target.value); }}
+                        placeholder="Search this list…"
+                        className="pl-8 pr-2 py-1.5 rounded-full text-xs bg-gray-100 dark:bg-[#2a3942] border border-transparent focus:outline-none focus:ring-2 focus:ring-[#00a884]/30 w-44"
+                      />
+                    </div>
                     {listContacts.length > 0 && !listLoading && (
                       <label className="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer">
                         <input
                           type="checkbox"
-                          checked={selectedInList.size === listContacts.length && listContacts.length > 0}
+                          checked={allMatchingInList || pageAllSelected}
                           onChange={toggleAllInList}
                           className="rounded accent-[#00a884]"
                         />
-                        Select all
+                        {allMatchingInList
+                          ? "All matching selected"
+                          : pageAllSelected && listMatchingTotal > listContacts.length
+                            ? `Select all ${listMatchingTotal} matching`
+                            : "Select this page"}
                       </label>
                     )}
-                    <span className="text-xs text-gray-500">Tick numbers to permanently delete them</span>
                   </div>
                 </div>
 
-                {selectedInList.size > 0 && (
+                {selectionCount > 0 && (
                   <div className="mb-2 rounded-xl border border-[#00a884]/30 bg-[#f0f9f6] dark:bg-[#0a332c]/20 p-2.5 flex flex-wrap items-center gap-2">
                     <span className="text-sm font-semibold text-[#008069] dark:text-[#00a884] flex-1 min-w-[80px]">
-                      {selectedInList.size} selected
+                      {selectedLabel}
                     </span>
                     <button
                       onClick={handleBulkRemoveFromList}
                       disabled={removingBulk || deletingPermanently}
-                      className="px-3 py-1.5 rounded-full text-xs font-semibold bg-white dark:bg-[#2a3942] text-[#54656f] dark:text-[#aebac1] hover:bg-gray-100 disabled:opacity-50"
+                      className="px-3 py-1.5 rounded-full text-xs font-semibold bg-white dark:bg-[#2a3942] text-[#54656f] dark:text-[#aebac1] hover:bg-gray-100 disabled:opacity-50 flex items-center gap-1"
                     >
-                      {removingBulk ? "Removing…" : "Remove from list"}
+                      {removingBulk ? "Removing…" : <><Minus size={12} /> Remove from list</>}
                     </button>
                     <button
                       onClick={handlePermanentDeleteInList}
                       disabled={removingBulk || deletingPermanently}
-                      className="px-3 py-1.5 rounded-full text-xs font-semibold text-white bg-red-600 hover:bg-red-500 disabled:opacity-50"
+                      className="px-3 py-1.5 rounded-full text-xs font-semibold text-white bg-red-600 hover:bg-red-500 disabled:opacity-50 flex items-center gap-1"
                     >
-                      {deletingPermanently ? "Deleting…" : "Delete permanently"}
+                      {deletingPermanently ? "Deleting…" : <><Trash2 size={12} /> Delete permanently</>}
                     </button>
                     <button
-                      onClick={() => setSelectedInList(new Set())}
+                      onClick={clearSelection}
                       className="px-3 py-1.5 rounded-full text-xs font-semibold text-gray-500 hover:bg-gray-100 dark:hover:bg-[#2a3942]"
                     >
                       Clear
@@ -499,13 +643,19 @@ export default function ListsPage() {
                   ) : listContacts.length === 0 ? (
                     <div className="py-10 text-center text-gray-500">
                       <Users size={32} className="mx-auto mb-2 opacity-30" />
-                      <p className="text-sm">No contacts in this list</p>
+                      <p className="text-sm">
+                        {memberSearch.trim()
+                          ? `No contacts match “${memberSearch.trim()}” in this list.`
+                          : "No contacts in this list"}
+                      </p>
                       <button onClick={openAddContacts} className="btn-primary btn-sm mt-3"><UserPlus size={14} className="mr-1" /> Add contacts</button>
                     </div>
                   ) : (
                     <div className="divide-y dark:divide-[#2a3942]">
                       {listContacts.map((contact) => {
-                        const isSelected = selectedInList.has(contact.id);
+                        const isSelected = allMatchingInList || selectedInList.has(contact.id);
+                        const removing = busyRow === `remove-${contact.id}`;
+                        const deleting = busyRow === `delete-${contact.id}`;
                         return (
                           <div
                             key={contact.id}
@@ -524,20 +674,61 @@ export default function ListsPage() {
                                 {contact.phone_number}{contact.business_name && displayName(contact) !== contact.business_name ? ` · ${contact.business_name}` : ""}
                               </p>
                             </div>
-                            <button
-                              onClick={() => handleRemoveContact(contact)}
-                              disabled={removingId === contact.id}
-                              className="px-3 py-1.5 rounded-full text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 flex items-center gap-1.5 disabled:opacity-50 flex-shrink-0"
-                              title="Remove from this list (keep the number)"
-                            >
-                              <Trash2 size={13} /> {removingId === contact.id ? "Removing…" : "Remove"}
-                            </button>
+                            <div className="flex items-center gap-1.5 flex-shrink-0">
+                              <button
+                                onClick={() => handleDeleteOneContact(contact)}
+                                disabled={removing || deleting || removingBulk || deletingPermanently}
+                                className="w-8 h-8 rounded-full text-red-600 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 flex items-center justify-center disabled:opacity-40"
+                                title="Permanently delete this phone number (fast)"
+                              >
+                                {deleting ? <span className="w-3 h-3 border-2 border-red-500 border-t-transparent rounded-full animate-spin" /> : <Trash2 size={13} />}
+                              </button>
+                              <button
+                                onClick={() => handleRemoveContact(contact)}
+                                disabled={removing || deleting || removingBulk || deletingPermanently}
+                                className="px-2.5 py-1.5 rounded-full text-xs font-semibold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-[#2a3942] hover:bg-gray-200 dark:hover:bg-[#3a4a54] flex items-center gap-1 disabled:opacity-40"
+                                title="Remove from this list (keep the number)"
+                              >
+                                {removing ? "Removing…" : "Remove"}
+                              </button>
+                            </div>
                           </div>
                         );
                       })}
                     </div>
                   )}
                 </div>
+
+                {listMatchingTotal > PAGE_SIZE && (
+                  <div className="flex items-center justify-between mt-2 text-xs text-gray-500 flex-wrap gap-2">
+                    <span>
+                      Showing {memberStart}–{memberEnd} of {listMatchingTotal}
+                      {memberSearch.trim() ? ` matching “${memberSearch.trim()}”` : ""}
+                    </span>
+                    <div className="flex gap-1 items-center">
+                      <button
+                        onClick={() => { const p = Math.max(1, memberPage - 1); setMemberPage(p); setSelectedInList(new Set()); setAllMatchingInList(false); if (viewListId) loadListContacts(viewListId, p, memberSearch, true); }}
+                        disabled={memberPage <= 1 || listLoading}
+                        className="px-2.5 py-1 rounded-lg border bg-white dark:bg-[#2a3942] disabled:opacity-40 flex items-center gap-1"
+                      >
+                        <ChevronLeft size={14} /> Prev
+                      </button>
+                      <span className="px-2">Page {memberPage} / {memberPages}</span>
+                      <button
+                        onClick={() => { const p = Math.min(memberPages, memberPage + 1); setMemberPage(p); setSelectedInList(new Set()); setAllMatchingInList(false); if (viewListId) loadListContacts(viewListId, p, memberSearch, true); }}
+                        disabled={memberPage >= memberPages || listLoading}
+                        className="px-2.5 py-1 rounded-lg border bg-white dark:bg-[#2a3942] disabled:opacity-40 flex items-center gap-1"
+                      >
+                        Next <ChevronRight size={14} />
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {!listLoading && listMatchingTotal > 0 && (
+                  <p className="text-[11px] text-gray-400 mt-1.5">
+                    Tip: tick rows (or “Select all {listMatchingTotal} matching”) then Remove / Delete — bulk actions run on the server, so even a 50,000-contact list is instant.
+                  </p>
+                )}
               </div>
             </div>
           </div>

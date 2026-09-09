@@ -296,6 +296,7 @@ class CreativeIn(BaseModel):
     tracking_link: Optional[str] = None
     allocation: float = 0.0
     status: str = "active"
+    template_id: Optional[int] = None
 
 
 class CreativePatch(BaseModel):
@@ -305,6 +306,7 @@ class CreativePatch(BaseModel):
     tracking_link: Optional[str] = None
     allocation: Optional[float] = None
     status: Optional[str] = None
+    template_id: Optional[int] = None
 
 
 class CreativeOut(BaseModel):
@@ -319,6 +321,7 @@ class CreativeOut(BaseModel):
     allocation: float
     current_version: int
     is_deleted: bool
+    template_id: Optional[int] = None
     created_at: datetime
 
     model_config = {"from_attributes": True}

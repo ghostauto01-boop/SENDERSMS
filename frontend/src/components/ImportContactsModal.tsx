@@ -11,6 +11,7 @@ import toast from "react-hot-toast";
 import { Upload, X } from "lucide-react";
 import { customKey, detectColumns } from "../utils/csv";
 import { clearShortcodeCache } from "./ShortcodePicker";
+import { notifyDataChange } from "../utils/syncEvents";
 import ListPicker from "./ListPicker";
 import TagPicker from "./TagPicker";
 
@@ -81,6 +82,7 @@ export default function ImportContactsModal({ onClose, onDone, defaultListId = "
       // Fresh imports register new shortcodes — drop the cached registry so
       // every composer picks them up without a reload.
       clearShortcodeCache();
+      notifyDataChange("variables-changed");
       if ((data.imported ?? 0) > 0) toast.success(`${data.imported} contacts imported`);
       if ((data.new_variables ?? 0) > 0)
         toast.success(`${data.new_variables} new shortcode${data.new_variables > 1 ? "s" : ""} discovered`, { icon: "🧩" });

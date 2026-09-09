@@ -45,7 +45,11 @@ export default function ContactsPage() {
   useEffect(()=>{loadContacts();},[page,search,leadStatus]);
 
   const loadContacts = async () => {
-    try { setLoading(true); const {data}=await api.get<PaginatedResponse<Contact>>("/contacts/",{params:{page,per_page:25,search:search||undefined,lead_status:leadStatus||undefined}}); setContacts(data.items); setTotal(data.total); }
+    try { setLoading(true); const {data}=await api.get<PaginatedResponse<Contact>>("/contacts/",{params:{page,per_page:25,search:search||undefined,lead_status:leadStatus||undefined}});
+      // Deleting the last row of a page must not leave the user stranded on
+      // an empty page — step back one page and let the effect reload.
+      if (data.items.length===0 && page>1) { setPage(p=>Math.max(1,p-1)); return; }
+      setContacts(data.items); setTotal(data.total); }
     catch (err:any) { setError(err.response?.data?.detail||"Failed"); }
     finally { setLoading(false); }
   };
@@ -68,7 +72,8 @@ export default function ContactsPage() {
     } catch { toast.error("Failed to export"); }
   };
 
-  const handleDelete = async (id:number) => { if(!confirm("Permanently delete this phone number? This cannot be undone."))return; try { await api.delete(`/contacts/${id}`); toast.success("Contact permanently deleted"); loadContacts(); } catch { toast.error("Failed to delete"); } };
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const handleDelete = async (id:number) => { if(!confirm("Permanently delete this phone number? This cannot be undone."))return; setDeletingId(id); try { await api.delete(`/contacts/${id}`); toast.success("Contact permanently deleted"); loadContacts(); } catch { toast.error("Failed to delete"); } finally { setDeletingId(null); } };
   const clearSelection = () => { setSelected(new Set()); setAllMatching(false); };
   const handleBulkDelete = async () => {
     const count = allMatching ? total : selected.size;
@@ -284,9 +289,11 @@ export default function ContactsPage() {
                 </button>
                 <button
                   onClick={()=>handleDelete(c.id)}
-                  className="w-[56px] bg-[#fce8e6] dark:bg-[#2a3942] hover:bg-[#f8d7da] text-[#c5221f] dark:text-[#f15c6d] rounded-full py-2.5 flex items-center justify-center active:scale-[0.98] transition-transform"
+                  disabled={deletingId===c.id}
+                  className="w-[56px] bg-[#fce8e6] dark:bg-[#2a3942] hover:bg-[#f8d7da] text-[#c5221f] dark:text-[#f15c6d] rounded-full py-2.5 flex items-center justify-center active:scale-[0.98] transition-transform disabled:opacity-50"
+                  title="Delete permanently"
                 >
-                  <Trash2 size={16}/>
+                  {deletingId===c.id ? <span className="w-4 h-4 border-2 border-[#c5221f] border-t-transparent rounded-full animate-spin"/> : <Trash2 size={16}/>}
                 </button>
               </div>
             </div>
@@ -353,7 +360,9 @@ export default function ContactsPage() {
                     <div className="flex justify-end gap-1">
                       <button onClick={()=>setProfileId(c.id)} className="w-8 h-8 rounded-full bg-[#f0f2f5] dark:bg-[#2a3942] hover:bg-[#00a884] hover:text-white text-[#54656f] dark:text-[#aebac1] flex items-center justify-center" title="View full profile"><IdCard size={14}/></button>
                       <button onClick={()=>{setQuickSendId(c.id);setQuickContact(c);setQuickMsg("")}} className="w-8 h-8 rounded-full bg-[#00a884]/10 hover:bg-[#00a884] hover:text-white text-[#00a884] flex items-center justify-center" title="Send SMS"><MessageSquare size={14}/></button>
-                      <button onClick={()=>handleDelete(c.id)} className="w-8 h-8 rounded-full bg-red-50 hover:bg-red-500 hover:text-white text-red-500 flex items-center justify-center" title="Delete"><Trash2 size={14}/></button>
+                      <button onClick={()=>handleDelete(c.id)} disabled={deletingId===c.id} className="w-8 h-8 rounded-full bg-red-50 hover:bg-red-500 hover:text-white text-red-500 flex items-center justify-center disabled:opacity-50" title="Delete permanently">
+                        {deletingId===c.id ? <span className="w-3.5 h-3.5 border-2 border-red-500 border-t-transparent rounded-full animate-spin"/> : <Trash2 size={14}/>}
+                      </button>
                     </div>
                   </td>
                 </tr>

@@ -315,6 +315,13 @@ class AdsCreative(Base):
     cta: Mapped[str | None] = mapped_column(String(255), nullable=True)
     tracking_link: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
+    #: Optional saved template this creative was started from. It records where
+    #: the text came from so the composer can show "synced to template" and
+    #: offer a one-click re-sync when the template later changes. It is a
+    #: pointer only -- the creative's own text/versions stay the source of
+    #: truth for what actually gets sent.
+    template_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+
     #: Relative share of the split. With split_mode="percentage" this is a
     #: percent (must total 100); with "weighted" it is an arbitrary weight.
     allocation: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
