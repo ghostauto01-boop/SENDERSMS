@@ -31,6 +31,9 @@ export interface Contact {
   consent_status: string;
   has_consented: boolean;
   is_opted_out: boolean;
+  is_undeliverable?: boolean;
+  undeliverable_reason?: string | null;
+  delivery_fail_count?: number;
   notes: string | null;
   custom_fields: string | null;
   tags: string[];

@@ -30,6 +30,12 @@ class SMSService:
     async def send_message(self,contact_id,body,campaign_id=None):
         c=(await self.db.execute(select(Contact).where(Contact.id==contact_id))).scalar_one_or_none()
         if not c or c.is_opted_out:return None
+        from app.services.list_hygiene import contact_is_blocked_from_send, mark_undeliverable
+        blocked=contact_is_blocked_from_send(c)
+        if blocked:
+            if blocked in ("invalid_format","not_nigerian_mobile","empty_number") and not c.is_undeliverable:
+                await mark_undeliverable(c, blocked)
+            return None
         if(await self.db.execute(select(SuppressionEntry).where(SuppressionEntry.phone_number==c.phone_number))).scalar_one_or_none():return None
         # Render through the variable registry so operator-defined short
         # codes ({{Pain Point}}) resolve, and any short code this contact has
@@ -59,9 +65,13 @@ class SMSService:
         from app.providers.smsgate import send_sms_direct
         r=await send_sms_direct(c.phone_number,body,await self._get_sim())
         if r["success"]:msg.status="sent";msg.provider_message_id=r.get("provider_message_id","");msg.sent_at=datetime.now(timezone.utc)
-        else:msg.status="failed";msg.last_error=r.get("error","");msg.failed_at=datetime.now(timezone.utc)
+        else:
+            msg.status="failed";msg.last_error=r.get("error","");msg.failed_at=datetime.now(timezone.utc)
+            from app.services.list_hygiene import mark_undeliverable
+            await mark_undeliverable(c, r.get("error") or "send_failed")
         msg.provider_response=json.dumps(r.get("raw"))if r.get("raw")else None
-        c.messages_sent=(c.messages_sent or 0)+1;c.last_contacted_at=datetime.now(timezone.utc)
+        if r["success"]:
+            c.messages_sent=(c.messages_sent or 0)+1;c.last_contacted_at=datetime.now(timezone.utc)
         cr.message_count=(cr.message_count or 0)+1;cr.last_message_preview=body[:100];cr.last_message_at=datetime.now(timezone.utc)
         await self.db.flush();return msg
 
@@ -349,6 +359,8 @@ class SMSService:
             if not m.delivered_at:m.delivered_at=delivered_at or now
         elif status in("failed","cancelled"):
             if not m.failed_at:m.failed_at=delivered_at or now
+            from app.services.list_hygiene import record_delivery_failure
+            await record_delivery_failure(self.db, m.contact_id, m.last_error or status)
         elif status=="sent":
             if not m.sent_at:m.sent_at=delivered_at or now
         # Roll the campaign's aggregate counters forward. These are what the

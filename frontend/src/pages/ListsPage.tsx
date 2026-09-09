@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import api from "../api/client";
 import { Contact, PaginatedResponse } from "../types";
 import toast from "react-hot-toast";
-import { Edit2, Plus, Search, Trash2, UserPlus, Users, X, ChevronLeft, ChevronRight, Minus } from "lucide-react";
+import { Edit2, Plus, Search, Trash2, UserPlus, Users, X, ChevronLeft, ChevronRight, Minus, Sparkles } from "lucide-react";
 
 interface ListItem {
   id: number;
@@ -62,6 +62,7 @@ export default function ListsPage() {
   const [deletingPermanently, setDeletingPermanently] = useState(false);
   const [deletingList, setDeletingList] = useState(false);
   const [addingToList, setAddingToList] = useState(false);
+  const [cleaningList, setCleaningList] = useState(false);
 
   useEffect(() => {
     loadLists();
@@ -317,6 +318,25 @@ export default function ListsPage() {
     }
   };
 
+  const handleCleanList = async () => {
+    if (!viewListId) return;
+    if (!window.confirm(
+      `Clean “${viewListName}”? Invalid numbers and numbers that already failed delivery will be removed from this list so the carrier is not billed again. Contacts stay in your database (marked undeliverable).`
+    )) return;
+    try {
+      setCleaningList(true);
+      const { data } = await api.post(`/lists/${viewListId}/clean`, null, { params: { remove_from_list: true } });
+      toast.success(
+        `Scanned ${data.scanned}. Removed ${data.removed_from_list} bad numbers (${data.invalid_format} invalid, ${data.previous_failures} previous failures). ${data.sendable} still sendable.`
+      );
+      await Promise.all([reloadMembers(), loadLists()]);
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || "Clean failed");
+    } finally {
+      setCleaningList(false);
+    }
+  };
+
   const handleDeleteListWithContacts = async () => {
     if (!viewListId) return;
     if (!window.confirm(`Delete "${viewListName}" AND permanently delete all ${listTotal} phone number${listTotal === 1 ? "" : "s"} in it?\n\nThis cannot be undone.`)) return;
@@ -453,6 +473,14 @@ export default function ListsPage() {
                 <p className="text-white/70 text-xs">{listTotal} contact{listTotal === 1 ? "" : "s"} in this list</p>
               </div>
               <div className="flex gap-2 flex-shrink-0">
+                <button
+                  onClick={handleCleanList}
+                  disabled={listLoading || cleaningList}
+                  className="px-3 py-2 rounded-full bg-white/15 text-white text-xs font-semibold flex items-center gap-1.5 disabled:opacity-50"
+                  title="Remove invalid and previously-failed numbers so they are not billed"
+                >
+                  <Sparkles size={14} /> {cleaningList ? "Cleaning…" : "Clean bad numbers"}
+                </button>
                 <button
                   onClick={openAddContacts}
                   disabled={listLoading}

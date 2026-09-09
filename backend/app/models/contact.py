@@ -42,6 +42,12 @@ class Contact(Base):
     opted_out_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     opt_out_reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
+    # Numbers that bounced / failed delivery. Sending again still bills the
+    # carrier, so we skip these until an operator unblocks them.
+    is_undeliverable: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
+    undeliverable_reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    delivery_fail_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     custom_fields: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON string
 
