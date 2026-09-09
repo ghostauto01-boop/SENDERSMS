@@ -63,6 +63,45 @@ async def _replied_conversation_ids(db: AsyncSession) -> set[int]:
     )
 
 
+async def _attributed_totals(db: AsyncSession, replied_ids: set[int]) -> dict[str, int]:
+    """People-level totals, counting each conversation exactly once.
+
+    Per-campaign rows deliberately count a lead under every campaign that
+    touched them: a contact who was cold-called and then retargeted really is
+    a lead for both, and each campaign's own reply rate must reflect that.
+
+    Summing those rows, however, counts that person twice. The overview shows
+    the per-campaign numbers and the roll-up on the same screen, so a naive
+    sum reads as a contradiction -- "13 leads" above a list of 10 people.
+    These totals answer the different question the header is really asking:
+    how many distinct people are we talking to?
+    """
+    convs = list(
+        (
+            await db.execute(
+                select(Conversation).where(
+                    or_(
+                        Conversation.campaign_id.is_not(None),
+                        Conversation.last_campaign_id.is_not(None),
+                        Conversation.ads_campaign_id.is_not(None),
+                        Conversation.last_ads_campaign_id.is_not(None),
+                    )
+                )
+            )
+        ).scalars().all()
+    )
+    totals = {"leads": 0, "replied": 0, "unread": 0, "interested": 0}
+    for conv in convs:
+        totals["leads"] += 1
+        if conv.id in replied_ids:
+            totals["replied"] += 1
+        if conv.unread_count or conv.status == "unread":
+            totals["unread"] += 1
+        if conv.status == "interested":
+            totals["interested"] += 1
+    return totals
+
+
 async def _classic_rows(db: AsyncSession, replied_ids: set[int]) -> list[dict]:
     """Every classic campaign, with inbox-derived engagement counts."""
     campaigns = list((await db.execute(select(Campaign))).scalars().all())
@@ -264,7 +303,10 @@ async def campaign_overview(
 
     sent = total("sent")
     delivered = total("delivered")
-    replied = total("replied")
+    # Message counts are per-send and safe to add up. People counts are not:
+    # one contact can be a lead for several campaigns, so they are recounted
+    # from conversations to keep the header consistent with the list below it.
+    people = await _attributed_totals(db, replied_ids)
     return {
         "items": rows,
         "totals": {
@@ -275,12 +317,12 @@ async def campaign_overview(
             "delivered": delivered,
             "failed": total("failed"),
             "queued": total("queued"),
-            "leads": total("leads"),
-            "replied": replied,
-            "unread": total("unread"),
-            "interested": total("interested"),
+            "leads": people["leads"],
+            "replied": people["replied"],
+            "unread": people["unread"],
+            "interested": people["interested"],
             "delivery_rate": _rate(delivered, sent),
-            "reply_rate": _rate(replied, sent),
+            "reply_rate": _rate(people["replied"], sent),
         },
     }
 

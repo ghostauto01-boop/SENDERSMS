@@ -13,6 +13,7 @@ made two separate dashboards untrustworthy.
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.database import Base, get_db
@@ -268,3 +269,77 @@ async def test_conversation_detail_carries_the_campaign_badge(client):
     assert data["campaign"]["id"] == camp.id
     assert data["campaign"]["name"] == "Lagos Promo"
     assert data["campaign"]["kind"] == "campaign"
+
+
+@pytest.mark.asyncio
+async def test_a_retargeted_lead_is_not_counted_twice_in_the_totals(client):
+    """One person touched by two campaigns is one lead in the header.
+
+    Per-campaign rows deliberately credit BOTH campaigns -- each one really
+    did work that lead, and each one's reply rate must say so. But the header
+    sits directly above the list, so summing the rows would render as a
+    contradiction: "3 leads" over a list of 2 people.
+    """
+    ac, session = client
+    from app.models.ads import AdsCampaign
+
+    camp = await seed(session, replies=1, sent=2)
+    ads = AdsCampaign(name="Retarget", objective="replies", status="active")
+    session.add(ads)
+    await session.flush()
+
+    # Retarget the contact who did NOT reply: now they belong to both.
+    conv = (
+        await session.execute(
+            select(Conversation).where(Conversation.campaign_id == camp.id).order_by(
+                Conversation.id.desc()
+            )
+        )
+    ).scalars().first()
+    conv.last_campaign_id = None
+    conv.last_ads_campaign_id = ads.id
+    await session.flush()
+
+    data = (await ac.get("/api/v1/overview/campaigns")).json()
+    rows = {(i["kind"], i["id"]): i for i in data["items"]}
+
+    # Both campaigns still claim that lead...
+    assert rows[("campaign", camp.id)]["leads"] == 2
+    assert rows[("ads", ads.id)]["leads"] == 1
+    assert sum(i["leads"] for i in data["items"]) == 3
+
+    # ...but only two actual people are being talked to.
+    assert data["totals"]["leads"] == 2
+
+    conversations = (
+        await session.execute(select(func.count()).select_from(Conversation))
+    ).scalar()
+    assert data["totals"]["leads"] == conversations
+
+
+@pytest.mark.asyncio
+async def test_metrics_header_agrees_with_the_inbox_conversation_count(client):
+    """The two halves of the overview screen must never disagree."""
+    ac, session = client
+    from app.models.ads import AdsCampaign
+
+    camp = await seed(session, replies=2, sent=3)
+    ads = AdsCampaign(name="Retarget", objective="replies", status="active")
+    session.add(ads)
+    await session.flush()
+    conv = (
+        await session.execute(
+            select(Conversation).where(Conversation.campaign_id == camp.id).order_by(
+                Conversation.id
+            )
+        )
+    ).scalars().first()
+    conv.last_ads_campaign_id = ads.id
+    await session.flush()
+
+    data = (await ac.get("/api/v1/overview/metrics?days=30")).json()
+
+    # "N conversations" in the inbox panel and "N leads" in the campaign
+    # panel are the same people, so they must be the same number.
+    assert data["campaigns"]["leads"] == data["inbox"]["conversations"]
+    assert data["campaigns"]["replied"] == data["inbox"]["replied"]
