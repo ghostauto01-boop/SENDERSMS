@@ -183,3 +183,91 @@ async def put_sr(dl:Optional[bool]=Query(None),dm:Optional[int]=Query(None),hl:O
             if s:s.value=val
             else:db.add(SystemSetting(key=k,value=val,category="sending_rules"))
     await db.flush();return{"success":True}
+
+# --------------------------------------------------------------------------
+# CallGate (phone calls) — mirrors /calls/config for the Settings -> Calls tab.
+# --------------------------------------------------------------------------
+
+@router.get("/callgate")
+async def get_callgate(db:AsyncSession=Depends(get_db),cu:User=Depends(get_current_user)):
+    from app.services.system_settings import get_callgate_settings, get_setting, CALLGATE_WEBHOOK_REGISTERED
+    from app.security.encryption import mask_value
+    cfg=await get_callgate_settings(db)
+    registered=await get_setting(db, CALLGATE_WEBHOOK_REGISTERED)
+    return {"base_url":cfg["base_url"],"username":cfg["username"],
+            "password_set":bool(cfg["password"]),
+            "password_hint":mask_value(cfg["password"]) if cfg["password"] else "",
+            "webhook_secret_set":bool(cfg["webhook_secret"]),
+            "dial_mode":cfg["dial_mode"],"configured":cfg["configured"],
+            "webhook_registered":registered}
+
+@router.put("/callgate")
+async def put_callgate(base_url:Optional[str]=Query(None),username:Optional[str]=Query(None),
+                       password:Optional[str]=Query(None),webhook_secret:Optional[str]=Query(None),
+                       dial_mode:Optional[str]=Query(None),
+                       db:AsyncSession=Depends(get_db),cu:User=Depends(get_current_user)):
+    from app.services.system_settings import set_callgate_settings
+    if dial_mode is not None and dial_mode not in ("callgate","direct"):
+        raise HTTPException(400,"dial_mode must be 'callgate' or 'direct'")
+    cfg=await set_callgate_settings(db,base_url=base_url,username=username,
+                                    password=password,webhook_secret=webhook_secret,
+                                    dial_mode=dial_mode)
+    await db.commit()
+    return {"success":True,"configured":cfg["configured"],"dial_mode":cfg["dial_mode"]}
+
+@router.post("/callgate/test")
+async def test_callgate(db:AsyncSession=Depends(get_db),cu:User=Depends(get_current_user)):
+    from app.providers import callgate as provider
+    from app.services.system_settings import get_callgate_settings
+    cfg=await get_callgate_settings(db)
+    r=await provider.test_connection_direct(cfg["base_url"],cfg["username"],cfg["password"])
+    return {"success":r["success"],"online":r.get("online",False),"message":r.get("message",""),"raw":r}
+
+@router.get("/callgate/webhooks")
+async def get_callgate_webhooks(db:AsyncSession=Depends(get_db),cu:User=Depends(get_current_user)):
+    from app.providers import callgate as provider
+    from app.services.system_settings import get_callgate_settings
+    cfg=await get_callgate_settings(db)
+    r=await provider.list_webhooks_direct(cfg["base_url"],cfg["username"],cfg["password"])
+    if not r.get("success"):
+        raise HTTPException(400,r.get("error") or "Could not read CallGate webhooks")
+    return {"webhooks":r["webhooks"],"events":list(provider.CALL_EVENTS)}
+
+@router.post("/callgate/register-webhook")
+async def reg_callgate_wh(url:Optional[str]=Query(None),db:AsyncSession=Depends(get_db),cu:User=Depends(get_current_user)):
+    from app.providers import callgate as provider
+    from app.services.system_settings import (get_callgate_settings,set_setting,
+                                              CALLGATE_WEBHOOK_REGISTERED)
+    from app.utils.urls import public_base_url
+    cfg=await get_callgate_settings(db)
+    if not cfg["configured"]:
+        raise HTTPException(400,"CallGate is not configured — set the phone address, username and password first.")
+    if url:
+        url=url.strip().rstrip("/")
+        if not url.startswith(("http://","https://")):
+            raise HTTPException(400,"The webhook URL must start with http:// or https://")
+        suffix="/api/v1/webhooks/callgate"
+        if not url.endswith(suffix):url=f"{url}{suffix}"
+    else:
+        base=(public_base_url() or "").rstrip("/")
+        if not base:
+            raise HTTPException(400,"PUBLIC_BASE_URL is not set — pass an explicit HTTPS URL instead.")
+        url=f"{base}/api/v1/webhooks/callgate"
+    r=await provider.register_webhook_direct(url,None,cfg["base_url"],cfg["username"],cfg["password"])
+    if r.get("success"):
+        await set_setting(db,CALLGATE_WEBHOOK_REGISTERED,url,category="callgate",
+                           description="Call webhook URL registered on the phone")
+        await db.commit()
+    else:
+        raise HTTPException(400,"; ".join(r.get("errors") or [r.get("error") or "Registration failed"]))
+    return r
+
+@router.delete("/callgate/webhooks/{webhook_id}")
+async def del_callgate_wh(webhook_id:str,db:AsyncSession=Depends(get_db),cu:User=Depends(get_current_user)):
+    from app.providers import callgate as provider
+    from app.services.system_settings import get_callgate_settings
+    cfg=await get_callgate_settings(db)
+    r=await provider.delete_webhook_direct(webhook_id,cfg["base_url"],cfg["username"],cfg["password"])
+    if not r.get("success"):
+        raise HTTPException(400,r.get("error") or "Delete failed")
+    return {"success":True,"deleted":webhook_id}

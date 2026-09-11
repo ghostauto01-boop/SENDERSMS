@@ -2,9 +2,9 @@ import { useState, useEffect } from "react";
 import api from "../api/client";
 import { NotificationProviderSettings } from "../types";
 import toast from "react-hot-toast";
-import { Wifi, Bell, Shield, Clock, TestTube, Eye, EyeOff, Activity, CheckCircle, XCircle, Webhook, RefreshCw, Trash2 } from "lucide-react";
+import { Wifi, Bell, Shield, Clock, TestTube, Eye, EyeOff, Activity, CheckCircle, XCircle, Webhook, RefreshCw, Trash2, Phone } from "lucide-react";
 
-type Tab = "gateway" | "notifications" | "compliance" | "sending";
+type Tab = "gateway" | "calls" | "notifications" | "compliance" | "sending";
 
 export default function SettingsPage() {
   const [tab, setTab] = useState<Tab>("gateway");
@@ -26,7 +26,8 @@ export default function SettingsPage() {
 
   const tabs = [
     { id: "gateway" as Tab, label: "SMS Gateway", icon: Wifi },
-    { id: "notifications" as Tab, label: "Pushover", icon: Bell },
+    { id: "calls" as Tab, label: "Calls", icon: Phone },
+    { id: "notifications" as Tab, label: "Notifications", icon: Bell },
     { id: "compliance" as Tab, label: "Compliance", icon: Shield },
     { id: "sending" as Tab, label: "Sending Rules", icon: Clock },
   ];
@@ -36,7 +37,7 @@ export default function SettingsPage() {
       <div className="flex gap-2 flex-wrap">{tabs.map(t => (<button key={t.id} onClick={() => setTab(t.id)}
         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium ${tab===t.id?"bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300":"text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"}`}><t.icon size={14}/>{t.label}</button>))}</div>
       {loading ? (<div className="card p-6"><div className="skeleton h-8 w-48 mb-4"/><div className="space-y-3">{[...Array(3)].map((_,i)=>(<div key={i} className="skeleton h-10 w-full"/>))}</div></div>)
-      : (<>{tab==="gateway"&&<GatewayTab />}{tab==="notifications"&&<NotifsTab provs={notifs} onUpdate={load}/>}{tab==="compliance"&&<CompTab s={comp} onUpdate={load}/>}{tab==="sending"&&<RulesTab s={rules} onUpdate={load}/>}</>)}
+      : (<>{tab==="gateway"&&<GatewayTab />}{tab==="calls"&&<CallsTab />}{tab==="notifications"&&<NotifsTab provs={notifs} onUpdate={load}/>}{tab==="compliance"&&<CompTab s={comp} onUpdate={load}/>}{tab==="sending"&&<RulesTab s={rules} onUpdate={load}/>}</>)}
     </div>);
 }
 
@@ -330,3 +331,230 @@ function RulesTab({ s, onUpdate }: { s: Record<string, string>; onUpdate: () => 
       {status.last_sent_at && <p className="text-xs text-gray-400">Last send: {new Date(status.last_sent_at).toLocaleString()}</p>}
     </div>)}
     </div>);}
+
+/* ------------------------------------------------------------------ */
+/* Calls (CallGate) — place real GSM calls from the app via your phone */
+/* ------------------------------------------------------------------ */
+
+function CallsTab() {
+  const [cfg, setCfg] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [sv, setSv] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [result, setResult] = useState<any>(null);
+  const [showPw, setShowPw] = useState(false);
+  const [showSecret, setShowSecret] = useState(false);
+  const [f, setF] = useState({ base_url: "", username: "", password: "", webhook_secret: "", dial_mode: "callgate" });
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const { data } = await api.get("/settings/callgate");
+      setCfg(data);
+      setF((prev) => ({ ...prev, base_url: data.base_url || "", username: data.username || "", dial_mode: data.dial_mode || "callgate" }));
+    } catch { toast.error("Could not load call settings"); }
+    finally { setLoading(false); }
+  };
+  useEffect(() => { load(); }, []);
+
+  const save = async () => {
+    setSv(true);
+    try {
+      const params: any = { base_url: f.base_url, username: f.username, dial_mode: f.dial_mode };
+      if (f.password) params.password = f.password;
+      if (f.webhook_secret) params.webhook_secret = f.webhook_secret;
+      const { data } = await api.put("/settings/callgate", null, { params });
+      toast.success(data.configured ? "CallGate connected!" : "Saved — still missing details");
+      setF((prev) => ({ ...prev, password: "", webhook_secret: "" }));
+      await load();
+    } catch (e: any) { toast.error(e.response?.data?.detail || "Save failed"); }
+    finally { setSv(false); }
+  };
+
+  const test = async () => {
+    setTesting(true); setResult(null);
+    try {
+      const { data } = await api.post("/settings/callgate/test");
+      setResult(data);
+      data.success ? toast.success("Connected to your phone!") : toast.error(data.message || "Failed");
+    } catch (e: any) { setResult({ success: false, message: e.response?.data?.detail || e.message }); toast.error("Test failed"); }
+    finally { setTesting(false); }
+  };
+
+  if (loading) return (<div className="card p-6"><div className="skeleton h-8 w-48 mb-4" /><div className="space-y-3">{[...Array(3)].map((_, i) => (<div key={i} className="skeleton h-10 w-full" />))}</div></div>);
+
+  return (
+    <div className="space-y-4">
+      <div className="card p-6 space-y-4 max-w-lg">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold flex items-center gap-2"><Phone size={18} />Phone Calls (CallGate)</h2>
+          {cfg?.configured
+            ? <span className="flex items-center gap-1 text-xs font-medium text-green-700 bg-green-50 px-2 py-1 rounded-full"><CheckCircle size={12} />Connected</span>
+            : <span className="flex items-center gap-1 text-xs font-medium text-amber-700 bg-amber-50 px-2 py-1 rounded-full"><XCircle size={12} />Not set up</span>}
+        </div>
+        <p className="text-xs text-gray-500">
+          CallGate is the companion app to SMS-Gate — install it on the <strong>same phone</strong> as SMS-Gate and this app can
+          place real phone calls from Contacts, Inbox and the Phone page, using your phone's SIM.
+        </p>
+
+        <div className="rounded-lg bg-gray-50 dark:bg-gray-700/50 p-3 text-xs text-gray-600 dark:text-gray-300 space-y-1.5">
+          <p className="font-semibold">Setup (2 minutes, on your phone):</p>
+          <ol className="list-decimal ml-4 space-y-1">
+            <li>Install <strong>CallGate</strong> from GitHub (<code>call-gate-app/android-app</code> → Releases → APK) on the same phone as SMS-Gate.</li>
+            <li>Open CallGate and tap <strong>Offline → Online</strong> to start its server (port 8084).</li>
+            <li>In CallGate: <strong>Settings → Server</strong> — note the username/password, find the phone's IP (Wi-Fi settings).</li>
+            <li>Enter the IP + credentials below, then <strong>Save</strong> and <strong>Test connection</strong>.</li>
+          </ol>
+          <p className="pt-1">⚠️ The server must be able to reach the phone (same Wi-Fi/LAN, VPN like Tailscale, or a tunnel app on the phone).
+            If it can't, calls automatically fall back to dialling directly from whatever device opens this app.</p>
+        </div>
+
+        <div>
+          <label className="label">Phone address (CallGate server)</label>
+          <input className="input w-full" placeholder="192.168.1.5:8084" value={f.base_url} onChange={(e) => setF({ ...f, base_url: e.target.value })} />
+          <p className="text-xs text-gray-400 mt-1">Just the IP works — <code>/api/v1</code> and <code>http://</code> are added automatically. Default port is 8084.</p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="label">Username</label>
+            <input className="input w-full" placeholder="From CallGate → Settings → Server" value={f.username} onChange={(e) => setF({ ...f, username: e.target.value })} />
+          </div>
+          <div>
+            <label className="label">Password {cfg?.password_set && <span className="text-green-600 font-normal">(saved {cfg.password_hint})</span>}</label>
+            <div className="relative">
+              <input type={showPw ? "text" : "password"} className="input w-full pr-10" placeholder={cfg?.password_set ? "•••••• (leave blank to keep)" : "CallGate password"} value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} />
+              <button onClick={() => setShowPw(!showPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">{showPw ? <EyeOff size={16} /> : <Eye size={16} />}</button>
+            </div>
+          </div>
+        </div>
+        <div>
+          <label className="label">How should calls be placed?</label>
+          <div className="flex gap-2">
+            <button onClick={() => setF({ ...f, dial_mode: "callgate" })} className={`btn flex-1 ${f.dial_mode === "callgate" ? "btn-primary" : "btn-secondary"}`}>
+              📱 Via shop phone (CallGate)
+            </button>
+            <button onClick={() => setF({ ...f, dial_mode: "direct" })} className={`btn flex-1 ${f.dial_mode === "direct" ? "btn-primary" : "btn-secondary"}`}>
+              ☎️ Direct dial (this device)
+            </button>
+          </div>
+          <p className="text-xs text-gray-400 mt-1">Shop-phone mode places the call on your SIM from anywhere. Direct dial opens the number on the device you're holding.</p>
+        </div>
+
+        {result && (
+          <div className={`p-3 rounded-lg text-sm flex items-center gap-2 ${result.success ? "bg-green-50 dark:bg-green-900/30 text-green-700" : "bg-red-50 dark:bg-red-900/30 text-red-700"}`}>
+            {result.success ? <CheckCircle size={16} /> : <XCircle size={16} />}
+            <span>{result.message || (result.success ? "Connected" : "Failed")}</span>
+          </div>
+        )}
+
+        <div className="flex gap-2">
+          <button onClick={save} disabled={sv} className="btn-primary flex-1">{sv ? "Saving..." : "Save"}</button>
+          <button onClick={test} disabled={testing} className="btn-secondary flex-1">
+            <Activity size={14} className="mr-1" />{testing ? "Testing..." : "Test connection"}
+          </button>
+        </div>
+      </div>
+      <CallWebhooksCard />
+      <div className="card p-6 space-y-3 max-w-lg">
+        <h3 className="font-semibold text-sm">Call history signing key (optional)</h3>
+        <p className="text-xs text-gray-500">
+          To record live call status (ringing → connected → ended) in your call history, set a webhook signing key in CallGate
+          (Settings → Webhooks → Signing Key) and paste it here, then register the webhook below. Without it, calls still work —
+          only the live status tracking is skipped.
+        </p>
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <input type={showSecret ? "text" : "password"} className="input w-full pr-10" placeholder={cfg?.webhook_secret_set ? "•••••• (saved — leave blank to keep)" : "Paste signing key"} value={f.webhook_secret} onChange={(e) => setF({ ...f, webhook_secret: e.target.value })} />
+            <button onClick={() => setShowSecret(!showSecret)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">{showSecret ? <EyeOff size={16} /> : <Eye size={16} />}</button>
+          </div>
+          <button onClick={save} disabled={sv} className="btn-secondary">Save</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CallWebhooksCard() {
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [customUrl, setCustomUrl] = useState("");
+  const [showCustom, setShowCustom] = useState(false);
+
+  const load = async () => {
+    setLoading(true);
+    try { const { data } = await api.get("/settings/callgate/webhooks"); setData(data); }
+    catch (e: any) { setData({ error: e.response?.data?.detail || "Could not read webhooks" }); }
+    finally { setLoading(false); }
+  };
+  useEffect(() => { load(); }, []);
+
+  const register = async () => {
+    setBusy(true);
+    try {
+      const params = showCustom && customUrl.trim() ? { url: customUrl.trim() } : undefined;
+      const { data } = await api.post("/settings/callgate/register-webhook", null, { params });
+      toast.success(data.created?.length ? `Registered ${data.created.length} event(s)` : "Already up to date");
+      await load();
+    } catch (e: any) { toast.error(e.response?.data?.detail || "Registration failed"); }
+    finally { setBusy(false); }
+  };
+
+  const remove = async (id: string) => {
+    setBusy(true);
+    try { await api.delete(`/settings/callgate/webhooks/${id}`); toast.success("Webhook removed"); await load(); }
+    catch (e: any) { toast.error(e.response?.data?.detail || "Delete failed"); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <div className="card p-6 space-y-4 max-w-lg">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold flex items-center gap-2"><Webhook size={18} />Call status webhooks</h2>
+        <button onClick={load} disabled={loading || busy} className="btn-secondary text-xs"><RefreshCw size={12} className="mr-1" />Refresh</button>
+      </div>
+      <p className="text-xs text-gray-500">CallGate tells this server when calls ring, connect and end — that's what fills your call history.</p>
+      {loading ? <div className="skeleton h-20 w-full" /> : data?.error ? (
+        <div className="p-3 rounded-lg text-sm bg-amber-50 dark:bg-amber-900/30 text-amber-700">{data.error}</div>
+      ) : (
+        <>
+          <div className="space-y-1">
+            {(data.events || []).map((ev: string) => {
+              const on = (data.webhooks || []).some((w: any) => w.event === ev);
+              return (
+                <div key={ev} className="flex items-center justify-between text-xs py-1 border-b border-gray-100 dark:border-gray-700 last:border-0">
+                  <code>{ev}</code>
+                  <span className={on ? "text-green-600 font-medium" : "text-gray-400"}>{on ? "registered" : "missing"}</span>
+                </div>
+              );
+            })}
+          </div>
+          {showCustom && (
+            <div>
+              <label className="label">Webhook URL</label>
+              <input className="input w-full" placeholder="https://your-server.com" value={customUrl} onChange={(e) => setCustomUrl(e.target.value)} />
+              <p className="text-xs text-gray-400 mt-1">Must be HTTPS and reachable FROM the phone. The path is appended automatically.</p>
+            </div>
+          )}
+          <div className="flex gap-2">
+            <button onClick={register} disabled={busy} className="btn-primary flex-1">{busy ? "Working..." : "Register webhooks"}</button>
+            <button onClick={() => setShowCustom((v) => !v)} className="btn-secondary text-xs">{showCustom ? "Use default" : "Custom URL"}</button>
+          </div>
+          {data.webhooks?.length > 0 && (
+            <details className="text-xs">
+              <summary className="cursor-pointer font-medium">All registrations on this phone ({data.webhooks.length})</summary>
+              <div className="mt-2 space-y-1">
+                {data.webhooks.map((w: any) => (
+                  <div key={w.id} className="flex items-center justify-between gap-2 py-1 border-b border-gray-100 dark:border-gray-700 last:border-0">
+                    <div className="min-w-0"><code className="block truncate">{w.event}</code><span className="block truncate text-[10px] text-gray-400">{w.url}</span></div>
+                    <button onClick={() => remove(w.id)} disabled={busy} className="text-red-600 hover:text-red-700 shrink-0" title="Remove"><Trash2 size={14} /></button>
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+        </>
+      )}
+    </div>
+  );
+}

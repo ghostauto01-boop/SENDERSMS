@@ -503,6 +503,13 @@ async def screen_contacts(
         if not number:
             bump("invalid_number")
             continue
+        # NOTE: the hardened pre-send filter lives at SEND time
+        # (sms_tasks._send_one), which is the billing boundary every dispatch
+        # path funnels through. Screening only excludes already-quarantined
+        # contacts here so eligibility counts stay stable.
+        if contact.is_undeliverable:
+            bump("invalid_number")
+            continue
         if contact.id in existing:
             bump("already_sent")
             continue
@@ -555,6 +562,32 @@ def creative_weights(ads_set: AdsSet, creatives: list[AdsCreative]) -> list[floa
     return [1.0] * len(creatives)
 
 
+def quota_counts(total: int, creatives: list[AdsCreative]) -> list[int]:
+    """Exact-count split: capped creatives take min(quota, remaining) in order.
+
+    Creatives with ``send_quota`` set take exactly that many contacts (up to
+    what is left); uncapped creatives split the remainder equally. Contacts
+    beyond the quotas are left unassigned (returned count < total) rather
+    than forced onto a capped creative.
+    """
+    counts = [0] * len(creatives)
+    remaining = max(0, total)
+    uncapped: list[int] = []
+    for i, c in enumerate(creatives):
+        quota = c.send_quota or 0
+        if quota > 0:
+            take = min(quota, remaining)
+            counts[i] = take
+            remaining -= take
+        else:
+            uncapped.append(i)
+    if remaining > 0 and uncapped:
+        shares = split_counts(remaining, [1.0] * len(uncapped))
+        for idx, share in zip(uncapped, shares):
+            counts[idx] = share
+    return counts
+
+
 def active_creatives(creatives: list[AdsCreative]) -> list[AdsCreative]:
     return [c for c in creatives if c.status == "active" and not c.is_deleted]
 
@@ -590,7 +623,10 @@ async def assign_contacts(
     if (ads_set.split_mode or "equal").lower() == "random":
         random.Random(campaign.id * 7919 + ads_set.id).shuffle(pool)
 
-    counts = split_counts(len(pool), creative_weights(ads_set, creatives))
+    if (ads_set.split_mode or "equal").lower() == "quota":
+        counts = quota_counts(len(pool), creatives)
+    else:
+        counts = split_counts(len(pool), creative_weights(ads_set, creatives))
     per_creative: dict[int, int] = {}
     cursor = 0
     assigned = 0

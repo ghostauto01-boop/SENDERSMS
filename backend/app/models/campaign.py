@@ -98,6 +98,8 @@ class CampaignContact(Base):
 
     # Message tracking
     messages_sent: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # Why this contact left the sending flow (filter reason, gateway error…).
+    last_error: Mapped[str | None] = mapped_column(String(500), nullable=True)
     last_message_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     last_message_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_reply_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

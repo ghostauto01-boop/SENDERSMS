@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import api from "../api/client";
 import toast from "react-hot-toast";
-import { Send, UserPlus, Search, X, Users, Phone, List, Clock, AlertCircle, CheckCircle2, Hourglass, RotateCcw, Trash2, Eye, Calendar, MessageSquare } from "lucide-react";
+import { Send, UserPlus, Search, X, Users, Phone, List, Clock, AlertCircle, CheckCircle2, Hourglass, RotateCcw, Trash2, Eye, Calendar, MessageSquare, ShieldCheck } from "lucide-react";
 import ShortcodePicker from "../components/ShortcodePicker";
 import ListPicker from "../components/ListPicker";
 import TemplatePicker from "../components/TemplatePicker";
@@ -29,6 +29,42 @@ export default function SendPage() {
   const [failedTotal, setFailedTotal] = useState(0);
   const [loadingSched, setLoadingSched] = useState(false);
   const [loadingHist, setLoadingHist] = useState(false);
+  const [validation, setValidation] = useState<any>(null);
+  const [validating, setValidating] = useState(false);
+
+  // Dry-run the pre-send filter: see what would send vs be blocked (nothing sent).
+  const runValidation = async () => {
+    const params: any = {};
+    if (mode === "contact" && selectedContacts.length === 1) params.contact_id = selectedContacts[0].id;
+    else if (mode === "number" && phoneNumber.trim()) params.phone_number = phoneNumber.trim();
+    else if (mode === "list" && selectedListId) params.list_id = parseInt(selectedListId);
+    else if (mode === "contact" && selectedContacts.length > 1) {
+      // Multi-contact: validate each (cheap, local + indexed lookups).
+      setValidating(true);
+      try {
+        let sendable = 0; const blocked: any[] = []; const byReason: Record<string, number> = {};
+        for (const c of selectedContacts) {
+          try {
+            const { data } = await api.post("/send/validate", null, { params: { contact_id: c.id } });
+            const item = data.items?.[0];
+            if (item?.sendable) sendable++;
+            else { blocked.push(item); if (item?.reason) byReason[item.reason] = (byReason[item.reason] || 0) + 1; }
+          } catch { /* count as unknown, don't block the preview */ }
+        }
+        setValidation({ total: selectedContacts.length, sendable, blocked: selectedContacts.length - sendable, by_reason: byReason, blocked_preview: blocked.slice(0, 20) });
+      } finally { setValidating(false); }
+      return;
+    }
+    else { toast.error("Select recipients first"); return; }
+    setValidating(true);
+    try {
+      const { data } = await api.post("/send/validate", null, { params });
+      setValidation(data);
+      if (data.blocked > 0) toast(`${data.sendable}/${data.total} numbers can receive SMS — ${data.blocked} will be filtered out`, { icon: "🛡️" });
+      else toast.success(`All ${data.total} number(s) look good — ready to send`);
+    } catch (err: any) { toast.error(err.response?.data?.detail || "Validation failed"); }
+    finally { setValidating(false); }
+  };
 
   const charCount = message.length;
   const segmentCount = charCount <= 160 ? 1 : Math.ceil(charCount / 153);
@@ -247,7 +283,35 @@ export default function SendPage() {
 {filtered.length>0&&contactsTotal>filtered.length&&<p className="text-xs text-center py-2 text-[#667781] border-t border-gray-100 dark:border-[#2a3942]">Showing {filtered.length} of {contactsTotal} — keep typing to narrow the search</p>}</>}
 </div>{selectedContacts.length>0&&(<div className="flex flex-wrap gap-1.5">{selectedContacts.map(c=>(<span key={c.id} className="bg-[#e7f3ff] dark:bg-[#182533] text-[#008069] dark:text-[#53bdeb] text-xs px-2.5 py-1 rounded-full flex items-center gap-1.5 font-medium">{c.first_name||c.phone_number}<button onClick={()=>toggleContact(c)} className="hover:text-red-500"><X size={12}/></button></span>))}</div>)}</>)}
               {mode==="number"&&(<div><label className="text-xs font-medium text-[#54656f]">Phone Number</label><input className="mt-1 w-full px-3 py-3 bg-[#f0f2f5] dark:bg-[#111b21] rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#00a884]/20" placeholder="08012345678" value={phoneNumber} onChange={e=>setPhoneNumber(e.target.value)}/><p className="text-xs text-[#667781] mt-1">International format auto-normalized to +234...</p></div>)}
-              {mode==="list"&&(<div><label className="text-xs font-medium text-[#54656f]">Contact List</label><div className="mt-1"><ListPicker value={selectedListId} onChange={setSelectedListId} placeholder="Select a list… (or create one)" allowNone={false} /></div><p className="text-xs text-[#667781] mt-1">All contacts in list get the same personalized message.</p></div>)}
+              {mode==="list"&&(<div><label className="text-xs font-medium text-[#54656f]">Contact List</label><div className="mt-1"><ListPicker value={selectedListId} onChange={(v)=>{setSelectedListId(v);setValidation(null);}} placeholder="Select a list… (or create one)" allowNone={false} /></div><p className="text-xs text-[#667781] mt-1">All contacts in list get the same personalized message.</p></div>)}
+              <button onClick={runValidation} disabled={validating} className="w-full py-2.5 rounded-xl border-2 border-dashed border-[#00a884]/40 hover:border-[#00a884] text-[#008069] text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-50">
+                {validating ? <span className="w-4 h-4 border-2 border-[#00a884] border-t-transparent rounded-full animate-spin"/> : <ShieldCheck size={16}/>}
+                {validating ? "Checking numbers…" : "Check numbers before sending"}
+              </button>
+              {validation && (
+                <div className={`rounded-xl p-3 text-sm border ${validation.blocked > 0 ? "bg-[#fff8c4] border-[#ffecb3]" : "bg-[#d9fdd3] border-[#a3e9a4]"}`}>
+                  <p className="font-semibold text-[13px]">
+                    {validation.blocked > 0 ? <>🛡️ {validation.sendable}/{validation.total} can receive SMS — {validation.blocked} will be filtered out (no charge)</> : <>✅ All {validation.total} number(s) look good</>}
+                  </p>
+                  {validation.by_reason && Object.keys(validation.by_reason).length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {Object.entries(validation.by_reason).map(([r, n]: any) => (
+                        <span key={r} className="text-[11px] px-2 py-0.5 rounded-full bg-white/70 font-medium">{r.replace(/_/g, " ")}: {n}</span>
+                      ))}
+                    </div>
+                  )}
+                  {(validation.blocked_preview?.length > 0 || validation.items?.some((i: any) => !i.sendable)) && (
+                    <details className="mt-2 text-xs">
+                      <summary className="cursor-pointer font-medium">See blocked numbers</summary>
+                      <div className="mt-1 space-y-1 max-h-32 overflow-y-auto">
+                        {(validation.blocked_preview || validation.items?.filter((i: any) => !i.sendable) || []).slice(0, 20).map((b: any, i: number) => (
+                          <p key={i} className="font-mono text-[11px]">{b.phone} — {b.reason?.replace(/_/g, " ")}</p>
+                        ))}
+                      </div>
+                    </details>
+                  )}
+                </div>
+              )}
             </div>
             <div className="bg-white dark:bg-[#202c33] rounded-xl p-4 space-y-3 shadow-sm border border-gray-100 dark:border-[#2a3942]">
               <h2 className="font-semibold text-[#111b21] dark:text-white flex items-center gap-2"><MessageSquare size={16} className="text-[#00a884]"/> Message</h2>
@@ -283,7 +347,15 @@ export default function SendPage() {
                 {result.scheduled ? (
                   <div className="p-3 rounded-xl text-sm bg-[#fff8c4] border border-[#ffecb3] text-[#8d5100] flex gap-2"><Hourglass size={16} className="flex-shrink-0 mt-0.5"/><div><strong>{result.count} scheduled</strong> for {new Date(result.schedule_at).toLocaleString()} • Watch <b>Scheduled</b> tab for status (pending → sent/failed).</div></div>
                 ) : (
-                  <><div className={`p-3 rounded-xl text-sm flex gap-2 ${result.failed>0?"bg-[#fce8e6] border border-[#f5c6cb] text-[#8a1c1c]":"bg-[#d9fdd3] border border-[#a3e9a4] text-[#0a332c]"}`}>{result.failed>0?<AlertCircle size={16} className="flex-shrink-0 mt-0.5"/>:<CheckCircle2 size={16} className="flex-shrink-0 mt-0.5"/>}<div><strong>{result.sent} sent</strong>{result.failed>0&&<>, {result.failed} failed</>}{result.total>0&&<> • {result.total} total</>}{result.gateway_url&&<div className="text-xs mt-1 opacity-70">Gateway SIM {result.sim_used}</div>}</div></div>
+                  <><div className={`p-3 rounded-xl text-sm flex gap-2 ${result.failed>0?"bg-[#fce8e6] border border-[#f5c6cb] text-[#8a1c1c]":"bg-[#d9fdd3] border border-[#a3e9a4] text-[#0a332c]"}`}>{result.failed>0?<AlertCircle size={16} className="flex-shrink-0 mt-0.5"/>:<CheckCircle2 size={16} className="flex-shrink-0 mt-0.5"/>}<div><strong>{result.sent} sent</strong>{result.failed>0&&<>, {result.failed} failed</>}{result.total>0&&<> • {result.total} total</>}{result.filtered_count>0&&<> • 🛡️ {result.filtered_count} bad number(s) filtered (no charge)</>}{result.gateway_url&&<div className="text-xs mt-1 opacity-70">Gateway SIM {result.sim_used}</div>}</div></div>
+                  {result.filtered_count>0 && (
+                    <details className="text-xs rounded-xl p-2.5 border bg-[#fff8c4] border-[#ffecb3]">
+                      <summary className="cursor-pointer font-medium">🛡️ {result.filtered_count} filtered out before sending (saved your credit)</summary>
+                      <div className="mt-1 space-y-1 max-h-32 overflow-y-auto">
+                        {(result.filtered||[]).slice(0,20).map((f:any,i:number)=>(<p key={i} className="font-mono text-[11px]">{f.phone} — {(f.reason||"").replace(/_/g," ")}</p>))}
+                      </div>
+                    </details>
+                  )}
                   {result.results&&result.results.slice(0,5).map((r:any,i:number)=>(<details key={i} className={`text-xs rounded-xl p-2.5 border ${r.status==="sent"?"bg-[#d9fdd3]/50 border-[#a3e9a4]":"bg-[#fce8e6] border-[#f5c6cb]"}`}><summary className="cursor-pointer font-medium flex items-center gap-2">{r.phone}: {r.status==="sent"?<span className="text-[#00a884]">✅ Sent</span>:<span className="text-[#c5221f]">❌ Failed</span>}{r.error&&<span className="text-[#c5221f] truncate">— {r.error}</span>}</summary><pre className="mt-2 whitespace-pre-wrap text-[10px] opacity-70 bg-white/50 p-2 rounded">{JSON.stringify(r.api_response,null,2)}</pre></details>))}</>
                 )}
               </div>)}

@@ -7,8 +7,9 @@ import {
   Send, Star, ThumbsDown, Archive, ChevronLeft, CheckCheck, MessageCircle,
   Bug, Search as SearchIcon, MoreVertical, Phone, Video, Paperclip, Smile,
   Mic, LogOut, Settings as SettingsIcon, Users, Megaphone, Home, FileText, CalendarPlus,
-  Filter, X as XIcon, BarChart3,
+  Filter, X as XIcon, BarChart3, Globe,
 } from "lucide-react";
+import { startCall, openWhatsappChat, openWhatsappForCall, openWebsite, websiteUrl } from "../utils/call";
 import type { Meeting, Template } from "../types";
 import ShortcodePicker from "../components/ShortcodePicker";
 import MeetingModal from "../components/MeetingModal";
@@ -786,8 +787,35 @@ export default function InboxPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-0.5">
-                  <button className="hidden sm:flex w-10 h-10 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-[#54656f] dark:text-[#aebac1]"><Video size={19} /></button>
-                  <button className="hidden sm:flex w-10 h-10 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-[#54656f] dark:text-[#aebac1]"><Phone size={19} /></button>
+                  {/* GSM call via your phone (CallGate) */}
+                  <button
+                    onClick={() => {
+                      const cid = selected.contact?.id || selected.contact_id;
+                      startCall(cid ? { contact_id: cid } : { phone_number: selected.contact_phone });
+                    }}
+                    title={`Call ${selected.contact_phone} (via your phone)`}
+                    className="flex w-10 h-10 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-[#00a884]"
+                  ><Phone size={19} /></button>
+                  {/* WhatsApp video/voice call entry */}
+                  <button
+                    onClick={() => openWhatsappForCall(selected.contact_phone, selected.contact_name)}
+                    title="WhatsApp call (opens WhatsApp)"
+                    className="hidden sm:flex w-10 h-10 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-[#54656f] dark:text-[#aebac1]"
+                  ><Video size={19} /></button>
+                  {/* WhatsApp chat */}
+                  <button
+                    onClick={() => openWhatsappChat(selected.contact_phone)}
+                    title="Open WhatsApp chat"
+                    className="hidden sm:flex w-10 h-10 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-[#25D366]"
+                  ><MessageCircle size={19} /></button>
+                  {/* Website, when the contact has one */}
+                  {websiteUrl(selected.contact?.website) && (
+                    <button
+                      onClick={() => openWebsite(selected.contact.website)}
+                      title="Open website"
+                      className="hidden sm:flex w-10 h-10 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-[#0066cc]"
+                    ><Globe size={19} /></button>
+                  )}
                   <button
                     onClick={() => setShowBooking(true)}
                     title="Book a meeting"
@@ -828,6 +856,29 @@ export default function InboxPage() {
                       {String(value)}
                     </p>
                   ))}
+                  <div className="flex flex-wrap gap-2 pt-2">
+                    <button
+                      onClick={() => {
+                        const cid = selected.contact?.id || selected.contact_id;
+                        startCall(cid ? { contact_id: cid } : { phone_number: selected.contact_phone });
+                      }}
+                      className="flex items-center gap-1.5 bg-[#00a884] text-white text-[12px] font-semibold px-3 py-1.5 rounded-full"
+                    ><Phone size={13} /> Call</button>
+                    <button
+                      onClick={() => openWhatsappChat(selected.contact_phone)}
+                      className="flex items-center gap-1.5 bg-[#25D366] text-white text-[12px] font-semibold px-3 py-1.5 rounded-full"
+                    ><MessageCircle size={13} /> WhatsApp</button>
+                    <button
+                      onClick={() => openWhatsappForCall(selected.contact_phone, selected.contact_name)}
+                      className="flex items-center gap-1.5 bg-[#128C7E] text-white text-[12px] font-semibold px-3 py-1.5 rounded-full"
+                    ><Video size={13} /> WhatsApp call</button>
+                    {websiteUrl(selected.contact.website) && (
+                      <button
+                        onClick={() => openWebsite(selected.contact.website)}
+                        className="flex items-center gap-1.5 bg-[#0066cc] text-white text-[12px] font-semibold px-3 py-1.5 rounded-full"
+                      ><Globe size={13} /> Website</button>
+                    )}
+                  </div>
                 </div>
               )}
               {showInfo && (

@@ -3,6 +3,7 @@ import os, logging, time
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse, FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from app.config import settings
@@ -47,6 +48,32 @@ async def _startup_webhook():
                 logger.warning("Webhook registration failed: %s", r)
     except Exception as e:
         logger.warning(f"Webhook: {e}")
+    # Same for CallGate (phone calls) — but only when it is configured, since
+    # the handset's local server is often unreachable from here at boot time.
+    try:
+        from app.services.system_settings import (
+            CALLGATE_WEBHOOK_REGISTERED, get_callgate_settings,
+        )
+        from app.utils.urls import public_base_url
+
+        async with async_session_factory() as db:
+            cfg = await get_callgate_settings(db)
+            base = (public_base_url() or "").rstrip("/")
+            if cfg["configured"] and base:
+                url = f"{base}/api/v1/webhooks/callgate"
+                if await get_setting(db, CALLGATE_WEBHOOK_REGISTERED) != url:
+                    from app.providers.callgate import register_webhook_direct as _reg_call
+                    r = await _reg_call(url, None, cfg["base_url"],
+                                        cfg["username"], cfg["password"])
+                    if r.get("success"):
+                        await set_setting(db, CALLGATE_WEBHOOK_REGISTERED, url,
+                                          description="Call webhook URL registered on the phone")
+                        await db.commit()
+                        logger.info("CallGate webhook auto-registered at %s", url)
+                    else:
+                        logger.warning("CallGate webhook registration failed: %s", r)
+    except Exception as e:
+        logger.warning(f"CallGate webhook: {e}")
 
 async def _poll():
     """Update delivery statuses for pending messages and process scheduled sends."""
@@ -537,6 +564,8 @@ async def lifespan(app: FastAPI):
             pass
 
 app = FastAPI(title=settings.APP_NAME, version="1.0.0", lifespan=lifespan)
+# GZip large JSON (inbox threads, analytics, contact pages) — cuts payloads ~70%.
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins_list, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 from app.security.rate_limit import install_rate_limiting
@@ -552,7 +581,7 @@ async def health():
     """
     return JSONResponse({"status":"ok","app":settings.APP_NAME,"version":"1.0.0"})
 
-from app.api.v1 import ads, auth, calendar, contacts, lists, campaigns, sequences, followups, inbox, overview, templates, analytics, settings as settings_api, webhooks, dashboard, send, autoreply, automations, ai, variables, campaign_followups
+from app.api.v1 import ads, auth, calendar, calls, contacts, lists, campaigns, sequences, followups, inbox, overview, templates, analytics, settings as settings_api, webhooks, dashboard, send, autoreply, automations, ai, variables, campaign_followups, notifications
 app.include_router(auth.router, prefix="/api/v1/auth")
 app.include_router(dashboard.router, prefix="/api/v1/dashboard")
 app.include_router(contacts.router, prefix="/api/v1/contacts")
@@ -577,6 +606,9 @@ app.include_router(campaign_followups.router, prefix="/api/v1/campaign-followups
 app.include_router(calendar.router, prefix="/api/v1/calendar")
 # SMS Ads Manager (additive; the legacy campaign routes above are untouched).
 app.include_router(ads.router, prefix="/api/v1/ads")
+# Phone calls via CallGate (same handset as SMS-Gate).
+app.include_router(calls.router, prefix="/api/v1/calls")
+app.include_router(notifications.router, prefix="/api/v1/notifications")
 
 PUBLIC_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "public")
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist")

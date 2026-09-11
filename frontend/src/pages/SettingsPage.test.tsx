@@ -43,11 +43,11 @@ beforeEach(() => {
   apiPut.mockResolvedValue({ data: { success: true } });
 });
 
-describe("SettingsPage — Pushover muted senders", () => {
-  it("loads the muted-sender list (MTN, AIRTEL) into the Pushover tab", async () => {
+describe("SettingsPage — muted senders", () => {
+  it("loads the muted-sender list (MTN, AIRTEL) into the Notifications tab", async () => {
     render(<SettingsPage />);
-    await waitFor(() => expect(screen.getByText("Pushover")).toBeInTheDocument());
-    fireEvent.click(screen.getByText("Pushover"));
+    await waitFor(() => expect(screen.getByText("Notifications")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("Notifications"));
 
     // Muted senders input shows the carrier list that suppresses alerts
     await waitFor(() => {
@@ -58,8 +58,8 @@ describe("SettingsPage — Pushover muted senders", () => {
 
   it("saves an edited muted-sender list through the API", async () => {
     render(<SettingsPage />);
-    await waitFor(() => expect(screen.getByText("Pushover")).toBeInTheDocument());
-    fireEvent.click(screen.getByText("Pushover"));
+    await waitFor(() => expect(screen.getByText("Notifications")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("Notifications"));
 
     const input = await screen.findByDisplayValue("MTN, AIRTEL") as HTMLInputElement;
     fireEvent.change(input, { target: { value: "MTN, AIRTEL, GTBANK" } });

@@ -116,18 +116,23 @@ async def send_sms_now(
 
     # SEND NOW
     recipients = []
+    filtered_out: list = []
     if contact_id:
         r = await db.execute(select(Contact).where(Contact.id == contact_id))
         c = r.scalar_one_or_none()
         if not c:
             raise HTTPException(404, "Contact not found")
-        if c.is_opted_out:
-            raise HTTPException(400, "Contact opted out")
-        if getattr(c, "is_undeliverable", False):
-            raise HTTPException(400, "Number is undeliverable — skipped to avoid carrier charges")
+        from app.services.number_filter import contact_sendable as _chk_sendable
+        _chk = await _chk_sendable(db, c)
+        if not _chk.sendable:
+            raise HTTPException(400, f"Number blocked by pre-send filter ({_chk.reason}): {_chk.detail}")
         recipients.append(c)
     elif phone_number:
-        norm = normalize_nigerian_number(phone_number)
+        from app.services.number_filter import classify_number as _classify
+        _cls = _classify(phone_number)
+        if not _cls.sendable:
+            raise HTTPException(400, f"Number blocked by pre-send filter ({_cls.reason}): {_cls.detail}")
+        norm = _cls.normalized or normalize_nigerian_number(phone_number)
         if not norm:
             raise HTTPException(400, f"Invalid:{phone_number}")
         r = await db.execute(select(Contact).where(Contact.phone_number == norm))
@@ -140,18 +145,32 @@ async def send_sms_now(
             raise HTTPException(400, "Contact opted out")
         recipients.append(c)
     elif list_id:
+        from app.services.number_filter import contact_sendable
+        from app.services.list_hygiene import mark_undeliverable
         members = await db.execute(select(ContactListMember).where(ContactListMember.list_id == list_id))
         for m in members.scalars().all():
             cr = await db.execute(select(Contact).where(Contact.id == m.contact_id))
             cc = cr.scalar_one_or_none()
-            if cc and not cc.is_opted_out and not getattr(cc, "is_undeliverable", False):
-                recipients.append(cc)
+            if not cc:
+                continue
+            chk = await contact_sendable(db, cc)
+            if not chk.sendable:
+                filtered_out.append({"contact_id": cc.id, "phone": cc.phone_number,
+                                     "reason": chk.reason, "detail": chk.detail})
+                if chk.reason not in ("opted_out", "suppressed", "undeliverable") and not cc.is_undeliverable:
+                    await mark_undeliverable(cc, chk.reason or "invalid_format")
+                continue
+            recipients.append(cc)
         if not recipients:
-            raise HTTPException(400, "List empty")
+            raise HTTPException(400, f"List empty — all {len(filtered_out)} number(s) were filtered out as undeliverable. Use POST /send/validate to preview.")
     else:
         raise HTTPException(400, "Provide contact_id, phone_number, or list_id")
 
     char_count, segment_count = count_sms_segments(body)
+    # Multipart guard: >5 segments almost always means an unrendered template
+    # loop or pasted blob — refuse rather than burn credit on 6+ SMS each.
+    if segment_count > 5:
+        raise HTTPException(400, f"Message is {segment_count} segments ({char_count} chars). Split it — messages over 5 segments are blocked to protect your credit.")
     from app.providers.smsgate import send_sms_direct
     from app.services.sending_limits import await_slot
     results = []
@@ -193,6 +212,16 @@ async def send_sms_now(
         db.add(message)
         await db.flush()
         r = await send_sms_direct(contact.phone_number, msg, sim)
+        if not r["success"]:
+            # SIM failover: retry once on the other slot (one billable attempt max).
+            other = 2 if sim == 1 else 1
+            r2 = await send_sms_direct(contact.phone_number, msg, other)
+            if r2["success"]:
+                r = r2
+            else:
+                r = {"success": False,
+                     "error": f"SIM{sim}: {r.get('error','')} | SIM{other}: {r2.get('error','')}"[:500],
+                     "raw": r2.get("raw") or r.get("raw")}
         if r["success"]:
             message.status = "sent"
             message.provider_message_id = r.get("provider_message_id", "")
@@ -230,12 +259,70 @@ async def send_sms_now(
         "sent": sc,
         "failed": len(results) - sc,
         "total": len(results),
+        "filtered": filtered_out if list_id else [],
+        "filtered_count": len(filtered_out) if list_id else 0,
         "deferred": len(recipients) - len(results),
         "char_count": char_count,
         "segments": segment_count,
         "results": results,
         "sim_used": sim,
     }
+
+
+@router.post("/validate")
+async def validate_recipients(
+    contact_id: Optional[int] = Query(None),
+    phone_number: Optional[str] = Query(None),
+    list_id: Optional[int] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    cu: User = Depends(get_current_user),
+):
+    """Dry-run the pre-send filter: see what WOULD send vs be blocked.
+
+    Nothing is sent and nothing is quarantined — pure preview for the UI.
+    """
+    from app.services.number_filter import classify_number, contact_sendable
+
+    if contact_id:
+        r = await db.execute(select(Contact).where(Contact.id == contact_id))
+        c = r.scalar_one_or_none()
+        if not c:
+            raise HTTPException(404, "Contact not found")
+        chk = await contact_sendable(db, c)
+        return {"total": 1, "sendable": 1 if chk.sendable else 0,
+                "blocked": 0 if chk.sendable else 1,
+                "items": [{"contact_id": c.id, "phone": c.phone_number,
+                           "sendable": chk.sendable, "reason": chk.reason, "detail": chk.detail}]}
+    if phone_number:
+        chk = classify_number(phone_number)
+        return {"total": 1, "sendable": 1 if chk.sendable else 0,
+                "blocked": 0 if chk.sendable else 1,
+                "items": [{"phone": phone_number, "normalized": chk.normalized,
+                           "sendable": chk.sendable, "reason": chk.reason, "detail": chk.detail}]}
+    if list_id:
+        members = await db.execute(select(ContactListMember).where(ContactListMember.list_id == list_id))
+        items: list[dict] = []
+        by_reason: dict[str, int] = {}
+        sendable = 0
+        for m in members.scalars().all():
+            cr = await db.execute(select(Contact).where(Contact.id == m.contact_id))
+            cc = cr.scalar_one_or_none()
+            if not cc:
+                continue
+            # Preview is strict: surface test-data lookalikes too (the live
+            # send still attempts them — see contact_sendable default).
+            chk = await contact_sendable(db, cc, strict_patterns=True)
+            if chk.sendable:
+                sendable += 1
+            else:
+                by_reason[chk.reason or "unknown"] = by_reason.get(chk.reason or "unknown", 0) + 1
+                if len(items) < 100:
+                    items.append({"contact_id": cc.id, "phone": cc.phone_number,
+                                  "reason": chk.reason, "detail": chk.detail})
+        total = sendable + sum(by_reason.values())
+        return {"total": total, "sendable": sendable, "blocked": total - sendable,
+                "by_reason": by_reason, "blocked_preview": items}
+    raise HTTPException(400, "Provide contact_id, phone_number, or list_id")
 
 @router.get("/scheduled")
 async def get_scheduled(
