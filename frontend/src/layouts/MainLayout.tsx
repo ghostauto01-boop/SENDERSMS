@@ -8,6 +8,7 @@ import {
   Activity, Phone,
 } from "lucide-react";
 import BrandMark from "../components/BrandMark";
+import NotificationBell from "../components/NotificationBell";
 
 const navItems = [
   { to: "/overview", label: "Overview", icon: Activity },
@@ -150,6 +151,7 @@ export default function MainLayout() {
           </div>
 
           <div className="flex items-center gap-2">
+            <NotificationBell />
             <button
               onClick={toggleDark}
               className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"

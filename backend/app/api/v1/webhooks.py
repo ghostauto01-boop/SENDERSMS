@@ -391,11 +391,24 @@ async def callgate_webhook(request: Request, db: AsyncSession = Depends(get_db))
                         row.duration_seconds = max(0, int((now - s).total_seconds()))
                     if contact is not None and row.contact_id is None:
                         row.contact_id = contact.id
+                    if row.direction == "incoming" and row.started_at is None:
+                        try:
+                            from app.services.push_service import notify_missed_call
+                            name = (contact.display_name if contact else None) or norm
+                            await notify_missed_call(db, name, norm)
+                        except Exception:  # noqa: BLE001, S110 — never break the webhook
+                            pass
                 else:
                     db.add(CallLog(contact_id=contact.id if contact else None,
                                    phone_number=norm, direction="incoming",
                                    status="ended", provider_event_id=event_id or None,
                                    device_id=body.get("deviceId"), ended_at=now))
+                    try:
+                        from app.services.push_service import notify_missed_call
+                        name = (contact.display_name if contact else None) or norm
+                        await notify_missed_call(db, name, norm)
+                    except Exception:  # noqa: BLE001, S110 — never break the webhook
+                        pass
         elif event_type not in CALL_EVENTS:
             logger.info("CALL WEBHOOK: ignoring unhandled event %r", event_type)
         evt.status = "processed"

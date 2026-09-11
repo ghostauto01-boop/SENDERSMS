@@ -55,6 +55,11 @@ class NotificationEvent(Base):
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     reference_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     reference_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    # In-app centre fields (provider="browser" rows): read state + where a tap
+    # should land (e.g. /inbox?conversation_id=12). Auto-added to old DBs by
+    # schema_repair.
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
+    url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False, index=True
     )

@@ -175,6 +175,15 @@ async def process_campaign_batch_async(
             if remaining.scalars().first() is None:
                 campaign.status = "completed"
                 campaign.completed_at = datetime.now(timezone.utc)
+                try:
+                    from app.services.push_service import notify_campaign_done
+                    await notify_campaign_done(
+                        db, campaign.name,
+                        sent=int(campaign.messages_sent or 0),
+                        delivered=int(campaign.messages_delivered or 0),
+                        campaign_id=campaign.id)
+                except Exception as e:  # noqa: BLE001 — notify never breaks completion
+                    logger.warning("Campaign-done notify failed: %s", e)
                 await db.commit()
             return 0
 

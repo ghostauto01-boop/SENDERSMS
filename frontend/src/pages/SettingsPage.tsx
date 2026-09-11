@@ -27,7 +27,7 @@ export default function SettingsPage() {
   const tabs = [
     { id: "gateway" as Tab, label: "SMS Gateway", icon: Wifi },
     { id: "calls" as Tab, label: "Calls", icon: Phone },
-    { id: "notifications" as Tab, label: "Pushover", icon: Bell },
+    { id: "notifications" as Tab, label: "Notifications", icon: Bell },
     { id: "compliance" as Tab, label: "Compliance", icon: Shield },
     { id: "sending" as Tab, label: "Sending Rules", icon: Clock },
   ];

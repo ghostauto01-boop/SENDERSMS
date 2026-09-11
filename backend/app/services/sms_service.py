@@ -305,6 +305,19 @@ class SMSService:
             if sender and sender in await get_muted_notify_senders(self.db):
                 logger.info(f"NOTIFY: muted sender {sender!r} — no Pushover alert")
                 return
+            # Inbuilt first: in-app centre + free browser push, no third party.
+            try:
+                from app.models.conversation import Conversation
+                from app.services.push_service import notify_inbound_sms
+                cr = (await self.db.execute(
+                    select(Conversation.id)
+                    .where(Conversation.contact_id == contact.id)
+                    .order_by(Conversation.id.desc()).limit(1))).scalar_one_or_none()
+                label = contact_display_name(contact, contact.phone_number)
+                await notify_inbound_sms(self.db, label, body or "", cr)
+                await self.db.flush()
+            except Exception as e:  # noqa: BLE001 — inbuilt notify never breaks ingest
+                logger.warning(f"Inbuilt inbound notify failed: {e}")
             r=await self.db.execute(select(NotificationProvider).where(NotificationProvider.provider=="pushover",NotificationProvider.is_enabled==True).limit(1))
             prov=r.scalar_one_or_none()
             if not prov:return

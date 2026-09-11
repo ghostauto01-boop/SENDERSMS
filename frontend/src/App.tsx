@@ -26,6 +26,7 @@ const CampaignFollowUpsPage = lazy(() => import("./pages/CampaignFollowUpsPage")
 const CalendarPage = lazy(() => import("./pages/CalendarPage"));
 const AudiencesPage = lazy(() => import("./pages/AudiencesPage"));
 const PhonePage = lazy(() => import("./pages/PhonePage"));
+const NotificationsPage = lazy(() => import("./pages/NotificationsPage"));
 
 function PageSpinner() {
   return (

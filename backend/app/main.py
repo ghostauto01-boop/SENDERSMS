@@ -581,7 +581,7 @@ async def health():
     """
     return JSONResponse({"status":"ok","app":settings.APP_NAME,"version":"1.0.0"})
 
-from app.api.v1 import ads, auth, calendar, calls, contacts, lists, campaigns, sequences, followups, inbox, overview, templates, analytics, settings as settings_api, webhooks, dashboard, send, autoreply, automations, ai, variables, campaign_followups
+from app.api.v1 import ads, auth, calendar, calls, contacts, lists, campaigns, sequences, followups, inbox, overview, templates, analytics, settings as settings_api, webhooks, dashboard, send, autoreply, automations, ai, variables, campaign_followups, notifications
 app.include_router(auth.router, prefix="/api/v1/auth")
 app.include_router(dashboard.router, prefix="/api/v1/dashboard")
 app.include_router(contacts.router, prefix="/api/v1/contacts")
@@ -608,6 +608,7 @@ app.include_router(calendar.router, prefix="/api/v1/calendar")
 app.include_router(ads.router, prefix="/api/v1/ads")
 # Phone calls via CallGate (same handset as SMS-Gate).
 app.include_router(calls.router, prefix="/api/v1/calls")
+app.include_router(notifications.router, prefix="/api/v1/notifications")
 
 PUBLIC_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "public")
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist")

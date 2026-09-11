@@ -91,6 +91,14 @@ class Settings(BaseSettings):
     PUSHOVER_APP_TOKEN: Optional[str] = None
     PUSHOVER_USER_KEY: Optional[str] = None
 
+    # --- Inbuilt browser notifications (VAPID Web Push, free forever) ---
+    # Leave blank and the server generates + persists its own keypair on first
+    # use. Set these only to keep the SAME keys across rebuilds started with
+    # a fresh database (changing keys silently unsubscribes every device).
+    VAPID_PUBLIC_KEY: Optional[str] = None
+    VAPID_PRIVATE_KEY: Optional[str] = None
+    VAPID_CLAIM_EMAIL: str = "admin@example.com"
+
     # --- Rate Limiting ---
     RATE_LIMIT_LOGIN: str = "5/minute"
     RATE_LIMIT_API: str = "60/minute"

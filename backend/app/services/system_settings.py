@@ -256,3 +256,51 @@ async def get_callgate_secret(db: AsyncSession) -> str:
         if not raw.startswith("enc:"):
             return raw
     return settings.CALLGATE_WEBHOOK_SECRET or ""
+
+
+# --- Inbuilt browser notifications (VAPID keypair, generated once) ---
+VAPID_PUBLIC_KEY = "push.vapid_public"
+VAPID_PRIVATE_KEY = "push.vapid_private"
+
+
+async def get_vapid_keys(db: AsyncSession) -> dict:
+    """Return the VAPID keypair, generating + persisting it on first use.
+
+    Env vars win when both are set (stable keys across fresh databases);
+    otherwise a keypair is generated once and stored in the DB so restarts
+    and redeploys never invalidate existing subscriptions.
+    """
+    from app.config import settings
+
+    if settings.VAPID_PUBLIC_KEY and settings.VAPID_PRIVATE_KEY:
+        return {"public": settings.VAPID_PUBLIC_KEY.strip(),
+                "private": settings.VAPID_PRIVATE_KEY.strip(),
+                "source": "env"}
+
+    pub = await get_setting(db, VAPID_PUBLIC_KEY)
+    priv = await get_setting(db, VAPID_PRIVATE_KEY)
+    if pub and priv:
+        return {"public": pub, "private": priv, "source": "db"}
+
+    # First run: generate a P-256 keypair.
+    import base64
+
+    from py_vapid import Vapid
+
+    v = Vapid()
+    v.generate_keys()
+    raw_priv = v.private_key.private_numbers().private_value.to_bytes(32, "big")
+    nums = v.public_key.public_numbers()
+    raw_pub = b"\x04" + nums.x.to_bytes(32, "big") + nums.y.to_bytes(32, "big")
+
+    def _b64(b: bytes) -> str:
+        return base64.urlsafe_b64encode(b).rstrip(b"=").decode()
+
+    pub, priv = _b64(raw_pub), _b64(raw_priv)
+    await set_setting(db, VAPID_PUBLIC_KEY, pub, category="push",
+                       description="VAPID public key for browser notifications")
+    await set_setting(db, VAPID_PRIVATE_KEY, priv, category="push",
+                       description="VAPID private key (server only, never exposed)")
+    await db.flush()
+    logger.info("Generated new VAPID keypair for browser notifications")
+    return {"public": pub, "private": priv, "source": "generated"}

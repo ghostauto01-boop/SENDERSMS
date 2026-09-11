@@ -25,6 +25,11 @@ redis==5.2.1
 # HTTP
 httpx==0.28.1
 
+# Inbuilt browser notifications (VAPID Web Push — free, no third party)
+pywebpush==2.5.0
+py-vapid==1.9.4
+cryptography==50.0.1
+
 # Utilities
 python-dateutil==2.9.0
 phonenumbers==8.13.52
