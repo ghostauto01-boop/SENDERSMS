@@ -71,9 +71,33 @@ async def _send_one(mid, final_on_failure=False, rate_wait_cap=_INLINE_RATE_WAIT
         from app.models.contact import Contact
         c=(await db.execute(select(Contact).where(Contact.id==m.contact_id))).scalar_one_or_none()
         if not c:m.status="failed";m.last_error="Contact not found";await db.commit();return False
+        # Last-chance pre-send filter: never bill the SIM for a number that
+        # cannot receive. (Queued rows may predate the contact going bad.)
+        from app.services.list_hygiene import contact_is_blocked_from_send, mark_undeliverable
+        blocked=contact_is_blocked_from_send(c)
+        if blocked:
+            m.status="failed";m.last_error=f"Filtered before send: {blocked}"
+            m.failed_at=datetime.now(timezone.utc)
+            if not c.is_undeliverable and blocked not in ("opted_out",):
+                await mark_undeliverable(c, blocked)
+            await _record_campaign_outcome(db,m,False)
+            await db.commit()
+            return False
         from app.providers.smsgate import send_sms_direct
         from app.services.system_settings import get_sim_number
-        r=await send_sms_direct(c.phone_number,m.body,await get_sim_number(db))
+        sim=await get_sim_number(db)
+        r=await send_sms_direct(c.phone_number,m.body,sim)
+        if not r["success"]:
+            # SIM failover: a dead/no-credit SIM fails fast — retry once on
+            # the other slot before giving up. Only one attempt can bill.
+            other=2 if sim==1 else 1
+            r2=await send_sms_direct(c.phone_number,m.body,other)
+            if r2["success"]:
+                r=r2
+            else:
+                r={"success":False,
+                   "error":f"SIM{sim}: {r.get('error','')} | SIM{other}: {r2.get('error','')}"[:500],
+                   "raw":r2.get("raw") or r.get("raw")}
         if r["success"]:m.status="sent";m.provider_message_id=r.get("provider_message_id","");m.sent_at=datetime.now(timezone.utc)
         else:
             m.retry_count=(m.retry_count or 0)+1

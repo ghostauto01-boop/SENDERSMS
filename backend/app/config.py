@@ -70,6 +70,19 @@ class Settings(BaseSettings):
     SMSGATE_RETRY_COUNT: int = 3
     SMSGATE_POLL_INTERVAL: int = 60
 
+    # --- Call Gateway (CallGate.app — Android call-control companion to SMS-Gate) ---
+    # Local-server REST API on the handset: http://<device-ip>:8084/api/v1
+    # Install on the SAME phone as SMS-Gate. Credentials can also be saved
+    # from the app UI (Settings -> Calls), which takes precedence over env.
+    CALLGATE_BASE_URL: Optional[str] = None
+    CALLGATE_USERNAME: Optional[str] = None
+    CALLGATE_PASSWORD: Optional[str] = None
+    CALLGATE_WEBHOOK_SECRET: Optional[str] = None
+    CALLGATE_TIMEOUT: int = 15
+    # When the backend cannot reach the handset (same Wi-Fi only), the UI
+    # falls back to direct tel: dialling on the user's own phone.
+    CALLGATE_ALLOW_DIRECT_DIAL_FALLBACK: bool = True
+
     # --- OneSignal ---
     ONESIGNAL_APP_ID: Optional[str] = None
     ONESIGNAL_REST_API_KEY: Optional[str] = None
@@ -97,6 +110,13 @@ class Settings(BaseSettings):
         """True when the SMS gateway has usable credentials."""
         return bool(
             self.SMSGATE_BASE_URL and self.SMSGATE_USERNAME and self.SMSGATE_PASSWORD
+        )
+
+    @property
+    def callgate_configured(self) -> bool:
+        """True when the CallGate gateway has usable credentials (env-level)."""
+        return bool(
+            self.CALLGATE_BASE_URL and self.CALLGATE_USERNAME and self.CALLGATE_PASSWORD
         )
 
     def insecure_defaults(self) -> list[str]:

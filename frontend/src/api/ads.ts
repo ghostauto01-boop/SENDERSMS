@@ -134,6 +134,8 @@ export type AdsCreative = {
   cta?: string | null;
   tracking_link?: string | null;
   allocation: number;
+  /** Exact SMS count for quota split mode (null/0 = no cap). */
+  send_quota?: number | null;
   current_version: number;
   is_deleted: boolean;
   /** Saved template this creative was started from (sync anchor). */

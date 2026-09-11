@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Users, List, Megaphone, GitBranch, Sparkles,
   Inbox, Send, Clock, FileText, BarChart3, Settings, MessageSquareReply,
   Zap, Moon, Sun, Menu, X, LogOut, Search, Braces, Repeat, Calendar, Target,
-  Activity,
+  Activity, Phone,
 } from "lucide-react";
 import BrandMark from "../components/BrandMark";
 
@@ -14,6 +14,7 @@ const navItems = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/send", label: "Send SMS", icon: Send },
   { to: "/contacts", label: "Contacts", icon: Users },
+  { to: "/phone", label: "Phone", icon: Phone },
   { to: "/lists", label: "Lists", icon: List },
   { to: "/audiences", label: "Audiences", icon: Target },
   { to: "/campaigns", label: "Campaigns", icon: Megaphone },

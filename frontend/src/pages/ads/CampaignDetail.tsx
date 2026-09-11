@@ -827,6 +827,7 @@ function SetEditor({
               <option value="equal">Equal split</option>
               <option value="percentage">Percentage split</option>
               <option value="weighted">Weighted</option>
+              <option value="quota">Exact SMS count per creative</option>
               <option value="random">Randomised</option>
             </select>
           </Field>
@@ -1039,6 +1040,11 @@ function CreativesTab({ detail, analytics, reload }: { detail: Detail; analytics
                               {s.split_mode === "percentage" ? `${c.allocation}%` : `weight ${c.allocation}`}
                             </span>
                           )}
+                          {s.split_mode === "quota" && (
+                            <span className="text-xs font-medium text-primary-700 dark:text-primary-300 bg-primary-50 dark:bg-primary-900/30 px-2 py-0.5 rounded-full">
+                              {c.send_quota ? `${c.send_quota} SMS` : "no cap (takes the rest)"}
+                            </span>
+                          )}
                         </div>
                         {c.template_id && templateLibrary !== null && (
                           <div className="mt-1.5">
@@ -1229,6 +1235,7 @@ function CreativeEditor({
     cta: creative?.cta || "",
     tracking_link: creative?.tracking_link || "",
     allocation: creative?.allocation ?? 0,
+    send_quota: creative?.send_quota ?? "",
     status: creative?.status || "active",
   });
   // Which saved template this creative is written against ("" = none). The
@@ -1340,6 +1347,7 @@ function CreativeEditor({
       ...form,
       name: form.name.trim(),
       allocation: Number(form.allocation) || 0,
+      send_quota: form.send_quota === "" || form.send_quota === null ? null : Math.max(0, Number(form.send_quota) || 0),
       cta: form.cta || null,
       tracking_link: form.tracking_link || null,
       // The template the composer is bound to. A binding whose template was
@@ -1487,6 +1495,16 @@ function CreativeEditor({
               className="input"
               value={form.allocation}
               onChange={(e) => set("allocation", e.target.value)}
+            />
+          </Field>
+          <Field label="Exact SMS count" hint="Used with 'Exact SMS count' split. Blank = no cap (shares the remainder).">
+            <input
+              type="number"
+              min={0}
+              className="input"
+              placeholder="e.g. 500"
+              value={form.send_quota}
+              onChange={(e) => set("send_quota", e.target.value)}
             />
           </Field>
           <Field label="Status">

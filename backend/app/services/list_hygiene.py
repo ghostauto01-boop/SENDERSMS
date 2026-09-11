@@ -24,14 +24,23 @@ from app.utils.phone import is_nigerian_mobile, normalize_nigerian_number
 
 
 def classify_number(phone: str) -> tuple[bool, str | None]:
-    """Return (ok_to_send, reason_if_not)."""
-    if not phone or not str(phone).strip():
-        return False, "empty_number"
-    if not normalize_nigerian_number(phone):
-        return False, "invalid_format"
-    if not is_nigerian_mobile(phone):
-        return False, "not_nigerian_mobile"
-    return True, None
+    """Return (ok_to_send, reason_if_not).
+
+    Delegates to the hardened pre-send filter (fake/test patterns, foreign
+    numbers, short codes, unknown prefixes) so every send path shares one
+    definition of \"sendable\".
+    """
+    from app.services.number_filter import classify_number as _classify
+
+    r = _classify(phone)
+    if r.sendable:
+        return True, None
+    # Keep the legacy reason spelling for the two historical cases so stored
+    # undeliverable_reason values stay comparable over time.
+    reason = r.reason or "invalid_format"
+    if reason == "not_mobile":
+        reason = "not_nigerian_mobile"
+    return False, reason
 
 
 async def mark_undeliverable(contact: Contact, reason: str) -> None:
@@ -104,17 +113,30 @@ async def clean_contacts(
     bounced = 0
     already = 0
     sendable = 0
+    by_reason: dict[str, int] = {}
     to_act: list[Contact] = []
 
     for c in contacts:
         if c.is_undeliverable:
             already += 1
+            by_reason["already_undeliverable"] = by_reason.get("already_undeliverable", 0) + 1
             to_act.append(c)
             continue
         ok, reason = classify_number(c.phone_number or "")
         if not ok:
             await mark_undeliverable(c, reason or "invalid_format")
             invalid += 1
+            by_reason[reason or "invalid_format"] = by_reason.get(reason or "invalid_format", 0) + 1
+            to_act.append(c)
+            continue
+        # Explicit clean: also catch test-data lookalikes (never hard-blocks
+        # a live send, but the user asked to remove them from this list).
+        from app.services.number_filter import looks_like_test_data
+        soft = looks_like_test_data(c.phone_number or "")
+        if soft:
+            await mark_undeliverable(c, soft)
+            invalid += 1
+            by_reason[soft] = by_reason.get(soft, 0) + 1
             to_act.append(c)
             continue
         if c.phone_number in suppressed or c.is_opted_out:
@@ -124,6 +146,7 @@ async def clean_contacts(
         if c.id in failed_ids:
             await mark_undeliverable(c, "previous_delivery_failed")
             bounced += 1
+            by_reason["previous_delivery_failed"] = by_reason.get("previous_delivery_failed", 0) + 1
             to_act.append(c)
             continue
         sendable += 1
@@ -166,6 +189,7 @@ async def clean_contacts(
         "previous_failures": bounced,
         "already_undeliverable": already,
         "quarantined": invalid + bounced,
+        "by_reason": by_reason,
         "removed_from_list": removed,
         "deleted": deleted,
     }

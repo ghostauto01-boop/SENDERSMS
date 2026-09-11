@@ -4,6 +4,7 @@ import { Contact, PaginatedResponse } from "../types";
 import toast from "react-hot-toast";
 import { Plus, Search, Trash2, Upload, Download, ChevronLeft, ChevronRight, X, ListPlus, MessageSquare, Phone, MapPin, Building2, User, CheckSquare, Square, IdCard } from "lucide-react";
 import ContactProfileModal from "../components/ContactProfileModal";
+import ContactActions from "../components/ContactActions";
 import ImportContactsModal from "../components/ImportContactsModal";
 import ListPicker from "../components/ListPicker";
 
@@ -28,6 +29,8 @@ export default function ContactsPage() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState(""); const [leadStatus, setLeadStatus] = useState("");
+  // Debounced search text — typing no longer fires a request per keystroke.
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [loading, setLoading] = useState(true); const [error, setError] = useState<string|null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   // "Select all N matching" — the selection covers every contact matching the
@@ -42,10 +45,11 @@ export default function ContactsPage() {
   // Full-record view: every column the CSV imported for this contact.
   const [profileId, setProfileId] = useState<number|null>(null);
 
-  useEffect(()=>{loadContacts();},[page,search,leadStatus]);
+  useEffect(()=>{ const t=setTimeout(()=>{ setDebouncedSearch(search); },350); return ()=>clearTimeout(t); },[search]);
+  useEffect(()=>{loadContacts();},[page,debouncedSearch,leadStatus]);
 
   const loadContacts = async () => {
-    try { setLoading(true); const {data}=await api.get<PaginatedResponse<Contact>>("/contacts/",{params:{page,per_page:25,search:search||undefined,lead_status:leadStatus||undefined}});
+    try { setLoading(true); const {data}=await api.get<PaginatedResponse<Contact>>("/contacts/",{params:{page,per_page:25,search:debouncedSearch||undefined,lead_status:leadStatus||undefined}});
       // Deleting the last row of a page must not leave the user stranded on
       // an empty page — step back one page and let the effect reload.
       if (data.items.length===0 && page>1) { setPage(p=>Math.max(1,p-1)); return; }
@@ -284,13 +288,17 @@ export default function ContactsPage() {
                 </div>
               </div>
               {/* action bar */}
+              <div className="px-3 pb-2">
+                <ContactActions
+                  layout="bar"
+                  contactId={c.id}
+                  phone={c.phone_number}
+                  name={`${c.first_name||""} ${c.last_name||""}`.trim()||c.business_name||undefined}
+                  website={c.website}
+                  onSms={()=>{setQuickSendId(c.id);setQuickContact(c);setQuickMsg(`Hi ${c.first_name||c.business_name||"there"}! 👋 This is a quick message from our restaurant promo team. Reply STOP to opt out.`);}}
+                />
+              </div>
               <div className="flex gap-2 px-3 pb-3">
-                <button
-                  onClick={()=>{setQuickSendId(c.id);setQuickContact(c);setQuickMsg(`Hi ${c.first_name||c.business_name||"there"}! 👋 This is a quick message from our restaurant promo team. Reply STOP to opt out.`);}}
-                  className="flex-1 bg-[#00a884] hover:bg-[#06cf9c] text-white rounded-full py-2.5 text-[13px] font-semibold flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform"
-                >
-                  <MessageSquare size={14}/> Message
-                </button>
                 <button
                   onClick={()=>setProfileId(c.id)}
                   className="w-[56px] bg-[#f0f2f5] dark:bg-[#2a3942] hover:bg-[#e9edef] text-[#54656f] dark:text-[#aebac1] rounded-full py-2.5 flex items-center justify-center active:scale-[0.98] transition-transform"
@@ -368,9 +376,15 @@ export default function ContactsPage() {
                   </td>
                   <td className="px-3 py-3"><span className={`text-[11px] px-2 py-1 rounded-full font-medium ${statusBadge(c.lead_status)}`}>{c.lead_status}</span></td>
                   <td className="px-3 py-3">
-                    <div className="flex justify-end gap-1">
+                    <div className="flex justify-end gap-1 items-center">
+                      <ContactActions
+                        contactId={c.id}
+                        phone={c.phone_number}
+                        name={`${c.first_name||""} ${c.last_name||""}`.trim()||c.business_name||undefined}
+                        website={c.website}
+                        onSms={()=>{setQuickSendId(c.id);setQuickContact(c);setQuickMsg("")}}
+                      />
                       <button onClick={()=>setProfileId(c.id)} className="w-8 h-8 rounded-full bg-[#f0f2f5] dark:bg-[#2a3942] hover:bg-[#00a884] hover:text-white text-[#54656f] dark:text-[#aebac1] flex items-center justify-center" title="View full profile"><IdCard size={14}/></button>
-                      <button onClick={()=>{setQuickSendId(c.id);setQuickContact(c);setQuickMsg("")}} className="w-8 h-8 rounded-full bg-[#00a884]/10 hover:bg-[#00a884] hover:text-white text-[#00a884] flex items-center justify-center" title="Send SMS"><MessageSquare size={14}/></button>
                       <button onClick={()=>handleDelete(c.id)} disabled={deletingId===c.id} className="w-8 h-8 rounded-full bg-red-50 hover:bg-red-500 hover:text-white text-red-500 flex items-center justify-center disabled:opacity-50" title="Delete permanently">
                         {deletingId===c.id ? <span className="w-3.5 h-3.5 border-2 border-red-500 border-t-transparent rounded-full animate-spin"/> : <Trash2 size={14}/>}
                       </button>

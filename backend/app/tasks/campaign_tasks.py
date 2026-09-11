@@ -298,6 +298,16 @@ async def _process_campaign_contact(db: AsyncSession, campaign: Campaign, cc: Ca
     if suppressed:
         cc.status = "opted_out"
         return
+    # Pre-send filter: never submit numbers that cannot receive (each attempt
+    # bills the SIM). Quarantine so future campaigns skip them too.
+    from app.services.list_hygiene import contact_is_blocked_from_send, mark_undeliverable
+    blocked = contact_is_blocked_from_send(contact)
+    if blocked:
+        cc.status = "failed"
+        cc.last_error = f"Filtered before send: {blocked}"
+        if not contact.is_undeliverable and blocked not in ("opted_out",):
+            await mark_undeliverable(contact, blocked)
+        return
 
     # Get sequence snapshot
     if campaign.sequence_version_id:

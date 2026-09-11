@@ -6,6 +6,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.database import get_db
+from app.models.contact import Contact
 from app.models.webhook import WebhookEvent
 from app.models.user import User
 from app.security.auth import get_current_user
@@ -262,6 +263,155 @@ async def smsgateway_webhook(request: Request, db: AsyncSession = Depends(get_db
 
 @router.get("/smsgateway")
 async def webhook_get(): return {"ok": True}
+
+
+# --------------------------------------------------------------------------
+# CallGate (phone calls) — same envelope + HMAC signing as SMS-Gate.
+# --------------------------------------------------------------------------
+
+CALL_EVENTS = ("call:ringing", "call:started", "call:ended")
+
+
+def _verify_call_signature(request, raw_body: bytes, secret: str) -> None:
+    if not secret:
+        if settings.SMSGATE_WEBHOOK_ALLOW_UNSIGNED and not settings.is_production:
+            logger.warning("CallGate webhook signature check SKIPPED (unsigned allowed).")
+            return
+        logger.error("CallGate webhook rejected: signing secret not configured.")
+        raise HTTPException(status_code=503, detail="Webhook signing not configured")
+    from app.providers.smsgate import SMSGateProvider
+
+    signature = request.headers.get("x-signature", "")
+    timestamp = request.headers.get("x-timestamp", "")
+    if not SMSGateProvider.validate_webhook_signature(raw_body, signature, timestamp, secret):
+        logger.warning("CallGate webhook rejected: invalid signature")
+        raise HTTPException(status_code=401, detail="Invalid webhook signature")
+
+
+@router.post("/callgate")
+async def callgate_webhook(request: Request, db: AsyncSession = Depends(get_db)):
+    """Receive call events from the CallGate Android app.
+
+    Envelope (same as SMS-Gate):
+    {
+      "deviceId": "...", "event": "call:started", "id": "unique-event-id",
+      "webhookId": "...", "payload": {"phoneNumber": "6505551212"}
+    }
+    """
+    from app.models.call import CallLog
+    from app.services.system_settings import get_callgate_secret
+
+    raw_body = await request.body()
+    _verify_call_signature(request, raw_body, await get_callgate_secret(db))
+
+    body = await _parse(request)
+    if not body:
+        return {"ok": True}
+
+    event_type = body.get("event", "") or ""
+    payload = body.get("payload", body)
+    if not isinstance(payload, dict):
+        payload = body
+    event_id = body.get("id") or ""
+    phone = str(payload.get("phoneNumber") or payload.get("phone") or "").strip()
+    idem_key = f"call-{event_id or (event_type + phone)}"[:255]
+
+    logger.info("CALL WEBHOOK: event=%s eventId=%s phone=%s", event_type, event_id, phone)
+
+    if (await db.execute(
+        select(WebhookEvent).where(WebhookEvent.idempotency_key == idem_key)
+    )).scalar_one_or_none():
+        return {"ok": True, "duplicate": True}
+
+    evt = WebhookEvent(
+        event_type=event_type or "unknown", provider="callgate",
+        provider_event_id=event_id or None, idempotency_key=idem_key,
+        payload=json.dumps(body)[:100000], status="received",
+    )
+    db.add(evt)
+    await db.flush()
+
+    try:
+        if event_type in CALL_EVENTS and phone:
+            from app.utils.phone import normalize_nigerian_number as _norm
+            norm = _norm(phone) or phone
+            # Find the contact (exact, then fuzzy on last 9 digits).
+            contact = (await db.execute(
+                select(Contact).where(Contact.phone_number == norm))).scalar_one_or_none()
+            if contact is None:
+                digits = "".join(ch for ch in norm if ch.isdigit())[-9:]
+                if digits:
+                    contact = (await db.execute(
+                        select(Contact).where(Contact.phone_number.ilike(f"%{digits}")))).scalars().first()
+
+            if event_type == "call:ringing":
+                # Incoming ring with no open outgoing call = inbound call.
+                open_out = (await db.execute(
+                    select(CallLog).where(
+                        CallLog.direction == "outgoing",
+                        CallLog.status.in_(("initiated", "ringing", "started")))
+                    .order_by(CallLog.id.desc()).limit(1))).scalar_one_or_none()
+                if open_out is not None:
+                    open_out.status = "ringing"
+                    open_out.provider_event_id = event_id or open_out.provider_event_id
+                    open_out.device_id = body.get("deviceId") or open_out.device_id
+                else:
+                    db.add(CallLog(contact_id=contact.id if contact else None,
+                                   phone_number=norm, direction="incoming",
+                                   status="ringing", provider_event_id=event_id or None,
+                                   device_id=body.get("deviceId")))
+            elif event_type == "call:started":
+                row = (await db.execute(
+                    select(CallLog).where(CallLog.status.in_(("initiated", "ringing")))
+                    .order_by(CallLog.id.desc()).limit(1))).scalar_one_or_none()
+                if row is not None:
+                    row.status = "started"
+                    row.started_at = datetime.now(timezone.utc)
+                    row.provider_event_id = event_id or row.provider_event_id
+                    if contact is not None and row.contact_id is None:
+                        row.contact_id = contact.id
+                else:
+                    db.add(CallLog(contact_id=contact.id if contact else None,
+                                   phone_number=norm, direction="incoming",
+                                   status="started", provider_event_id=event_id or None,
+                                   device_id=body.get("deviceId"),
+                                   started_at=datetime.now(timezone.utc)))
+            elif event_type == "call:ended":
+                row = (await db.execute(
+                    select(CallLog).where(CallLog.status.in_(("initiated", "ringing", "started")))
+                    .order_by(CallLog.id.desc()).limit(1))).scalar_one_or_none()
+                now = datetime.now(timezone.utc)
+                if row is not None:
+                    row.status = "ended"
+                    row.ended_at = now
+                    if row.started_at:
+                        s = row.started_at
+                        if s.tzinfo is None:
+                            s = s.replace(tzinfo=timezone.utc)
+                        row.duration_seconds = max(0, int((now - s).total_seconds()))
+                    if contact is not None and row.contact_id is None:
+                        row.contact_id = contact.id
+                else:
+                    db.add(CallLog(contact_id=contact.id if contact else None,
+                                   phone_number=norm, direction="incoming",
+                                   status="ended", provider_event_id=event_id or None,
+                                   device_id=body.get("deviceId"), ended_at=now))
+        elif event_type not in CALL_EVENTS:
+            logger.info("CALL WEBHOOK: ignoring unhandled event %r", event_type)
+        evt.status = "processed"
+        evt.processed_at = datetime.now(timezone.utc)
+    except Exception as e:
+        evt.status = "error"
+        evt.error = str(e)[:1000]
+        evt.processed_at = datetime.now(timezone.utc)
+        logger.exception("CALL WEBHOOK: failed to process %s", event_type)
+
+    await db.flush()
+    return {"ok": True}
+
+
+@router.get("/callgate")
+async def callgate_webhook_get(): return {"ok": True}
 
 # Legacy compat
 @router.post("/smsgate/inbound")

@@ -295,6 +295,7 @@ class CreativeIn(BaseModel):
     cta: Optional[str] = None
     tracking_link: Optional[str] = None
     allocation: float = 0.0
+    send_quota: Optional[int] = Field(None, ge=0, description="Exact SMS count for quota split mode")
     status: str = "active"
     template_id: Optional[int] = None
 
@@ -305,6 +306,7 @@ class CreativePatch(BaseModel):
     cta: Optional[str] = None
     tracking_link: Optional[str] = None
     allocation: Optional[float] = None
+    send_quota: Optional[int] = Field(None, ge=0)
     status: Optional[str] = None
     template_id: Optional[int] = None
 
@@ -319,6 +321,7 @@ class CreativeOut(BaseModel):
     cta: Optional[str]
     tracking_link: Optional[str]
     allocation: float
+    send_quota: Optional[int] = None
     current_version: int
     is_deleted: bool
     template_id: Optional[int] = None

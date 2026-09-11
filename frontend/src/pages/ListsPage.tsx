@@ -326,8 +326,10 @@ export default function ListsPage() {
     try {
       setCleaningList(true);
       const { data } = await api.post(`/lists/${viewListId}/clean`, null, { params: { remove_from_list: true } });
+      const reasons = data.by_reason ? Object.entries(data.by_reason).map(([r, n]: any) => `${n} ${String(r).replace(/_/g, " ")}`).join(", ") : "";
       toast.success(
-        `Scanned ${data.scanned}. Removed ${data.removed_from_list} bad numbers (${data.invalid_format} invalid, ${data.previous_failures} previous failures). ${data.sendable} still sendable.`
+        `Scanned ${data.scanned}. Removed ${data.removed_from_list} bad numbers. ${data.sendable} still sendable.${reasons ? ` (${reasons})` : ""}`,
+        { duration: 6000 }
       );
       await Promise.all([reloadMembers(), loadLists()]);
     } catch (err: any) {

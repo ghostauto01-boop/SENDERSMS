@@ -219,7 +219,9 @@ class AdsSet(Base):
     exclude_campaign_ids: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     daily_limit: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    #: equal | percentage | weighted | random
+    #: equal | percentage | weighted | random | quota
+    #: "quota" = each creative sends exactly its send_quota SMS (uncapped
+    #: creatives split the remainder equally).
     split_mode: Mapped[str] = mapped_column(String(20), default="equal", nullable=False)
 
     #: Per-set placement toggle for Andromeda auto-optimization. Only takes
@@ -325,6 +327,11 @@ class AdsCreative(Base):
     #: Relative share of the split. With split_mode="percentage" this is a
     #: percent (must total 100); with "weighted" it is an arbitrary weight.
     allocation: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+
+    #: Exact SMS quota for this creative (split_mode="quota"): "send exactly N
+    #: SMS with this creative". NULL/0 means no cap — the creative shares
+    #: whatever is left after capped creatives take their quota.
+    send_quota: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     current_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
 
