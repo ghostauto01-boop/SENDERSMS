@@ -16,7 +16,8 @@ psycopg2-binary==2.9.10
 argon2-cffi==23.1.0
 python-jose[cryptography]==3.3.0
 python-multipart==0.0.18
-cryptography==44.0.0
+# cryptography is pinned once below (pywebpush 2.5.0 / py-vapid 1.9.4
+# require >=47; a duplicate 44.0.0 pin broke pip resolution on Render).
 
 # Task Queue
 celery[redis]==5.4.0
