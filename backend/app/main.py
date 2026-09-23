@@ -568,6 +568,21 @@ app = FastAPI(title=settings.APP_NAME, version="1.0.0", lifespan=lifespan)
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins_list, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
+
+@app.middleware("http")
+async def _cache_static_assets(request, call_next):
+    """Vite emits content-hashed filenames, so /assets/* never changes.
+
+    Marking them immutable lets returning browsers (and the service worker)
+    reuse every JS/CSS chunk without a revalidation round-trip, which is most
+    of the difference between a 1s and a 5s reload on mobile data.
+    """
+    response = await call_next(request)
+    if request.url.path.startswith("/assets/"):
+        response.headers.setdefault("Cache-Control", "public, max-age=31536000, immutable")
+    return response
+
+
 from app.security.rate_limit import install_rate_limiting
 install_rate_limiting(app)
 

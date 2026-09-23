@@ -41,7 +41,10 @@ class ContactListMember(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     list_id: Mapped[int] = mapped_column(Integer, ForeignKey("contact_lists.id", ondelete="CASCADE"), nullable=False)
-    contact_id: Mapped[int] = mapped_column(Integer, ForeignKey("contacts.id", ondelete="CASCADE"), nullable=False)
+    # Indexed: "which lists contain this contact" and bulk per-contact cleanup
+    # run on every contact delete; the (list_id, contact_id) unique constraint
+    # only covers lookups that start from the list side.
+    contact_id: Mapped[int] = mapped_column(Integer, ForeignKey("contacts.id", ondelete="CASCADE"), nullable=False, index=True)
     added_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
     )

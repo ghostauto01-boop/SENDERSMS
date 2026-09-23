@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import api from "../api/client";
 import { Contact, PaginatedResponse } from "../types";
 import toast from "react-hot-toast";
-import { Edit2, Plus, Search, Trash2, UserPlus, Users, X, ChevronLeft, ChevronRight, Minus, Sparkles } from "lucide-react";
+import { Edit2, Plus, Search, Trash2, UserPlus, Users, X, ChevronLeft, ChevronRight, Minus, Sparkles, CheckSquare, PhoneCall } from "lucide-react";
+import ContactActions from "../components/ContactActions";
+import { openWhatsappForCall } from "../utils/call";
 
 interface ListItem {
   id: number;
@@ -51,6 +53,9 @@ export default function ListsPage() {
   const [addPage, setAddPage] = useState(1);
   const [addQuery, setAddQuery] = useState("");
   const [selectedToAdd, setSelectedToAdd] = useState<Set<number>>(new Set());
+  // "All N matching" — when the picker search narrows to (say) 1,200 people,
+  // one tap adds every matching contact on the server, not just this page's 50.
+  const [allMatchingToAdd, setAllMatchingToAdd] = useState(false);
   const addTimer = useRef<number | null>(null);
 
   const [selectedInList, setSelectedInList] = useState<Set<number>>(new Set());
@@ -360,6 +365,7 @@ export default function ListsPage() {
   const openAddContacts = () => {
     setShowAddContacts(true);
     setSelectedToAdd(new Set());
+    setAllMatchingToAdd(false);
     setAddPage(1);
     setAddQuery("");
     loadAddPage(1, "");
@@ -393,24 +399,68 @@ export default function ListsPage() {
     if (addTimer.current) window.clearTimeout(addTimer.current);
     addTimer.current = window.setTimeout(() => {
       setAddPage(1);
+      setSelectedToAdd(new Set());
+      setAllMatchingToAdd(false);
       loadAddPage(1, q);
     }, 300);
   };
 
+  const addPageAllSelected =
+    addItems.length > 0 && selectedToAdd.size === addItems.length && !allMatchingToAdd;
+  const addToSelectionCount = allMatchingToAdd ? addTotal : selectedToAdd.size;
+
   const toggleToAdd = (id: number) => {
+    // Tapping a row while "all matching" is active drops back to a concrete
+    // page selection minus that row, so checkboxes always mirror reality.
+    if (allMatchingToAdd) {
+      const next = new Set(addItems.map((c) => c.id));
+      next.delete(id);
+      setSelectedToAdd(next);
+      setAllMatchingToAdd(false);
+      return;
+    }
     const next = new Set(selectedToAdd);
     next.has(id) ? next.delete(id) : next.add(id);
     setSelectedToAdd(next);
   };
 
+  // Three states: the 50 on this page -> all N matching the search -> clear.
+  const toggleAllToAdd = () => {
+    if (allMatchingToAdd) {
+      setSelectedToAdd(new Set());
+      setAllMatchingToAdd(false);
+      return;
+    }
+    if (addPageAllSelected) {
+      if (addTotal > addItems.length) setAllMatchingToAdd(true);
+      else setSelectedToAdd(new Set());
+    } else {
+      setSelectedToAdd(new Set(addItems.map((c) => c.id)));
+    }
+  };
+
   const handleAddContacts = async () => {
-    if (!viewListId || selectedToAdd.size === 0) return;
-    const count = selectedToAdd.size;
+    if (!viewListId) return;
+    const count = allMatchingToAdd ? addTotal : selectedToAdd.size;
+    if (count === 0) return;
     try {
       setAddingToList(true);
-      const { data } = await api.post(`/lists/${viewListId}/contacts`, [...selectedToAdd]);
-      toast.success(`${data.added ?? count} contact${(data.added ?? count) === 1 ? "" : "s"} added`);
+      if (allMatchingToAdd) {
+        // Server-scoped: add every contact matching the picker's search in
+        // one request. Existing members are skipped server-side.
+        const { data } = await api.post(`/lists/${viewListId}/contacts/add-all`, {
+          search: addQuery.trim() || undefined,
+        });
+        toast.success(
+          `${data.added ?? 0} contact${(data.added ?? 0) === 1 ? "" : "s"} added to ${viewListName}` +
+            (data.matched > data.added ? ` (${data.matched - data.added} already in it)` : "")
+        );
+      } else {
+        const { data } = await api.post(`/lists/${viewListId}/contacts`, [...selectedToAdd]);
+        toast.success(`${data.added ?? count} contact${(data.added ?? count) === 1 ? "" : "s"} added`);
+      }
       setSelectedToAdd(new Set());
+      setAllMatchingToAdd(false);
       setShowAddContacts(false);
       setMemberPage(1);
       await Promise.all([loadListContacts(viewListId, 1, memberSearch, true), loadLists()]);
@@ -540,6 +590,22 @@ export default function ListsPage() {
                       autoFocus
                     />
                   </div>
+                  {addItems.length > 0 && (
+                    <div className="flex items-center justify-between px-1">
+                      <span className="text-[12px] text-gray-500 dark:text-gray-400">
+                        {addTotal} available{addQuery.trim() ? ` · “${addQuery.trim()}”` : ""}
+                      </span>
+                      <button
+                        onClick={toggleAllToAdd}
+                        className="flex items-center gap-1.5 text-[13px] font-semibold text-[#00a884] dark:text-[#00dfa2] py-1 px-1"
+                        title={allMatchingToAdd ? "Clear selection" : addPageAllSelected && addTotal > addItems.length ? `Select every contact matching “${addQuery.trim() || "this view"}”, on every page` : "Select all on this page"}
+                      >
+                        {allMatchingToAdd
+                          ? <><X size={14} /> Clear</>
+                          : <><CheckSquare size={15} />{addPageAllSelected && addTotal > addItems.length ? `Select all ${addTotal} matching` : "Select all"}</>}
+                      </button>
+                    </div>
+                  )}
                   <div className="border dark:border-[#2a3942] rounded-xl overflow-hidden bg-white dark:bg-[#202c33] max-h-72 overflow-y-auto">
                     {addLoading ? (
                       <div className="py-8 text-center text-sm text-gray-500">Loading…</div>
@@ -558,7 +624,7 @@ export default function ListsPage() {
                           >
                             <input
                               type="checkbox"
-                              checked={selectedToAdd.has(contact.id)}
+                              checked={allMatchingToAdd || selectedToAdd.has(contact.id)}
                               onChange={() => toggleToAdd(contact.id)}
                               className="rounded accent-[#00a884] flex-shrink-0"
                             />
@@ -566,6 +632,14 @@ export default function ListsPage() {
                               <p className="text-sm font-medium truncate">{displayName(contact)}</p>
                               <p className="text-xs text-gray-500 truncate">{contact.phone_number}</p>
                             </div>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); openWhatsappForCall(contact.phone_number, displayName(contact)); }}
+                              className="w-8 h-8 rounded-full bg-[#25D366] text-white flex items-center justify-center flex-shrink-0 hover:bg-[#1fb857]"
+                              title={`Call ${displayName(contact)} on WhatsApp`}
+                            >
+                              <PhoneCall size={14} />
+                            </button>
                           </label>
                         ))}
                       </div>
@@ -593,13 +667,17 @@ export default function ListsPage() {
                       </div>
                     </div>
                   )}
-                  {selectedToAdd.size > 0 && (
+                  {addToSelectionCount > 0 && (
                     <button
                       onClick={handleAddContacts}
                       disabled={addingToList || addLoading}
                       className="w-full py-2.5 rounded-full bg-[#00a884] hover:bg-[#06cf9c] text-white text-sm font-semibold disabled:opacity-50"
                     >
-                      {addingToList ? "Adding…" : `Add ${selectedToAdd.size} selected contact${selectedToAdd.size === 1 ? "" : "s"}`}
+                      {addingToList
+                        ? "Adding…"
+                        : allMatchingToAdd
+                          ? `Add all ${addTotal} matching contacts`
+                          : `Add ${selectedToAdd.size} selected contact${selectedToAdd.size === 1 ? "" : "s"}`}
                     </button>
                   )}
                 </div>
@@ -704,6 +782,22 @@ export default function ListsPage() {
                                 {contact.phone_number}{contact.business_name && displayName(contact) !== contact.business_name ? ` · ${contact.business_name}` : ""}
                               </p>
                             </div>
+                            <div className="flex-shrink-0 hidden sm:block">
+                              <ContactActions
+                                contactId={contact.id}
+                                phone={contact.phone_number}
+                                name={displayName(contact)}
+                              />
+                            </div>
+                            {/* Compact WhatsApp actions when the space is tight (phones) */}
+                            <button
+                              onClick={() => openWhatsappForCall(contact.phone_number, displayName(contact))}
+                              disabled={removing || deleting || removingBulk || deletingPermanently}
+                              className="w-8 h-8 rounded-full bg-[#25D366] text-white flex items-center justify-center flex-shrink-0 hover:bg-[#1fb857] disabled:opacity-40 sm:hidden"
+                              title={`Call ${displayName(contact)} on WhatsApp`}
+                            >
+                              <PhoneCall size={13} />
+                            </button>
                             <div className="flex items-center gap-1.5 flex-shrink-0">
                               <button
                                 onClick={() => handleDeleteOneContact(contact)}

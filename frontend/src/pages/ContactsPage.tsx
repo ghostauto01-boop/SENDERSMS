@@ -107,6 +107,30 @@ export default function ContactsPage() {
     finally { setQuickSending(false); }
   };
 
+  const [addingToList, setAddingToList] = useState(false);
+  // Works for BOTH selection modes: ticked contacts are sent as ids, while
+  // "all N matching" is resolved on the server from the current search/status
+  // filters — so adding 12,000 contacts to a list is one request, not 12,000.
+  const confirmAddToList = async () => {
+    if(!selectedListId){toast.error("Select a list");return;}
+    setAddingToList(true);
+    try {
+      if (allMatching) {
+        const { data } = await api.post(`/lists/${selectedListId}/contacts/add-all`,{
+          search: debouncedSearch || undefined,
+          lead_status: leadStatus || undefined,
+        });
+        toast.success(`${data.added} contact${data.added===1?"":"s"} added to list${data.matched>data.added?` (${data.matched-data.added} already in it)`:""}`);
+      } else {
+        await api.post(`/lists/${selectedListId}/contacts`,[...selected]);
+        toast.success(`${selected.size} contact${selected.size===1?"":"s"} added to list`);
+      }
+      setShowListModal(false); clearSelection(); setSelectedListId(""); loadContacts();
+    } catch (err:any) { toast.error(err.response?.data?.detail||"Failed to add to list"); }
+    finally { setAddingToList(false); }
+  };
+
+
   const pageAll = contacts.length>0 && selected.size===contacts.length && !allMatching;
   const selectedCount = allMatching ? total : selected.size;
 
@@ -187,19 +211,17 @@ export default function ContactsPage() {
               </span>
               <div className="flex items-center gap-1.5 flex-wrap">
                 {!allMatching && (
-                  <>
-                    <select className="bg-white text-[#111b21] px-2 py-1.5 rounded-full text-xs font-medium" onChange={e=>{if(e.target.value)handleBulkStatus(e.target.value); e.target.value=""}} value="">
-                      <option value="">Status…</option>{LEAD_STATUSES.map(s=><option key={s} value={s}>{s}</option>)}
-                    </select>
-                    <button onClick={()=>setShowListModal(true)} className="bg-white text-[#008069] px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1"><ListPlus size={12}/><span className="hidden sm:inline">List</span></button>
-                  </>
+                  <select className="bg-white text-[#111b21] px-2 py-1.5 rounded-full text-xs font-medium" onChange={e=>{if(e.target.value)handleBulkStatus(e.target.value); e.target.value=""}} value="">
+                    <option value="">Status…</option>{LEAD_STATUSES.map(s=><option key={s} value={s}>{s}</option>)}
+                  </select>
                 )}
+                <button onClick={()=>setShowListModal(true)} className="bg-white text-[#008069] px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1"><ListPlus size={12}/><span className="hidden sm:inline">Add to list</span><span className="sm:hidden">List</span></button>
                 <button onClick={handleBulkDelete} className="bg-white text-[#c5221f] px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1"><Trash2 size={12}/>Delete permanently</button>
               </div>
             </div>
             {allMatching && (
               <p className="text-[11px] text-white/80 mt-1.5 leading-snug">
-                Delete permanently will remove all {total} phone numbers matching your current search &amp; status — across every page, not just this one.
+                Bulk actions cover all {total} contacts matching your current search &amp; status — across every page. “Add to list” adds them all in one go; “Delete permanently” removes them all.
               </p>
             )}
           </div>
@@ -401,7 +423,7 @@ export default function ContactsPage() {
       {showAdd && <AddContactModal lists={[]} onClose={()=>{setShowAdd(false);loadContacts()}} />}
       {showImport && <ImportContactsModal onClose={()=>setShowImport(false)} onDone={()=>{setShowImport(false);loadContacts()}}/>}
       {profileId !== null && <ContactProfileModal contactId={profileId} onClose={()=>setProfileId(null)}/>}
-      {showListModal && <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4"><div className="bg-white dark:bg-[#202c33] w-full sm:max-w-md rounded-t-2xl sm:rounded-xl p-4 sm:p-6 max-h-[92vh] overflow-y-auto"><div className="flex justify-between mb-4"><h2 className="text-lg font-semibold text-[#111b21] dark:text-white">Add to List</h2><button onClick={()=>setShowListModal(false)} className="w-8 h-8 rounded-full bg-[#f0f2f5] dark:bg-[#111b21] flex items-center justify-center"><X size={16}/></button></div><p className="text-sm text-[#667781] mb-3">{selected.size} contacts</p><ListPicker value={selectedListId} onChange={setSelectedListId} placeholder="Select list... (or create one)" allowNone={false} /><button onClick={async()=>{if(!selectedListId){toast.error("Select a list");return};try{await api.post(`/lists/${selectedListId}/contacts`,[...selected]);toast.success("Added to list");setShowListModal(false);setSelected(new Set());setSelectedListId("");loadContacts();}catch{toast.error("Failed")}}} className="bg-[#00a884] text-white w-full rounded-full py-3 mt-4 font-semibold">Add to List</button></div></div>}
+      {showListModal && <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4"><div className="bg-white dark:bg-[#202c33] w-full sm:max-w-md rounded-t-2xl sm:rounded-xl p-4 sm:p-6 max-h-[92vh] overflow-y-auto"><div className="flex justify-between mb-4"><h2 className="text-lg font-semibold text-[#111b21] dark:text-white">Add to List</h2><button onClick={()=>setShowListModal(false)} className="w-8 h-8 rounded-full bg-[#f0f2f5] dark:bg-[#111b21] flex items-center justify-center"><X size={16}/></button></div><p className="text-sm text-[#667781] mb-3">{allMatching ? `All ${total} matching contacts${search||leadStatus?" (current search & status)":""}` : `${selected.size} contacts`}</p><ListPicker value={selectedListId} onChange={setSelectedListId} placeholder="Select list... (or create one)" allowNone={false} /><button onClick={confirmAddToList} disabled={addingToList} className="bg-[#00a884] text-white w-full rounded-full py-3 mt-4 font-semibold disabled:opacity-60">{addingToList ? "Adding…" : allMatching ? `Add all ${total} to list` : "Add to List"}</button></div></div>}
 
       {/* WhatsApp-style Quick Send - bottom sheet */}
       {quickSendId && (

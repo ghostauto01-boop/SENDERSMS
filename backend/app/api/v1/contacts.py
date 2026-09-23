@@ -129,7 +129,27 @@ async def list_contacts(
     result = await db.execute(query)
     contacts = result.scalars().all()
 
-    items = [await _serialize_contact(db, c) for c in contacts]
+    # Tags for the whole page in ONE query. Serialising per-contact used to
+    # run a second query for every row (25 rows = 26 queries per page); a
+    # single grouped fetch keeps the payload identical at a fraction of the
+    # round-trips, which is what made search feel slow on big databases.
+    tag_map: dict[int, list[str]] = {}
+    if contacts:
+        contact_ids = [c.id for c in contacts]
+        tag_rows = await db.execute(
+            select(ContactTag.contact_id, Tag.name)
+            .join(Tag, ContactTag.tag_id == Tag.id)
+            .where(ContactTag.contact_id.in_(contact_ids))
+            .order_by(Tag.name.asc())
+        )
+        for cid, name in tag_rows.all():
+            tag_map.setdefault(cid, []).append(name)
+
+    items = []
+    for contact in contacts:
+        data = {k: v for k, v in vars(contact).items() if not k.startswith("_")}
+        data["tags"] = tag_map.get(contact.id, [])
+        items.append(ContactOut.model_validate(data).model_dump(mode="json"))
     return ContactListOut(total=total, items=items)
 
 

@@ -271,7 +271,7 @@ async def add_contacts_to_list(
 ):
     """Add existing contacts to a list."""
     contact_list = await _find_list(db, list_id)
-    requested_ids = set(contact_ids)
+    requested_ids = {int(cid) for cid in contact_ids}
     if not requested_ids:
         return {"success": True, "added": 0, "contact_count": await _sync_contact_count(db, contact_list)}
 
@@ -283,24 +283,79 @@ async def add_contacts_to_list(
         missing = ", ".join(str(contact_id) for contact_id in sorted(missing_ids))
         raise HTTPException(status_code=404, detail=f"Contact not found: {missing}")
 
-    existing_ids = set(
-        (
-            await db.execute(
-                select(ContactListMember.contact_id).where(
-                    ContactListMember.list_id == list_id,
-                    ContactListMember.contact_id.in_(valid_ids),
-                )
-            )
-        ).scalars().all()
-    )
-    new_ids = valid_ids - existing_ids
-    for contact_id in new_ids:
-        db.add(ContactListMember(list_id=list_id, contact_id=contact_id))
-
-    await db.flush()
+    added = await _insert_members(db, list_id, valid_ids)
     count = await _sync_contact_count(db, contact_list)
     await db.flush()
-    return {"success": True, "added": len(new_ids), "contact_count": count}
+    return {"success": True, "added": added, "contact_count": count}
+
+
+class AddMatchingContacts(BaseModel):
+    """Body for the server-scoped bulk add.
+
+    Instead of the client enumerating every matching contact id (slow and
+    unreliable across pages), it sends the filters the user is looking at and
+    the server adds every contact that matches — skipping contacts that are
+    already members, so re-running the same add is always safe.
+    """
+
+    search: Optional[str] = None
+    lead_status: Optional[str] = None
+
+
+async def _insert_members(db: AsyncSession, list_id: int, contact_ids) -> int:
+    """Bulk-insert list memberships, skipping contacts already in the list.
+
+    Chunked so ``IN (...)`` stays under SQLite's parameter cap even when an
+    "add all 20,000 matching" lands on a SQLite-backed deployment.
+    """
+    ids = [int(cid) for cid in contact_ids]
+    added = 0
+    for chunk in _chunked_ids(ids, size=1000):
+        existing = set(
+            (
+                await db.execute(
+                    select(ContactListMember.contact_id).where(
+                        ContactListMember.list_id == list_id,
+                        ContactListMember.contact_id.in_(chunk),
+                    )
+                )
+            ).scalars().all()
+        )
+        new_ids = [cid for cid in chunk if cid not in existing]
+        if new_ids:
+            db.add_all(
+                [ContactListMember(list_id=list_id, contact_id=cid) for cid in new_ids]
+            )
+            await db.flush()
+            added += len(new_ids)
+    return added
+
+
+@router.post("/{list_id}/contacts/add-all")
+async def add_all_matching_contacts(
+    list_id: int,
+    data: AddMatchingContacts = Body(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Add EVERY contact matching the given search/status to a list at once.
+
+    Powers both bulk-add surfaces: the Contacts screen's "select all N
+    matching -> Add to list" and the list editor's "select all matching" in
+    the add-contacts picker. Membership is deduped server-side, so this is
+    idempotent and safe to retry.
+    """
+    contact_list = await _find_list(db, list_id)
+
+    query = _apply_contact_filters(select(Contact.id), data.search, data.lead_status, None)
+    ids = list((await db.execute(query)).scalars().all())
+
+    # _insert_members skips contacts that are already in the list, so re-running
+    # an "add all" (or overlapping adds) can never create duplicate memberships.
+    added = await _insert_members(db, list_id, ids)
+    count = await _sync_contact_count(db, contact_list)
+    await db.flush()
+    return {"success": True, "added": added, "matched": len(ids), "contact_count": count}
 
 
 @router.post("/{list_id}/contacts/remove")

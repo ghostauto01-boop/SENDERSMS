@@ -3,6 +3,7 @@ import api from "../api/client";
 import toast from "react-hot-toast";
 import { Braces, Copy, Loader2, Phone, X } from "lucide-react";
 import type { ContactProfile } from "../types";
+import ContactActions from "./ContactActions";
 
 /**
  * The full record for one contact: every standard column plus every column the
@@ -82,6 +83,14 @@ export default function ContactProfileModal({
 
           {profile && (
             <>
+              {/* Reach them instantly: SIM call, WhatsApp call, WhatsApp chat, website */}
+              <ContactActions
+                layout="bar"
+                contactId={contactId}
+                phone={profile.phone_number}
+                name={profile.display_name}
+                website={(profile.fields.find((f) => f.shortcode === "website") || {}).value as string | null | undefined}
+              />
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-sm">
                 <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-700">
                   <p className="text-lg font-bold">{profile.messages_sent}</p>

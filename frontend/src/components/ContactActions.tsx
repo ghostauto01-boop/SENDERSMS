@@ -1,6 +1,6 @@
-/** Reusable per-contact action buttons: Call, SMS, WhatsApp, Website. */
-import { useState } from "react";
-import { Phone, MessageSquare, MessageCircle, Globe, Loader2 } from "lucide-react";
+/** Reusable per-contact action buttons: Call, SMS, WhatsApp chat, WhatsApp call, Website. */
+import { memo, useState } from "react";
+import { Phone, PhoneCall, MessageSquare, MessageCircle, Globe, Loader2 } from "lucide-react";
 import { startCall, openWhatsappChat, openWhatsappForCall, openWebsite, websiteUrl } from "../utils/call";
 
 interface Props {
@@ -14,7 +14,11 @@ interface Props {
   layout?: "row" | "bar";
 }
 
-export default function ContactActions({ contactId, phone, name, website, onSms, size = "sm", layout = "row" }: Props) {
+/**
+ * Memoised: contact grids render 25–50 of these at once and toggling one
+ * checkbox used to re-render every button in the list.
+ */
+function ContactActions({ contactId, phone, name, website, onSms, size = "sm", layout = "row" }: Props) {
   const [calling, setCalling] = useState(false);
   const hasSite = !!websiteUrl(website);
   const btn = size === "sm" ? "w-8 h-8" : "w-10 h-10";
@@ -36,6 +40,7 @@ export default function ContactActions({ contactId, phone, name, website, onSms,
           onClick={doCall}
           disabled={calling}
           className="flex-1 bg-[#00a884] hover:bg-[#06cf9c] text-white rounded-full py-2.5 text-[13px] font-semibold flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform disabled:opacity-60"
+          title={`Call ${phone} via your phone (SIM)`}
         >
           {calling ? <Loader2 size={14} className="animate-spin" /> : <Phone size={14} />} Call
         </button>
@@ -48,18 +53,18 @@ export default function ContactActions({ contactId, phone, name, website, onSms,
           </button>
         )}
         <button
+          onClick={() => openWhatsappForCall(phone, name)}
+          title="Call on WhatsApp (opens the chat — tap the call icon)"
+          className="w-[52px] bg-[#25D366] hover:bg-[#1fb857] text-white rounded-full py-2.5 flex items-center justify-center active:scale-[0.98] transition-transform"
+        >
+          <PhoneCall size={16} />
+        </button>
+        <button
           onClick={() => openWhatsappChat(phone)}
           title="Open WhatsApp chat"
           className="w-[52px] bg-[#25D366]/15 hover:bg-[#25D366] hover:text-white text-[#128C7E] rounded-full py-2.5 flex items-center justify-center active:scale-[0.98] transition-transform"
         >
           <MessageCircle size={16} />
-        </button>
-        <button
-          onClick={() => openWhatsappForCall(phone, name)}
-          title="WhatsApp call (opens WhatsApp)"
-          className="w-[52px] bg-[#25D366]/15 hover:bg-[#25D366] hover:text-white text-[#128C7E] rounded-full py-2.5 flex items-center justify-center active:scale-[0.98] transition-transform"
-        >
-          <Phone size={16} />
         </button>
         {hasSite && (
           <button
@@ -94,18 +99,18 @@ export default function ContactActions({ contactId, phone, name, website, onSms,
         </button>
       )}
       <button
-        onClick={() => openWhatsappChat(phone)}
-        className={`${btn} rounded-full bg-[#25D366]/10 hover:bg-[#25D366] hover:text-white text-[#128C7E] flex items-center justify-center`}
-        title="WhatsApp chat"
+        onClick={() => openWhatsappForCall(phone, name)}
+        className={`${btn} rounded-full bg-[#25D366] text-white flex items-center justify-center hover:bg-[#1fb857]`}
+        title="Call on WhatsApp (opens the chat — tap the call icon)"
       >
-        <MessageCircle size={icon} />
+        <PhoneCall size={icon} />
       </button>
       <button
-        onClick={() => openWhatsappForCall(phone, name)}
+        onClick={() => openWhatsappChat(phone)}
         className={`${btn} rounded-full bg-[#25D366]/10 hover:bg-[#25D366] hover:text-white text-[#128C7E] flex items-center justify-center`}
-        title="WhatsApp call (opens WhatsApp)"
+        title="Open WhatsApp chat"
       >
-        <Phone size={icon} />
+        <MessageCircle size={icon} />
       </button>
       {hasSite && (
         <button
@@ -119,3 +124,5 @@ export default function ContactActions({ contactId, phone, name, website, onSms,
     </div>
   );
 }
+
+export default memo(ContactActions);
