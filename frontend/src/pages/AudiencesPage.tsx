@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import { Copy, Eye, Megaphone, Pencil, Plus, Search, Trash2, Users } from "lucide-react";
+import { Copy, Eye, Megaphone, MessageCircle, Pencil, PhoneCall, Plus, Search, Trash2, Users } from "lucide-react";
 import adsApi, { AdsAudience } from "../api/ads";
 import ContactPicker from "../components/ContactPicker";
+import { openWhatsappChat, openWhatsappForCall } from "../utils/call";
 import { Empty, Field, Metric, Modal, Stat, fmtDay } from "./ads/ui";
 
 const csvList = (raw?: string | null) => (raw || "").split(",").map((x) => x.trim()).filter(Boolean);
@@ -531,6 +532,24 @@ function AudiencePreviewModal({ audience, close }: { audience: AdsAudience; clos
                       <tr key={c.id} className="border-b border-gray-50 dark:border-gray-700/50">
                         <td className="p-2.5">{c.name || "—"}</td>
                         <td className="p-2.5 whitespace-nowrap">{c.phone_number}</td>
+                        <td className="p-2.5 whitespace-nowrap">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => openWhatsappForCall(c.phone_number, c.name || undefined)}
+                              className="w-7 h-7 rounded-full bg-[#25D366] text-white flex items-center justify-center hover:bg-[#1fb857]"
+                              title={`Call ${c.name || c.phone_number} on WhatsApp`}
+                            >
+                              <PhoneCall size={12} />
+                            </button>
+                            <button
+                              onClick={() => openWhatsappChat(c.phone_number)}
+                              className="w-7 h-7 rounded-full bg-[#25D366]/15 text-[#128C7E] flex items-center justify-center hover:bg-[#25D366] hover:text-white"
+                              title="Open WhatsApp chat"
+                            >
+                              <MessageCircle size={12} />
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>

@@ -8,7 +8,7 @@ import {
   ChevronLeft, ChevronRight, Clock, XCircle, CheckCircle2, Loader2, Wifi, WifiOff,
 } from "lucide-react";
 import ContactActions from "../components/ContactActions";
-import { displayName, startCall } from "../utils/call";
+import { displayName, startCall, openWhatsappForCall } from "../utils/call";
 
 const avatarColor = (name: string) => {
   const colors = ["bg-[#00a884]", "bg-[#128C7E]", "bg-[#075E54]", "bg-[#34B7F1]", "bg-[#FF8A65]", "bg-[#BA68C8]", "bg-[#4DB6AC]", "bg-[#FFB74D]"];
@@ -258,9 +258,16 @@ export default function PhonePage() {
                     onClick={() => doCallContact(c)}
                     disabled={callingId === c.id}
                     className="w-11 h-11 rounded-full bg-[#00a884] hover:bg-[#06cf9c] text-white flex items-center justify-center flex-shrink-0 disabled:opacity-60"
-                    title={`Call ${name}`}
+                    title={`Call ${name} via your phone (SIM)`}
                   >
                     {callingId === c.id ? <Loader2 size={18} className="animate-spin" /> : <Phone size={18} />}
+                  </button>
+                  <button
+                    onClick={() => openWhatsappForCall(c.phone_number, name)}
+                    className="w-11 h-11 rounded-full bg-[#25D366] hover:bg-[#1fb857] text-white flex items-center justify-center flex-shrink-0"
+                    title={`Call ${name} on WhatsApp`}
+                  >
+                    <PhoneCall size={18} />
                   </button>
                   <div className="hidden sm:block">
                     <ContactActions contactId={c.id} phone={c.phone_number} name={name} website={c.website} />

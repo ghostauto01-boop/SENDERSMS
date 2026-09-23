@@ -3,10 +3,11 @@ import { useNavigate } from "react-router-dom";
 import api from "../api/client";
 import toast from "react-hot-toast";
 import {
-  ArrowRight, Inbox as InboxIcon, MessageCircle, Search, Star, ThumbsDown,
+  ArrowRight, Inbox as InboxIcon, MessageCircle, PhoneCall, Search, Star, ThumbsDown,
   TrendingUp, Users, X,
 } from "lucide-react";
 import type { CampaignConversation } from "../types";
+import { openWhatsappForCall } from "../utils/call";
 
 /**
  * CAMPAIGN -> REPLIES -> ONE CHAT
@@ -234,10 +235,19 @@ export default function CampaignRepliesDrawer({
                         <span className="text-[11px] text-gray-400">
                           {when(row.last_reply?.created_at || row.last_message_at)}
                         </span>
-                        <ArrowRight
-                          size={15}
-                          className="text-gray-300 group-hover:text-primary-600 transition-colors"
-                        />
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); openWhatsappForCall(row.contact_phone, row.contact_name); }}
+                            className="w-8 h-8 rounded-full bg-[#25D366] text-white flex items-center justify-center hover:bg-[#1fb857] transition-colors"
+                            title={`Call ${row.contact_name} on WhatsApp`}
+                          >
+                            <PhoneCall size={14} />
+                          </button>
+                          <ArrowRight
+                            size={15}
+                            className="text-gray-300 group-hover:text-primary-600 transition-colors"
+                          />
+                        </div>
                       </div>
                     </div>
                   </button>

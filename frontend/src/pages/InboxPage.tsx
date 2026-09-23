@@ -800,13 +800,13 @@ export default function InboxPage() {
                   <button
                     onClick={() => openWhatsappForCall(selected.contact_phone, selected.contact_name)}
                     title="WhatsApp call (opens WhatsApp)"
-                    className="hidden sm:flex w-10 h-10 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-[#54656f] dark:text-[#aebac1]"
+                    className="flex w-10 h-10 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-[#54656f] dark:text-[#aebac1]"
                   ><Video size={19} /></button>
                   {/* WhatsApp chat */}
                   <button
                     onClick={() => openWhatsappChat(selected.contact_phone)}
                     title="Open WhatsApp chat"
-                    className="hidden sm:flex w-10 h-10 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-[#25D366]"
+                    className="flex w-10 h-10 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-[#25D366]"
                   ><MessageCircle size={19} /></button>
                   {/* Website, when the contact has one */}
                   {websiteUrl(selected.contact?.website) && (

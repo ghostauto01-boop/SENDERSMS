@@ -17,15 +17,20 @@ export function whatsappChatUrl(phone: string, text?: string): string {
 }
 
 /**
- * Open a WhatsApp chat for a voice/video call.
- * WhatsApp exposes no official voice-call URL scheme, so we open the chat
- * directly — the call button is one tap away inside WhatsApp.
+ * Open WhatsApp and land the user one tap from a live call.
+ *
+ * WhatsApp exposes no public voice-call URL scheme — the chat deep link is the
+ * official, reliable entry point on Android, iOS and desktop. Opening wa.me
+ * drops the user straight into the contact's chat where the call button sits
+ * in the header bar, so the whole flow is open → tap call.
  */
 export function openWhatsappForCall(phone: string, name?: string) {
   window.open(whatsappChatUrl(phone), "_blank", "noopener");
   toast.success(
-    name ? `WhatsApp opened — tap the call icon to call ${name}` : "WhatsApp opened — tap the call icon to call",
-    { duration: 3500 }
+    name
+      ? `WhatsApp opened for ${name} — tap the call icon (top right) to start the call`
+      : "WhatsApp opened — tap the call icon (top right) to start the call",
+    { duration: 4000 }
   );
 }
 
