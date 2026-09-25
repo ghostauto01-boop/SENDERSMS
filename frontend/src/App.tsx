@@ -47,7 +47,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // The app always sits behind the login screen.
+  // No password anywhere: /login is a single "Log in as admin" button.
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }

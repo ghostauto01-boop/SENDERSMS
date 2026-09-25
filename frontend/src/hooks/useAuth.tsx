@@ -5,10 +5,11 @@ import { User } from "../types";
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (username: string, password: string) => Promise<boolean>;
+  /** One-tap sign-in: no username, no password. */
+  loginAsAdmin: () => Promise<boolean>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
-  /** The app always sits behind the login screen. */
+  /** The password wall is gone — nothing ever asks for a password. */
   passwordRequired: boolean;
   noteAccess: (passwordRequired: boolean) => void;
 }
@@ -16,10 +17,10 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
-  login: async () => false,
+  loginAsAdmin: async () => false,
   logout: async () => {},
   isAuthenticated: false,
-  passwordRequired: true,
+  passwordRequired: false,
   noteAccess: () => {},
 });
 
@@ -43,13 +44,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const noteAccess = (_required: boolean) => {
-    // Kept for the Settings page. The login screen is always shown
-    // regardless of the stored site-access flag.
+    // Kept for the Settings page. No gate exists any more, so there is
+    // nothing to switch on or off.
   };
 
-  const login = async (username: string, password: string): Promise<boolean> => {
+  const loginAsAdmin = async (): Promise<boolean> => {
     try {
-      const { data } = await api.post("/auth/login", { username, password });
+      const { data } = await api.post("/auth/admin");
       if (data.success) {
         await checkAuth();
         return true;
@@ -70,7 +71,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, login, logout, isAuthenticated: !!user, passwordRequired: true, noteAccess }}
+      value={{
+        user,
+        loading,
+        loginAsAdmin,
+        logout,
+        isAuthenticated: !!user,
+        passwordRequired: false,
+        noteAccess,
+      }}
     >
       {children}
     </AuthContext.Provider>

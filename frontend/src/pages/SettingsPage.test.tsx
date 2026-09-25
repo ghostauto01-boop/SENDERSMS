@@ -48,13 +48,17 @@ beforeEach(() => {
 });
 
 describe("SettingsPage — site access", () => {
-  it("shows that the login screen is always on", async () => {
+  it("says the login wall is off", async () => {
     render(<SettingsPage />);
     await waitFor(() => expect(screen.getByText("Site access")).toBeInTheDocument());
     fireEvent.click(screen.getByText("Site access"));
     await waitFor(() => {
-      expect(screen.getByText(/Everyone signs in with the admin username and password/)).toBeInTheDocument();
+      expect(screen.getByText(/There is no password wall/)).toBeInTheDocument();
     });
+    // The old username/password instruction must be gone.
+    expect(
+      screen.queryByText(/Everyone signs in with the admin username and password/)
+    ).not.toBeInTheDocument();
   });
 });
 

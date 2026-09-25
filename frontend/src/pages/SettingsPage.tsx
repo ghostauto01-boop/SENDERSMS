@@ -92,10 +92,10 @@ function AccessTab() {
   return (
     <div className="card p-6 space-y-4 max-w-lg">
       <h2 className="text-lg font-semibold">Site access</h2>
-      <div className="p-3 rounded-lg text-sm bg-amber-50 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200">
-        Locked. Everyone signs in with the admin username and password set in
-        the server environment (Render). Changing the environment password
-        takes effect on the next login.
+      <div className="p-3 rounded-lg text-sm bg-emerald-50 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-200">
+        Open. There is no password wall — the login screen is a single
+        “Log in as admin” button and nothing is typed. The optional password
+        below stays as a second way in, but it blocks nothing.
       </div>
       <div>
         <label className="label">Extra login password {passwordSet && <span className="text-green-600 font-normal">(saved — leave blank to keep)</span>}</label>
@@ -112,7 +112,7 @@ function AccessTab() {
             {show ? <EyeOff size={16} /> : <Eye size={16} />}
           </button>
         </div>
-        <p className="text-xs text-gray-400 mt-1">Optional. This password also opens the login screen, without typing your admin credentials.</p>
+        <p className="text-xs text-gray-400 mt-1">Optional. A second way in for an older client — nothing is locked without it.</p>
       </div>
       <button onClick={save} disabled={saving} className="btn-primary w-full">{saving ? "Saving..." : "Save"}</button>
     </div>

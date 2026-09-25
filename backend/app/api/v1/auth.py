@@ -1,5 +1,10 @@
 """
 Authentication API routes.
+
+There is no login wall: the screen is a single "Log in as admin" button and
+``POST /api/v1/auth/admin`` hands out a session for the operator account with
+no credentials at all. ``POST /api/v1/auth/login`` is kept for the older
+clients and also treats an empty password as the same one-tap sign-in.
 """
 
 import hmac
@@ -30,6 +35,9 @@ async def _authenticate(db: AsyncSession, username: str | None, password: str | 
     """Return the User for a successful login, or None.
 
     Accepts, in order:
+    0. No password at all — the one-tap "Log in as admin" button. The operator
+       account is signed in directly; nothing is verified because the login
+       wall was removed on purpose.
     1. A named account (usually ``admin``). The admin row's stored hash is
        kept in sync with the ADMIN_PASSWORD environment variable, so the
        credentials set on Render always work even after they are changed.
@@ -42,7 +50,8 @@ async def _authenticate(db: AsyncSession, username: str | None, password: str | 
     """
     candidate = (password or "").strip()
     if not candidate:
-        return None
+        # 0) One-tap sign-in: no password means the operator account.
+        return await ensure_admin(db)
 
     uname = (username or "").strip() or settings.ADMIN_USERNAME
 
@@ -84,23 +93,8 @@ async def _authenticate(db: AsyncSession, username: str | None, password: str | 
     return None
 
 
-@router.post("/login", response_model=LoginResponse)
-@limiter.limit(settings.RATE_LIMIT_LOGIN)
-async def login(request: Request, data: LoginRequest, db: AsyncSession = Depends(get_db)):
-    """Authenticate with username + password and set the session cookie.
-
-    The credentials are the ADMIN_USERNAME / ADMIN_PASSWORD pair set in the
-    deployment environment (Render). Changing ADMIN_PASSWORD there takes
-    effect on the next login — the stored hash is refreshed automatically,
-    which is the fix for the old "invalid username or password" lockout.
-    """
-    user = await _authenticate(db, data.username, data.password)
-    if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid username or password",
-        )
-
+async def _sign_in(db: AsyncSession, user: User) -> Response:
+    """Stamp the session cookie and build the login response for ``user``."""
     if not user.is_active:
         user.is_active = True
 
@@ -119,15 +113,44 @@ async def login(request: Request, data: LoginRequest, db: AsyncSession = Depends
         message="Login successful",
     )
 
-    # Set HTTP-only cookie
+    # Return the Response object WITH the cookie set
     resp = Response(
         content=response.model_dump_json(),
         media_type="application/json",
     )
     apply_session_cookie(resp, token)
-
-    # Return the Response object WITH the cookie set
     return resp
+
+
+@router.post("/admin", response_model=LoginResponse)
+async def login_as_admin(db: AsyncSession = Depends(get_db)):
+    """One-tap sign-in. No username, no password — just the button.
+
+    Creates (or reuses) the operator account and hands back its session
+    cookie. The account and every row it owns already exist, so this changes
+    nothing in the database except ``last_login``.
+    """
+    user = await ensure_admin(db)
+    return await _sign_in(db, user)
+
+
+@router.post("/login", response_model=LoginResponse)
+@limiter.limit(settings.RATE_LIMIT_LOGIN)
+async def login(request: Request, data: LoginRequest, db: AsyncSession = Depends(get_db)):
+    """Sign in. An empty body is the one-tap "Log in as admin" path.
+
+    A password, when one is still sent by an older client, is checked against
+    ADMIN_PASSWORD (environment), the optional site password from
+    Settings → Site access, or the legacy LOGIN_PASSWORD — in that order.
+    """
+    user = await _authenticate(db, data.username, data.password)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid username or password",
+        )
+
+    return await _sign_in(db, user)
 
 
 @router.post("/logout")
@@ -146,13 +169,18 @@ async def logout(current_user: User = Depends(get_current_user)):
 
 @router.get("/access")
 async def access_status(db: AsyncSession = Depends(get_db)):
-    """Public. Tells the UI whether the password wall is on.
+    """Public. Tells the UI whether a password is needed to get in.
 
-    Defaults to off, so opening the site address is enough.
+    It never is: the login wall was removed, so this always reports the door
+    as open. ``password_set`` still reflects the optional extra password from
+    Settings → Site access, which remains a second way in but gates nothing.
     """
-    from app.services.system_settings import is_site_password_required
+    from app.services.system_settings import get_site_password_hash
 
-    return {"password_required": await is_site_password_required(db)}
+    return {
+        "password_required": False,
+        "password_set": bool(await get_site_password_hash(db)),
+    }
 
 
 @router.get("/me", response_model=UserOut)

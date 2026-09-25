@@ -6,8 +6,16 @@ from pydantic import BaseModel, Field
 
 
 class LoginRequest(BaseModel):
+    """Credentials are optional.
+
+    The login screen has no password field any more — it is a single
+    "Log in as admin" button, so the client posts an empty body. Both
+    fields stay here so the old env/site-password logins keep working for
+    anyone still calling them.
+    """
+
     username: str | None = None
-    password: str
+    password: str | None = None
 
 
 class LoginResponse(BaseModel):

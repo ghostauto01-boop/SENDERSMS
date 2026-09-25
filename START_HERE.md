@@ -126,11 +126,14 @@ openssl rand -base64 32
 **Save in notes:** `SECRET_KEY`, `CREDENTIAL_ENCRYPTION_KEY`
 
 Also decide now:
-- `ADMIN_USERNAME` — your login name, e.g. `admin`
-- `ADMIN_PASSWORD` — **make this strong.** This is the front door to your whole system.
+- `ADMIN_USERNAME` — the operator account name, e.g. `admin`
+- `ADMIN_PASSWORD` — optional now. The login screen has no password field: it is
+  a single **Log in as admin** button. This value is only a fallback for older
+  clients that still post credentials.
 
-> This account is created once, the first time the app starts. Changing these values later
-> will *not* change your password — you'd change it inside the app.
+> Because there is no password wall, **anyone who knows your app's address can
+> open it**. Keep the URL private (or put the site behind a VPN / basic auth at
+> the host level) if the data matters.
 
 ---
 
