@@ -12,8 +12,9 @@ from typing import Optional
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError, VerificationError
 from jose import JWTError, jwt
-from fastapi import Cookie, Depends, HTTPException, Request, status
+from fastapi import Depends, HTTPException, Request, Response, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -62,42 +63,92 @@ def decode_access_token(token: str) -> Optional[dict]:
         return None
 
 
+def apply_session_cookie(response: Response, token: str) -> None:
+    """Attach the HTTP-only session cookie used by the login wall."""
+    response.set_cookie(
+        key="sendsms_session",
+        value=token,
+        httponly=True,
+        secure=settings.APP_ENV == "production",
+        samesite="lax",
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        path="/",
+    )
+
+
+async def ensure_admin(db: AsyncSession) -> User:
+    """Return the operator account, creating it on first use."""
+    result = await db.execute(select(User).where(User.username == settings.ADMIN_USERNAME))
+    admin = result.scalar_one_or_none()
+    if admin is None:
+        admin = User(
+            username=settings.ADMIN_USERNAME,
+            password_hash=hash_password(settings.ADMIN_PASSWORD),
+            display_name="Administrator",
+            role="admin",
+            is_active=True,
+        )
+        db.add(admin)
+        try:
+            await db.flush()
+        except IntegrityError:
+            # Parallel first requests can race on the unique username.
+            await db.rollback()
+            result = await db.execute(select(User).where(User.username == settings.ADMIN_USERNAME))
+            admin = result.scalar_one_or_none()
+            if admin is None:
+                raise
+    if admin is not None and not admin.is_active:
+        admin.is_active = True
+        await db.flush()
+    return admin
+
+
+async def _user_from_session(request: Request, db: AsyncSession) -> Optional[User]:
+    token = request.cookies.get("sendsms_session")
+    if not token:
+        return None
+    payload = decode_access_token(token)
+    if payload is None:
+        return None
+    user_id = payload.get("sub")
+    if user_id is None:
+        return None
+    try:
+        uid = int(user_id)
+    except (TypeError, ValueError):
+        return None
+    result = await db.execute(select(User).where(User.id == uid))
+    user = result.scalar_one_or_none()
+    if user is None or not user.is_active:
+        return None
+    return user
+
+
 async def get_current_user(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> User:
-    """Dependency that extracts the current user from the session cookie."""
-    token = request.cookies.get("sendsms_session")
-    if not token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated",
-        )
+    """Current operator.
 
-    payload = decode_access_token(token)
-    if payload is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired session",
-        )
+    A valid session cookie always wins. When the site password wall is off
+    (the default — turn it on later in Settings → Site access), anyone who
+    can reach the URL is treated as the operator. No cookie, no password.
+    """
+    user = await _user_from_session(request, db)
+    if user is not None:
+        return user
 
-    user_id = payload.get("sub")
-    if user_id is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid session",
-        )
+    # Imported here to avoid a cycle with system_settings → hash_password.
+    from app.services.system_settings import is_site_password_required
 
-    result = await db.execute(select(User).where(User.id == int(user_id)))
-    user = result.scalar_one_or_none()
+    if not await is_site_password_required(db):
+        return await ensure_admin(db)
 
-    if user is None or not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found or inactive",
-        )
-
-    return user
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Not authenticated",
+    )
 
 
 def generate_csrf_token(secret: str) -> str:

@@ -258,6 +258,68 @@ async def get_callgate_secret(db: AsyncSession) -> str:
     return settings.CALLGATE_WEBHOOK_SECRET or ""
 
 
+# Site access. Missing key means the password wall is OFF — anyone with the
+# URL can use the app. Turn it on later from Settings → Site access.
+AUTH_PASSWORD_REQUIRED = "auth.password_required"
+AUTH_PASSWORD_HASH = "auth.password_hash"
+
+
+def _is_truthy(raw: Optional[str]) -> bool:
+    return str(raw or "").strip().lower() in ("1", "true", "yes", "on")
+
+
+async def is_site_password_required(db: AsyncSession) -> bool:
+    """True only after the operator turns the password wall on in Settings."""
+    return _is_truthy(await get_setting(db, AUTH_PASSWORD_REQUIRED, "false"))
+
+
+async def get_site_password_hash(db: AsyncSession) -> Optional[str]:
+    raw = await get_setting(db, AUTH_PASSWORD_HASH)
+    return raw or None
+
+
+async def get_site_access(db: AsyncSession) -> dict:
+    stored = await get_site_password_hash(db)
+    return {
+        "password_required": await is_site_password_required(db),
+        "password_set": bool(stored),
+    }
+
+
+async def set_site_access(
+    db: AsyncSession,
+    *,
+    password_required: bool,
+    password: Optional[str] = None,
+) -> dict:
+    """Save the site-access gate. A password is required before the gate can turn on."""
+    from app.security.auth import hash_password
+
+    cleaned = (password or "").strip()
+    if cleaned:
+        if len(cleaned) < 4:
+            raise ValueError("Password must be at least 4 characters")
+        if len(cleaned) > 128:
+            raise ValueError("Password must be 128 characters or fewer")
+        await set_setting(
+            db,
+            AUTH_PASSWORD_HASH,
+            hash_password(cleaned),
+            category="auth",
+            description="Site access password (Argon2id)",
+        )
+    if password_required and not await get_site_password_hash(db):
+        raise ValueError("Set a password before turning the gate on")
+    await set_setting(
+        db,
+        AUTH_PASSWORD_REQUIRED,
+        "true" if password_required else "false",
+        category="auth",
+        description="Require a password to open the site",
+    )
+    return await get_site_access(db)
+
+
 # --- Inbuilt browser notifications (VAPID keypair, generated once) ---
 VAPID_PUBLIC_KEY = "push.vapid_public"
 VAPID_PRIVATE_KEY = "push.vapid_private"

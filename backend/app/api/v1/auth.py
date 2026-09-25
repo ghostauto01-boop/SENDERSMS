@@ -2,20 +2,21 @@
 Authentication API routes.
 """
 
+import hmac
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Response, Request, status
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.user import User
 from app.schemas.auth import LoginRequest, LoginResponse, UserOut
 from app.security.auth import (
-    hash_password,
-    verify_password,
+    apply_session_cookie,
     create_access_token,
+    ensure_admin,
     get_current_user,
+    verify_password,
 )
 from app.config import settings
 from app.security.rate_limit import limiter
@@ -23,23 +24,17 @@ from app.security.rate_limit import limiter
 router = APIRouter()
 
 
-async def _bootstrap_admin(db: AsyncSession):
-    """Create admin user from environment variables if it doesn't exist."""
-    result = await db.execute(select(User).where(User.username == settings.ADMIN_USERNAME))
-    admin = result.scalar_one_or_none()
+async def _password_matches(db: AsyncSession, plain: str) -> bool:
+    """Check the password saved in Settings, or the env login password if none is saved."""
+    from app.services.system_settings import get_site_password_hash
 
-    if not admin:
-        admin = User(
-            username=settings.ADMIN_USERNAME,
-            password_hash=hash_password(settings.ADMIN_PASSWORD),
-            display_name="Administrator",
-            role="admin",
-            is_active=True,
-        )
-        db.add(admin)
-        await db.flush()
-
-    return admin
+    candidate = (plain or "").strip()
+    if not candidate:
+        return False
+    stored = await get_site_password_hash(db)
+    if stored:
+        return verify_password(candidate, stored)
+    return hmac.compare_digest(candidate.encode(), settings.LOGIN_PASSWORD.encode())
 
 
 @router.post("/login", response_model=LoginResponse)
@@ -54,14 +49,13 @@ async def login(request: Request, data: LoginRequest, db: AsyncSession = Depends
     ADMIN_PASSWORD in the environment never updated the stored hash and the
     real password was rejected as "invalid".
     """
-    import hmac
-    if not hmac.compare_digest(data.password.strip().encode(), settings.LOGIN_PASSWORD.encode()):
+    if not await _password_matches(db, data.password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid password",
         )
 
-    user = await _bootstrap_admin(db)
+    user = await ensure_admin(db)
     if not user.is_active:
         user.is_active = True
 
@@ -85,15 +79,7 @@ async def login(request: Request, data: LoginRequest, db: AsyncSession = Depends
         content=response.model_dump_json(),
         media_type="application/json",
     )
-    resp.set_cookie(
-        key="sendsms_session",
-        value=token,
-        httponly=True,
-        secure=settings.APP_ENV == "production",
-        samesite="lax",
-        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        path="/",
-    )
+    apply_session_cookie(resp, token)
 
     # Return the Response object WITH the cookie set
     return resp
@@ -111,6 +97,17 @@ async def logout(current_user: User = Depends(get_current_user)):
         samesite="lax",
     )
     return resp
+
+
+@router.get("/access")
+async def access_status(db: AsyncSession = Depends(get_db)):
+    """Public. Tells the UI whether the password wall is on.
+
+    Defaults to off, so opening the site address is enough.
+    """
+    from app.services.system_settings import is_site_password_required
+
+    return {"password_required": await is_site_password_required(db)}
 
 
 @router.get("/me", response_model=UserOut)

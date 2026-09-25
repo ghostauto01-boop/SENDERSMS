@@ -1,5 +1,12 @@
 import axios from "axios";
 
+/** When false (the default), a 401 must not bounce the visitor to the password screen. */
+let sitePasswordRequired = false;
+
+export function setSitePasswordRequired(required: boolean) {
+  sitePasswordRequired = required;
+}
+
 const api = axios.create({
   baseURL: "/api/v1",
   withCredentials: true,
@@ -33,7 +40,7 @@ api.interceptors.response.use(
     if (error.response?.data) {
       normaliseDetail(error.response.data);
     }
-    if (error.response?.status === 401) {
+    if (error.response?.status === 401 && sitePasswordRequired) {
       const currentPath = window.location.pathname;
       if (currentPath !== "/login") {
         window.location.href = "/login";
