@@ -479,7 +479,13 @@ After deployment, here's what you need to set:
 
 - Render web service spins down after 15 min idle (30-60s cold start on wake)
 - Render free PostgreSQL expires after 90 days
-- Neon free tier: 0.5 GB storage, 100 compute hours/month
+- Neon free tier: 0.5 GB storage, **100 compute-hours/month per project**. Neon suspends
+  the compute after 5 min without queries; a database that is queried around the clock
+  (0.25 CU × 24 h × 30 d ≈ 180 CU-h) is switched off by Neon around day 17 of the month
+  and every page then fails until the 1st. The inline poller is idle-aware for this
+  reason (`INLINE_IDLE_POLL_INTERVAL`, `INLINE_POLL_ACTIVE_WINDOW`), and the UI stops
+  polling in background tabs. Do not point an uptime pinger at the app, and suspend the
+  `sendsms-worker` service when `ENABLE_INLINE_POLLER=true` (it is redundant there).
 - Upstash free tier: 256 MB, 10,000 commands/day
 - Total cost: **$0.00**
 
@@ -628,6 +634,20 @@ Before going live, verify each item:
 ```bash
 cd backend && PYTHONPATH=. uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
+
+### Every page shows an error / API answers 503
+
+**Symptom:** the UI shows an amber "Database unavailable" notice on every page, or API
+calls answer `503 {"error_kind": "database", "db": {"kind": ..., "message": ..., "hint": ...}}`.
+
+**Diagnose in one request:** `GET /api/v1/health/db` (public, no credentials in the output).
+
+| `kind` | Meaning | Fix |
+|---|---|---|
+| `quota_exceeded` | Neon suspended the free project: monthly compute (or data transfer) quota used up. Data is intact. | Wait for the 1st, upgrade the Neon project, or point `DATABASE_URL` at a new (empty) Neon project. See *Free Tier Notes* to stop it recurring. |
+| `auth_failed` | Credentials in `DATABASE_URL` rejected | Copy the connection string again from Neon → Render env |
+| `unreachable` / `timeout` | Host down or wrong | Check the Neon project status and the host in `DATABASE_URL` |
+| `schema` | Missing table/column | Redeploy (auto-repair runs at boot) or run `scripts/migrate_existing_db.sql` |
 
 ### Database connection refused
 

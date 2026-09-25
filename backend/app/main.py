@@ -1,16 +1,21 @@
 """FastAPI — webhook auto-register, status poll, scheduled, PWA, SPA."""
 import os, logging, time
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, BackgroundTasks
+from fastapi import FastAPI, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse, FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from app.config import settings
 from app.database import init_db, async_session_factory
+from app import db_health
+from app.poll_scheduler import PollActivity, next_poll_delay
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Signals for the idle-aware inline poller (see app.poll_scheduler).
+poll_activity = PollActivity()
 
 async def _startup_webhook():
     """Register our webhook URL with the gateway once per deployment target."""
@@ -75,18 +80,35 @@ async def _startup_webhook():
     except Exception as e:
         logger.warning(f"CallGate webhook: {e}")
 
-async def _poll():
-    """Update delivery statuses for pending messages and process scheduled sends."""
+async def _poll() -> int:
+    """Update delivery statuses for pending messages and process scheduled sends.
+
+    Returns a rough count of things touched this cycle (statuses updated,
+    messages sent, campaigns launched ...). ``0`` means nothing was due. The
+    scheduler uses that to decide whether the next cycle can wait.
+
+    A database outage (Neon suspended, host unreachable ...) is recorded in
+    ``db_health.status`` and re-raised as ``_DatabaseDown`` so the loop backs
+    off instead of retrying every 30 seconds.
+    """
+    work = 0
     try:
         from app.services.system_settings import LAST_POLL, get_float, set_setting
 
         now = time.time()
-        async with async_session_factory() as db:
-            if now - await get_float(db, LAST_POLL, 0.0) < 15:
-                return
-            await set_setting(db, LAST_POLL, str(now),
-                              description="Unix time of the last delivery-status poll")
-            await db.commit()
+        try:
+            async with async_session_factory() as db:
+                if now - await get_float(db, LAST_POLL, 0.0) < 15:
+                    return 0
+                await set_setting(db, LAST_POLL, str(now),
+                                  description="Unix time of the last delivery-status poll")
+                await db.commit()
+        except Exception as exc:
+            if db_health.is_db_error(exc):
+                db_health.status.note_error(exc)
+                raise _DatabaseDown() from exc
+            raise
+        db_health.status.note_ok()
 
         from sqlalchemy import select
         from app.models.conversation import Message
@@ -100,6 +122,8 @@ async def _poll():
                 ).limit(100))
             ids = [m.provider_message_id for m in msgs.scalars().all()]
             if ids:
+                # Statuses still settling — keep polling at full speed.
+                work += 1
                 results = await poll_status_for_ids(ids)
                 count = 0
                 for r in results:
@@ -117,30 +141,113 @@ async def _poll():
                 if count:
                     await db.commit()
                     logger.info(f"STATUS: updated {count} messages")
+                    work += count
 
         # Always process schedules even when no delivery statuses to poll
-        await _process_scheduled()
-        await _launch_scheduled_campaigns()
-        await _process_due_followups()
-        await _process_campaign_followups()
-        await _process_meeting_reminders()
+        work += await _process_scheduled()
+        work += await _launch_scheduled_campaigns()
+        work += await _process_due_followups()
+        work += await _process_campaign_followups()
+        work += await _process_meeting_reminders()
         # Fallback inline sender for running campaigns when Celery worker is
         # asleep (free tier) or Redis unreachable — otherwise campaigns stay
         # “running” with pending contacts forever.
-        await _process_running_campaigns_inline()
+        work += await _process_running_campaigns_inline()
         # Sweep any queued messages that were rate-limited / deferred (or that
         # a dead broker left behind). Uses the same atomic claim as Celery so
         # the two can never double-send the same message.
-        await _process_queued_messages_inline()
+        work += await _process_queued_messages_inline()
         # SMS Ads Manager: dispatch, follow-up automation and always-on
         # audience refresh. Uses the same no-worker fallback pattern as the
         # legacy campaign sweep above.
-        await _process_ads_manager()
+        work += await _process_ads_manager()
+    except _DatabaseDown:
+        raise
     except Exception as e:
         logger.warning(f"Poll: {e}")
+    return work
 
 
-async def _process_queued_messages_inline():
+class _DatabaseDown(Exception):
+    """Raised by _poll when the database itself is unavailable."""
+
+
+async def _pending_work_snapshot() -> tuple[bool, "float | None"]:
+    """Cheap look at what is queued so the poller can sleep when idle.
+
+    Returns ``(has_pending_work, next_due_at)``:
+
+    * ``has_pending_work`` — something needs attention *now* (a running
+      campaign, queued outgoing messages, delivery statuses still settling).
+    * ``next_due_at`` — unix time of the earliest future job among scheduled
+      messages, scheduled campaigns, follow-ups and upcoming meetings, or
+      ``None``.
+
+    Only the simple time-indexed tables are consulted; the ads manager and
+    campaign follow-up chains are swept on every cycle anyway and tolerate
+    the idle interval.
+    """
+    from datetime import datetime as dt, timezone as tz
+    from sqlalchemy import select, func
+    from app.models.campaign import Campaign
+    from app.models.conversation import Message
+    from app.models.scheduled import ScheduledMessage
+    from app.models.followup import FollowUp
+    from app.models.meeting import Meeting
+
+    now = dt.now(tz.utc)
+    async with async_session_factory() as db:
+        running = (await db.execute(
+            select(func.count()).select_from(Campaign).where(Campaign.status == "running")
+        )).scalar() or 0
+        queued = (await db.execute(
+            select(func.count()).select_from(Message).where(
+                Message.direction == "outgoing", Message.status == "queued")
+        )).scalar() or 0
+        settling = (await db.execute(
+            select(func.count()).select_from(Message).where(
+                Message.provider_message_id.isnot(None),
+                Message.status.in_(("sent", "sending", "queued")))
+        )).scalar() or 0
+
+        candidates = []
+        for stmt in (
+            select(func.min(ScheduledMessage.schedule_at)).where(ScheduledMessage.status == "pending"),
+            select(func.min(Campaign.scheduled_at)).where(Campaign.status == "scheduled"),
+            select(func.min(FollowUp.scheduled_at)).where(FollowUp.status == "pending"),
+        ):
+            value = (await db.execute(stmt)).scalar()
+            if value is not None:
+                if value.tzinfo is None:
+                    value = value.replace(tzinfo=tz.utc)
+                candidates.append(value.timestamp())
+
+        # Meeting reminders fire N minutes *before* the meeting, so the due
+        # time is starts_at - N for every reminder not sent yet.
+        from app.services.meeting_service import reminder_minutes, reminders_sent
+        meetings = (await db.execute(
+            select(Meeting).where(
+                Meeting.status.in_(("scheduled", "confirmed")),
+                Meeting.send_sms_reminder == 1,
+                Meeting.starts_at > now,
+            ).order_by(Meeting.starts_at.asc()).limit(100)
+        )).scalars().all()
+        for meeting in meetings:
+            sent = reminders_sent(meeting)
+            starts = meeting.starts_at
+            if starts.tzinfo is None:
+                starts = starts.replace(tzinfo=tz.utc)
+            for minutes in reminder_minutes(meeting):
+                if str(minutes) in sent:
+                    continue
+                candidates.append(starts.timestamp() - minutes * 60)
+
+    has_pending = bool(running or queued or settling)
+    next_due = min(candidates) if candidates else None
+    return has_pending, next_due
+
+
+async def _process_queued_messages_inline() -> int:
     """Send queued outgoing messages when no Celery worker picks them up.
 
     This is the safety net behind sending limits: a rate-limited message is
@@ -175,11 +282,13 @@ async def _process_queued_messages_inline():
                 logger.warning("Queued sweep: message %s error: %s", mid, exc)
         if sent:
             logger.info("QUEUED SWEEP: sent %s deferred message(s)", sent)
+        return sent
     except Exception as exc:
         logger.warning("Queued sweep: %s", exc)
+        return 0
 
 
-async def _process_ads_manager():
+async def _process_ads_manager() -> int:
     """Drive SMS Ads Manager campaigns without a Celery worker.
 
     Mirrors the legacy inline campaign sweep: claim work atomically, dispatch a
@@ -193,11 +302,13 @@ async def _process_ads_manager():
         result = await run_ads_cycle(send_inline=True)
         if result.get("sent") or result.get("followups"):
             logger.info("ADS: %s", result)
+        return int(result.get("sent") or 0) + int(result.get("followups") or 0)
     except Exception as exc:
         logger.warning("Ads manager sweep: %s", exc)
+        return 0
 
 
-async def _launch_scheduled_campaigns():
+async def _launch_scheduled_campaigns() -> int:
     """Start campaigns whose scheduled time has arrived.
 
     Celery beat does this too. It is repeated here because on the Render free
@@ -211,10 +322,12 @@ async def _launch_scheduled_campaigns():
         launched = await launch_due_campaigns_async()
         if launched:
             logger.info("SCHEDULED CAMPAIGNS: launched %s", launched)
+        return int(launched or 0)
     except Exception as e:
         logger.warning(f"Scheduled campaigns: {e}")
+        return 0
 
-async def _process_due_followups():
+async def _process_due_followups() -> int:
     """Send due follow-ups when this deployment has no awake Celery worker."""
     try:
         from app.tasks.campaign_tasks import process_due_followups_async
@@ -222,11 +335,13 @@ async def _process_due_followups():
         processed = await process_due_followups_async(send_inline=True)
         if processed:
             logger.info("FOLLOW-UPS: processed %s", processed)
+        return int(processed or 0)
     except Exception as exc:
         logger.warning("Due follow-ups: %s", exc)
+        return 0
 
 
-async def _process_campaign_followups():
+async def _process_campaign_followups() -> int:
     """Send campaign follow-ups whose wait time has elapsed.
 
     Runs in the same inline poller as the other sweeps so follow-up chains keep
@@ -241,11 +356,13 @@ async def _process_campaign_followups():
                 "CAMPAIGN FOLLOW-UPS: sent %s, stopped %s across %s rule(s)",
                 totals["sent"], totals["stopped"], totals["rules"],
             )
+        return int(totals.get("sent") or 0) + int(totals.get("stopped") or 0)
     except Exception as exc:
         logger.warning("Campaign follow-ups: %s", exc)
+        return 0
 
 
-async def _process_meeting_reminders():
+async def _process_meeting_reminders() -> int:
     """Fire calendar reminders whose window has opened.
 
     Runs in the same inline poller as the other sweeps so meeting reminders go
@@ -260,11 +377,13 @@ async def _process_meeting_reminders():
                 "MEETING REMINDERS: sent %s, skipped %s across %s meeting(s)",
                 totals["sent"], totals["skipped"], totals["checked"],
             )
+        return int(totals.get("sent") or 0)
     except Exception as exc:
         logger.warning("Meeting reminders: %s", exc)
+        return 0
 
 
-async def _process_running_campaigns_inline():
+async def _process_running_campaigns_inline() -> int:
     """Process running campaigns when a Celery worker is unavailable/asleep.
 
     This delegates to the same sequence-aware engine as Celery instead of
@@ -287,6 +406,7 @@ async def _process_running_campaigns_inline():
                 ).scalars().all()
             )
 
+        total = 0
         for campaign_id in campaign_ids:
             processed = await process_campaign_batch_async(
                 campaign_id, send_inline=True, batch_size=10
@@ -297,10 +417,15 @@ async def _process_running_campaigns_inline():
                     campaign_id,
                     processed,
                 )
+                total += int(processed or 0)
+        # A running campaign is pending work even when this batch sent nothing
+        # (e.g. paused by the sending window) — keep the poller awake for it.
+        return total or (1 if campaign_ids else 0)
     except Exception as exc:
         logger.warning("Inline campaign process: %s", exc)
+        return 0
 
-async def _process_scheduled():
+async def _process_scheduled() -> int:
     """Send due scheduled messages and mirror them into the normal Message/Inbox tables.
 
     Each ScheduledMessage becomes one Message row (outgoing). That way:
@@ -325,7 +450,7 @@ async def _process_scheduled():
                 ScheduledMessage.schedule_at <= dt.now(tz.utc)).order_by(ScheduledMessage.schedule_at.asc()).limit(10))
             scheduled = due.scalars().all()
             if not scheduled:
-                return
+                return 0
 
             # Respect sending limits / pacing. When the next slot is not open,
             # leave the messages pending and try again on the next poll cycle —
@@ -338,7 +463,7 @@ async def _process_scheduled():
                     "SCHEDULED: rate limited (%s); deferring %s message(s)",
                     slot["reason"], len(scheduled),
                 )
-                return
+                return len(scheduled)
 
             for sm in scheduled:
                 try:
@@ -469,8 +594,10 @@ async def _process_scheduled():
             sent = sum(1 for s in scheduled if s.status == "sent")
             failed = sum(1 for s in scheduled if s.status == "failed")
             logger.info(f"SCHEDULED: {len(scheduled)} messages ({sent} sent, {failed} failed)")
+            return len(scheduled)
     except Exception as e:
         logger.warning(f"Scheduled: {e}")
+    return 0
 
 async def _create_scheduled_message_row(db, sm, contact, status, error):
     """Helper: create a failed Message bubble for a scheduled that never reached gateway."""
@@ -513,16 +640,70 @@ async def _create_scheduled_message_row(db, sm, contact, status, error):
         logger.warning(f"_create_scheduled_message_row: {e}")
 
 async def _poll_loop():
-    """Run _poll() on a timer instead of piggybacking on health checks."""
+    """Run _poll() on an idle-aware timer (see app.poll_scheduler).
+
+    Full speed (INLINE_POLL_INTERVAL) while someone is using the app or there
+    is work in flight; otherwise sleep until the next known due time, capped
+    at INLINE_IDLE_POLL_INTERVAL, so an idle deployment lets the database
+    scale to zero instead of burning its monthly quota.
+    """
     import asyncio
+
+    delay = float(settings.INLINE_POLL_INTERVAL)
+    idle = False
     while True:
         try:
-            await asyncio.sleep(settings.INLINE_POLL_INTERVAL)
-            await _poll()
+            poll_activity.wake.clear()
+            try:
+                # Any API request / webhook wakes us early via poll_activity.touch().
+                await asyncio.wait_for(poll_activity.wake.wait(), timeout=delay)
+            except asyncio.TimeoutError:
+                pass
+
+            did_work = False
+            db_ok = True
+            has_pending = False
+            next_due = None
+            try:
+                did_work = (await _poll()) > 0
+                try:
+                    has_pending, next_due = await _pending_work_snapshot()
+                except Exception as exc:
+                    if db_health.is_db_error(exc):
+                        db_health.status.note_error(exc)
+                        db_ok = False
+                    else:
+                        logger.warning("Poll snapshot: %s", exc)
+            except _DatabaseDown:
+                db_ok = False
+
+            delay = next_poll_delay(
+                interval=settings.INLINE_POLL_INTERVAL,
+                idle_interval=settings.INLINE_IDLE_POLL_INTERVAL,
+                active_window=settings.INLINE_POLL_ACTIVE_WINDOW,
+                now=time.time(),
+                last_request_at=poll_activity.last_request_at,
+                did_work=did_work,
+                has_pending_work=has_pending,
+                next_due_at=next_due,
+                db_ok=db_ok,
+            )
+            now_idle = delay > settings.INLINE_POLL_INTERVAL
+            if now_idle != idle:
+                idle = now_idle
+                if idle:
+                    logger.info(
+                        "Poller idle (%s): next pass in %.0fs so the database can sleep",
+                        "database unavailable" if not db_ok else "nothing due, nobody active",
+                        delay,
+                    )
+                else:
+                    logger.info("Poller active: every %ss", settings.INLINE_POLL_INTERVAL)
         except asyncio.CancelledError:
             raise
         except Exception as e:
             logger.warning("Poll loop: %s", e)
+            delay = float(settings.INLINE_POLL_INTERVAL)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -534,9 +715,14 @@ async def lifespan(app: FastAPI):
     async def _boot():
         try:
             await asyncio.wait_for(init_db(), timeout=45)
+            db_health.status.note_ok()
             logger.info("DB ready")
         except Exception as e:
-            logger.warning("init_db: %s", e)
+            if db_health.is_db_error(e) or isinstance(e, asyncio.TimeoutError):
+                kind, msg = db_health.status.note_error(e)
+                logger.error("init_db failed (%s): %s", kind, msg)
+            else:
+                logger.warning("init_db: %s", e)
         try:
             await asyncio.wait_for(_startup_webhook(), timeout=20)
         except Exception as e:
@@ -576,11 +762,50 @@ async def _cache_static_assets(request, call_next):
     Marking them immutable lets returning browsers (and the service worker)
     reuse every JS/CSS chunk without a revalidation round-trip, which is most
     of the difference between a 1s and a 5s reload on mobile data.
+
+    The same pass records real API traffic for the idle-aware poller. Health
+    probes and static files do not count — an uptime pinger must not keep the
+    database awake.
     """
-    response = await call_next(request)
-    if request.url.path.startswith("/assets/"):
+    path = request.url.path
+    if path.startswith("/api/") and not path.startswith("/api/v1/health"):
+        poll_activity.touch()
+    try:
+        response = await call_next(request)
+    except Exception as exc:  # noqa: BLE001 — every crash must become JSON
+        return _error_response(request, exc)
+    if path.startswith("/assets/"):
         response.headers.setdefault("Cache-Control", "public, max-age=31536000, immutable")
     return response
+
+
+def _error_response(request: Request, exc: Exception) -> JSONResponse:
+    """Never answer with a blank 'Internal Server Error'.
+
+    A database outage becomes a 503 whose JSON body says what is wrong and
+    what to do (see app.db_health), so the UI shows one clear banner instead
+    of a broken widget on every page. Anything else is a generic 500 — the
+    traceback goes to the server log only.
+    """
+    if db_health.is_db_error(exc):
+        payload = db_health.error_payload(exc)
+        logger.warning(
+            "DB error on %s %s: %s", request.method, request.url.path, payload["db"]["message"]
+        )
+        return JSONResponse(status_code=503, content=payload,
+                            headers={"Retry-After": "30", "Cache-Control": "no-store"})
+    logger.error("Unhandled error on %s %s", request.method, request.url.path, exc_info=exc)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error. Please try again; if it persists check the server logs."},
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+@app.exception_handler(Exception)
+async def _unhandled_error(request: Request, exc: Exception):
+    """Fallback for anything that escapes the middleware above."""
+    return _error_response(request, exc)
 
 
 from app.security.rate_limit import install_rate_limiting
@@ -595,6 +820,20 @@ async def health():
     balancer probe drove real SMS traffic.
     """
     return JSONResponse({"status":"ok","app":settings.APP_NAME,"version":"1.0.0"})
+
+
+@app.get("/api/v1/health/db")
+async def health_db():
+    """Database probe. Public, safe, and the first thing to check when every
+    page shows an error.
+
+    Runs ``SELECT 1`` and reports a classified, credential-free summary:
+    ``{"ok": false, "kind": "quota_exceeded", "message": ..., "hint": ...}``.
+    Answers 200 when healthy and 503 when not, so uptime tools can alert.
+    """
+    result = await db_health.check_db(async_session_factory)
+    code = 200 if result.get("ok") else 503
+    return JSONResponse(result, status_code=code, headers={"Cache-Control": "no-store"})
 
 from app.api.v1 import ads, auth, calendar, calls, contacts, lists, campaigns, sequences, followups, inbox, overview, templates, analytics, settings as settings_api, webhooks, dashboard, send, autoreply, automations, ai, variables, campaign_followups, notifications
 app.include_router(auth.router, prefix="/api/v1/auth")

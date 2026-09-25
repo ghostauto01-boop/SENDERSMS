@@ -327,6 +327,7 @@ If all six happen, you are fully live.
 
 | What you see | What's wrong | Fix |
 |---|---|---|
+| **Every page shows an error / an amber notice "Database paused by Neon"** | Neon switched the free database off for the rest of the month because its **100 compute-hours** were used up. Your data is safe. | Open `https://<your-app>.onrender.com/api/v1/health/db` — it tells you the exact reason. See **"Every page shows an error"** below. |
 | SMS never arrives on the target phone | Gateway phone offline, out of airtime, or Android killed the app | Check the phone; set Battery → **Unrestricted** (Step 5.6) |
 | Replies never show in the Inbox | `PUBLIC_BASE_URL` wrong/blank, so the webhook points nowhere | Redo Step 7, then **Settings → Webhooks → Register webhook** |
 | Replies show in Inbox but no Pushover alert | Pushover not enabled in Settings | Step 9; press **Test** |
@@ -337,6 +338,37 @@ If all six happen, you are fully live.
 
 **Reading the logs** (your best tool): Render → the service → **Logs**. Errors are the red
 lines. The last few lines before it stopped tell you what happened.
+
+### Every page shows an error
+
+Since this fix the app tells you *why* instead of just failing: an amber notice appears at
+the top of every page (including the login screen), and the address
+`https://<your-app>.onrender.com/api/v1/health/db` answers with the reason in one line.
+
+The usual reason on the free plan is `quota_exceeded`:
+
+> Your account or project has exceeded the compute time quota. Upgrade your plan to increase limits.
+
+Neon's free plan gives each project **100 compute-hours a month**. When they are gone Neon
+suspends the database until the **1st of next month** — every connection is refused, so
+every page that needs data fails. **Nothing is deleted.** You have three options:
+
+| Option | Cost | Data | When it works again |
+|---|---|---|---|
+| Wait | free | kept | 1st of next month, automatically |
+| Upgrade the Neon project (Neon → Billing) | paid | kept | immediately |
+| Create a **new** free Neon project and paste its address into Render → `sendsms-api` → Environment → `DATABASE_URL` | free | **starts empty** (the old data comes back with the old address after the 1st) | after the next deploy |
+
+To stop it happening again, the app now lets the database sleep when nobody is using it
+(open tabs stop refreshing in the background, and the built-in scheduler backs off when
+nothing is due). Two more things help a lot:
+
+- **Do not keep an "uptime pinger" pointed at the app.** Every ping keeps the server, and
+  therefore the database, awake.
+- **Suspend the `sendsms-worker` service** on Render if you are on the free plan: the API
+  already does the worker's job (`ENABLE_INLINE_POLLER=true`), and the worker only adds a
+  second process querying the database every 30 seconds. Render → `sendsms-worker` →
+  Settings → **Suspend**.
 
 ---
 

@@ -1,3 +1,4 @@
+import { useVisiblePolling } from "../hooks/useVisiblePolling";
 import { useState, useEffect, useRef } from "react";
 import api from "../api/client";
 import toast from "react-hot-toast";
@@ -76,9 +77,8 @@ export default function SendPage() {
     loadScheduled();
     loadHistory();
     loadFailed();
-    const iv = setInterval(()=>{ loadScheduled(); loadHistory(); loadFailed(); }, 15000);
-    return ()=>clearInterval(iv);
   }, []);
+  useVisiblePolling(()=>{ loadScheduled(); loadHistory(); loadFailed(); }, 15000);
 
   // reload when switching tabs
   useEffect(()=>{ if(activeTab==="scheduled") loadScheduled(); if(activeTab==="sent") loadHistory(); if(activeTab==="failed") loadFailed(); }, [activeTab]);
