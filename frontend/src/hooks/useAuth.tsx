@@ -5,8 +5,12 @@ import { User } from "../types";
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  /** One-tap sign-in: no username, no password. */
-  loginAsAdmin: () => Promise<boolean>;
+  /**
+   * One-tap sign-in: no username, no password.
+   * Resolves `true` on success, otherwise the error (so the caller can say
+   * *why* — e.g. the database being down — instead of a generic message).
+   */
+  loginAsAdmin: () => Promise<true | any>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
   /** The password wall is gone — nothing ever asks for a password. */
@@ -48,16 +52,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // nothing to switch on or off.
   };
 
-  const loginAsAdmin = async (): Promise<boolean> => {
+  const loginAsAdmin = async (): Promise<true | any> => {
     try {
       const { data } = await api.post("/auth/admin");
       if (data.success) {
         await checkAuth();
         return true;
       }
-      return false;
-    } catch {
-      return false;
+      return new Error(data.message || "Sign-in was rejected");
+    } catch (err) {
+      return err ?? new Error("Sign-in failed");
     }
   };
 

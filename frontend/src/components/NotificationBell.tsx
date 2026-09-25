@@ -1,3 +1,4 @@
+import { useVisiblePolling } from "../hooks/useVisiblePolling";
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Bell, BellOff, CheckCheck, Loader2 } from "lucide-react";
@@ -47,16 +48,18 @@ export default function NotificationBell() {
   useEffect(() => {
     pushState().then(setState).catch(() => {});
     refreshCount();
-    const t = setInterval(refreshCount, 15000);
     const onClick = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
     document.addEventListener("mousedown", onClick);
     return () => {
-      clearInterval(t);
       document.removeEventListener("mousedown", onClick);
     };
   }, []);
+
+  // Unread badge: every 30 s while the tab is visible. (It sits on every
+  // page, so a background tab must not keep the database awake for it.)
+  useVisiblePolling(refreshCount, 30000);
 
   const openPanel = async () => {
     const next = !open;

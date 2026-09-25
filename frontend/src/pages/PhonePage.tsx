@@ -1,4 +1,5 @@
 /** Phone — browse all contacts and call them from the app (via your phone). */
+import { useVisiblePolling } from "../hooks/useVisiblePolling";
 import { useState, useEffect, useCallback } from "react";
 import api from "../api/client";
 import { Contact, PaginatedResponse } from "../types";
@@ -116,11 +117,7 @@ export default function PhonePage() {
   useEffect(() => { if (tab === "recent") loadLogs(1); }, [tab, loadLogs]);
 
   // Refresh the active-call banner while it exists.
-  useEffect(() => {
-    if (!active) return;
-    const iv = setInterval(loadActive, 5000);
-    return () => clearInterval(iv);
-  }, [active, loadActive]);
+  useVisiblePolling(loadActive, active ? 5000 : null);
 
   const doCallContact = async (c: Contact) => {
     setCallingId(c.id);

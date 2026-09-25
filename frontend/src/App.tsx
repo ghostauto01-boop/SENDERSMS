@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./hooks/useAuth";
 import MainLayout from "./layouts/MainLayout";
 import LoginPage from "./pages/LoginPage";
+import DbStatusBanner from "./components/DbStatusBanner";
 
 // Route-level code splitting: each page ships as its own chunk so the initial
 // load (the login screen) no longer pulls in the entire application.
@@ -106,6 +107,9 @@ function AppRoutes() {
 export default function App() {
   return (
     <AuthProvider>
+      {/* One explained notice when the database itself is down, above every
+          page — instead of every widget failing on its own. */}
+      <DbStatusBanner />
       <AppRoutes />
     </AuthProvider>
   );

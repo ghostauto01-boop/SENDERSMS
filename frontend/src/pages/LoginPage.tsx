@@ -1,14 +1,28 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import toast from "react-hot-toast";
 import { LogIn } from "lucide-react";
 import BrandMark from "../components/BrandMark";
+import api from "../api/client";
+import { dbOutageFromError, DbOutage, dbOutageTitle, subscribeDbStatus } from "../utils/dbStatus";
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
+  const [outage, setOutage] = useState<DbOutage | null>(null);
   const { loginAsAdmin, isAuthenticated, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+
+  // Mirror the global banner state so the button can explain a failure.
+  useEffect(() => subscribeDbStatus(setOutage), []);
+
+  // The one-tap sign-in needs the database. Check it once on arrival so the
+  // reason for a broken app is on screen *before* the user taps anything.
+  useEffect(() => {
+    api.get("/health/db").catch(() => {
+      /* the interceptor already reported the outage to the banner */
+    });
+  }, []);
 
   if (authLoading) {
     return (
@@ -24,11 +38,18 @@ export default function LoginPage() {
 
   const handleEnter = async () => {
     setLoading(true);
-    const success = await loginAsAdmin();
+    const result = await loginAsAdmin();
     setLoading(false);
-    if (success) {
+    if (result === true) {
       toast.success("Signed in as admin");
       navigate("/dashboard");
+      return;
+    }
+    const reason = dbOutageFromError(result);
+    if (reason) {
+      toast.error(`${dbOutageTitle(reason.kind)}. ${reason.message}`, { duration: 8000 });
+    } else if (result?.response?.data?.detail) {
+      toast.error(String(result.response.data.detail));
     } else {
       toast.error("Could not sign in — is the server reachable?");
     }
@@ -67,7 +88,9 @@ export default function LoginPage() {
             )}
           </button>
           <p className="text-xs text-gray-400 mt-3 text-center">
-            No password. One tap and you are in.
+            {outage
+              ? "Signing in needs the database, which is currently unavailable — see the notice above."
+              : "No password. One tap and you are in."}
           </p>
         </div>
       </div>

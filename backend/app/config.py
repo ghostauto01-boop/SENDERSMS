@@ -68,6 +68,13 @@ class Settings(BaseSettings):
     # worker + beat handle this, to avoid duplicate work.
     ENABLE_INLINE_POLLER: bool = True
     INLINE_POLL_INTERVAL: int = 30
+    # When nobody has used the app for INLINE_POLL_ACTIVE_WINDOW seconds and
+    # nothing is due, the poller sleeps up to INLINE_IDLE_POLL_INTERVAL
+    # seconds between passes (or exactly until the next scheduled job). This
+    # lets a Neon free-plan database scale to zero instead of being queried
+    # every 30 s around the clock and exhausting its monthly compute quota.
+    INLINE_IDLE_POLL_INTERVAL: int = 15 * 60
+    INLINE_POLL_ACTIVE_WINDOW: int = 10 * 60
     SMSGATE_TIMEOUT: int = 30
     SMSGATE_RETRY_COUNT: int = 3
     SMSGATE_POLL_INTERVAL: int = 60

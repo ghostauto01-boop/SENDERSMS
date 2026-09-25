@@ -1,3 +1,4 @@
+import { useVisiblePolling } from "../hooks/useVisiblePolling";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import api from "../api/client";
@@ -102,10 +103,7 @@ export default function OverviewPage() {
   useEffect(() => { load(); }, [load]);
 
   // Keep the screen live without a hard reload — campaigns send continuously.
-  useEffect(() => {
-    const t = setInterval(() => load(true), 30000);
-    return () => clearInterval(t);
-  }, [load]);
+  useVisiblePolling(() => load(true), 30000);
 
   const visible = useMemo(
     () => (scope === "live" ? campaigns.filter((c) => c.is_live) : campaigns),

@@ -1,3 +1,4 @@
+import { useVisiblePolling } from "../hooks/useVisiblePolling";
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import api from "../api/client";
@@ -134,7 +135,6 @@ export default function InboxPage() {
   }, [campaignId, adsCampaignId, campaignOptions]);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
-  const pollRef = useRef<any>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -237,10 +237,9 @@ export default function InboxPage() {
     if (selected && nearBottomRef.current) chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, selected?.id]);
 
-  useEffect(() => {
-    pollRef.current = setInterval(() => { loadConvs(); if (selected) loadMessages(selected.id); }, 8000);
-    return () => clearInterval(pollRef.current);
-  }, [selected?.id]);
+  // Live refresh while the tab is visible; a background tab stops polling so
+  // it does not keep the database awake all day. (Coming back refreshes at once.)
+  useVisiblePolling(() => { loadConvs(); if (selected) loadMessages(selected.id); }, 8000);
 
   // Auto-grow the composer textarea (WhatsApp style, capped height).
   useEffect(() => {
