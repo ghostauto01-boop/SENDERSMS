@@ -1,9 +1,10 @@
-"""Login is always required, with the env admin credentials.
+"""A session cookie is still needed, but getting one takes no password.
 
-Restores the original model: the app sits behind the login screen and the
-ADMIN_USERNAME / ADMIN_PASSWORD pair set in the deployment environment
-(Render) is the source of truth — changing ADMIN_PASSWORD takes effect on
-the next login instead of locking the operator out forever.
+The login screen is a single "Log in as admin" button (see
+``test_one_tap_admin_login``). These cases cover what is left of the
+credential path: an old client that still sends ADMIN_PASSWORD, the optional
+site password from Settings → Site access, and the stored hash following the
+environment when ADMIN_PASSWORD is rotated on Render.
 """
 import pytest
 from httpx import ASGITransport, AsyncClient

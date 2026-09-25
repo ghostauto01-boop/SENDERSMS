@@ -2,13 +2,12 @@ import { useState } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import toast from "react-hot-toast";
+import { LogIn } from "lucide-react";
 import BrandMark from "../components/BrandMark";
 
 export default function LoginPage() {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const { login, isAuthenticated, loading: authLoading } = useAuth();
+  const { loginAsAdmin, isAuthenticated, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
   if (authLoading) {
@@ -23,20 +22,15 @@ export default function LoginPage() {
     return <Navigate to="/dashboard" replace />;
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!username || !password) {
-      toast.error("Please fill in all fields");
-      return;
-    }
+  const handleEnter = async () => {
     setLoading(true);
-    const success = await login(username, password);
+    const success = await loginAsAdmin();
     setLoading(false);
     if (success) {
-      toast.success("Welcome back!");
+      toast.success("Signed in as admin");
       navigate("/dashboard");
     } else {
-      toast.error("Invalid username or password");
+      toast.error("Could not sign in — is the server reachable?");
     }
   };
 
@@ -54,45 +48,27 @@ export default function LoginPage() {
         </div>
 
         <div className="card p-6">
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="label">Username</label>
-              <input
-                type="text"
-                className="input"
-                placeholder="Enter your username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                autoFocus
-                autoComplete="username"
-              />
-            </div>
-            <div>
-              <label className="label">Password</label>
-              <input
-                type="password"
-                className="input"
-                placeholder="Enter your password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete="current-password"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="btn-primary w-full"
-            >
-              {loading ? (
-                <span className="flex items-center gap-2">
-                  <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
-                  Signing in...
-                </span>
-              ) : (
-                "Sign In"
-              )}
-            </button>
-          </form>
+          <button
+            type="button"
+            onClick={handleEnter}
+            disabled={loading}
+            className="btn-primary w-full flex items-center justify-center gap-2"
+          >
+            {loading ? (
+              <span className="flex items-center gap-2">
+                <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                Signing in...
+              </span>
+            ) : (
+              <>
+                <LogIn size={18} />
+                Log in as admin
+              </>
+            )}
+          </button>
+          <p className="text-xs text-gray-400 mt-3 text-center">
+            No password. One tap and you are in.
+          </p>
         </div>
       </div>
     </div>

@@ -178,9 +178,12 @@ You should see:
 
 #### 7. Open the Application
 
-Visit **http://localhost:5173** and log in with the credentials you set in `.env`.
+Visit **http://localhost:5173** and tap **Log in as admin**.
 
-The first login triggers automatic creation of the admin account from `ADMIN_USERNAME`/`ADMIN_PASSWORD`. After that, the password is hashed with Argon2id, and the env vars are no longer used for authentication.
+There is no password on the login screen: one tap opens the operator account
+(`ADMIN_USERNAME`, `admin` by default), creating it on first use.
+`ADMIN_PASSWORD` is still accepted if an older client sends it, but nothing
+asks for it — so keep the deployment URL private.
 
 ---
 

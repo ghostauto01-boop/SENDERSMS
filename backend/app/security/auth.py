@@ -150,12 +150,12 @@ async def get_current_user(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> User:
-    """Current operator. A valid login session is always required.
+    """Current operator.
 
-    This restores the original behaviour: the site is behind the login
-    screen, and every API call needs the session cookie issued at login.
-    (An interim change treated the site as open when no password was
-    configured, which let anyone who reached the URL use the app.)
+    A session cookie is still required, but getting one takes no credentials:
+    the login screen is one "Log in as admin" button that calls
+    ``POST /api/v1/auth/admin``. Nothing here reads or verifies a password,
+    so removing the wall changed no data and no other route.
     """
     user = await _user_from_session(request, db)
     if user is not None:
