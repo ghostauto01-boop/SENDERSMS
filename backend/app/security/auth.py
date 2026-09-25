@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from argon2 import PasswordHasher
-from argon2.exceptions import VerifyMismatchError, VerificationError
+from argon2.exceptions import InvalidHashError, VerifyMismatchError, VerificationError
 from jose import JWTError, jwt
 from fastapi import Depends, HTTPException, Request, Response, status
 from sqlalchemy import select
@@ -39,10 +39,17 @@ def hash_password(password: str) -> str:
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify a password against its Argon2id hash."""
+    """Verify a password against its Argon2id hash.
+
+    A malformed stored hash (older deploy, manual edit, corruption) counts as
+    a mismatch so callers can fall through to repair/reject paths instead of
+    crashing the request.
+    """
     try:
         return ph.verify(hashed_password, plain_password)
-    except (VerifyMismatchError, VerificationError):
+    except (VerifyMismatchError, VerificationError, InvalidHashError):
+        # InvalidHashError subclasses ValueError, not VerificationError, so it
+        # must be listed explicitly.
         return False
 
 
@@ -77,7 +84,15 @@ def apply_session_cookie(response: Response, token: str) -> None:
 
 
 async def ensure_admin(db: AsyncSession) -> User:
-    """Return the operator account, creating it on first use."""
+    """Return the operator account, creating it on first use.
+
+    The ADMIN_PASSWORD environment variable is the source of truth for the
+    admin password. The row used to be bootstrapped exactly once, so changing
+    ADMIN_PASSWORD in the deployment environment (e.g. on Render) never
+    updated the stored hash and the real password was rejected with
+    "invalid username or password" forever. The hash is now refreshed here
+    whenever it no longer matches the environment.
+    """
     result = await db.execute(select(User).where(User.username == settings.ADMIN_USERNAME))
     admin = result.scalar_one_or_none()
     if admin is None:
@@ -98,9 +113,15 @@ async def ensure_admin(db: AsyncSession) -> User:
             admin = result.scalar_one_or_none()
             if admin is None:
                 raise
-    if admin is not None and not admin.is_active:
-        admin.is_active = True
-        await db.flush()
+    if admin is not None:
+        if not admin.is_active:
+            admin.is_active = True
+            await db.flush()
+        # Keep the stored hash in step with the environment so an
+        # ADMIN_PASSWORD change on Render takes effect on the next login.
+        if not verify_password(settings.ADMIN_PASSWORD, admin.password_hash):
+            admin.password_hash = hash_password(settings.ADMIN_PASSWORD)
+            await db.flush()
     return admin
 
 
@@ -129,21 +150,16 @@ async def get_current_user(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> User:
-    """Current operator.
+    """Current operator. A valid login session is always required.
 
-    A valid session cookie always wins. When the site password wall is off
-    (the default — turn it on later in Settings → Site access), anyone who
-    can reach the URL is treated as the operator. No cookie, no password.
+    This restores the original behaviour: the site is behind the login
+    screen, and every API call needs the session cookie issued at login.
+    (An interim change treated the site as open when no password was
+    configured, which let anyone who reached the URL use the app.)
     """
     user = await _user_from_session(request, db)
     if user is not None:
         return user
-
-    # Imported here to avoid a cycle with system_settings → hash_password.
-    from app.services.system_settings import is_site_password_required
-
-    if not await is_site_password_required(db):
-        return await ensure_admin(db)
 
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,

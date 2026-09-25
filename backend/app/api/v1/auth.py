@@ -6,6 +6,7 @@ import hmac
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Response, Request, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -16,6 +17,7 @@ from app.security.auth import (
     create_access_token,
     ensure_admin,
     get_current_user,
+    hash_password,
     verify_password,
 )
 from app.config import settings
@@ -24,38 +26,81 @@ from app.security.rate_limit import limiter
 router = APIRouter()
 
 
-async def _password_matches(db: AsyncSession, plain: str) -> bool:
-    """Check the password saved in Settings, or the env login password if none is saved."""
+async def _authenticate(db: AsyncSession, username: str | None, password: str | None):
+    """Return the User for a successful login, or None.
+
+    Accepts, in order:
+    1. A named account (usually ``admin``). The admin row's stored hash is
+       kept in sync with the ADMIN_PASSWORD environment variable, so the
+       credentials set on Render always work even after they are changed.
+    2. The optional site password saved in Settings → Site access (any
+       username is accepted with it).
+    3. The legacy LOGIN_PASSWORD environment fallback.
+
+    ``username`` may be empty for the interim password-only clients; it then
+    defaults to the admin account.
+    """
+    candidate = (password or "").strip()
+    if not candidate:
+        return None
+
+    uname = (username or "").strip() or settings.ADMIN_USERNAME
+
+    # The operator account is created on first use and kept in sync with the
+    # ADMIN_PASSWORD environment variable (see ensure_admin).
+    if uname == settings.ADMIN_USERNAME:
+        user = await ensure_admin(db)
+    else:
+        result = await db.execute(select(User).where(User.username == uname))
+        user = result.scalar_one_or_none()
+
+    # 1) Named account (admin first — the operator account).
+    if user is not None and user.is_active:
+        if verify_password(candidate, user.password_hash):
+            return user
+        if (
+            user.username == settings.ADMIN_USERNAME
+            and hmac.compare_digest(
+                candidate.encode(), settings.ADMIN_PASSWORD.encode()
+            )
+        ):
+            # The environment password changed after the row was created —
+            # the environment wins, so store the new hash and sign in.
+            user.password_hash = hash_password(candidate)
+            await db.flush()
+            return user
+
+    # 2) Optional site password (Settings → Site access).
     from app.services.system_settings import get_site_password_hash
 
-    candidate = (plain or "").strip()
-    if not candidate:
-        return False
     stored = await get_site_password_hash(db)
-    if stored:
-        return verify_password(candidate, stored)
-    return hmac.compare_digest(candidate.encode(), settings.LOGIN_PASSWORD.encode())
+    if stored and verify_password(candidate, stored):
+        return await ensure_admin(db)
+
+    # 3) Legacy LOGIN_PASSWORD fallback (password-only interim login).
+    if hmac.compare_digest(candidate.encode(), settings.LOGIN_PASSWORD.encode()):
+        return await ensure_admin(db)
+
+    return None
 
 
 @router.post("/login", response_model=LoginResponse)
 @limiter.limit(settings.RATE_LIMIT_LOGIN)
 async def login(request: Request, data: LoginRequest, db: AsyncSession = Depends(get_db)):
-    """Password-only login.
+    """Authenticate with username + password and set the session cookie.
 
-    The app has a single operator. Username is ignored. A password saved in
-    Settings is checked first; otherwise LOGIN_PASSWORD is used. The session
-    is issued for the admin account, which is created on first use.
-    Previously the admin row was only created once, so changing
-    ADMIN_PASSWORD in the environment never updated the stored hash and the
-    real password was rejected as "invalid".
+    The credentials are the ADMIN_USERNAME / ADMIN_PASSWORD pair set in the
+    deployment environment (Render). Changing ADMIN_PASSWORD there takes
+    effect on the next login — the stored hash is refreshed automatically,
+    which is the fix for the old "invalid username or password" lockout.
     """
-    if not await _password_matches(db, data.password):
+    user = await _authenticate(db, data.username, data.password)
+    if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid password",
+            detail="Invalid username or password",
         )
 
-    user = await ensure_admin(db)
     if not user.is_active:
         user.is_active = True
 

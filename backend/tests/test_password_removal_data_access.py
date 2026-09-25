@@ -1,12 +1,13 @@
-"""Regression test: data created with password ON must be accessible after password is removed.
+"""Regression test: existing data must never be hidden or lost by access changes.
 
-This test simulates the exact scenario where:
-1. User has password wall enabled
-2. User logs in and creates contacts, campaigns, messages
-3. User disables the password wall
-4. A fresh browser (no cookies) must still see ALL the data
+The scenario this guards (updated for the restored login screen):
+1. The operator signs in and creates contacts, campaigns, messages
+2. Later deployments change access settings (extra site password on/off,
+   rotated ADMIN_PASSWORD, fresh browser, new session cookie)
+3. After signing in again — with the env admin credentials or the saved
+   site password — ALL the data must still be there.
 
-This ensures data is never lost or hidden when switching access modes.
+Data lives in the database; the login screen only guards the door.
 """
 import pytest
 import pytest_asyncio
@@ -72,39 +73,28 @@ async def test_db():
 
 
 @pytest.mark.asyncio
-async def test_data_accessible_after_password_removal(test_db):
-    """Data created with password ON must be visible after password is removed."""
+async def test_data_accessible_from_any_browser_after_login(test_db):
+    """Data created in one session must be visible after signing in again."""
     from app.main import app
 
-    # Phase 1: Enable password wall
+    # Phase 1: Sign in with the env admin credentials and create data
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        response = await client.put(
-            "/api/v1/settings/access",
-            json={"password_required": True, "password": "testpass123"},
+        login = await client.post(
+            "/api/v1/auth/login", json={"username": "admin", "password": "admin"}
         )
-        assert response.status_code == 200
-        assert response.json()["password_required"] is True
-
-    # Phase 2: Login and create data
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        # Login
-        login = await client.post("/api/v1/auth/login", json={"password": "testpass123"})
         assert login.status_code == 200
 
-        # Get user info
         me = await client.get("/api/v1/auth/me")
         assert me.status_code == 200
         admin_user_id = me.json()["id"]
 
         # Create contacts
-        contacts_created = []
         for name, phone in [("Alice", "08011111111"), ("Bob", "08022222222"), ("Charlie", "08033333333")]:
             response = await client.post(
                 "/api/v1/contacts/",
                 json={"first_name": name, "phone_number": phone},
             )
             assert response.status_code == 201
-            contacts_created.append(response.json())
 
         # Verify contacts exist
         contacts_list = await client.get("/api/v1/contacts/")
@@ -118,29 +108,21 @@ async def test_data_accessible_after_password_removal(test_db):
         )
         assert campaign.status_code == 201
 
-    # Phase 3: Disable password wall
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        # Login first
-        login = await client.post("/api/v1/auth/login", json={"password": "testpass123"})
+    # Phase 2: A completely fresh browser (no cookies) is stopped at the door…
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as fresh:
+        me = await fresh.get("/api/v1/auth/me")
+        assert me.status_code == 401
+        contacts = await fresh.get("/api/v1/contacts/")
+        assert contacts.status_code == 401
+
+    # Phase 3: …but after signing in again it sees ALL the data.
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as fresh:
+        login = await fresh.post(
+            "/api/v1/auth/login", json={"username": "admin", "password": "admin"}
+        )
         assert login.status_code == 200
 
-        # Turn off password
-        response = await client.put(
-            "/api/v1/settings/access",
-            json={"password_required": False},
-        )
-        assert response.status_code == 200
-        assert response.json()["password_required"] is False
-
-    # Phase 4: Fresh browser (no cookies) must see ALL data
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as fresh_client:
-        # Verify password is off
-        access = await fresh_client.get("/api/v1/auth/access")
-        assert access.status_code == 200
-        assert access.json()["password_required"] is False
-
-        # Verify user is authenticated (via ensure_admin)
-        me = await fresh_client.get("/api/v1/auth/me")
+        me = await fresh.get("/api/v1/auth/me")
         assert me.status_code == 200
         fresh_user = me.json()
         # Should be the SAME admin user
@@ -148,7 +130,7 @@ async def test_data_accessible_after_password_removal(test_db):
         assert fresh_user["username"] == "admin"
 
         # CRITICAL: All contacts must be visible
-        contacts = await fresh_client.get("/api/v1/contacts/")
+        contacts = await fresh.get("/api/v1/contacts/")
         assert contacts.status_code == 200
         contacts_data = contacts.json()
         assert contacts_data["total"] == 3, f"Expected 3 contacts, got {contacts_data['total']}"
@@ -158,27 +140,30 @@ async def test_data_accessible_after_password_removal(test_db):
         assert contact_names == {"Alice", "Bob", "Charlie"}
 
         # Campaigns must be visible
-        campaigns = await fresh_client.get("/api/v1/campaigns/")
+        campaigns = await fresh.get("/api/v1/campaigns/")
         assert campaigns.status_code == 200
         campaigns_data = campaigns.json()
         campaign_items = campaigns_data.get("items", campaigns_data if isinstance(campaigns_data, list) else [])
         assert len(campaign_items) == 1, f"Expected 1 campaign, got {len(campaign_items)}"
 
         # Dashboard stats must reflect the data
-        dashboard = await fresh_client.get("/api/v1/dashboard/stats")
+        dashboard = await fresh.get("/api/v1/dashboard/stats")
         assert dashboard.status_code == 200
         dashboard_data = dashboard.json()
         assert dashboard_data["total_contacts"] == 3
 
 
 @pytest.mark.asyncio
-async def test_password_can_be_reenabled_without_data_loss(test_db):
-    """Turning password back on must not hide or delete any data."""
+async def test_toggling_site_password_keeps_data_intact(test_db):
+    """Turning the extra site password on or off must not hide or delete data."""
     from app.main import app
 
-    # Start with password off, create data
+    # Create data while signed in with the env admin credentials
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        # Create contacts without password
+        login = await client.post(
+            "/api/v1/auth/login", json={"username": "admin", "password": "admin"}
+        )
+        assert login.status_code == 200
         for name, phone in [("Dave", "08044444444"), ("Eve", "08055555555")]:
             response = await client.post(
                 "/api/v1/contacts/",
@@ -186,18 +171,50 @@ async def test_password_can_be_reenabled_without_data_loss(test_db):
             )
             assert response.status_code == 201
 
-    # Enable password
+    # Enable the extra site password
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        login = await client.post(
+            "/api/v1/auth/login", json={"username": "admin", "password": "admin"}
+        )
+        cookie = {"sendsms_session": login.cookies["sendsms_session"]}
         response = await client.put(
             "/api/v1/settings/access",
             json={"password_required": True, "password": "newpass456"},
+            cookies=cookie,
         )
         assert response.status_code == 200
 
-    # Login and verify data is still there
+    # Sign in with the site password — data must still be there
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        login = await client.post("/api/v1/auth/login", json={"password": "newpass456"})
+        login = await client.post(
+            "/api/v1/auth/login", json={"username": "admin", "password": "newpass456"}
+        )
         assert login.status_code == 200
+
+        contacts = await client.get("/api/v1/contacts/")
+        assert contacts.status_code == 200
+        contacts_data = contacts.json()
+        assert contacts_data["total"] == 2, f"Expected 2 contacts, got {contacts_data['total']}"
+        contact_names = {c["first_name"] for c in contacts_data["items"]}
+        assert contact_names == {"Dave", "Eve"}
+
+        # Dashboard must agree
+        dashboard = await client.get("/api/v1/dashboard/stats")
+        assert dashboard.status_code == 200
+        assert dashboard.json()["total_contacts"] == 2
+
+    # Turn the extra password off again — data still intact
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        login = await client.post(
+            "/api/v1/auth/login", json={"username": "admin", "password": "newpass456"}
+        )
+        cookie = {"sendsms_session": login.cookies["sendsms_session"]}
+        response = await client.put(
+            "/api/v1/settings/access",
+            json={"password_required": False},
+            cookies=cookie,
+        )
+        assert response.status_code == 200
 
         contacts = await client.get("/api/v1/contacts/")
         assert contacts.status_code == 200
