@@ -42,9 +42,9 @@ async def _password_matches(db: AsyncSession, plain: str) -> bool:
 async def login(request: Request, data: LoginRequest, db: AsyncSession = Depends(get_db)):
     """Password-only login.
 
-    The app has a single operator. Username is ignored: the password is
-    checked against settings.LOGIN_PASSWORD (default "12345678") and the
-    session is issued for the admin account, which is created on first use.
+    The app has a single operator. Username is ignored. A password saved in
+    Settings is checked first; otherwise LOGIN_PASSWORD is used. The session
+    is issued for the admin account, which is created on first use.
     Previously the admin row was only created once, so changing
     ADMIN_PASSWORD in the environment never updated the stored hash and the
     real password was rejected as "invalid".
