@@ -564,20 +564,6 @@ async def lifespan(app: FastAPI):
             pass
 
 app = FastAPI(title=settings.APP_NAME, version="1.0.0", lifespan=lifespan)
-
-
-@app.exception_handler(Exception)
-async def _show_unhandled(request, exc):
-    """Surface the real error. Blank 500s hide a broken boot."""
-    import traceback
-    logger.exception("Unhandled %s %s", request.method, request.url.path)
-    return JSONResponse(
-        status_code=500,
-        content={
-            "detail": f"{type(exc).__name__}: {exc}",
-            "trace": traceback.format_exc()[-1500:],
-        },
-    )
 # GZip large JSON (inbox threads, analytics, contact pages) — cuts payloads ~70%.
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins_list, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
@@ -609,23 +595,6 @@ async def health():
     balancer probe drove real SMS traffic.
     """
     return JSONResponse({"status":"ok","app":settings.APP_NAME,"version":"1.0.0"})
-
-
-@app.get("/api/v1/health/db")
-async def health_db():
-    """DB probe. Returns the error instead of a blank 500 so a bad boot is visible."""
-    import traceback
-    try:
-        from sqlalchemy import text
-        async with async_session_factory() as session:
-            await session.execute(text("SELECT 1"))
-        return {"ok": True}
-    except Exception as exc:
-        return {
-            "ok": False,
-            "error": f"{type(exc).__name__}: {exc}",
-            "trace": traceback.format_exc()[-1500:],
-        }
 
 from app.api.v1 import ads, auth, calendar, calls, contacts, lists, campaigns, sequences, followups, inbox, overview, templates, analytics, settings as settings_api, webhooks, dashboard, send, autoreply, automations, ai, variables, campaign_followups, notifications
 app.include_router(auth.router, prefix="/api/v1/auth")
