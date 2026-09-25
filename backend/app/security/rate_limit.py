@@ -61,7 +61,27 @@ class ApiOnlySlowAPIMiddleware(SlowAPIMiddleware):
         path = request.url.path
         if not path.startswith("/api/") or path.startswith(EXEMPT_PREFIXES):
             return await call_next(request)
-        return await super().dispatch(request, call_next)
+        limiter: Limiter = request.app.state.limiter
+        if not limiter.enabled:
+            return await call_next(request)
+        try:
+            from slowapi.middleware import sync_check_limits
+            error_response, should_inject_headers = sync_check_limits(
+                limiter, request, None, request.app
+            )
+        except Exception:
+            # A Redis/limiter outage must not turn every API call into a 500.
+            logger.exception("Rate limiter failed; allowing %s %s", request.method, path)
+            return await call_next(request)
+        if error_response is not None:
+            return error_response
+        response = await call_next(request)
+        if should_inject_headers:
+            try:
+                response = limiter._inject_headers(response, request.state.view_rate_limit)
+            except Exception:
+                logger.exception("Could not add rate-limit headers")
+        return response
 
 
 async def rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
