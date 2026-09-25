@@ -4,7 +4,7 @@ import api from "../api/client";
 import toast from "react-hot-toast";
 import { useAuth } from "../hooks/useAuth";
 import {
-  Send, Star, ThumbsDown, Archive, ChevronLeft, CheckCheck, MessageCircle,
+  Send, Star, ThumbsDown, ThumbsUp, Archive, ChevronLeft, CheckCheck, MessageCircle,
   Bug, Search as SearchIcon, MoreVertical, Phone, Video, Paperclip, Smile,
   Mic, LogOut, Settings as SettingsIcon, Users, Megaphone, Home, FileText, CalendarPlus,
   Filter, X as XIcon, BarChart3, Globe,
@@ -347,6 +347,17 @@ export default function InboxPage() {
     }
     catch (err: any) { toast.error(err.response?.data?.detail || "Failed"); }
     finally { setSending(false); }
+  };
+
+  const rateReply = async (messageId: number, verdict: "good" | "bad") => {
+    try {
+      const { data } = await api.post(`/inbox/messages/${messageId}/feedback`, { verdict });
+      setMessages((ms) => ms.map((m) => m.id === messageId
+        ? { ...m, ai_sentiment: data.ai_sentiment, ai_intent: data.ai_intent, ai_confidence: 1 } : m));
+      setSelected((s: any) => s ? { ...s, status: data.status ?? s.status } : s);
+      toast.success(verdict === "good" ? "Marked as good reply" : "Marked as bad reply — lead opted out");
+      loadConvs();
+    } catch (err: any) { toast.error(err.response?.data?.detail || "Failed"); }
   };
 
   const markAs = async (status: string) => {
@@ -960,12 +971,32 @@ export default function InboxPage() {
                             {isFailed && m.last_error && (
                               <p className="text-[11px] mt-1 text-red-600 dark:text-red-300 bg-red-50 dark:bg-red-900/20 px-1.5 py-0.5 rounded">⚠ {m.last_error}</p>
                             )}
-                            {!isOut && m.ai_sentiment && (
-                              <p className="text-[10px] mt-1 inline-flex items-center gap-1 text-[#54656f] dark:text-[#8696a0]">
-                                <span className={`px-1.5 py-0.5 rounded-full ${m.ai_sentiment === "positive" ? "bg-[#d9fdd3] text-[#008069]" : m.ai_sentiment === "negative" ? "bg-[#fce8e6] text-[#c5221f]" : "bg-[#f0f2f5] text-[#54656f]"}`}>
-                                  AI: {m.ai_sentiment}{m.ai_intent && m.ai_intent !== "general" ? ` · ${m.ai_intent.replace(/_/g, " ")}` : ""}
-                                </span>
-                              </p>
+                            {!isOut && (
+                              <div className="text-[10px] mt-1 flex flex-wrap items-center gap-1 text-[#54656f] dark:text-[#8696a0]">
+                                {m.ai_sentiment && (
+                                  <span className={`px-1.5 py-0.5 rounded-full ${m.ai_sentiment === "positive" ? "bg-[#d9fdd3] text-[#008069]" : m.ai_sentiment === "negative" ? "bg-[#fce8e6] text-[#c5221f]" : "bg-[#f0f2f5] text-[#54656f]"}`}>
+                                    AI: {m.ai_sentiment}{m.ai_intent && m.ai_intent !== "general" ? ` · ${m.ai_intent.replace(/_/g, " ")}` : ""}
+                                  </span>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => rateReply(m.id, "good")}
+                                  aria-label="Mark as good reply"
+                                  title="Good reply"
+                                  className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full border ${m.ai_sentiment === "positive" ? "bg-[#008069] text-white border-[#008069]" : "border-[#d1d7db] hover:bg-[#d9fdd3]"}`}
+                                >
+                                  <ThumbsUp size={11} /> Good
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => rateReply(m.id, "bad")}
+                                  aria-label="Mark as bad reply and opt out"
+                                  title="Bad reply — opt out lead"
+                                  className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full border ${m.ai_sentiment === "negative" ? "bg-[#c5221f] text-white border-[#c5221f]" : "border-[#d1d7db] hover:bg-[#fce8e6]"}`}
+                                >
+                                  <ThumbsDown size={11} /> Bad
+                                </button>
+                              </div>
                             )}
                             {g.isLast && (
                               <div className={`flex items-center gap-1 justify-end mt-0.5 text-[11px] select-none ${isOut ? "text-[#667781] dark:text-[#8696a0]" : "text-[#667781] dark:text-[#8696a0]"}`}>

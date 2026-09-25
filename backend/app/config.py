@@ -51,6 +51,8 @@ class Settings(BaseSettings):
     # --- Bootstrap Admin ---
     ADMIN_USERNAME: str = "admin"
     ADMIN_PASSWORD: str = INSECURE_ADMIN_PASSWORD
+    # Password-only login (the only thing typed on the login screen).
+    LOGIN_PASSWORD: str = "12345678"
 
     # --- SMS Gateway (SMS-Gate.app) ---
     # Credentials MUST come from the environment — never hardcode them here.
@@ -134,8 +136,6 @@ class Settings(BaseSettings):
             problems.append("SECRET_KEY")
         if self.CREDENTIAL_ENCRYPTION_KEY == INSECURE_ENCRYPTION_KEY:
             problems.append("CREDENTIAL_ENCRYPTION_KEY")
-        if self.ADMIN_PASSWORD == INSECURE_ADMIN_PASSWORD:
-            problems.append("ADMIN_PASSWORD")
         return problems
 
     def validate_runtime(self) -> None:

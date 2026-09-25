@@ -643,3 +643,72 @@ async def poll_debug(db:AsyncSession=Depends(get_db),cu:User=Depends(get_current
 async def poll_now(db:AsyncSession=Depends(get_db),cu:User=Depends(get_current_user)):
     """Sync inbox — re-register webhooks, replay history, refresh statuses."""
     return await sync_full_inbox(db, cu)
+
+
+# --------------------------------------------------------------------------
+# Manual override of the AI reply classification.
+# "good"  -> sentiment positive, lead marked interested (opt-out reverted).
+# "bad"   -> sentiment negative, lead opted out + suppressed, sequence stopped.
+# --------------------------------------------------------------------------
+from pydantic import BaseModel as _BaseModel
+
+
+class _ReplyFeedback(_BaseModel):
+    verdict: str  # "good" | "bad"
+
+
+@router.post("/messages/{message_id}/feedback")
+async def message_feedback(message_id: int, data: _ReplyFeedback,
+                           db: AsyncSession = Depends(get_db), cu: User = Depends(get_current_user)):
+    from app.models.suppression import SuppressionEntry
+    verdict = (data.verdict or "").lower().strip()
+    if verdict not in ("good", "bad"):
+        raise HTTPException(400, "verdict must be 'good' or 'bad'")
+    msg = (await db.execute(select(Message).where(Message.id == message_id))).scalar_one_or_none()
+    if not msg:
+        raise HTTPException(404, "Message not found")
+    conv = await _get_conv(db, msg.conversation_id)
+    contact = (await db.execute(select(Contact).where(Contact.id == conv.contact_id))).scalar_one_or_none()
+    now = dt.now(tz.utc)
+    msg.ai_confidence = 1.0
+    if verdict == "good":
+        msg.ai_sentiment = "positive"
+        msg.ai_intent = "interested"
+        conv.status = "interested"
+        if contact:
+            contact.lead_status = "interested"
+            if contact.is_opted_out:
+                contact.is_opted_out = False
+                contact.opted_out_at = None
+                contact.opt_out_reason = None
+                if hasattr(contact, "consent_status"):
+                    contact.consent_status = "unknown"
+                entry = (await db.execute(select(SuppressionEntry).where(
+                    SuppressionEntry.phone_number == contact.phone_number))).scalar_one_or_none()
+                if entry:
+                    await db.delete(entry)
+    else:
+        msg.ai_sentiment = "negative"
+        msg.ai_intent = "opt_out"
+        conv.status = "not_interested"
+        conv.sequence_paused = True
+        if contact:
+            contact.lead_status = "not_interested"
+            contact.is_opted_out = True
+            contact.opted_out_at = now
+            contact.opt_out_reason = "Marked bad reply in inbox"
+            if hasattr(contact, "consent_status"):
+                contact.consent_status = "opted_out"
+            if hasattr(contact, "has_consented"):
+                contact.has_consented = False
+            exists = (await db.execute(select(SuppressionEntry).where(
+                SuppressionEntry.phone_number == contact.phone_number))).scalar_one_or_none()
+            if not exists:
+                db.add(SuppressionEntry(phone_number=contact.phone_number, contact_id=contact.id,
+                                        reason="Marked bad reply in inbox", source="manual"))
+            from app.services.sms_service import SMSService
+            await SMSService(db)._stop_seq(contact.id)
+    await db.flush()
+    return {"success": True, "message_id": msg.id, "ai_sentiment": msg.ai_sentiment,
+            "ai_intent": msg.ai_intent, "status": conv.status,
+            "is_opted_out": bool(contact.is_opted_out) if contact else False}
