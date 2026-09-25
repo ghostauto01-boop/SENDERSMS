@@ -46,7 +46,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data } = await api.get<User>("/auth/me");
       setUser(data);
     } catch {
-      setUser(null);
+      // When the site is open (no password required), /auth/me should always succeed
+      // because the backend creates/returns the admin user via ensure_admin().
+      // If it fails, retry once after a short delay to handle transient errors.
+      if (!required) {
+        try {
+          await new Promise((r) => setTimeout(r, 500));
+          const retry = await api.get<User>("/auth/me");
+          setUser(retry.data);
+        } catch {
+          setUser(null);
+        }
+      } else {
+        setUser(null);
+      }
     } finally {
       setLoading(false);
     }
@@ -55,6 +68,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const noteAccess = (required: boolean) => {
     setPasswordRequired(required);
     setSitePasswordRequired(required);
+    // When access mode changes, re-fetch the user to ensure we have the correct auth state
+    // This is especially important when switching from password-required to open access
+    checkAuth();
   };
 
   const login = async (password: string): Promise<boolean> => {
