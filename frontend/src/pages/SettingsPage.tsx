@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import api from "../api/client";
+import { useAuth } from "../hooks/useAuth";
 import { NotificationProviderSettings } from "../types";
 import toast from "react-hot-toast";
-import { Wifi, Bell, Shield, Clock, TestTube, Eye, EyeOff, Activity, CheckCircle, XCircle, Webhook, RefreshCw, Trash2, Phone } from "lucide-react";
+import { Wifi, Bell, Shield, Clock, TestTube, Eye, EyeOff, Activity, CheckCircle, XCircle, Webhook, RefreshCw, Trash2, Phone, Lock } from "lucide-react";
 
-type Tab = "gateway" | "calls" | "notifications" | "compliance" | "sending";
+type Tab = "gateway" | "calls" | "notifications" | "compliance" | "sending" | "access";
 
 export default function SettingsPage() {
   const [tab, setTab] = useState<Tab>("gateway");
@@ -25,6 +26,7 @@ export default function SettingsPage() {
   };
 
   const tabs = [
+    { id: "access" as Tab, label: "Site access", icon: Lock },
     { id: "gateway" as Tab, label: "SMS Gateway", icon: Wifi },
     { id: "calls" as Tab, label: "Calls", icon: Phone },
     { id: "notifications" as Tab, label: "Notifications", icon: Bell },
@@ -37,8 +39,90 @@ export default function SettingsPage() {
       <div className="flex gap-2 flex-wrap">{tabs.map(t => (<button key={t.id} onClick={() => setTab(t.id)}
         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium ${tab===t.id?"bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300":"text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"}`}><t.icon size={14}/>{t.label}</button>))}</div>
       {loading ? (<div className="card p-6"><div className="skeleton h-8 w-48 mb-4"/><div className="space-y-3">{[...Array(3)].map((_,i)=>(<div key={i} className="skeleton h-10 w-full"/>))}</div></div>)
-      : (<>{tab==="gateway"&&<GatewayTab />}{tab==="calls"&&<CallsTab />}{tab==="notifications"&&<NotifsTab provs={notifs} onUpdate={load}/>}{tab==="compliance"&&<CompTab s={comp} onUpdate={load}/>}{tab==="sending"&&<RulesTab s={rules} onUpdate={load}/>}</>)}
+      : (<>{tab==="access"&&<AccessTab />}{tab==="gateway"&&<GatewayTab />}{tab==="calls"&&<CallsTab />}{tab==="notifications"&&<NotifsTab provs={notifs} onUpdate={load}/>}{tab==="compliance"&&<CompTab s={comp} onUpdate={load}/>}{tab==="sending"&&<RulesTab s={rules} onUpdate={load}/>}</>)}
     </div>);
+}
+
+function AccessTab() {
+  const { noteAccess } = useAuth();
+  const [required, setRequired] = useState(false);
+  const [passwordSet, setPasswordSet] = useState(false);
+  const [password, setPassword] = useState("");
+  const [show, setShow] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    api.get("/settings/access")
+      .then(({ data }) => {
+        setRequired(!!data.password_required);
+        setPasswordSet(!!data.password_set);
+      })
+      .catch(() => toast.error("Could not load site access"))
+      .finally(() => setReady(true));
+  }, []);
+
+  const save = async () => {
+    if (required && !password.trim() && !passwordSet) {
+      toast.error("Set a password before turning the gate on");
+      return;
+    }
+    setSaving(true);
+    try {
+      const { data } = await api.put("/settings/access", {
+        password_required: required,
+        password: password.trim() || undefined,
+      });
+      setRequired(!!data.password_required);
+      setPasswordSet(!!data.password_set);
+      setPassword("");
+      noteAccess(!!data.password_required);
+      toast.success(data.password_required
+        ? "Password gate is on. Other visitors must sign in."
+        : "Site is open. The address is enough.");
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || "Could not save");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!ready) {
+    return <div className="card p-6 max-w-lg"><div className="skeleton h-8 w-48" /></div>;
+  }
+
+  return (
+    <div className="card p-6 space-y-4 max-w-lg">
+      <h2 className="text-lg font-semibold">Site access</h2>
+      <div className={`p-3 rounded-lg text-sm ${required ? "bg-amber-50 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200" : "bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200"}`}>
+        {required
+          ? "Locked. Visitors must type a password before they can open the site."
+          : "Open. Anyone with the site address can use it. No password is asked."}
+      </div>
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" checked={required} onChange={(e) => setRequired(e.target.checked)} />
+        Require a password to open this site
+      </label>
+      <div>
+        <label className="label">Password {passwordSet && <span className="text-green-600 font-normal">(saved — leave blank to keep)</span>}</label>
+        <div className="relative">
+          <input
+            type={show ? "text" : "password"}
+            className="input w-full pr-10"
+            placeholder={passwordSet ? "••••••" : "Set a password for later"}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="new-password"
+          />
+          <button type="button" onClick={() => setShow(!show)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+            {show ? <EyeOff size={16} /> : <Eye size={16} />}
+          </button>
+        </div>
+        <p className="text-xs text-gray-400 mt-1">Leave the gate off for now. When you want a password wall again, turn it on here — no redeploy needed.</p>
+      </div>
+      <button onClick={save} disabled={saving} className="btn-primary w-full">{saving ? "Saving..." : "Save"}</button>
+    </div>
+  );
 }
 
 function GatewayTab() {

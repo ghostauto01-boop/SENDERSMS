@@ -18,6 +18,11 @@ class LoginResponse(BaseModel):
     message: str
 
 
+class SiteAccessUpdate(BaseModel):
+    password_required: bool
+    password: str | None = None
+
+
 class UserOut(BaseModel):
     id: int
     username: str

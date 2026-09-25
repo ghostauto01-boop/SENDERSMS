@@ -7,10 +7,19 @@ import BrandMark from "../components/BrandMark";
 export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const { login, isAuthenticated } = useAuth();
+  const { login, isAuthenticated, loading: authLoading, passwordRequired } = useAuth();
   const navigate = useNavigate();
 
-  if (isAuthenticated) {
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600" />
+      </div>
+    );
+  }
+
+  // No password wall right now — the address itself is enough.
+  if (isAuthenticated || !passwordRequired) {
     return <Navigate to="/dashboard" replace />;
   }
 

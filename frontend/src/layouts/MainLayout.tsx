@@ -47,7 +47,7 @@ export default function MainLayout() {
   });
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, logout, passwordRequired } = useAuth();
 
   const toggleDark = () => {
     const newDark = !dark;
@@ -163,13 +163,15 @@ export default function MainLayout() {
               <span className="text-sm text-gray-700 dark:text-gray-300 hidden sm:block">
                 {user?.display_name || user?.username}
               </span>
-              <button
-                onClick={handleLogout}
-                className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"
-                title="Logout"
-              >
-                <LogOut size={18} />
-              </button>
+              {passwordRequired && (
+                <button
+                  onClick={handleLogout}
+                  className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  title="Logout"
+                >
+                  <LogOut size={18} />
+                </button>
+              )}
             </div>
           </div>
         </header>

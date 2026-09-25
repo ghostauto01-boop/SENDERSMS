@@ -11,6 +11,7 @@ vi.mock("../api/client", () => ({
     put: (...args: any[]) => apiPut(...args),
     post: () => Promise.resolve({ data: {} }),
   },
+  setSitePasswordRequired: () => {},
 }));
 
 beforeEach(() => {
@@ -37,10 +38,24 @@ beforeEach(() => {
     if (url === "/settings/notifications/muted-senders") {
       return Promise.resolve({ data: { senders: ["MTN", "AIRTEL"] } });
     }
+    if (url === "/settings/access") {
+      return Promise.resolve({ data: { password_required: false, password_set: false } });
+    }
     return Promise.reject(new Error("unmocked GET " + url));
   });
 
   apiPut.mockResolvedValue({ data: { success: true } });
+});
+
+describe("SettingsPage — site access", () => {
+  it("shows that the site is open, with no password required", async () => {
+    render(<SettingsPage />);
+    await waitFor(() => expect(screen.getByText("Site access")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("Site access"));
+    await waitFor(() => {
+      expect(screen.getByText(/Anyone with the site address can use it/)).toBeInTheDocument();
+    });
+  });
 });
 
 describe("SettingsPage — muted senders", () => {

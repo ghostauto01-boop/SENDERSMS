@@ -136,7 +136,7 @@ export default function InboxPage() {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<any>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
-  const { user, logout } = useAuth();
+  const { user, logout, passwordRequired } = useAuth();
   const navigate = useNavigate();
 
   // The inbox renders outside the dashboard shell, so own the dark-mode class.
@@ -477,11 +477,15 @@ export default function InboxPage() {
                           <it.icon size={16} className="text-[#54656f] dark:text-[#aebac1]" /> {it.label}
                         </Link>
                       ))}
-                      <div className="border-t border-gray-100 dark:border-[#222d34] my-1" />
-                      <button onClick={handleLogout}
-                        className="w-full flex items-center gap-3 px-3 py-2.5 text-[14px] text-red-600 dark:text-red-400 hover:bg-[#f0f2f5] dark:hover:bg-[#182533]">
-                        <LogOut size={16} /> Log out
-                      </button>
+                      {passwordRequired && (
+                        <>
+                          <div className="border-t border-gray-100 dark:border-[#222d34] my-1" />
+                          <button onClick={handleLogout}
+                            className="w-full flex items-center gap-3 px-3 py-2.5 text-[14px] text-red-600 dark:text-red-400 hover:bg-[#f0f2f5] dark:hover:bg-[#182533]">
+                            <LogOut size={16} /> Log out
+                          </button>
+                        </>
+                      )}
                     </div>
                   </>
                 )}

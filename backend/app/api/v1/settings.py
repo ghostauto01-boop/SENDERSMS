@@ -2,19 +2,43 @@
 import json,logging,os
 from datetime import datetime, timezone
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models.notification import NotificationProvider
 from app.models.system import SystemSetting
 from app.models.user import User
-from app.security.auth import get_current_user
+from app.schemas.auth import SiteAccessUpdate
+from app.security.auth import apply_session_cookie, create_access_token, get_current_user
 from app.security.encryption import encrypt_value,decrypt_value,mask_value
 from app.config import settings
 
 logger=logging.getLogger(__name__)
 router=APIRouter()
+
+@router.get("/access")
+async def get_access(db:AsyncSession=Depends(get_db), cu:User=Depends(get_current_user)):
+    """Whether the site password wall is on. Off by default."""
+    from app.services.system_settings import get_site_access
+    return await get_site_access(db)
+
+@router.put("/access")
+async def put_access(body:SiteAccessUpdate, response:Response, db:AsyncSession=Depends(get_db), cu:User=Depends(get_current_user)):
+    """Turn the password wall on or off. Used from Settings → Site access.
+
+    Turning it on keeps this browser signed in (session cookie) so the
+    operator is not locked out of the screen they just saved.
+    """
+    from app.services.system_settings import set_site_access
+    try:
+        saved = await set_site_access(db, password_required=body.password_required, password=body.password)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    if body.password_required:
+        token = create_access_token(data={"sub": str(cu.id), "role": cu.role})
+        apply_session_cookie(response, token)
+    return saved
 
 @router.get("/gateway")
 async def get_gw(db:AsyncSession=Depends(get_db)):

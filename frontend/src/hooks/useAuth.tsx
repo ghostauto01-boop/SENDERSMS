@@ -1,5 +1,5 @@
 import { useState, useEffect, createContext, useContext, ReactNode } from "react";
-import api from "../api/client";
+import api, { setSitePasswordRequired } from "../api/client";
 import { User } from "../types";
 
 interface AuthContextType {
@@ -8,6 +8,9 @@ interface AuthContextType {
   login: (password: string) => Promise<boolean>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
+  /** False until a password is turned on in Settings → Site access. */
+  passwordRequired: boolean;
+  noteAccess: (passwordRequired: boolean) => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -16,17 +19,29 @@ const AuthContext = createContext<AuthContextType>({
   login: async () => false,
   logout: async () => {},
   isAuthenticated: false,
+  passwordRequired: false,
+  noteAccess: () => {},
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [passwordRequired, setPasswordRequired] = useState(false);
 
   useEffect(() => {
     checkAuth();
   }, []);
 
   const checkAuth = async () => {
+    let required = false;
+    try {
+      const { data } = await api.get<{ password_required: boolean }>("/auth/access");
+      required = !!data.password_required;
+    } catch {
+      required = false;
+    }
+    setPasswordRequired(required);
+    setSitePasswordRequired(required);
     try {
       const { data } = await api.get<User>("/auth/me");
       setUser(data);
@@ -35,6 +50,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const noteAccess = (required: boolean) => {
+    setPasswordRequired(required);
+    setSitePasswordRequired(required);
   };
 
   const login = async (password: string): Promise<boolean> => {
@@ -60,7 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, login, logout, isAuthenticated: !!user }}
+      value={{ user, loading, login, logout, isAuthenticated: !!user, passwordRequired, noteAccess }}
     >
       {children}
     </AuthContext.Provider>
