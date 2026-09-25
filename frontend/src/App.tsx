@@ -37,7 +37,7 @@ function PageSpinner() {
 }
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, loading, passwordRequired } = useAuth();
+  const { isAuthenticated, loading } = useAuth();
 
   if (loading) {
     return (
@@ -47,8 +47,8 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // Password wall is off unless turned on in Settings → Site access.
-  if (!isAuthenticated && passwordRequired) {
+  // The app always sits behind the login screen.
+  if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
 

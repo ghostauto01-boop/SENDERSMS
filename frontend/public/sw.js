@@ -1,4 +1,4 @@
-const V = "sms-sender-v4";
+const V = "sms-sender-v5";
 const APP_SHELL = ["/", "/manifest.json", "/icon-192.png", "/icon-512.png", "/favicon.svg"];
 
 self.addEventListener("install", e => {

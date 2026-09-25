@@ -45,7 +45,6 @@ export default function SettingsPage() {
 
 function AccessTab() {
   const { noteAccess } = useAuth();
-  const [required, setRequired] = useState(false);
   const [passwordSet, setPasswordSet] = useState(false);
   const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
@@ -55,7 +54,6 @@ function AccessTab() {
   useEffect(() => {
     api.get("/settings/access")
       .then(({ data }) => {
-        setRequired(!!data.password_required);
         setPasswordSet(!!data.password_set);
       })
       .catch(() => toast.error("Could not load site access"))
@@ -63,23 +61,23 @@ function AccessTab() {
   }, []);
 
   const save = async () => {
-    if (required && !password.trim() && !passwordSet) {
-      toast.error("Set a password before turning the gate on");
+    if (!password.trim() && !passwordSet) {
+      toast.error("Type the extra password you want to sign in with");
       return;
     }
     setSaving(true);
     try {
       const { data } = await api.put("/settings/access", {
-        password_required: required,
+        password_required: true,
         password: password.trim() || undefined,
       });
-      setRequired(!!data.password_required);
+      const hadPassword = passwordSet;
       setPasswordSet(!!data.password_set);
       setPassword("");
-      noteAccess(!!data.password_required);
-      toast.success(data.password_required
-        ? "Password gate is on. Other visitors must sign in."
-        : "Site is open. The address is enough.");
+      noteAccess(true);
+      toast.success(hadPassword
+        ? "Login password updated. You can sign in with it too."
+        : "Login password saved. You can sign in with it too.");
     } catch (e: any) {
       toast.error(e?.response?.data?.detail || "Could not save");
     } finally {
@@ -94,22 +92,18 @@ function AccessTab() {
   return (
     <div className="card p-6 space-y-4 max-w-lg">
       <h2 className="text-lg font-semibold">Site access</h2>
-      <div className={`p-3 rounded-lg text-sm ${required ? "bg-amber-50 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200" : "bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200"}`}>
-        {required
-          ? "Locked. Visitors must type a password before they can open the site."
-          : "Open. Anyone with the site address can use it. No password is asked."}
+      <div className="p-3 rounded-lg text-sm bg-amber-50 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200">
+        Locked. Everyone signs in with the admin username and password set in
+        the server environment (Render). Changing the environment password
+        takes effect on the next login.
       </div>
-      <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" checked={required} onChange={(e) => setRequired(e.target.checked)} />
-        Require a password to open this site
-      </label>
       <div>
-        <label className="label">Password {passwordSet && <span className="text-green-600 font-normal">(saved — leave blank to keep)</span>}</label>
+        <label className="label">Extra login password {passwordSet && <span className="text-green-600 font-normal">(saved — leave blank to keep)</span>}</label>
         <div className="relative">
           <input
             type={show ? "text" : "password"}
             className="input w-full pr-10"
-            placeholder={passwordSet ? "••••••" : "Set a password for later"}
+            placeholder={passwordSet ? "••••••" : "Optional second password"}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="new-password"
@@ -118,7 +112,7 @@ function AccessTab() {
             {show ? <EyeOff size={16} /> : <Eye size={16} />}
           </button>
         </div>
-        <p className="text-xs text-gray-400 mt-1">Leave the gate off for now. When you want a password wall again, turn it on here — no redeploy needed.</p>
+        <p className="text-xs text-gray-400 mt-1">Optional. This password also opens the login screen, without typing your admin credentials.</p>
       </div>
       <button onClick={save} disabled={saving} className="btn-primary w-full">{saving ? "Saving..." : "Save"}</button>
     </div>
