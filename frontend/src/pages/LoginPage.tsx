@@ -5,7 +5,6 @@ import toast from "react-hot-toast";
 import BrandMark from "../components/BrandMark";
 
 export default function LoginPage() {
-  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const { login, isAuthenticated } = useAuth();
@@ -17,18 +16,18 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username || !password) {
-      toast.error("Please fill in all fields");
+    if (!password) {
+      toast.error("Please enter your password");
       return;
     }
     setLoading(true);
-    const success = await login(username, password);
+    const success = await login(password);
     setLoading(false);
     if (success) {
       toast.success("Welcome back!");
       navigate("/dashboard");
     } else {
-      toast.error("Invalid username or password");
+      toast.error("Incorrect password");
     }
   };
 
@@ -48,17 +47,6 @@ export default function LoginPage() {
         <div className="card p-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="label">Username</label>
-              <input
-                type="text"
-                className="input"
-                placeholder="Enter your username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                autoFocus
-              />
-            </div>
-            <div>
               <label className="label">Password</label>
               <input
                 type="password"
@@ -66,6 +54,9 @@ export default function LoginPage() {
                 placeholder="Enter your password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                autoFocus
+                inputMode="numeric"
+                autoComplete="current-password"
               />
             </div>
             <button

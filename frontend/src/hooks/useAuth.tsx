@@ -5,7 +5,7 @@ import { User } from "../types";
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (username: string, password: string) => Promise<boolean>;
+  login: (password: string) => Promise<boolean>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
 }
@@ -37,9 +37,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const login = async (username: string, password: string): Promise<boolean> => {
+  const login = async (password: string): Promise<boolean> => {
     try {
-      const { data } = await api.post("/auth/login", { username, password });
+      const { data } = await api.post("/auth/login", { password });
       if (data.success) {
         await checkAuth();
         return true;

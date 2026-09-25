@@ -45,24 +45,25 @@ async def _bootstrap_admin(db: AsyncSession):
 @router.post("/login", response_model=LoginResponse)
 @limiter.limit(settings.RATE_LIMIT_LOGIN)
 async def login(request: Request, data: LoginRequest, db: AsyncSession = Depends(get_db)):
-    """Authenticate user and set session cookie."""
-    # Bootstrap admin if needed
-    await _bootstrap_admin(db)
+    """Password-only login.
 
-    result = await db.execute(select(User).where(User.username == data.username))
-    user = result.scalar_one_or_none()
-
-    if not user or not user.is_active:
+    The app has a single operator. Username is ignored: the password is
+    checked against settings.LOGIN_PASSWORD (default "12345678") and the
+    session is issued for the admin account, which is created on first use.
+    Previously the admin row was only created once, so changing
+    ADMIN_PASSWORD in the environment never updated the stored hash and the
+    real password was rejected as "invalid".
+    """
+    import hmac
+    if not hmac.compare_digest(data.password.strip().encode(), settings.LOGIN_PASSWORD.encode()):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid username or password",
+            detail="Invalid password",
         )
 
-    if not verify_password(data.password, user.password_hash):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid username or password",
-        )
+    user = await _bootstrap_admin(db)
+    if not user.is_active:
+        user.is_active = True
 
     # Update last login
     user.last_login = datetime.now(timezone.utc)
