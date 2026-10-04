@@ -584,6 +584,9 @@ Before going live, verify each item:
 - [ ] No secrets in `docker-compose.yml` (use env files or secrets manager)
 - [ ] Render env vars with `sync: false` are set manually
 - [ ] Change admin password after first login
+- [ ] If an AI assistant is connected (Settings → **AI (MCP)**): each token has only the
+      scope it needs (start read-only), and any token you no longer use is **revoked**.
+      A `write` token can send real messages — treat it like the admin password.
 
 ### Database
 
@@ -784,6 +787,11 @@ Beyond the usual `DATABASE_URL` / `REDIS_URL` / `SECRET_KEY`, this release adds:
 | `SMSGATE_WEBHOOK_SECRET` | Inbound webhooks are rejected with `401` unless their HMAC-SHA256 signature matches. Found on the device under Settings → Webhooks → Signing Key. |
 | `SMSGATE_USERNAME` / `SMSGATE_PASSWORD` | Gateway credentials. These are now **env-only** — the previous hardcoded defaults were removed. |
 | `ENABLE_INLINE_POLLER` | Set to `true` only when running without a Celery worker. |
+
+There is nothing to configure for the **MCP** endpoint: it lives at `POST /mcp` and is
+authenticated by tokens you create in the app (Settings → AI (MCP)), not by an environment
+variable. It needs a **public HTTPS** address — the same one `PUBLIC_BASE_URL` describes — for
+ChatGPT or Claude to reach it.
 
 In production (`APP_ENV=production`) the app **refuses to start** if
 `SECRET_KEY`, `CREDENTIAL_ENCRYPTION_KEY`, or `ADMIN_PASSWORD` are left at their

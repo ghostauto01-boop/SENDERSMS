@@ -938,7 +938,7 @@ async def health_db():
     code = 200 if result.get("ok") else 503
     return JSONResponse(result, status_code=code, headers={"Cache-Control": "no-store"})
 
-from app.api.v1 import ads, auth, calendar, calls, contacts, lists, campaigns, sequences, followups, inbox, overview, templates, analytics, settings as settings_api, webhooks, dashboard, send, autoreply, automations, ai, variables, campaign_followups, notifications, email as email_api
+from app.api.v1 import ads, auth, calendar, calls, contacts, lists, campaigns, sequences, followups, inbox, overview, templates, analytics, settings as settings_api, webhooks, dashboard, send, autoreply, automations, ai, variables, campaign_followups, notifications, email as email_api, mcp as mcp_api
 app.include_router(auth.router, prefix="/api/v1/auth")
 app.include_router(dashboard.router, prefix="/api/v1/dashboard")
 app.include_router(contacts.router, prefix="/api/v1/contacts")
@@ -969,6 +969,9 @@ app.include_router(notifications.router, prefix="/api/v1/notifications")
 # Email channel (Brevo): senders, one-off sends, the email inbox and its stats.
 # The SMS routes above are untouched -- this is a parallel, additive surface.
 app.include_router(email_api.router, prefix="/api/v1/email")
+app.include_router(mcp_api.router, prefix="/api/v1/mcp")
+# The one address an AI assistant is pointed at: https://your-app/mcp
+app.include_router(mcp_api.protocol_router, prefix="/mcp")
 
 PUBLIC_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "public")
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist")

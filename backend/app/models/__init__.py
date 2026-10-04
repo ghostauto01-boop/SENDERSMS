@@ -25,6 +25,7 @@ from app.models.meeting import Meeting, MeetingAttendee
 from app.models.call import CallLog
 from app.models.push import PushSubscription
 from app.models.email import EmailAccount, EmailEvent, EmailSuppression
+from app.models.mcp import McpCall, McpToken
 from app.models.ads import (
     AdsAudience,
     AdsCampaign,

@@ -47,6 +47,48 @@ campaigns work identically on both:
   campaign rule) quotes the newest message in the thread, so it arrives inside
   the same conversation in Gmail/Outlook instead of starting a new one.
 
+## Let an AI run it (MCP)
+
+The app is also a **Model Context Protocol** server, so ChatGPT, Claude or any MCP
+client can operate it — import contacts, write and send campaigns, answer the
+inbox, read analytics — using the app's own endpoints, rules and consent checks.
+
+* **Endpoint** — `POST https://your-app/mcp` (JSON-RPC 2.0 over Streamable HTTP;
+  a JSON reply, or one SSE event when the client asks for `text/event-stream`).
+* **Access** — Settings → **AI (MCP)** → *Create token*. The token is shown once
+  and stored only as a SHA-256 hash. Send it as `Authorization: Bearer <token>`
+  (`?token=<token>` also works for clients that cannot set headers). ChatGPT:
+  *Settings → Connectors → Add custom connector*. Claude: *Settings → Connectors*,
+  or `claude mcp add --transport http sendsms https://your-app/mcp --header "Authorization: Bearer <token>"`.
+* **Scope** — a `read` token can look at everything and change nothing; a `write`
+  token can do anything the app's UI can. Write tools are refused on a read token,
+  including through the escape hatch.
+* **~57 tools** in groups: guide, contacts (search/create/update, CSV import and
+  export, per-channel consent), lists, templates (+ preview with a real contact's
+  values), campaigns (create/update/validate/start/pause/resume/duplicate flags/
+  analytics/delete draft), sending (`send_sms_now`, `send_email_now`,
+  `send_test_email`), email (senders, inbox, threaded reply, per-contact
+  engagement, suppression), unified inbox, follow-ups (per-contact and
+  per-campaign), analytics, and `app_api_request` — an escape hatch to *any*
+  endpoint, discovered with `list_api_endpoints`.
+* **Same rules as the UI** — tools call the app's own REST API in-process, so
+  opt-outs, unsubscribes, bounces, sending limits, placeholder-address rejection
+  and campaign validation behave identically. A refusal is reported to the
+  assistant, not silently skipped.
+* **Guide first** — the server tells the assistant to read
+  `how_to_use_this_app` (also exposed as the `sendsms://guide` resource) before
+  sending: channels, consent rules and the safe order of operations.
+* **Audit trail** — every tool call is journalled (tool, endpoint, status,
+  duration, error) and shown in Settings → AI (MCP), so the operator can see
+  exactly what the assistant did, and revoke its token in one click.
+
+```bash
+# What an assistant does, from the outside:
+curl -s https://your-app/mcp \
+  -H "Authorization: Bearer mcp_…" -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+```
+
 Required environment for the absolute links (webhook URL, unsubscribe URL):
 
 | Variable | Why |
@@ -70,6 +112,10 @@ python tools/simulate_email_flow.py
 
 # 4. Prove nothing else broke: every parameterless GET endpoint
 python tools/smoke_all_endpoints.py
+
+# 5. Drive the app the way an AI assistant does (token → JSON-RPC → real
+#    endpoints): handshake, import, template, campaign, send, inbox, guard rails
+python tools/mcp_smoke.py
 ```
 
 `BREVO_API_BASE` only exists so a test can point at that stand-in; production never

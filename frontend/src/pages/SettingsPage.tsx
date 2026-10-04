@@ -3,11 +3,12 @@ import api from "../api/client";
 import { useAuth } from "../hooks/useAuth";
 import { NotificationProviderSettings } from "../types";
 import toast from "react-hot-toast";
-import { Wifi, Bell, Shield, Clock, TestTube, Eye, EyeOff, Activity, CheckCircle, XCircle, Webhook, RefreshCw, Trash2, Phone, Lock, Mail, Plus } from "lucide-react";
+import { Wifi, Bell, Shield, Clock, TestTube, Eye, EyeOff, Activity, CheckCircle, XCircle, Webhook, RefreshCw, Trash2, Phone, Lock, Mail, Plus, Sparkles, Copy, KeyRound } from "lucide-react";
 import { Link } from "react-router-dom";
 import emailApi, { EmailAccount } from "../api/email";
+import mcpApi, { McpCallRow, McpToken } from "../api/mcp";
 
-type Tab = "gateway" | "calls" | "notifications" | "compliance" | "sending" | "access" | "email";
+type Tab = "gateway" | "calls" | "notifications" | "compliance" | "sending" | "access" | "email" | "ai";
 
 export default function SettingsPage() {
   const [tab, setTab] = useState<Tab>("gateway");
@@ -31,6 +32,7 @@ export default function SettingsPage() {
     { id: "access" as Tab, label: "Site access", icon: Lock },
     { id: "gateway" as Tab, label: "SMS Gateway", icon: Wifi },
     { id: "email" as Tab, label: "Email (Brevo)", icon: Mail },
+    { id: "ai" as Tab, label: "AI (MCP)", icon: Sparkles },
     { id: "calls" as Tab, label: "Calls", icon: Phone },
     { id: "notifications" as Tab, label: "Notifications", icon: Bell },
     { id: "compliance" as Tab, label: "Compliance", icon: Shield },
@@ -42,7 +44,7 @@ export default function SettingsPage() {
       <div className="flex gap-2 flex-wrap">{tabs.map(t => (<button key={t.id} onClick={() => setTab(t.id)}
         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium ${tab===t.id?"bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300":"text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"}`}><t.icon size={14}/>{t.label}</button>))}</div>
       {loading ? (<div className="card p-6"><div className="skeleton h-8 w-48 mb-4"/><div className="space-y-3">{[...Array(3)].map((_,i)=>(<div key={i} className="skeleton h-10 w-full"/>))}</div></div>)
-      : (<>{tab==="access"&&<AccessTab />}{tab==="gateway"&&<GatewayTab />}{tab==="calls"&&<CallsTab />}{tab==="email"&&<EmailTab />}{tab==="notifications"&&<NotifsTab provs={notifs} onUpdate={load}/>}{tab==="compliance"&&<CompTab s={comp} onUpdate={load}/>}{tab==="sending"&&<RulesTab s={rules} onUpdate={load}/>}</>)}
+      : (<>{tab==="access"&&<AccessTab />}{tab==="gateway"&&<GatewayTab />}{tab==="calls"&&<CallsTab />}{tab==="email"&&<EmailTab />}{tab==="ai"&&<McpTab />}{tab==="notifications"&&<NotifsTab provs={notifs} onUpdate={load}/>}{tab==="compliance"&&<CompTab s={comp} onUpdate={load}/>}{tab==="sending"&&<RulesTab s={rules} onUpdate={load}/>}</>)}
     </div>);
 }
 
@@ -740,6 +742,249 @@ function EmailTab() {
           opens, clicks, bounces and inbound replies into the app. Copy it from the senders list in the
           Email Manager.
         </p>
+      </div>
+    </div>
+  );
+}
+
+
+/**
+ * AI (MCP): hand an assistant a token so it can operate this app, and watch
+ * exactly what it did. Tokens are the only secret involved — nothing here is
+ * shared with the assistant's own account.
+ */
+function McpTab() {
+  const [tokens, setTokens] = useState<McpToken[]>([]);
+  const [calls, setCalls] = useState<McpCallRow[]>([]);
+  const [callsTotal, setCallsTotal] = useState(0);
+  const [name, setName] = useState("ChatGPT");
+  const [scope, setScope] = useState<"read" | "write">("write");
+  const [creating, setCreating] = useState(false);
+  const [fresh, setFresh] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const endpoint = mcpApi.endpoint();
+
+  const load = async () => {
+    try {
+      const [t, a] = await Promise.all([mcpApi.listTokens(), mcpApi.activity(40)]);
+      setTokens(t.items);
+      setCalls(a.items);
+      setCallsTotal(a.total);
+    } catch {
+      /* the token list is the only thing that matters here; stay quiet on failure */
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const create = async () => {
+    setCreating(true);
+    try {
+      const made = await mcpApi.createToken(name.trim() || "AI assistant", scope);
+      setFresh(made.token);
+      toast.success("Token created — copy it now, it is only shown once");
+      await load();
+    } catch {
+      toast.error("Could not create the token");
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const revoke = async (id: number, label: string) => {
+    if (!confirm(`Revoke the token for "${label}"? Whatever is using it stops working immediately.`)) return;
+    try {
+      await mcpApi.revokeToken(id);
+      toast.success("Token revoked");
+      await load();
+    } catch {
+      toast.error("Could not revoke the token");
+    }
+  };
+
+  const copy = async (value: string, what: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      toast.success(`${what} copied`);
+    } catch {
+      toast.error("Copy failed — select it and press Ctrl/Cmd+C");
+    }
+  };
+
+  return (
+    <div className="space-y-4 max-w-3xl">
+      <div className="card p-6 space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            <Sparkles size={18} /> Let an AI operate this app
+          </h2>
+          <p className="text-sm text-gray-500 mt-1">
+            This app speaks the Model Context Protocol, so ChatGPT, Claude, or any MCP client can
+            import contacts, write and send campaigns, reply in the inbox and read analytics — the
+            same actions you can do here. Every call is logged below.
+          </p>
+        </div>
+
+        <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4 space-y-3">
+          <h3 className="font-semibold text-sm">1. Create a token</h3>
+          <div className="flex flex-wrap items-end gap-2">
+            <label className="text-sm">
+              <span className="block text-gray-500 mb-1">What is it for?</span>
+              <input
+                className="input"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="ChatGPT"
+              />
+            </label>
+            <label className="text-sm">
+              <span className="block text-gray-500 mb-1">Permission</span>
+              <select className="input" value={scope} onChange={(e) => setScope(e.target.value as "read" | "write")}>
+                <option value="write">Read &amp; write — can send</option>
+                <option value="read">Read only — cannot change anything</option>
+              </select>
+            </label>
+            <button className="btn-primary btn-sm" onClick={create} disabled={creating}>
+              <Plus size={14} className="mr-1" /> {creating ? "Creating…" : "Create token"}
+            </button>
+          </div>
+
+          {fresh && (
+            <div className="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-3 space-y-2">
+              <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                Copy this now — it is not stored and cannot be shown again.
+              </p>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 text-xs bg-white dark:bg-gray-900 rounded p-2 overflow-x-auto whitespace-nowrap">
+                  {fresh}
+                </code>
+                <button className="btn-secondary btn-sm" onClick={() => copy(fresh, "Token")}>
+                  <Copy size={13} className="mr-1" /> Copy
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4 space-y-3">
+          <h3 className="font-semibold text-sm">2. Point the assistant at this URL</h3>
+          <div className="flex items-center gap-2">
+            <code className="flex-1 text-xs bg-gray-50 dark:bg-gray-900 rounded p-2 overflow-x-auto whitespace-nowrap">
+              {endpoint}
+            </code>
+            <button className="btn-secondary btn-sm" onClick={() => copy(endpoint, "URL")}>
+              <Copy size={13} className="mr-1" /> Copy
+            </button>
+          </div>
+          <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1 list-disc pl-5">
+            <li>
+              <strong>ChatGPT</strong> (Plus/Pro): Settings → Connectors → Add custom connector, paste
+              the URL, and choose <em>API key</em> authentication with the token above.
+            </li>
+            <li>
+              <strong>Claude</strong>: Settings → Connectors → Add custom connector, paste the URL and
+              the token when asked. In Claude Code: <code>claude mcp add --transport http sendsms {endpoint} --header "Authorization: Bearer &lt;token&gt;"</code>
+            </li>
+            <li>
+              Any other MCP client that supports a remote HTTP server works the same way: the token
+              goes in the <code>Authorization: Bearer</code> header (a <code>?token=</code> query
+              parameter also works, for clients that cannot set headers).
+            </li>
+            <li>
+              Not reachable from the internet? The URL above is this app's own address — the
+              assistant has to be able to reach it.
+            </li>
+          </ul>
+          <p className="text-xs text-gray-500">
+            Ask the assistant to run <code>how_to_use_this_app</code> first: it returns this app's
+            sending rules, channels and the safe order of operations.
+          </p>
+        </div>
+
+        <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4 space-y-2">
+          <h3 className="font-semibold text-sm flex items-center gap-2">
+            <KeyRound size={14} /> 3. Manage access
+          </h3>
+          {loading ? (
+            <div className="skeleton h-10 w-full" />
+          ) : tokens.length === 0 ? (
+            <p className="text-sm text-gray-500">No token yet — the assistant cannot reach the app until you create one.</p>
+          ) : (
+            <div className="divide-y divide-gray-100 dark:divide-gray-800">
+              {tokens.map((t) => (
+                <div key={t.id} className="py-3 flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-medium flex items-center gap-2 flex-wrap">
+                      {t.name}
+                      <span className={t.scope === "write" ? "badge-blue" : "badge-gray"}>{t.scope}</span>
+                      {!t.is_active && <span className="badge-gray">revoked</span>}
+                      <code className="text-xs text-gray-400">{t.prefix}…</code>
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {t.call_count} call{t.call_count === 1 ? "" : "s"}
+                      {t.last_used_at ? ` · last used ${new Date(t.last_used_at).toLocaleString()}` : " · never used"}
+                    </p>
+                    {t.last_error && (
+                      <p className="text-xs text-red-500 mt-1 truncate">Last error: {t.last_error}</p>
+                    )}
+                  </div>
+                  {t.is_active && (
+                    <button className="btn-secondary btn-sm shrink-0 text-red-600" onClick={() => revoke(t.id, t.name)}>
+                      <Trash2 size={13} className="mr-1" /> Revoke
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="card p-6 space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold flex items-center gap-2">
+            <Activity size={16} /> What the AI did
+          </h3>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500">{callsTotal} call{callsTotal === 1 ? "" : "s"} all time</span>
+            <button className="btn-secondary btn-sm" onClick={load}>
+              <RefreshCw size={13} className="mr-1" /> Refresh
+            </button>
+          </div>
+        </div>
+        {calls.length === 0 ? (
+          <p className="text-sm text-gray-500">Nothing yet. Once an assistant connects, every tool call shows up here.</p>
+        ) : (
+          <div className="divide-y divide-gray-100 dark:divide-gray-800 max-h-96 overflow-y-auto">
+            {calls.map((c) => (
+              <div key={c.id} className="py-2.5 flex items-start gap-3 text-sm">
+                {c.ok ? (
+                  <CheckCircle size={15} className="text-green-500 mt-0.5 shrink-0" />
+                ) : (
+                  <XCircle size={15} className="text-red-500 mt-0.5 shrink-0" />
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium flex items-center gap-2 flex-wrap">
+                    <code className="text-xs">{c.tool}</code>
+                    {c.token_name && <span className="text-xs text-gray-400">via {c.token_name}</span>}
+                    {c.duration_ms != null && <span className="text-xs text-gray-400">{c.duration_ms} ms</span>}
+                  </p>
+                  {c.request && <p className="text-xs text-gray-500 truncate">{c.request}</p>}
+                  {c.error && <p className="text-xs text-red-500 truncate">{c.error}</p>}
+                </div>
+                <span className="text-xs text-gray-400 whitespace-nowrap">
+                  {c.created_at ? new Date(c.created_at).toLocaleString() : ""}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
