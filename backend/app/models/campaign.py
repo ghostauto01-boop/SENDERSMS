@@ -21,6 +21,10 @@ class Campaign(Base):
     # Status: draft, scheduled, running, paused, completed, stopped, failed
     status: Mapped[str] = mapped_column(String(50), default="draft", nullable=False, index=True)
 
+    #: "sms" or "email" — which channel this campaign sends on. Existing rows
+    #: default to "sms", so nothing about the current behaviour changes.
+    channel: Mapped[str] = mapped_column(String(10), default="sms", nullable=False, index=True)
+
     # References
     list_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("contact_lists.id"), nullable=True)
     template_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("templates.id"), nullable=True)
@@ -32,6 +36,21 @@ class Campaign(Base):
     message_body: Mapped[str | None] = mapped_column(Text, nullable=True)
     sequence_version_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     gateway_setting_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("gateway_settings.id"), nullable=True)
+
+    # ---- Email channel -------------------------------------------------
+    #: Brevo sender this campaign sends through. NULL falls back to the
+    #: default EmailAccount at send time.
+    email_account_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    #: Used automatically when the primary account rejects the send (burned /
+    #: banned / over quota), so a campaign keeps going without a rebuild.
+    fallback_email_account_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    subject: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    #: Rich body for email campaigns (template_id / message_body still work).
+    html_body: Mapped[str | None] = mapped_column(Text, nullable=True)
+    track_opens: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    track_clicks: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    #: JSON list of attachments (base64) sent with every email in this campaign.
+    attachments: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Sending rules
     daily_limit: Mapped[int | None] = mapped_column(Integer, nullable=True)

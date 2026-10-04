@@ -46,11 +46,20 @@ class AutoReplyService:
     def __init__(self, db):
         self.db = db
 
-    async def find_matching_rules(self, body: str) -> list[AutoReplyRule]:
-        """Enabled rules that match, in priority order."""
+    async def find_matching_rules(
+        self, body: str, channel: str = "sms"
+    ) -> list[AutoReplyRule]:
+        """Enabled rules for THIS channel that match, in priority order.
+
+        Channel scoping matters: an SMS rule that answers "price?" must not
+        start answering email replies with a text message.
+        """
         result = await self.db.execute(
             select(AutoReplyRule)
-            .where(AutoReplyRule.is_enabled == True)  # noqa: E712
+            .where(
+                AutoReplyRule.is_enabled == True,  # noqa: E712
+                AutoReplyRule.channel == channel,
+            )
             .order_by(AutoReplyRule.priority.asc(), AutoReplyRule.id.asc())
         )
         matched = []
@@ -70,7 +79,9 @@ class AutoReplyService:
         if not rule.cooldown_minutes:
             return False
         cutoff = datetime.now(timezone.utc) - timedelta(minutes=rule.cooldown_minutes)
-        recent = await self.db.execute(
+        # Cooldown is per channel: a reply sent to an SMS must not silence the
+        # email autoresponder for the same contact.
+        query = (
             select(Message)
             .where(
                 Message.contact_id == contact_id,
@@ -78,21 +89,27 @@ class AutoReplyService:
                 Message.is_auto_reply == True,  # noqa: E712
                 Message.created_at >= cutoff,
             )
-            .limit(1)
         )
+        if getattr(rule, "channel", None):
+            query = query.where(Message.channel == rule.channel)
+        recent = await self.db.execute(query.limit(1))
         return recent.scalars().first() is not None
 
-    async def build_reply(self, contact, body: str):
+    async def build_reply(self, contact, body: str, channel: str = "sms"):
         """Return (rule, rendered_text) for the first rule that should fire.
 
         Returns (None, None) when nothing matches or the contact is in
         cooldown. Never raises for ordinary "no reply" cases.
         """
-        # Never argue with someone who just opted out.
-        if getattr(contact, "is_opted_out", False):
+        # Never argue with someone who just opted out. Each channel has its own
+        # consent flag, so an email unsubscribe never silences SMS replies.
+        if channel == "email":
+            if getattr(contact, "is_email_opted_out", False):
+                return None, None
+        elif getattr(contact, "is_opted_out", False):
             return None, None
 
-        for rule in await self.find_matching_rules(body):
+        for rule in await self.find_matching_rules(body, channel=channel):
             if await self._in_cooldown(rule, contact.id):
                 logger.info(
                     "AUTOREPLY: rule %s matched but contact %s is in cooldown",

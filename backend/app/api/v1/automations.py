@@ -28,6 +28,8 @@ def _dump(a: Automation) -> dict:
         "conditions": load_json(a.conditions_json),
         "match_all": a.match_all,
         "actions": load_json(a.actions_json),
+        "channel": getattr(a, "channel", "sms") or "sms",
+        "email_account_id": getattr(a, "email_account_id", None),
         "times_triggered": a.times_triggered,
         "last_triggered_at": a.last_triggered_at.isoformat() if a.last_triggered_at else None,
         "created_at": a.created_at.isoformat(),
@@ -37,13 +39,17 @@ def _dump(a: Automation) -> dict:
 
 @router.get("/", response_model=dict)
 async def list_automations(
+    channel: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Automations for one channel (defaults to SMS; ``all`` for both)."""
+    query = select(Automation)
+    wanted = (channel or "sms").lower()
+    if wanted != "all":
+        query = query.where(Automation.channel == wanted)
     rows = (
-        await db.execute(
-            select(Automation).order_by(Automation.priority.asc(), Automation.id.asc())
-        )
+        await db.execute(query.order_by(Automation.priority.asc(), Automation.id.asc()))
     ).scalars().all()
     return {"items": [_dump(a) for a in rows]}
 
@@ -60,6 +66,8 @@ async def create_automation(
         is_enabled=payload.is_enabled,
         priority=payload.priority,
         trigger_type=payload.trigger_type,
+        channel=payload.channel if payload.channel in ("sms", "email") else "sms",
+        email_account_id=payload.email_account_id,
         conditions_json=json.dumps(payload.conditions, ensure_ascii=False),
         match_all=payload.match_all,
         actions_json=json.dumps(payload.actions, ensure_ascii=False),

@@ -780,7 +780,7 @@ Beyond the usual `DATABASE_URL` / `REDIS_URL` / `SECRET_KEY`, this release adds:
 
 | Variable | Why it matters |
 |---|---|
-| `PUBLIC_BASE_URL` | The address registered with SMS-Gate as the inbound webhook target. **Without it you receive no replies.** On Render, `RENDER_EXTERNAL_URL` is used as a fallback. |
+| `PUBLIC_BASE_URL` | The address registered with SMS-Gate as the inbound webhook target, **and** the base for the Brevo webhook URL and the email one-click unsubscribe link. **Without it you receive no replies.** On Render, `RENDER_EXTERNAL_URL` is used as a fallback. |
 | `SMSGATE_WEBHOOK_SECRET` | Inbound webhooks are rejected with `401` unless their HMAC-SHA256 signature matches. Found on the device under Settings → Webhooks → Signing Key. |
 | `SMSGATE_USERNAME` / `SMSGATE_PASSWORD` | Gateway credentials. These are now **env-only** — the previous hardcoded defaults were removed. |
 | `ENABLE_INLINE_POLLER` | Set to `true` only when running without a Celery worker. |

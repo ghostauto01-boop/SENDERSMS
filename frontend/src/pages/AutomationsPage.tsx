@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { useChannel } from "../hooks/useChannel";
+import ChannelSwitch from "../components/ChannelSwitch";
 import api from "../api/client";
 import { Automation, AutomationAction, AutomationCondition } from "../types";
 import toast from "react-hot-toast";
@@ -24,6 +26,7 @@ const LABEL_OPTIONS = ["yes", "no", "positive", "negative", "neutral", "wrong_nu
 
 const ACTION_TYPES: { value: string; label: string }[] = [
   { value: "send_sms", label: "Send an SMS" },
+  { value: "send_email", label: "Send an email" },
   { value: "stop_sequence", label: "Stop the campaign sequence (skip next messages)" },
   { value: "opt_out", label: "Opt the contact out (block future sends)" },
   { value: "add_tag", label: "Add a tag" },
@@ -47,6 +50,10 @@ function actionSummary(a: AutomationAction): string {
   switch (a.type) {
     case "send_sms":
       return a.delay_minutes ? `Send SMS in ${a.delay_minutes} min: "${a.body?.slice(0, 40)}…"` : `Send SMS: "${a.body?.slice(0, 40)}…"`;
+    case "send_email":
+      return a.delay_minutes
+        ? `Send email in ${a.delay_minutes} min: "${a.body?.slice(0, 40)}…"`
+        : `Send email: "${a.body?.slice(0, 40)}…"`;
     case "stop_sequence": return "Stop the campaign sequence";
     case "opt_out": return "Opt the contact out";
     case "add_tag": return `Add tag "${a.value}"`;
@@ -59,10 +66,12 @@ function actionSummary(a: AutomationAction): string {
 
 function AutomationModal({
   automation,
+  channel = "sms",
   onClose,
   onSaved,
 }: {
   automation: Automation | null;
+  channel?: "sms" | "email";
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -84,7 +93,14 @@ function AutomationModal({
     setSaving(true);
     setError("");
     try {
-      const payload = { name: name.trim(), description, match_all: matchAll, conditions, actions };
+      const payload = {
+        name: name.trim(),
+        description,
+        match_all: matchAll,
+        conditions,
+        actions,
+        channel: automation ? (automation as any).channel || channel : channel,
+      };
       if (automation) await api.put(`/automations/${automation.id}`, payload);
       else await api.post("/automations/", payload);
       onSaved();
@@ -176,9 +192,17 @@ function AutomationModal({
                   </select>
                   <button onClick={() => setActions((as) => as.filter((_, idx) => idx !== i))} className="btn-ghost btn-sm text-red-600"><Trash2 size={14} /></button>
                 </div>
-                {a.type === "send_sms" && (
+                {(a.type === "send_sms" || a.type === "send_email") && (
                   <div className="space-y-1.5">
-                    <textarea className="input text-sm min-h-[60px]" placeholder="Great! We'll send you our menu shortly, {{first_name}}." value={a.body || ""} onChange={(e) => updateAction(i, { body: e.target.value })} />
+                    <textarea className="input text-sm min-h-[60px]" placeholder={a.type === "send_email" ? "Thanks for reaching out — here is the pricing sheet you asked for." : "Great! We'll send you our menu shortly, {{first_name}}."} value={a.body || ""} onChange={(e) => updateAction(i, { body: e.target.value })} />
+                    {a.type === "send_email" && (
+                      <input
+                        className="input text-sm"
+                        placeholder="Subject line (optional)"
+                        value={a.subject || ""}
+                        onChange={(e) => updateAction(i, { subject: e.target.value })}
+                      />
+                    )}
                     <div className="flex items-center gap-2 text-xs text-gray-500">
                       <span>Delay</span>
                       <select className="input text-sm py-1" value={String(a.delay_minutes || 0)} onChange={(e) => updateAction(i, { delay_minutes: Number(e.target.value) })}>
@@ -261,6 +285,7 @@ function AiTester() {
 }
 
 export default function AutomationsPage() {
+  const { channel } = useChannel();
   const [automations, setAutomations] = useState<Automation[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -270,14 +295,14 @@ export default function AutomationsPage() {
   const load = async () => {
     setLoading(true);
     try {
-      const { data } = await api.get("/automations/");
+      const { data } = await api.get("/automations/", { params: { channel } });
       setAutomations(data.items || []);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [channel]);
 
   const toggle = async (a: Automation) => {
     await api.put(`/automations/${a.id}`, { is_enabled: !a.is_enabled });
@@ -294,8 +319,13 @@ export default function AutomationsPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold">Automations</h1>
-          <p className="text-sm text-gray-500">Reply to your contacts automatically — the GoHighLevel way.</p>
+          <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-3">
+            Automations
+            <ChannelSwitch size="sm" />
+          </h1>
+          <p className="text-sm text-gray-500">
+            Reply to your contacts automatically — over {channel === "email" ? "email" : "SMS"}.
+          </p>
         </div>
         <button onClick={() => { setEditing(null); setShowModal(true); }} className="btn-primary btn-sm"><Plus size={14} className="mr-1" />New Automation</button>
       </div>
@@ -357,7 +387,14 @@ export default function AutomationsPage() {
         </div>
       )}
 
-      {showModal && <AutomationModal automation={editing} onClose={() => setShowModal(false)} onSaved={load} />}
+      {showModal && (
+        <AutomationModal
+          automation={editing}
+          channel={channel}
+          onClose={() => setShowModal(false)}
+          onSaved={load}
+        />
+      )}
     </div>
   );
 }

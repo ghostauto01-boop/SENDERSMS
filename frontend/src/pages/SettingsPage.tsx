@@ -3,9 +3,11 @@ import api from "../api/client";
 import { useAuth } from "../hooks/useAuth";
 import { NotificationProviderSettings } from "../types";
 import toast from "react-hot-toast";
-import { Wifi, Bell, Shield, Clock, TestTube, Eye, EyeOff, Activity, CheckCircle, XCircle, Webhook, RefreshCw, Trash2, Phone, Lock } from "lucide-react";
+import { Wifi, Bell, Shield, Clock, TestTube, Eye, EyeOff, Activity, CheckCircle, XCircle, Webhook, RefreshCw, Trash2, Phone, Lock, Mail, Plus } from "lucide-react";
+import { Link } from "react-router-dom";
+import emailApi, { EmailAccount } from "../api/email";
 
-type Tab = "gateway" | "calls" | "notifications" | "compliance" | "sending" | "access";
+type Tab = "gateway" | "calls" | "notifications" | "compliance" | "sending" | "access" | "email";
 
 export default function SettingsPage() {
   const [tab, setTab] = useState<Tab>("gateway");
@@ -28,6 +30,7 @@ export default function SettingsPage() {
   const tabs = [
     { id: "access" as Tab, label: "Site access", icon: Lock },
     { id: "gateway" as Tab, label: "SMS Gateway", icon: Wifi },
+    { id: "email" as Tab, label: "Email (Brevo)", icon: Mail },
     { id: "calls" as Tab, label: "Calls", icon: Phone },
     { id: "notifications" as Tab, label: "Notifications", icon: Bell },
     { id: "compliance" as Tab, label: "Compliance", icon: Shield },
@@ -39,7 +42,7 @@ export default function SettingsPage() {
       <div className="flex gap-2 flex-wrap">{tabs.map(t => (<button key={t.id} onClick={() => setTab(t.id)}
         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium ${tab===t.id?"bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300":"text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"}`}><t.icon size={14}/>{t.label}</button>))}</div>
       {loading ? (<div className="card p-6"><div className="skeleton h-8 w-48 mb-4"/><div className="space-y-3">{[...Array(3)].map((_,i)=>(<div key={i} className="skeleton h-10 w-full"/>))}</div></div>)
-      : (<>{tab==="access"&&<AccessTab />}{tab==="gateway"&&<GatewayTab />}{tab==="calls"&&<CallsTab />}{tab==="notifications"&&<NotifsTab provs={notifs} onUpdate={load}/>}{tab==="compliance"&&<CompTab s={comp} onUpdate={load}/>}{tab==="sending"&&<RulesTab s={rules} onUpdate={load}/>}</>)}
+      : (<>{tab==="access"&&<AccessTab />}{tab==="gateway"&&<GatewayTab />}{tab==="calls"&&<CallsTab />}{tab==="email"&&<EmailTab />}{tab==="notifications"&&<NotifsTab provs={notifs} onUpdate={load}/>}{tab==="compliance"&&<CompTab s={comp} onUpdate={load}/>}{tab==="sending"&&<RulesTab s={rules} onUpdate={load}/>}</>)}
     </div>);
 }
 
@@ -633,6 +636,111 @@ function CallWebhooksCard() {
           )}
         </>
       )}
+    </div>
+  );
+}
+
+
+/**
+ * Email (Brevo) settings.
+ *
+ * Credentials are never entered here twice: this tab summarises the senders
+ * configured in the Email Manager and links straight to the page that owns
+ * them, so there is exactly one place to add or rotate a Brevo API key.
+ */
+function EmailTab() {
+  const [accounts, setAccounts] = useState<EmailAccount[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [testing, setTesting] = useState<number | null>(null);
+
+  const load = async () => {
+    try {
+      const data = await emailApi.listAccounts();
+      setAccounts(data.items);
+    } catch {
+      toast.error("Could not load your email senders");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const test = async (account: EmailAccount) => {
+    setTesting(account.id);
+    try {
+      const result = await emailApi.testAccount(account.id);
+      if (result.success) toast.success(`"${account.name}" is connected to Brevo`);
+      else toast.error(result.error || "Brevo rejected this API key");
+      load();
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || "Could not reach Brevo");
+    } finally {
+      setTesting(null);
+    }
+  };
+
+  if (loading) {
+    return <div className="card p-6"></div>;
+  }
+
+  return (
+    <div className="card p-6 space-y-4 max-w-2xl">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            <Mail size={18} /> Email sending (Brevo)
+          </h2>
+          <p className="text-sm text-gray-500 mt-1">
+            One API key per sender — add as many as you like and point each campaign at the one it
+            should use. Keys are encrypted at rest and never shown again in full.
+          </p>
+        </div>
+        <Link to="/email-manager" className="btn-primary btn-sm whitespace-nowrap">
+          <Plus size={14} className="mr-1" /> Manage senders
+        </Link>
+      </div>
+
+      {accounts.length === 0 ? (
+        <div className="rounded-lg bg-gray-50 dark:bg-gray-800 p-4 text-sm text-gray-600 dark:text-gray-300">
+          No Brevo sender yet. Create an API key in Brevo (<strong>SMTP &amp; API → API keys</strong>),
+          then add it in the Email Manager with the From name and From address you want to send as.
+        </div>
+      ) : (
+        <div className="divide-y divide-gray-100 dark:divide-gray-800">
+          {accounts.map((account) => (
+            <div key={account.id} className="py-3 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-medium flex items-center gap-2 truncate">
+                  {account.name}
+                  {account.is_default && <span className="badge-blue">default</span>}
+                  {!account.is_active && <span className="badge-gray">off</span>}
+                </p>
+                <p className="text-xs text-gray-500 truncate">
+                  {account.from_name} &lt;{account.from_email}&gt; · key {account.api_key_masked || "—"}
+                </p>
+              </div>
+              <button
+                className="btn-secondary btn-sm shrink-0"
+                onClick={() => test(account)}
+                disabled={testing === account.id}
+              >
+                {testing === account.id ? "Testing…" : "Test"}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4 text-sm space-y-2">
+        <h3 className="font-semibold">Webhooks (opens, clicks, replies)</h3>
+        <p className="text-gray-500">
+          Each sender has its own webhook URL. Paste it into Brevo under{" "}
+          <strong>Transactional → Settings → Webhook</strong> (and the inbound parsing webhook) to get
+          opens, clicks, bounces and inbound replies into the app. Copy it from the senders list in the
+          Email Manager.
+        </p>
+      </div>
     </div>
   );
 }

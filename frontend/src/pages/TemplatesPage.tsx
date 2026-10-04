@@ -1,4 +1,7 @@
 import { useState, useEffect, useRef } from "react";
+import { useChannel } from "../hooks/useChannel";
+import ChannelSwitch from "../components/ChannelSwitch";
+import RichEmailEditor, { AttachmentPayload } from "../components/RichEmailEditor";
 import api from "../api/client";
 import { Template } from "../types";
 import toast from "react-hot-toast";
@@ -8,6 +11,7 @@ import { notifyDataChange } from "../utils/syncEvents";
 import { smsCount } from "../utils/sms";
 
 export default function TemplatesPage() {
+  const { channel } = useChannel();
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -17,12 +21,12 @@ export default function TemplatesPage() {
   });
   const [previewData, setPreviewData] = useState<{ preview: string; char_count: number; segment_count: number } | null>(null);
 
-  useEffect(() => { loadTemplates(); }, []);
+  useEffect(() => { loadTemplates(); }, [channel]);
 
   const loadTemplates = async () => {
     try {
       setLoading(true);
-      const { data } = await api.get("/templates/");
+      const { data } = await api.get("/templates/", { params: { channel } });
       setTemplates(data.items);
     } catch (err: any) {
       setError(err.response?.data?.detail || "Failed to load templates");
@@ -80,10 +84,15 @@ export default function TemplatesPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold">Templates</h1>
+          <h1 className="text-xl sm:text-2xl font-bold">
+            Templates
+            <span className="ml-2 align-middle">
+              <ChannelSwitch size="sm" />
+            </span>
+          </h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            Saved messages you reuse everywhere. Edit one and every composer
-            that picks it sees the new text immediately.
+            Saved {channel === "email" ? "emails" : "messages"} you reuse everywhere. Edit one and
+            every composer that picks it sees the new text immediately.
           </p>
         </div>
         <button onClick={openCreate} className="btn-primary btn-sm">
@@ -102,7 +111,9 @@ export default function TemplatesPage() {
         ) : templates.length === 0 ? (
           <div className="col-span-full text-center py-12 text-gray-500">
             <FileText size={48} className="mx-auto mb-2 opacity-30" />
-            <p>No templates yet. Create your first SMS template.</p>
+            <p>
+              No {channel === "email" ? "email" : "SMS"} templates yet. Create your first one.
+            </p>
           </div>
         ) : (
           templates.map((tpl) => (
@@ -163,6 +174,7 @@ export default function TemplatesPage() {
         <TemplateFormModal
           key={modal.template ? `edit-${modal.template.id}` : "create"}
           initial={modal.template}
+          channel={channel}
           onClose={() => setModal({ open: false, template: null })}
           onSaved={() => {
             setModal({ open: false, template: null });
@@ -177,14 +189,20 @@ export default function TemplatesPage() {
 
 function TemplateFormModal({
   initial,
+  channel,
   onClose,
   onSaved,
 }: {
   initial: Template | null;
+  channel: "sms" | "email";
   onClose: () => void;
   onSaved: () => void;
 }) {
   const editing = !!initial;
+  const isEmail = channel === "email";
+  const [subject, setSubject] = useState((initial as any)?.subject ?? "");
+  const [htmlBody, setHtmlBody] = useState((initial as any)?.html_body ?? "");
+  const [attachments, setAttachments] = useState<AttachmentPayload[]>([]);
   const [name, setName] = useState(initial?.name ?? "");
   const [category, setCategory] = useState(initial?.category ?? "");
   const [body, setBody] = useState(initial?.body ?? "");
@@ -195,9 +213,22 @@ function TemplateFormModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !body.trim()) { toast.error("Name and body required"); return; }
+    if (isEmail && !subject.trim()) { toast.error("Email templates need a subject"); return; }
     setSubmitting(true);
     try {
-      const payload = { name: name.trim(), category: category.trim() || null, body };
+      const payload: any = {
+        name: name.trim(),
+        category: category.trim() || null,
+        body,
+        channel,
+      };
+      if (isEmail) {
+        payload.subject = subject.trim();
+        payload.html_body = htmlBody.trim() || null;
+        // Editing an existing template keeps its stored files unless new ones
+        // are uploaded, so a subject tweak never detaches the PDF.
+        if (attachments.length) payload.attachments = attachments;
+      }
       if (editing) {
         await api.put(`/templates/${initial!.id}`, payload);
         toast.success("Template updated — every composer using it is now in sync");
@@ -232,8 +263,42 @@ function TemplateFormModal({
             <label className="label">Category</label>
             <input className="input" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="e.g. outreach, follow-up" />
           </div>
+          {isEmail && (
+            <>
+              <div>
+                <label className="label">Subject *</label>
+                <input
+                  className="input"
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  placeholder="Quick question about {{company}}"
+                />
+              </div>
+              <div>
+                <label className="label">HTML body (optional)</label>
+                <textarea
+                  className="input font-mono text-xs"
+                  rows={4}
+                  value={htmlBody}
+                  onChange={(e) => setHtmlBody(e.target.value)}
+                  placeholder="<p>Hi {{first_name}},</p>"
+                />
+              </div>
+            </>
+          )}
           <div>
             <label className="label">Message Body *</label>
+            {isEmail ? (
+              <RichEmailEditor
+                body={body}
+                onBody={setBody}
+                html={htmlBody}
+                onHtml={setHtmlBody}
+                attachments={attachments}
+                onAttachments={setAttachments}
+              />
+            ) : (
+            <>
             <textarea
               ref={bodyRef}
               className="input"
@@ -268,6 +333,8 @@ function TemplateFormModal({
                 {count.unicode && " · unicode (70/SMS)"}
               </span>
             </div>
+            </>
+            )}
           </div>
           <div className="flex gap-2 pt-2">
             <button type="button" onClick={onClose} className="btn-secondary flex-1">Cancel</button>

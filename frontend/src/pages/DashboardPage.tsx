@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import { useChannel } from "../hooks/useChannel";
+import ChannelSwitch from "../components/ChannelSwitch";
 import api from "../api/client";
 import {
   Users, MessageSquare, CheckCircle2, XCircle, TrendingUp,
@@ -15,14 +17,16 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => { loadData(); }, []);
+  const { channel } = useChannel();
+
+  useEffect(() => { loadData(); }, [channel]);
 
   const loadData = async () => {
     try {
       setLoading(true); setError(null);
       const [sr, cr] = await Promise.allSettled([
-        api.get("/dashboard/stats"),
-        api.get("/dashboard/charts", { params: { days: 30 } }),
+        api.get("/dashboard/stats", { params: { channel } }),
+        api.get("/dashboard/charts", { params: { days: 30, channel } }),
       ]);
       if (sr.status === "fulfilled") setStats(sr.value.data);
       if (cr.status === "fulfilled") setCharts(cr.value.data);
@@ -74,7 +78,12 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
+          Dashboard
+          <span className="ml-2 align-middle">
+            <ChannelSwitch size="sm" />
+          </span>
+        </h1>
         <span className={`badge ${(s.gateway_status || "") === "healthy" ? "badge-green" : "badge-gray"}`}>
           Gateway: {s.gateway_status || "unknown"}
         </span>

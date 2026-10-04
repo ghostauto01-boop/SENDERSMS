@@ -41,20 +41,25 @@ ALTER TABLE campaigns
 -- ------------------------------------------------------------
 -- 2. Merge duplicate conversations
 --
--- For each contact we keep the OLDEST thread (lowest id) and move every
--- message from the newer duplicates onto it, so no chat history is lost.
+-- Duplicates are threads for the SAME contact on the SAME channel: since the
+-- email release a contact legitimately has one SMS thread and one email
+-- thread, and those two must never be merged. (Run this after deploying --
+-- the app adds the channel column on startup.) For each duplicate group we
+-- keep the OLDEST thread (lowest id) and move every message from the newer
+-- duplicates onto it, so no chat history is lost.
 -- ------------------------------------------------------------
 
 -- Move messages from duplicate threads onto the surviving thread.
 UPDATE messages m
 SET conversation_id = keeper.keep_id
 FROM (
-    SELECT contact_id, MIN(id) AS keep_id
+    SELECT contact_id, COALESCE(channel, 'sms') AS channel, MIN(id) AS keep_id
     FROM conversations
-    GROUP BY contact_id
+    GROUP BY contact_id, COALESCE(channel, 'sms')
 ) AS keeper
 JOIN conversations dup
     ON dup.contact_id = keeper.contact_id
+   AND COALESCE(dup.channel, 'sms') = keeper.channel
    AND dup.id <> keeper.keep_id
 WHERE m.conversation_id = dup.id;
 
@@ -75,22 +80,26 @@ WHERE c.id = stats.conversation_id;
 -- Delete the now-empty duplicate threads.
 DELETE FROM conversations c
 USING (
-    SELECT contact_id, MIN(id) AS keep_id
+    SELECT contact_id, COALESCE(channel, 'sms') AS channel, MIN(id) AS keep_id
     FROM conversations
-    GROUP BY contact_id
+    GROUP BY contact_id, COALESCE(channel, 'sms')
 ) AS keeper
 WHERE c.contact_id = keeper.contact_id
+  AND COALESCE(c.channel, 'sms') = keeper.channel
   AND c.id <> keeper.keep_id;
 
 
 -- ------------------------------------------------------------
 -- 3. Stop duplicates from coming back
 --
--- This is what the application model now declares. Without it the database
--- will happily accept a second thread again.
+-- The key was WIDENED for the email channel: one thread per contact PER
+-- CHANNEL. The old single-column index has to go first, otherwise a contact
+-- can never have both an SMS and an email thread (the insert fails with a
+-- duplicate-key error that looks like an inbox bug).
 -- ------------------------------------------------------------
-CREATE UNIQUE INDEX IF NOT EXISTS uq_conversation_contact
-    ON conversations (contact_id);
+DROP INDEX IF EXISTS uq_conversation_contact;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_conversation_contact_channel
+    ON conversations (contact_id, channel);
 
 -- ------------------------------------------------------------
 -- 4. Inline campaign messages
@@ -220,3 +229,36 @@ COMMIT;
 --   GROUP BY contact_id
 --   HAVING COUNT(*) > 1;
 -- ------------------------------------------------------------
+
+-- ============================================================
+-- Email threading, attachments and bulk-send headers
+-- ============================================================
+-- Same additive changes the startup auto-repair makes. Run this by hand when
+-- you want the indexes and the strict NOT NULL constraints applied up front
+-- instead of waiting for the first request that touches the column.
+
+BEGIN;
+
+-- Every outgoing email gets an RFC Message-ID so the reply can quote it, and
+-- each reply records the id it answers. Both are indexed because inbound mail
+-- looks conversations up by them.
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS rfc_message_id VARCHAR(255);
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS in_reply_to VARCHAR(255);
+-- JSON: [{name, content_type, size, content(base64)}]. Stored so a retry, or a
+-- scheduled send that fires hours later, still has the files.
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS attachments TEXT;
+-- TRUE for campaign/audience mail: adds List-Unsubscribe + List-Unsubscribe-Post.
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS bulk_send BOOLEAN NOT NULL DEFAULT FALSE;
+
+CREATE INDEX IF NOT EXISTS ix_messages_rfc_message_id ON messages (rfc_message_id);
+CREATE INDEX IF NOT EXISTS ix_messages_in_reply_to ON messages (in_reply_to);
+
+-- Templates and campaigns can carry attachments too.
+ALTER TABLE templates ADD COLUMN IF NOT EXISTS attachments TEXT;
+ALTER TABLE templates ADD COLUMN IF NOT EXISTS include_unsubscribe BOOLEAN NOT NULL DEFAULT TRUE;
+
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS attachments TEXT;
+
+ALTER TABLE scheduled_messages ADD COLUMN IF NOT EXISTS attachments TEXT;
+
+COMMIT;

@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { useChannel } from "../hooks/useChannel";
+import ChannelSwitch from "../components/ChannelSwitch";
 import api from "../api/client";
 import { Contact, FollowUp, PaginatedResponse } from "../types";
 import toast from "react-hot-toast";
@@ -55,22 +57,24 @@ export default function FollowUpsPage() {
   const [contactsLoading, setContactsLoading] = useState(false);
   const [contactSearch, setContactSearch] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const { channel } = useChannel();
   const [form, setForm] = useState({
     contact_id: "",
     scheduled_at: defaultFollowupTime(),
     message_text: "",
+    subject: "",
   });
 
   useEffect(() => {
     loadFollowups();
-  }, [view, page]);
+  }, [view, page, channel]);
 
   const loadFollowups = async () => {
     try {
       setLoading(true);
       setError(null);
       const { data } = await api.get("/followups/", {
-        params: { view, page, per_page: 25 },
+        params: { view, page, per_page: 25, channel },
       });
       setFollowups(data.items);
       setTotal(data.total);
@@ -110,6 +114,10 @@ export default function FollowUpsPage() {
       toast.error("Type a follow-up message");
       return;
     }
+    if (channel === "email" && !form.subject.trim()) {
+      toast.error("An email follow-up needs a subject line");
+      return;
+    }
 
     const localTime = new Date(form.scheduled_at);
     if (Number.isNaN(localTime.getTime()) || localTime.getTime() <= Date.now()) {
@@ -123,6 +131,8 @@ export default function FollowUpsPage() {
         contact_id: Number(form.contact_id),
         scheduled_at: localTime.toISOString(),
         message_text: form.message_text.trim(),
+        channel,
+        subject: channel === "email" ? form.subject.trim() : null,
       });
       toast.success("Follow-up created");
       setShowCreate(false);
@@ -131,6 +141,7 @@ export default function FollowUpsPage() {
         contact_id: "",
         scheduled_at: defaultFollowupTime(),
         message_text: "",
+        subject: "",
       });
       if (view !== "all") {
         setView("all");
@@ -209,8 +220,13 @@ export default function FollowUpsPage() {
     <div className="space-y-4 pb-20 lg:pb-0">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold">Follow-ups</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Schedule a personal SMS and track what is due.</p>
+          <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-3">
+            Follow-ups
+            <ChannelSwitch size="sm" />
+          </h1>
+          <p className="text-sm text-gray-500 mt-0.5">
+            Schedule a personal {channel === "email" ? "email" : "SMS"} and track what is due.
+          </p>
         </div>
         <button onClick={openCreate} className="btn-primary whitespace-nowrap">
           <Plus size={16} className="mr-1.5" /> Create Follow-up
@@ -275,7 +291,11 @@ export default function FollowUpsPage() {
                       {followup.contact_phone && <p className="text-xs text-gray-400 mt-0.5">{followup.contact_phone}</p>}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300 max-w-xs">
-                      <p className="line-clamp-2">{followup.message_text || "Sequence continuation"}</p>
+                      <p className="line-clamp-2">
+                        {(followup as any).subject
+                          ? `${(followup as any).subject} — ${followup.message_text}`
+                          : followup.message_text || "Sequence continuation"}
+                      </p>
                       {followup.sequence_id && (
                         <p className="text-[11px] text-primary-600 mt-1">
                           Sequence #{followup.sequence_id} · step {(followup.sequence_step_order ?? 0) + 1}
@@ -355,7 +375,8 @@ export default function FollowUpsPage() {
                   <option value="">{contactsLoading ? "Loading contacts…" : "Select contact…"}</option>
                   {filteredContacts.map((contact) => (
                     <option key={contact.id} value={contact.id}>
-                      {contactName(contact)} — {contact.phone_number}
+                      {contactName(contact)} —{" "}
+                      {channel === "email" ? (contact as any).email || "no email" : contact.phone_number}
                     </option>
                   ))}
                 </select>
@@ -366,6 +387,18 @@ export default function FollowUpsPage() {
                   <p className="text-xs text-gray-500 mt-1">No contacts match this filter.</p>
                 )}
               </div>
+
+              {channel === "email" && (
+                <div>
+                  <label className="text-xs font-medium text-[#54656f]">Subject</label>
+                  <input
+                    className="w-full mt-1 px-3 py-2.5 bg-[#f0f2f5] dark:bg-[#111b21] rounded-xl text-sm"
+                    value={form.subject}
+                    onChange={(event) => setForm({ ...form, subject: event.target.value })}
+                    placeholder="Following up on {{business_name}}"
+                  />
+                </div>
+              )}
 
               <div>
                 <label className="text-xs font-medium text-[#54656f]">Send date and time</label>
@@ -382,7 +415,9 @@ export default function FollowUpsPage() {
 
               <div>
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-medium text-[#54656f]">Message</label>
+                  <label className="text-xs font-medium text-[#54656f]">
+                    {channel === "email" ? "Email body" : "Message"}
+                  </label>
                   <span className="text-[11px] text-[#667781]">{form.message_text.length} characters</span>
                 </div>
                 <textarea

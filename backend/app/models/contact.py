@@ -48,12 +48,31 @@ class Contact(Base):
     undeliverable_reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
     delivery_fail_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
+    # ---- Email channel state ------------------------------------------
+    # Deliberately separate from the SMS opt-out flags: an SMS STOP must not
+    # unsubscribe somebody from email, and an email unsubscribe must not stop
+    # their texts. ``email_status`` is the coarse state the UI shows:
+    # active | unsubscribed | bounced | complained | invalid.
+    is_email_opted_out: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    email_opted_out_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    email_opt_out_reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    email_status: Mapped[str] = mapped_column(String(30), default="active", nullable=False, index=True)
+    #: Hard-bounced / provider-blocked addresses are skipped like undeliverable
+    #: numbers, because sending again damages the sender reputation.
+    is_email_undeliverable: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    email_fail_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    email_last_error: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     custom_fields: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON string
 
     # Counters
     messages_sent: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     messages_received: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    emails_sent: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    emails_received: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    last_emailed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_email_reply_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_contacted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_reply_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 

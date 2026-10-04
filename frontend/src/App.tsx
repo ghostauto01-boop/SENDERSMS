@@ -1,6 +1,7 @@
 import { Suspense, lazy } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./hooks/useAuth";
+import { ChannelProvider } from "./hooks/useChannel";
 import MainLayout from "./layouts/MainLayout";
 import LoginPage from "./pages/LoginPage";
 import DbStatusBanner from "./components/DbStatusBanner";
@@ -13,6 +14,8 @@ const ContactsPage = lazy(() => import("./pages/ContactsPage"));
 const ListsPage = lazy(() => import("./pages/ListsPage"));
 const CampaignsPage = lazy(() => import("./pages/CampaignsPage"));
 const SMSManagerPage = lazy(() => import("./pages/SMSManagerPage"));
+const EmailManagerPage = lazy(() => import("./pages/EmailManagerPage"));
+const EmailInboxPage = lazy(() => import("./pages/EmailInboxPage"));
 const SequencesPage = lazy(() => import("./pages/SequencesPage"));
 const InboxPage = lazy(() => import("./pages/InboxPage"));
 const FollowUpsPage = lazy(() => import("./pages/FollowUpsPage"));
@@ -86,6 +89,8 @@ function AppRoutes() {
         <Route path="/audiences" element={<AudiencesPage />} />
         <Route path="/campaigns" element={<CampaignsPage />} />
         <Route path="/sms-manager" element={<SMSManagerPage />} />
+        <Route path="/email-manager" element={<EmailManagerPage />} />
+        <Route path="/email-inbox" element={<EmailInboxPage />} />
         <Route path="/sequences" element={<SequencesPage />} />
         <Route path="/follow-ups" element={<FollowUpsPage />} />
         <Route path="/templates" element={<TemplatesPage />} />
@@ -107,10 +112,14 @@ function AppRoutes() {
 export default function App() {
   return (
     <AuthProvider>
-      {/* One explained notice when the database itself is down, above every
-          page — instead of every widget failing on its own. */}
-      <DbStatusBanner />
-      <AppRoutes />
+      {/* SMS | Email is an app-wide choice: every channel-aware page reads it
+          from here instead of each page growing its own switch. */}
+      <ChannelProvider>
+        {/* One explained notice when the database itself is down, above every
+            page — instead of every widget failing on its own. */}
+        <DbStatusBanner />
+        <AppRoutes />
+      </ChannelProvider>
     </AuthProvider>
   );
 }

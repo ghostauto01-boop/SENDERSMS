@@ -43,9 +43,10 @@ a missing column.
 """
 
 import logging
+import re
 
 from sqlalchemy import inspect, text
-from sqlalchemy.schema import CreateColumn, CreateIndex
+from sqlalchemy.schema import CreateColumn, CreateIndex, CreateTable
 
 logger = logging.getLogger(__name__)
 
@@ -146,6 +147,227 @@ def _add_column_sql(sync_conn, table_name: str, column) -> str:
     return f'ALTER TABLE "{table_name}" ADD COLUMN {ddl}'
 
 
+def _sqlite_rebuild_table(sync_conn, metadata, table_name: str) -> bool:
+    """Rebuild one SQLite table so its constraints match the models.
+
+    SQLite cannot drop a UNIQUE constraint that was declared inline in
+    ``CREATE TABLE``, so a legacy database would keep ``UNIQUE (contact_id)``
+    forever and a contact could never have both an SMS and an email thread.
+
+    The rebuild is the documented SQLite procedure and it is transactional:
+    create ``<table>__repair`` from the current model, copy every shared column
+    across, drop the old table, rename the new one into place. Indexes are
+    restored by the index pass that follows this one. Foreign key enforcement is
+    switched off for the swap (as SQLite's own documentation prescribes) and
+    restored afterwards; the copy happens before anything is dropped, so a
+    failure leaves the original table untouched.
+    """
+    table = metadata.tables.get(table_name)
+    if table is None:
+        return False
+
+    tmp = f"{table_name}__repair"
+    try:
+        create_sql = str(CreateTable(table).compile(dialect=sync_conn.dialect)).strip()
+        create_sql = re.sub(
+            r'^CREATE TABLE ["\w]+',
+            f'CREATE TABLE "{tmp}"',
+            create_sql,
+            count=1,
+        )
+
+        old_cols = [c["name"] for c in inspect(sync_conn).get_columns(table_name)]
+        model_cols = {c.name for c in table.columns}
+        shared = [c for c in old_cols if c in model_cols]
+
+        fk_state = 0
+        try:
+            fk_state = sync_conn.execute(text("PRAGMA foreign_keys")).scalar() or 0
+            sync_conn.execute(text("PRAGMA foreign_keys=OFF"))
+        except Exception:  # noqa: BLE001 - pragma support varies; best effort
+            pass
+
+        try:
+            sync_conn.execute(text(f'DROP TABLE IF EXISTS "{tmp}"'))
+            sync_conn.execute(text(create_sql))
+            if shared:
+                cols = ", ".join(f'"{c}"' for c in shared)
+                sync_conn.execute(
+                    text(f'INSERT INTO "{tmp}" ({cols}) SELECT {cols} FROM "{table_name}"')
+                )
+            sync_conn.execute(text(f'DROP TABLE "{table_name}"'))
+            sync_conn.execute(text(f'ALTER TABLE "{tmp}" RENAME TO "{table_name}"'))
+        finally:
+            if fk_state:
+                try:
+                    sync_conn.execute(text("PRAGMA foreign_keys=ON"))
+                except Exception:  # noqa: BLE001
+                    pass
+
+        logger.warning(
+            "schema_repair: rebuilt table %s to apply the model's unique key "
+            "(%d row(s) copied).",
+            table_name,
+            sync_conn.execute(text(f'SELECT COUNT(*) FROM "{table_name}"')).scalar() or 0,
+        )
+        return True
+    except Exception as exc:  # noqa: BLE001 - never fatal
+        logger.error(
+            "schema_repair: could not rebuild %s (%s). The old unique key stays in "
+            "place; run scripts/migrate_existing_db.sql for a manual fix.",
+            table_name,
+            exc,
+        )
+        return False
+
+
+#: Unique keys that a release deliberately WIDENED.
+#:
+#: ``create_all`` never touches a table it already knows, so a unique
+#: constraint that existed before a widening keeps its old, narrower shape
+#: forever. For conversations that is not cosmetic: the previous release
+#: declared ``UNIQUE (contact_id)``, and once email exists a contact needs one
+#: SMS thread *and* one email thread. Leaving the old key in place makes the
+#: second thread fail with a duplicate-key error that looks like an inbox bug.
+#:
+#: Each entry: table -> (old column set, new column set, new index name).
+_WIDENED_UNIQUE_KEYS: dict[str, tuple[set[str], set[str], str]] = {
+    "conversations": (
+        {"contact_id"},
+        {"contact_id", "channel"},
+        "uq_conversation_contact_channel",
+    ),
+}
+
+
+def _repair_widened_unique_keys(sync_conn, metadata) -> list[str]:
+    """Drop too-narrow legacy unique keys, then create the widened one.
+
+    Only keys whose columns are exactly the OLD set are dropped -- a
+    hand-written partial index or a differently shaped constraint is left
+    alone. Dropping an index or constraint never destroys rows, so this stays
+    within the module's "no data loss" rule even though it is not purely
+    additive. Failure is logged, never fatal.
+    """
+    from sqlalchemy import inspect
+
+    applied: list[str] = []
+    inspector = inspect(sync_conn)
+    tables = set(inspector.get_table_names())
+
+    for table, (old_cols, new_cols, new_name) in _WIDENED_UNIQUE_KEYS.items():
+        if table not in tables:
+            continue
+        have_cols = {c["name"] for c in inspector.get_columns(table)}
+        if not new_cols.issubset(have_cols):
+            # A column the widened key needs is missing; the ADD COLUMN pass
+            # above already tried, and the next boot will finish the job.
+            continue
+
+        candidates: list[tuple[str, str]] = []  # (kind, name)
+        existing_names: set = set()
+        widened_sets: list[set] = []
+        rebuilt = False
+        try:
+            for uc in inspector.get_unique_constraints(table):
+                name = uc.get("name")
+                if name:
+                    existing_names.add(name)
+                cols = set(uc.get("column_names") or [])
+                if cols and cols.issuperset(new_cols):
+                    widened_sets.append(cols)
+                if cols == old_cols and name:
+                    candidates.append(("constraint", name))
+            for ix in inspector.get_indexes(table):
+                name = ix.get("name")
+                if not ix.get("unique"):
+                    continue
+                if name:
+                    existing_names.add(name)
+                cols = set(ix.get("column_names") or [])
+                if cols and cols.issuperset(new_cols):
+                    widened_sets.append(cols)
+                if cols == old_cols and name:
+                    candidates.append(("index", name))
+        except Exception as exc:  # noqa: BLE001
+            logger.error("schema_repair: could not inspect %s unique keys (%s)", table, exc)
+            continue
+
+        for kind, name in candidates:
+            if name == new_name:
+                continue
+
+            if kind == "constraint" and sync_conn.dialect.name == "sqlite":
+                # SQLite has no ALTER TABLE ... DROP CONSTRAINT at all; the only
+                # honest way to widen the key is to rebuild the table.
+                if _sqlite_rebuild_table(sync_conn, metadata, table):
+                    applied.append(f"rebuilt table {table}")
+                    rebuilt = True
+                break
+
+            try:
+                if kind == "constraint":
+                    sync_conn.execute(
+                        text(f'ALTER TABLE "{table}" DROP CONSTRAINT IF EXISTS "{name}"')
+                    )
+                else:
+                    sync_conn.execute(text(f'DROP INDEX IF EXISTS "{name}"'))
+
+                # "IF EXISTS" makes a miss a silent no-op, so confirm the key is
+                # really gone instead of trusting the statement.
+                fresh = inspect(sync_conn)
+                still_there = any(
+                    uc.get("name") == name for uc in fresh.get_unique_constraints(table)
+                ) or any(ix.get("name") == name for ix in fresh.get_indexes(table))
+                if still_there:
+                    raise RuntimeError("the legacy key is still present")
+
+                applied.append(f"dropped legacy unique {kind} {name}")
+                logger.warning(
+                    "schema_repair: dropped legacy unique %s %s on %s; the model "
+                    "widened this key to (%s).",
+                    kind, name, table, ", ".join(sorted(new_cols)),
+                )
+            except Exception as exc:  # noqa: BLE001
+                if sync_conn.dialect.name == "sqlite" and _sqlite_rebuild_table(
+                    sync_conn, metadata, table
+                ):
+                    applied.append(f"rebuilt table {table}")
+                    rebuilt = True
+                    break
+                logger.error(
+                    "schema_repair: could not drop legacy unique %s %s (%s). "
+                    "Rebuild the table or drop it by hand -- until then a contact "
+                    "cannot have both an SMS and an email thread.",
+                    kind, name, exc,
+                )
+
+        if rebuilt:
+            # The rebuilt table took its unique key from the models, and the
+            # inspector we hold is a pre-rebuild snapshot.
+            continue
+
+        already_widened = new_name in existing_names or new_cols in widened_sets
+        if already_widened:
+            # Already widened on an earlier boot (or by create_all on a fresh
+            # database): stay silent so a clean restart reports nothing.
+            continue
+
+        try:
+            cols_sql = ", ".join(sorted(new_cols))
+            sync_conn.execute(
+                text(
+                    f'CREATE UNIQUE INDEX IF NOT EXISTS "{new_name}" '
+                    f'ON "{table}" ({cols_sql})'
+                )
+            )
+            applied.append(f"unique index {new_name}")
+        except Exception as exc:  # noqa: BLE001
+            logger.error("schema_repair: could not create %s (%s)", new_name, exc)
+
+    return applied
+
+
 def repair_schema_sync(sync_conn, metadata) -> list[str]:
     """Add every missing column, then every missing index.
 
@@ -169,7 +391,15 @@ def repair_schema_sync(sync_conn, metadata) -> list[str]:
                 exc,
             )
 
-    # Indexes second: a column added above may be the one being indexed.
+    # Widened unique keys next: they need the columns added above (the rebuild
+    # path copies them), and they must exist before the index pass decides what
+    # is missing.
+    try:
+        applied.extend(_repair_widened_unique_keys(sync_conn, metadata))
+    except Exception as exc:  # noqa: BLE001 - never take the service down
+        logger.error("schema_repair: widened-key repair failed (%s)", exc)
+
+    # Indexes last: a column added above may be the one being indexed.
     for index in _pending_indexes(sync_conn, metadata):
         try:
             # IF NOT EXISTS (SQLite and PostgreSQL both support it) so a name

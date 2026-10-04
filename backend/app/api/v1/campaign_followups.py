@@ -173,6 +173,8 @@ async def create_campaign_followup(
         campaign_id=campaign_id,
         step_order=step_order,
         name=data.name or f"Follow-up {step_order}",
+        channel=(data.channel or "sms").lower(),
+        subject=(data.subject or "").strip() or None,
         message_text=data.message_text,
         template_id=data.template_id,
         delay_minutes=data.delay_minutes,

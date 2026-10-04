@@ -290,6 +290,41 @@ The script merges duplicate threads into the oldest one and keeps every message.
 wrapped in a transaction: if anything goes wrong it undoes itself and changes nothing.
 Running it twice is harmless.
 
+It also adds the email columns (thread ids, attachments, bulk-mail flag). If you skip it,
+the app adds those columns by itself on the next boot — the script just does it up front,
+with the indexes and the strict settings.
+
+---
+
+## Step 8b — Email through Brevo (optional)
+
+The app sends **and receives** email through your own **Brevo** account, next to SMS. You
+do not edit any file to set it up — everything is on the **Email Manager** page.
+
+1. In Brevo: **SMTP & API → API Keys → Create a new API key** (a v3 key starting
+   `xkeysib-`). Copy it.
+2. In this app: **Email Manager → Senders → Add sender**. Paste the API key, the **From
+   name**, the **From address** and a **reply-to** address. Press **Test** — a green badge
+   means Brevo accepted the key.
+3. Add as many Brevo accounts as you like (a second key for when the first runs out of
+   daily sends). Exactly one is the **default**; any campaign can pick a different one.
+4. **Receiving mail:** on the Email Manager page each sender shows a **webhook URL**.
+   Paste it into Brevo under **Transactional → Settings → Webhook** (or *Inbound parsing*
+   for replies). Brevo then delivers replies straight into **Email Inbox**, threaded
+   under the message they answer.
+5. **Deliverability tab** — shows whether your domain's SPF/DKIM are authenticated
+   (read live from Brevo), your bounce/open/click rates, and what to fix.
+
+**Two things worth knowing**
+
+* The webhook URL and the one-click unsubscribe link are absolute addresses, so the server
+  needs to know its own public address: set **`PUBLIC_BASE_URL`** (Render → your service →
+  Environment) to `https://your-app.onrender.com`. Without it, bulk mail still carries a
+  `mailto:` unsubscribe and replies still arrive, but the clickable link and the webhook
+  URL cannot be built.
+* Use a **verified sender domain** in Brevo (Senders & IP → Domains). Mail from an
+  unauthenticated domain lands in spam no matter what the app does.
+
 ---
 
 ## Step 9 — Phone alerts, then the real test

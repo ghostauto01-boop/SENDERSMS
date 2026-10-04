@@ -38,6 +38,12 @@ class CampaignFollowUp(Base):
     step_order: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     name: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
+    #: "sms" or "email". Defaults to sms; the campaign's channel is used when
+    #: the rule itself does not override it.
+    channel: Mapped[str] = mapped_column(String(10), default="sms", nullable=False, index=True)
+    #: Email only: subject line for this step.
+    subject: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
     #: The message. Supports the same {{shortcode}} variables as everything
     #: else. A template can be used instead.
     message_text: Mapped[str | None] = mapped_column(Text, nullable=True)

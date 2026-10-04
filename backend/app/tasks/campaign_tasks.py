@@ -294,7 +294,25 @@ async def _process_campaign_contact(db: AsyncSession, campaign: Campaign, cc: Ca
     # Get contact
     contact_result = await db.execute(select(Contact).where(Contact.id == cc.contact_id))
     contact = contact_result.scalar_one_or_none()
-    if not contact or contact.is_opted_out:
+    if not contact:
+        cc.status = "opted_out"
+        return
+
+    if (campaign.channel or "sms") == "email":
+        # Email campaigns validate the ADDRESS and the EMAIL consent. The SMS
+        # number filters below must not run here: an email-only contact has no
+        # usable phone number, and an SMS STOP is a different consent.
+        from app.services import email_service
+
+        problem = await email_service.contact_email_problem(db, contact)
+        if problem:
+            cc.status = "opted_out" if problem in ("email_opted_out", "suppressed", "email_bounced") else "failed"
+            cc.last_error = f"Not emailable: {problem}"
+            return
+        await _send_template_message(db, campaign, cc, contact, outbox=outbox)
+        return
+
+    if contact.is_opted_out:
         cc.status = "opted_out"
         return
     suppressed = (
@@ -502,17 +520,50 @@ async def _send_template_message(
     from app.services.variable_service import render_for_contact
     body = await render_for_contact(db, body, contact)
 
+    is_email = (campaign.channel or "sms") == "email"
+    subject = None
+    html_body = None
+    account = None
+    if is_email:
+        # Subject/HTML come from the campaign, then from the template it used.
+        from app.models.template import Template
+        from app.services import email_service
+
+        subject = campaign.subject
+        html_body = campaign.html_body
+        tid = template_id or campaign.template_id
+        if tid and not (subject and html_body):
+            template = (
+                await db.execute(select(Template).where(Template.id == tid))
+            ).scalar_one_or_none()
+            if template is not None:
+                subject = subject or template.subject
+                html_body = html_body or template.html_body
+        account = await email_service.get_account(db, campaign.email_account_id)
+        if account is None:
+            account = await email_service.get_default_account(db)
+        if account is None:
+            cc.status = "failed"
+            cc.last_error = "No email sender configured"
+            logger.error("Campaign %s has no email sender; skipping contact %s", campaign.id, contact.id)
+            return
+        if subject:
+            subject = await render_for_contact(db, subject, contact)
+        if html_body:
+            html_body = await render_for_contact(db, html_body, contact)
+        if not subject:
+            subject = "(no subject)"
+
     # Create message
-    from app.utils.phone import count_sms_segments
     import uuid
-    char_count, segment_count = count_sms_segments(body)
     idempotency_key = f"campaign-{campaign.id}-{cc.contact_id}-{uuid.uuid4().hex[:8]}"
 
-    # Find or create conversation
+    # Find or create conversation (one thread per contact PER CHANNEL)
     from app.models.conversation import Conversation
+    thread_channel = "email" if is_email else "sms"
     conv_result = await db.execute(
         select(Conversation)
-        .where(Conversation.contact_id == contact.id)
+        .where(Conversation.contact_id == contact.id, Conversation.channel == thread_channel)
         .order_by(Conversation.id)
         .limit(1)
     )
@@ -520,6 +571,7 @@ async def _send_template_message(
     if not conversation:
         conversation = Conversation(
             contact_id=contact.id,
+            channel=thread_channel,
             campaign_id=campaign.id,
             status="active",
         )
@@ -532,18 +584,51 @@ async def _send_template_message(
 
     stamp_conversation(conversation, campaign_id=campaign.id)
 
-    message = Message(
-        conversation_id=conversation.id,
-        contact_id=contact.id,
-        campaign_id=campaign.id,
-        direction="outgoing",
-        body=body,
-        segment_count=segment_count,
-        char_count=char_count,
-        status="queued",
-        provider="smsgate",
-        idempotency_key=idempotency_key,
-    )
+    if is_email:
+        message = Message(
+            conversation_id=conversation.id,
+            contact_id=contact.id,
+            campaign_id=campaign.id,
+            channel="email",
+            direction="outgoing",
+            body=body,
+            html_body=html_body,
+            subject=subject[:500],
+            from_address=account.from_email,
+            to_address=(contact.email or "").strip().lower() or None,
+            email_account_id=account.id,
+            char_count=len(body or ""),
+            status="queued",
+            provider="brevo",
+            # Attachments ride along with the campaign (campaign first, then the
+            # template it uses) and this is bulk mail, so it carries the
+            # List-Unsubscribe headers Gmail/Yahoo require.
+            attachments=email_service.dump_attachments(
+                email_service.load_attachments(getattr(campaign, "attachments", None))
+                or email_service.load_attachments(getattr(template, "attachments", None))
+            ),
+            bulk_send=True,
+            rfc_message_id=email_service._new_rfc_message_id(account.from_email),
+            idempotency_key=idempotency_key,
+        )
+        conversation.subject = subject[:500]
+        if not conversation.email_account_id:
+            conversation.email_account_id = account.id
+    else:
+        from app.utils.phone import count_sms_segments
+        char_count, segment_count = count_sms_segments(body)
+        message = Message(
+            conversation_id=conversation.id,
+            contact_id=contact.id,
+            campaign_id=campaign.id,
+            direction="outgoing",
+            body=body,
+            segment_count=segment_count,
+            char_count=char_count,
+            status="queued",
+            provider="smsgate",
+            idempotency_key=idempotency_key,
+        )
     db.add(message)
     await db.flush()
 
@@ -552,7 +637,7 @@ async def _send_template_message(
     # messaged only by a campaign showed up in the inbox as an empty thread
     # with no preview and no timestamp to sort by.
     conversation.message_count = (conversation.message_count or 0) + 1
-    conversation.last_message_preview = body[:100]
+    conversation.last_message_preview = (subject or body)[:100]
     conversation.last_message_at = datetime.now(timezone.utc)
 
     # Update campaign contact.
@@ -646,7 +731,17 @@ async def _check_condition(db, cc, step):
     elif condition_type == "contact_opted_out":
         contact_result = await db.execute(select(Contact).where(Contact.id == cc.contact_id))
         contact = contact_result.scalar_one_or_none()
-        return contact.is_opted_out if contact else False
+        if contact is None:
+            return False
+        # Consent is per channel: an email follow-up must key off email consent,
+        # otherwise a contact who unsubscribed by email still reads as "not
+        # opted out" and gets mailed again.
+        channel = (
+            await db.execute(select(Campaign.channel).where(Campaign.id == cc.campaign_id))
+        ).scalar_one_or_none()
+        if (channel or "sms") == "email":
+            return bool(contact.is_email_opted_out)
+        return bool(contact.is_opted_out)
 
     return False
 
@@ -686,7 +781,13 @@ async def process_followup_async(followup_id: int, *, send_inline: bool = False)
             ).scalar_one_or_none()
             if not contact:
                 raise ValueError("Contact not found")
-            if contact.is_opted_out:
+            # Consent is per channel — an email follow-up is stopped by an email
+            # unsubscribe, an SMS one by STOP.
+            followup_channel = (getattr(followup, "channel", None) or "sms").lower()
+            if followup_channel == "email":
+                if contact.is_email_opted_out:
+                    raise ValueError("Contact has unsubscribed from email")
+            elif contact.is_opted_out:
                 raise ValueError("Contact has opted out")
 
             if followup.campaign_contact_id:
@@ -747,11 +848,31 @@ async def process_followup_async(followup_id: int, *, send_inline: bool = False)
             else:
                 if not followup.message_text or not followup.message_text.strip():
                     raise ValueError("Follow-up message is empty")
-                from app.services.sms_service import SMSService
+                if (followup.channel or "sms") == "email":
+                    # Email follow-ups go out through Brevo. The contact's email
+                    # consent is checked (never the SMS opt-out flag).
+                    from app.services import email_service
 
-                message = await SMSService(db).send_message(
-                    followup.contact_id, followup.message_text
-                )
+                    account = await email_service.get_account(db, followup.email_account_id)
+                    if account is None:
+                        account = await email_service.get_default_account(db)
+                    message, send_result = await email_service.send_now(
+                        db, contact,
+                        subject=followup.subject or "Follow-up",
+                        text_body=followup.message_text,
+                        account=account,
+                        campaign_id=followup.campaign_id,
+                    )
+                    if message is None:
+                        raise ValueError("Contact cannot receive email")
+                    if not send_result.get("success"):
+                        raise ValueError(send_result.get("error") or "Brevo rejected the email")
+                else:
+                    from app.services.sms_service import SMSService
+
+                    message = await SMSService(db).send_message(
+                        followup.contact_id, followup.message_text
+                    )
                 if message is None:
                     raise ValueError("Contact cannot receive this message")
                 followup.message_id = message.id

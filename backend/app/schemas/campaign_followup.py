@@ -8,6 +8,11 @@ from pydantic import BaseModel, Field, field_validator
 
 class CampaignFollowUpBase(BaseModel):
     name: Optional[str] = Field(default=None, max_length=200)
+    #: "sms" or "email". Defaults to sms; when left at sms the campaign's own
+    #: channel wins at send time, so existing rules keep working.
+    channel: str = "sms"
+    #: Email only: subject line for this step.
+    subject: Optional[str] = Field(default=None, max_length=500)
     message_text: Optional[str] = Field(default=None, max_length=5000)
     template_id: Optional[int] = None
     delay_minutes: int = Field(default=1440, ge=1, le=60 * 24 * 90)
@@ -33,6 +38,8 @@ class CampaignFollowUpCreate(CampaignFollowUpBase):
 
 class CampaignFollowUpUpdate(BaseModel):
     name: Optional[str] = Field(default=None, max_length=200)
+    channel: Optional[str] = None
+    subject: Optional[str] = Field(default=None, max_length=500)
     message_text: Optional[str] = Field(default=None, max_length=5000)
     template_id: Optional[int] = None
     delay_minutes: Optional[int] = Field(default=None, ge=1, le=60 * 24 * 90)
@@ -49,6 +56,8 @@ class CampaignFollowUpOut(BaseModel):
     id: int
     campaign_id: int
     step_order: int
+    channel: str = "sms"
+    subject: Optional[str] = None
     name: Optional[str]
     message_text: Optional[str]
     template_id: Optional[int]

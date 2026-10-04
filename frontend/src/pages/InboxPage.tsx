@@ -8,8 +8,9 @@ import {
   Send, Star, ThumbsDown, ThumbsUp, Archive, ChevronLeft, CheckCheck, MessageCircle,
   Bug, Search as SearchIcon, MoreVertical, Phone, Video, Paperclip, Smile,
   Mic, LogOut, Settings as SettingsIcon, Users, Megaphone, Home, FileText, CalendarPlus,
-  Filter, X as XIcon, BarChart3, Globe,
+  Filter, X as XIcon, BarChart3, Globe, Mail,
 } from "lucide-react";
+import emailApi from "../api/email";
 import { startCall, openWhatsappChat, openWhatsappForCall, openWebsite, websiteUrl } from "../utils/call";
 import type { Meeting, Template } from "../types";
 import ShortcodePicker from "../components/ShortcodePicker";
@@ -93,6 +94,9 @@ const sameGroup = (a: any, b: any) => {
 /* ------------------------------------------------------------------ */
 
 export default function InboxPage() {
+  // Unread email threads, so the Email button carries the same kind of badge
+  // the SMS side shows for chats.
+  const [emailUnread, setEmailUnread] = useState(0);
   const [convs, setConvs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<any>(null);
@@ -183,6 +187,14 @@ export default function InboxPage() {
   const filterRef = useRef(filter);
   const searchRef = useRef(search);
   const campaignRef = useRef({ campaignId, adsCampaignId, repliedOnly });
+  // Badge for the Email inbox button; refreshed with the SMS poll below.
+  useEffect(() => {
+    emailApi
+      .unreadCount()
+      .then((data) => setEmailUnread(data.unread || 0))
+      .catch(() => {});
+  }, []);
+
   useEffect(() => { filterRef.current = filter; }, [filter]);
   useEffect(() => { searchRef.current = search; }, [search]);
   useEffect(() => {
@@ -453,6 +465,16 @@ export default function InboxPage() {
               </span>
             </div>
             <div className="flex items-center gap-0.5">
+              {/* The email inbox is its own screen; this jumps straight to it. */}
+              <Link to="/email-inbox" title="Open the Email inbox"
+                className="h-10 px-2.5 flex items-center gap-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-[#54656f] dark:text-[#aebac1] text-[13px]">
+                <Mail size={18} />
+                {emailUnread > 0 && (
+                  <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-[#00a884] text-white text-[11px] flex items-center justify-center">
+                    {emailUnread}
+                  </span>
+                )}
+              </Link>
               <button onClick={doPoll} disabled={polling} title="Sync from phone"
                 className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-[#54656f] dark:text-[#aebac1]">
                 <span className={`text-[20px] leading-none ${polling ? "animate-spin inline-block" : ""}`}>↻</span>

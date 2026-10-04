@@ -151,22 +151,43 @@ async def ensure_version(db: AsyncSession, creative: AdsCreative) -> AdsCreative
         version=creative.current_version,
         body=creative.body or "",
         cta=creative.cta,
+        subject=creative.subject,
+        html_body=creative.html_body,
     )
     db.add(row)
     await db.flush()
     return row
 
 
-async def bump_version(db: AsyncSession, creative: AdsCreative, body: str, cta: str | None) -> AdsCreativeVersion:
-    """Write a NEW immutable version. Never mutates an existing one."""
+async def bump_version(
+    db: AsyncSession,
+    creative: AdsCreative,
+    body: str,
+    cta: str | None,
+    *,
+    subject: str | None = None,
+    html_body: str | None = None,
+) -> AdsCreativeVersion:
+    """Write a NEW immutable version. Never mutates an existing one.
+
+    The email fields are part of the snapshot for the same reason the SMS body
+    is: a contact queued with version 3 must receive version 3, not whatever the
+    creative says after an edit.
+    """
     creative.current_version = (creative.current_version or 0) + 1
     creative.body = body
     creative.cta = cta
+    if subject is not None:
+        creative.subject = subject
+    if html_body is not None:
+        creative.html_body = html_body
     row = AdsCreativeVersion(
         creative_id=creative.id,
         version=creative.current_version,
         body=body,
         cta=cta,
+        subject=creative.subject,
+        html_body=creative.html_body,
     )
     db.add(row)
     await db.flush()
@@ -437,6 +458,32 @@ async def preview_filters(
     }
 
 
+def is_email_campaign(campaign: AdsCampaign | None) -> bool:
+    """True when this campaign sends over the email channel."""
+    return bool(campaign is not None and (campaign.channel or "sms") == "email")
+
+
+async def _suppressed_emails(db: AsyncSession, addresses: Iterable[str]) -> set[str]:
+    """Email twin of :func:`_suppressed_numbers`."""
+    from app.models.email import EmailSuppression
+    from app.services.email_service import normalize_email
+
+    values = [v for v in (normalize_email(a) for a in addresses) if v]
+    if not values:
+        return set()
+    rows = await db.execute(
+        select(EmailSuppression.email_address).where(EmailSuppression.email_address.in_(values))
+    )
+    return set(rows.scalars().all())
+
+
+async def email_blocked_reason(db: AsyncSession, contact: Contact) -> str | None:
+    """Why this contact cannot be emailed at send time, or ``None``."""
+    from app.services.email_service import contact_email_problem
+
+    return await contact_email_problem(db, contact)
+
+
 async def _suppressed_numbers(db: AsyncSession, numbers: Iterable[str]) -> set[str]:
     numbers = [n for n in numbers if n]
     if not numbers:
@@ -467,7 +514,48 @@ SKIP_REASONS = (
     "creative_paused",
     "insufficient_balance",
     "invalid_number",
+    # Email channel reasons.
+    "missing_email",
+    "email_opted_out",
+    "email_bounced",
+    "placeholder_email",
+    "no_email_account",
 )
+
+
+async def _screen_email_contacts(
+    db: AsyncSession,
+    campaign: AdsCampaign | None,
+    contacts: list[Contact],
+    existing: set[int],
+) -> tuple[list[Contact], dict[str, int]]:
+    """Eligibility rules for an EMAIL campaign."""
+    counts: dict[str, int] = {}
+
+    def bump(reason: str) -> None:
+        counts[reason] = counts.get(reason, 0) + 1
+
+    suppressed = await _suppressed_emails(db, [c.email for c in contacts])
+    eligible: list[Contact] = []
+    seen: set[str] = set()
+    for contact in contacts:
+        problem = await email_blocked_reason(db, contact)
+        if problem:
+            bump("missing_email" if problem == "no_email" else problem)
+            continue
+        if contact.id in existing:
+            bump("already_sent")
+            continue
+        address = (contact.email or "").strip().lower()
+        if address in suppressed:
+            bump("suppressed")
+            continue
+        if address in seen:
+            bump("duplicate")
+            continue
+        seen.add(address)
+        eligible.append(contact)
+    return eligible, counts
 
 
 async def screen_contacts(
@@ -494,6 +582,15 @@ async def screen_contacts(
                 )
             ).scalars().all()
         )
+    if is_email_campaign(campaign):
+        # Email audiences are screened on the email address, not the phone
+        # number: "no email", "unsubscribed" and "hard bounced" are the reasons
+        # that matter here, and a missing phone number is irrelevant.
+        email_eligible, email_counts = await _screen_email_contacts(
+            db, campaign, contacts, existing
+        )
+        return email_eligible, email_counts
+
     suppressed = await _suppressed_numbers(db, [c.phone_number for c in contacts])
 
     eligible: list[Contact] = []
@@ -873,21 +970,29 @@ async def _frequency_blocked(db: AsyncSession, campaign: AdsCampaign, contact_id
     return False
 
 
-async def _creative_body(db: AsyncSession, assignment: AdsAssignment, campaign: AdsCampaign) -> tuple[str | None, AdsCreative | None]:
+async def _creative_content(
+    db: AsyncSession, assignment: AdsAssignment, campaign: AdsCampaign
+) -> dict:
+    """The exact copy a contact was assigned: body, subject and HTML.
+
+    Email campaigns need three fields where SMS needs one, and both must obey
+    the same immutable-version policy, so this is the single place the version
+    choice is made.
+    """
     creative = (
         await db.execute(select(AdsCreative).where(AdsCreative.id == assignment.creative_id))
     ).scalar_one_or_none()
+    empty = {"body": None, "subject": None, "html_body": None, "creative": None}
     if creative is None:
-        return None, None
+        return empty
     if creative.is_deleted or creative.status != "active":
-        return None, creative
+        return {**empty, "creative": creative}
 
+    body, subject, html = creative.body, creative.subject, creative.html_body
     # Version policy: "keep" (default) sends the version the contact was
     # assigned, so an edit mid-flight never rewrites what a queued contact was
     # promised. "update" opts in to the latest text.
-    if (campaign.queued_edit_policy or "keep") == "update":
-        return creative.body, creative
-    if assignment.creative_version_id:
+    if (campaign.queued_edit_policy or "keep") != "update" and assignment.creative_version_id:
         version = (
             await db.execute(
                 select(AdsCreativeVersion).where(
@@ -896,8 +1001,18 @@ async def _creative_body(db: AsyncSession, assignment: AdsAssignment, campaign: 
             )
         ).scalar_one_or_none()
         if version:
-            return version.body, creative
-    return creative.body, creative
+            body = version.body
+            subject = version.subject if version.subject is not None else subject
+            html = version.html_body if version.html_body is not None else html
+    return {"body": body, "subject": subject, "html_body": html, "creative": creative}
+
+
+async def _creative_body(
+    db: AsyncSession, assignment: AdsAssignment, campaign: AdsCampaign
+) -> tuple[str | None, AdsCreative | None]:
+    """Back-compat wrapper: (body, creative) for the SMS path."""
+    content = await _creative_content(db, assignment, campaign)
+    return content["body"], content["creative"]
 
 
 async def dispatch_campaign(
@@ -910,6 +1025,7 @@ async def dispatch_campaign(
     frequency, window, daily+total budget, balance, idempotency.
     """
     result = {"sent": 0, "skipped": 0, "state": campaign.status, "reasons": {}}
+    email_campaign = is_email_campaign(campaign)
 
     def skip(reason: str) -> None:
         result["skipped"] += 1
@@ -1013,24 +1129,39 @@ async def dispatch_campaign(
 
         # FINAL send-time re-validation. A contact may have opted out after the
         # queue was built.
-        if contact.is_opted_out:
-            assignment.send_status = "skipped"
-            assignment.skip_reason = "opted_out"
-            skip("opted_out")
-            record_event(db, "MESSAGE_SKIPPED", campaign_id=campaign.id, contact_id=contact.id, detail="opted_out")
-            continue
-        number = normalize(contact.phone_number)
-        if not number:
-            assignment.send_status = "skipped"
-            assignment.skip_reason = "invalid_number"
-            skip("invalid_number")
-            continue
-        if await _suppressed_numbers(db, [contact.phone_number, number]):
-            assignment.send_status = "skipped"
-            assignment.skip_reason = "suppressed"
-            skip("suppressed")
-            record_event(db, "MESSAGE_SKIPPED", campaign_id=campaign.id, contact_id=contact.id, detail="suppressed")
-            continue
+        if email_campaign:
+            # Email: the address that matters is the email address, and the
+            # opt-out that matters is the EMAIL opt-out (an SMS STOP is a
+            # different consent and must not block mail, or vice versa).
+            problem = await email_blocked_reason(db, contact)
+            if problem:
+                assignment.send_status = "skipped"
+                assignment.skip_reason = problem
+                skip(problem)
+                record_event(
+                    db, "MESSAGE_SKIPPED", campaign_id=campaign.id,
+                    contact_id=contact.id, detail=problem,
+                )
+                continue
+        else:
+            if contact.is_opted_out:
+                assignment.send_status = "skipped"
+                assignment.skip_reason = "opted_out"
+                skip("opted_out")
+                record_event(db, "MESSAGE_SKIPPED", campaign_id=campaign.id, contact_id=contact.id, detail="opted_out")
+                continue
+            number = normalize(contact.phone_number)
+            if not number:
+                assignment.send_status = "skipped"
+                assignment.skip_reason = "invalid_number"
+                skip("invalid_number")
+                continue
+            if await _suppressed_numbers(db, [contact.phone_number, number]):
+                assignment.send_status = "skipped"
+                assignment.skip_reason = "suppressed"
+                skip("suppressed")
+                record_event(db, "MESSAGE_SKIPPED", campaign_id=campaign.id, contact_id=contact.id, detail="suppressed")
+                continue
         if await _frequency_blocked(db, campaign, contact.id):
             assignment.send_status = "pending"
             assignment.skip_reason = "frequency_limit"
@@ -1048,10 +1179,18 @@ async def dispatch_campaign(
             skip("campaign_paused")
             continue
 
-        body, creative = await _creative_body(db, assignment, campaign)
-        if creative is None or not body or not body.strip():
+        content = await _creative_content(db, assignment, campaign)
+        body, creative = content["body"], content["creative"]
+        slim_body = (body or "").strip()
+        if creative is None or not slim_body:
             # A paused creative must NOT be dropped: put the contact back so it
             # resumes if the creative is re-activated.
+            assignment.send_status = "pending"
+            assignment.skip_reason = "creative_paused"
+            assignment.next_attempt_at = now_utc() + timedelta(minutes=30)
+            skip("creative_paused")
+            continue
+        if email_campaign and not (content["subject"] or campaign.subject or "").strip():
             assignment.send_status = "pending"
             assignment.skip_reason = "creative_paused"
             assignment.next_attempt_at = now_utc() + timedelta(minutes=30)
@@ -1061,6 +1200,14 @@ async def dispatch_campaign(
         from app.services.variable_service import render_for_contact
 
         rendered = await render_for_contact(db, body, contact)
+        rendered_subject = None
+        rendered_html = None
+        if email_campaign:
+            rendered_subject = await render_for_contact(
+                db, content["subject"] or campaign.subject or "(no subject)", contact
+            )
+            if content["html_body"]:
+                rendered_html = await render_for_contact(db, content["html_body"], contact)
 
         if campaign.test_mode:
             # Simulated send: nothing leaves the server, no credits consumed.
@@ -1100,13 +1247,22 @@ async def dispatch_campaign(
             assignment.send_status = "sent" if existing.status in ("sent", "delivered") else "pending"
             continue
 
+        thread_channel = "email" if email_campaign else "sms"
         conversation = (
             await db.execute(
-                select(Conversation).where(Conversation.contact_id == contact.id).order_by(Conversation.id).limit(1)
+                select(Conversation)
+                .where(
+                    Conversation.contact_id == contact.id,
+                    Conversation.channel == thread_channel,
+                )
+                .order_by(Conversation.id)
+                .limit(1)
             )
         ).scalars().first()
         if conversation is None:
-            conversation = Conversation(contact_id=contact.id, status="active")
+            conversation = Conversation(
+                contact_id=contact.id, channel=thread_channel, status="active"
+            )
             db.add(conversation)
             await db.flush()
 
@@ -1118,25 +1274,66 @@ async def dispatch_campaign(
 
         from app.utils.phone import count_sms_segments
 
-        char_count, segment_count = count_sms_segments(rendered)
-        message = Message(
-            conversation_id=conversation.id,
-            contact_id=contact.id,
-            ads_campaign_id=campaign.id,
-            direction="outgoing",
-            body=rendered,
-            segment_count=segment_count,
-            char_count=char_count,
-            status="queued",
-            provider="smsgate",
-            idempotency_key=assignment.idempotency_key,
-        )
+        if email_campaign:
+            # The sender is chosen per creative, then per campaign, then the
+            # default account. The address is captured on the row so a later
+            # edit of the contact never rewrites what was sent.
+            from app.services import email_service
+
+            account = (
+                await email_service.get_account(db, creative.email_account_id)
+                or await email_service.get_account(db, campaign.email_account_id)
+                or await email_service.get_default_account(db)
+            )
+            if account is None:
+                assignment.send_status = "pending"
+                assignment.skip_reason = "no_email_account"
+                assignment.next_attempt_at = now_utc() + timedelta(minutes=30)
+                skip("no_email_account")
+                continue
+            message = Message(
+                conversation_id=conversation.id,
+                contact_id=contact.id,
+                ads_campaign_id=campaign.id,
+                channel="email",
+                bulk_send=True,
+                rfc_message_id=email_service._new_rfc_message_id(account.from_email),
+                direction="outgoing",
+                body=rendered,
+                html_body=rendered_html,
+                subject=(rendered_subject or "(no subject)")[:500],
+                from_address=account.from_email,
+                to_address=(contact.email or "").strip().lower() or None,
+                email_account_id=account.id,
+                char_count=len(rendered or ""),
+                status="queued",
+                provider="brevo",
+                idempotency_key=assignment.idempotency_key,
+            )
+        else:
+            char_count, segment_count = count_sms_segments(rendered)
+            message = Message(
+                conversation_id=conversation.id,
+                contact_id=contact.id,
+                ads_campaign_id=campaign.id,
+                direction="outgoing",
+                body=rendered,
+                segment_count=segment_count,
+                char_count=char_count,
+                status="queued",
+                provider="smsgate",
+                idempotency_key=assignment.idempotency_key,
+            )
         db.add(message)
         await db.flush()
 
         conversation.message_count = (conversation.message_count or 0) + 1
-        conversation.last_message_preview = rendered[:100]
+        conversation.last_message_preview = (rendered_subject or rendered)[:100]
         conversation.last_message_at = now_utc()
+        if email_campaign:
+            conversation.subject = (rendered_subject or "")[:500]
+            if not conversation.email_account_id:
+                conversation.email_account_id = message.email_account_id
 
         assignment.message_id = message.id
         assignment.send_status = "sent"
@@ -1269,6 +1466,25 @@ async def _condition_met(db: AsyncSession, step: AdsFollowUpStep, assignment: Ad
         return (contact.lead_status or "").lower() == "not_interested"
     if cond == "converted":
         return (contact.lead_status or "").lower() in ("converted", "customer")
+    if cond in ("link_clicked", "link_not_clicked", "opened", "not_opened"):
+        # Email campaigns get real open/click data from Brevo; SMS campaigns
+        # get clicks from the tracked-link redirect. Both land on the Message
+        # row, so one lookup answers either channel's condition.
+        clicked = opened = False
+        if assignment is not None and assignment.message_id:
+            message = (
+                await db.execute(select(Message).where(Message.id == assignment.message_id))
+            ).scalar_one_or_none()
+            if message is not None:
+                clicked = (message.click_count or 0) > 0 or bool(message.clicked_at)
+                opened = (message.open_count or 0) > 0 or bool(message.opened_at)
+        if cond == "link_clicked":
+            return clicked
+        if cond == "link_not_clicked":
+            return not clicked
+        if cond == "opened":
+            return opened
+        return not opened
     if cond == "meeting_scheduled":
         count = (
             await db.execute(
@@ -1312,8 +1528,17 @@ async def process_followups(db: AsyncSession, *, limit: int = 50, send_inline: b
             totals["cancelled"] += 1
             continue
 
-        # Automatic stop conditions.
-        if contact.is_opted_out or await _suppressed_numbers(db, [contact.phone_number]):
+        # Automatic stop conditions. Email follow-ups stop on an EMAIL opt-out
+        # / bounce; SMS follow-ups stop on the phone suppression list. The two
+        # consents are independent by design.
+        if is_email_campaign(campaign):
+            blocked = await email_blocked_reason(db, contact)
+            if blocked:
+                task.status = "cancelled"
+                task.note = f"Contact not emailable ({blocked})"
+                totals["cancelled"] += 1
+                continue
+        elif contact.is_opted_out or await _suppressed_numbers(db, [contact.phone_number]):
             task.status = "cancelled"
             task.note = "Contact opted out / suppressed"
             totals["cancelled"] += 1
@@ -1341,10 +1566,21 @@ async def process_followups(db: AsyncSession, *, limit: int = 50, send_inline: b
             continue
 
         action = (step.action or "send_sms").lower()
-        if action == "send_sms" and (step.body or task.body):
+        if email_campaign:
+            # On an email campaign "send_sms" steps are sent as email: a step
+            # written against the SMS action must not be silently dropped just
+            # because the campaign's channel changed.
+            wants_send = action in ("send_sms", "send_email")
+        else:
+            wants_send = action == "send_sms"
+        if wants_send and (step.body or task.body):
             body = step.body or task.body or ""
             mid = await send_adhoc_sms(
-                db, contact, body, test_mode=campaign.test_mode, campaign_id=campaign.id
+                db, contact, body,
+                test_mode=campaign.test_mode,
+                campaign_id=campaign.id,
+                subject=step.subject,
+                channel=campaign.channel or "sms",
             )
             if mid:
                 outbox.append(mid)
@@ -1411,8 +1647,10 @@ async def send_adhoc_sms(
     *,
     test_mode: bool = False,
     campaign_id: int | None = None,
+    subject: str | None = None,
+    channel: str = "sms",
 ) -> int | None:
-    """Queue one personalised SMS through the existing message pipeline.
+    """Queue one personalised message (SMS or email) through the message pipeline.
 
     ``campaign_id`` is the *ads* campaign this send belongs to (a follow-up
     step, normally). It attributes the conversation so the inbox badge and the
@@ -1420,18 +1658,40 @@ async def send_adhoc_sms(
     """
     if test_mode:
         return None
+    from app.services import email_service
     from app.services.attribution import stamp_conversation
     from app.services.variable_service import render_for_contact
     from app.utils.phone import count_sms_segments
 
+    if channel == "email":
+        campaign = None
+        if campaign_id is not None:
+            campaign = (
+                await db.execute(select(AdsCampaign).where(AdsCampaign.id == campaign_id))
+            ).scalar_one_or_none()
+        account = await email_service.get_account(
+            db, campaign.email_account_id if campaign else None
+        ) or await email_service.get_default_account(db)
+        message = await email_service.queue_email(
+            db, contact,
+            subject=subject or (campaign.subject if campaign else None) or "Follow-up",
+            text_body=body,
+            account=account,
+            ads_campaign_id=campaign_id,
+        )
+        return message.id if message else None
+
     rendered = await render_for_contact(db, body, contact)
     conversation = (
         await db.execute(
-            select(Conversation).where(Conversation.contact_id == contact.id).order_by(Conversation.id).limit(1)
+            select(Conversation)
+            .where(Conversation.contact_id == contact.id, Conversation.channel == "sms")
+            .order_by(Conversation.id)
+            .limit(1)
         )
     ).scalars().first()
     if conversation is None:
-        conversation = Conversation(contact_id=contact.id, status="active")
+        conversation = Conversation(contact_id=contact.id, status="active", channel="sms")
         db.add(conversation)
         await db.flush()
     if campaign_id is not None:
@@ -1700,6 +1960,32 @@ async def _counts_for(
     # used rather than pretending to know what it cannot.
     opens = len(reply_contacts | click_contacts)
     open_base = delivered or sent
+
+    # Email campaigns DO have provider-measured opens and clicks (Brevo's
+    # tracking pixel and link rewriting). Replace the SMS heuristic with the
+    # real numbers rather than reporting an estimate the provider already
+    # measured for us.
+    if campaign_id is not None:
+        campaign = (
+            await db.execute(select(AdsCampaign).where(AdsCampaign.id == campaign_id))
+        ).scalar_one_or_none()
+        if campaign is not None and (campaign.channel or "sms") == "email":
+            engagement = list(
+                (
+                    await db.execute(
+                        select(Message)
+                        .join(AdsAssignment, AdsAssignment.message_id == Message.id)
+                        .where(
+                            AdsAssignment.campaign_id == campaign_id,
+                            Message.direction == "outgoing",
+                        )
+                    )
+                ).scalars().all()
+            )
+            opens = sum(1 for m in engagement if (m.open_count or 0) > 0 or m.opened_at)
+            clicks = sum(1 for m in engagement if (m.click_count or 0) > 0 or m.clicked_at)
+            click_contacts = {m.contact_id for m in engagement if (m.click_count or 0) > 0}
+            open_base = len(engagement) or delivered or sent
     return {
         "assigned": len(rows),
         "sent": sent,
@@ -2008,8 +2294,9 @@ async def validate_campaign(db: AsyncSession, campaign: AdsCampaign) -> dict:
             )
         ).scalars().all()
     )
+    email_campaign = is_email_campaign(campaign)
     if not sets:
-        errors.append("Add at least one active SMS set")
+        errors.append("Add at least one active email set" if email_campaign else "Add at least one active SMS set")
 
     creative_count = 0
     for ads_set in sets:
@@ -2024,9 +2311,19 @@ async def validate_campaign(db: AsyncSession, campaign: AdsCampaign) -> dict:
         )
         creative_count += len(creatives)
         if not creatives:
-            errors.append(f"SMS set '{ads_set.name}' has no active creative")
+            errors.append(
+                f"{'Email' if email_campaign else 'SMS'} set '{ads_set.name}' has no active creative"
+            )
         for creative in creatives:
-            if not (creative.body or "").strip():
+            if email_campaign:
+                if not (creative.body or "").strip() and not (creative.html_body or "").strip():
+                    errors.append(f"Email creative '{creative.name}' has no message body")
+                if not (creative.subject or campaign.subject or "").strip():
+                    errors.append(
+                        f"Email creative '{creative.name}' has no subject line "
+                        "(set one on the creative or on the campaign)"
+                    )
+            elif not (creative.body or "").strip():
                 errors.append(f"Creative '{creative.name}' has no message text")
         if (ads_set.split_mode or "") == "percentage" and creatives:
             total = round(sum(c.allocation or 0 for c in creatives), 2)
@@ -2042,11 +2339,48 @@ async def validate_campaign(db: AsyncSession, campaign: AdsCampaign) -> dict:
     if not campaign.test_mode:
         from app.config import settings
 
-        if not getattr(settings, "smsgate_configured", False):
+        if email_campaign:
+            from app.services import email_service
+
+            primary = await email_service.get_account(db, campaign.email_account_id)
+            if primary is None:
+                primary = await email_service.get_default_account(db)
+            if primary is None:
+                errors.append(
+                    "No email sender configured. Add a Brevo API key on the Email Senders "
+                    "page, then pick it on this campaign."
+                )
+            else:
+                usable, why = await email_service.account_is_usable(primary)
+                if not usable:
+                    errors.append(
+                        f"Email sender '{primary.name}' cannot send right now ({why})."
+                    )
+                if campaign.fallback_email_account_id:
+                    fallback = await email_service.get_account(
+                        db, campaign.fallback_email_account_id
+                    )
+                    if fallback is None:
+                        warnings.append("The fallback sender chosen for this campaign no longer exists.")
+            if not (campaign.subject or "").strip() and not any(
+                (c.subject or "").strip()
+                for ads_set in sets
+                for c in active_creatives(
+                    list(
+                        (
+                            await db.execute(
+                                select(AdsCreative).where(AdsCreative.set_id == ads_set.id)
+                            )
+                        ).scalars().all()
+                    )
+                )
+            ):
+                errors.append("Every email creative needs a subject line (or a campaign subject).")
+        elif not getattr(settings, "smsgate_configured", False):
             warnings.append("No SMS gateway configured; messages will fail until one is set up.")
 
     if campaign.daily_limit is None:
-        warnings.append("No daily SMS limit set: the whole audience may go out at once.")
+        warnings.append("No daily limit set: the whole audience may go out at once.")
 
     return {"ok": not errors, "errors": errors, "warnings": warnings, "summary": sim}
 

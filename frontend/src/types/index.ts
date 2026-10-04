@@ -68,6 +68,14 @@ export interface Campaign {
   interested: number;
   // Future time the campaign launches by itself. null = manual start.
   scheduled_start_at: string | null;
+  //: "sms" or "email" — nullable rows predate the email channel.
+  channel?: string | null;
+  email_account_id?: number | null;
+  fallback_email_account_id?: number | null;
+  subject?: string | null;
+  html_body?: string | null;
+  track_opens?: boolean | null;
+  track_clicks?: boolean | null;
   created_at: string;
   updated_at: string;
 }
@@ -77,6 +85,12 @@ export interface Template {
   name: string;
   category: string | null;
   body: string;
+  //: "sms" or "email". Email templates also carry a subject and HTML body.
+  channel?: string | null;
+  subject?: string | null;
+  html_body?: string | null;
+  preheader?: string | null;
+  email_account_id?: number | null;
   char_count: number;
   segment_count: number;
   is_active: boolean;
@@ -256,6 +270,8 @@ export interface AutomationAction {
   type: string;
   value?: string;
   body?: string;
+  //: Email actions ("send_email") can carry their own subject line.
+  subject?: string;
   delay_minutes?: number;
 }
 
@@ -263,6 +279,8 @@ export interface Automation {
   id: number;
   name: string;
   description: string | null;
+  //: "sms" or "email" — an automation only fires on its own channel.
+  channel?: string | null;
   is_enabled: boolean;
   priority: number;
   trigger_type: string;

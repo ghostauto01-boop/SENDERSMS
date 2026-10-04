@@ -10,6 +10,12 @@ MatchType = Literal["contains", "exact", "starts", "any"]
 
 class AutoReplyRuleCreate(BaseModel):
     name: str = Field(..., max_length=120)
+    #: "sms" (default) or "email".
+    channel: str = "sms"
+    #: Email only: subject line for the automatic reply.
+    subject: Optional[str] = Field(default=None, max_length=500)
+    #: Email only: sender override (falls back to the default sender).
+    email_account_id: Optional[int] = None
     keywords: Optional[str] = None
     match_type: MatchType = "contains"
     reply_body: str = Field(..., min_length=1)
@@ -28,6 +34,9 @@ class AutoReplyRuleCreate(BaseModel):
 
 class AutoReplyRuleUpdate(BaseModel):
     name: Optional[str] = Field(default=None, max_length=120)
+    channel: Optional[str] = None
+    subject: Optional[str] = Field(default=None, max_length=500)
+    email_account_id: Optional[int] = None
     keywords: Optional[str] = None
     match_type: Optional[MatchType] = None
     reply_body: Optional[str] = None
@@ -40,6 +49,9 @@ class AutoReplyRuleUpdate(BaseModel):
 class AutoReplyRuleOut(BaseModel):
     id: int
     name: str
+    channel: str = "sms"
+    subject: Optional[str] = None
+    email_account_id: Optional[int] = None
     keywords: Optional[str]
     match_type: str
     reply_body: str

@@ -1,6 +1,7 @@
 """Follow-ups API routes."""
 
 from datetime import datetime, timezone
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select, func
@@ -48,6 +49,11 @@ def _followup_item(followup: FollowUp, contact: Contact | None) -> dict:
         "scheduled_at": _utc_iso(followup.scheduled_at),
         "executed_at": _utc_iso(followup.executed_at),
         "message_text": followup.message_text,
+        #: "sms" (default) or "email" — an email follow-up also carries a subject.
+        "channel": followup.channel or "sms",
+        "subject": followup.subject,
+        "email_account_id": followup.email_account_id,
+        "contact_email": contact.email if contact else None,
         "attempt_count": followup.attempt_count,
         "max_attempts": followup.max_attempts,
         "notify_on_due": bool(followup.notify_on_due),
@@ -60,13 +66,18 @@ async def list_followups(
     view: str = Query(default="due_today"),  # due_today, overdue, upcoming, completed, skipped
     page: int = Query(default=1, ge=1),
     per_page: int = Query(default=25, ge=1, le=100),
+    channel: Optional[str] = Query(default="sms", description="sms | email | all"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """List follow-ups based on view."""
+    """List follow-ups based on view, for one channel (defaults to SMS)."""
     today_start, today_end = local_day_utc_bounds()
 
     query = select(FollowUp)
+    wanted = (channel or "sms").lower()
+    if wanted != "all":
+        # Pre-channel rows are SMS, so they stay visible on the SMS side.
+        query = query.where(func.coalesce(FollowUp.channel, "sms") == wanted)
 
     if view == "due_today":
         query = query.where(
@@ -118,7 +129,17 @@ async def create_followup(
     contact = contact_result.scalar_one_or_none()
     if not contact:
         raise HTTPException(status_code=404, detail="Contact not found")
-    if contact.is_opted_out:
+    channel = (data.channel or "sms").lower()
+    if channel not in ("sms", "email"):
+        raise HTTPException(status_code=422, detail="channel must be 'sms' or 'email'")
+    if channel == "email":
+        if contact.is_email_opted_out:
+            raise HTTPException(status_code=400, detail="Contact has opted out of email")
+        if not (contact.email or "").strip():
+            raise HTTPException(status_code=400, detail="Contact has no email address")
+        if not (data.subject or "").strip():
+            raise HTTPException(status_code=422, detail="An email follow-up needs a subject")
+    elif contact.is_opted_out:
         raise HTTPException(status_code=400, detail="Cannot create a follow-up for an opted-out contact")
 
     scheduled_at = data.scheduled_at.astimezone(timezone.utc)
@@ -130,6 +151,9 @@ async def create_followup(
         status="pending",
         scheduled_at=scheduled_at,
         message_text=data.message_text,
+        channel=channel,
+        subject=(data.subject or "").strip() or None,
+        email_account_id=data.email_account_id,
         notify_on_due=data.notify_on_due,
         max_attempts=data.max_attempts,
     )

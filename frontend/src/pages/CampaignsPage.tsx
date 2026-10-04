@@ -9,6 +9,10 @@ import TemplatePicker from "../components/TemplatePicker";
 import ShortcodePicker from "../components/ShortcodePicker";
 import ImportContactsModal from "../components/ImportContactsModal";
 import CampaignRepliesDrawer from "../components/CampaignRepliesDrawer";
+import { useChannel } from "../hooks/useChannel";
+import ChannelSwitch from "../components/ChannelSwitch";
+import emailApi, { EmailAccount } from "../api/email";
+import RichEmailEditor, { AttachmentPayload } from "../components/RichEmailEditor";
 
 const statusBadge = (status: string) => {
   const map: Record<string, string> = {
@@ -112,6 +116,7 @@ function ScheduleModal({
 }
 
 export default function CampaignsPage() {
+  const { channel } = useChannel();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -125,13 +130,13 @@ export default function CampaignsPage() {
   // the inbox renders, so the "N replies" button never lies.
   const [live, setLive] = useState<Record<number, any>>({});
 
-  useEffect(() => { loadCampaigns(); }, []);
+  useEffect(() => { loadCampaigns(); }, [channel]);
 
   const loadCampaigns = async () => {
     try {
       setLoading(true);
       setError(null);
-      const { data } = await api.get("/campaigns/");
+      const { data } = await api.get("/campaigns/", { params: { channel } });
       setCampaigns(data.items);
       // Best-effort: the page is fully usable without it.
       api.get("/overview/campaigns")
@@ -209,7 +214,10 @@ export default function CampaignsPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <h1 className="text-xl sm:text-2xl font-bold">Campaigns</h1>
+        <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-3">
+          Campaigns
+          <ChannelSwitch size="sm" />
+        </h1>
         <div className="flex gap-2">
           <Link to="/overview" className="btn-secondary btn-sm" title="All campaigns and inbox activity in one view">
             <Activity size={14} className="mr-1" /> Overview
@@ -231,7 +239,9 @@ export default function CampaignsPage() {
         ) : campaigns.length === 0 ? (
           <div className="card p-12 text-center text-gray-500">
             <Megaphone size={48} className="mx-auto mb-2 opacity-30" />
-            <p>No campaigns yet. Create your first SMS campaign.</p>
+            <p>
+              No {channel === "email" ? "email" : "SMS"} campaigns yet. Create your first one.
+            </p>
           </div>
         ) : (
           campaigns.map((camp) => (
@@ -351,7 +361,12 @@ export default function CampaignsPage() {
         )}
       </div>
 
-      {showCreate && <CampaignModal onClose={() => { setShowCreate(false); loadCampaigns(); }} />}
+      {showCreate && (
+        <CampaignModal
+          channel={channel}
+          onClose={() => { setShowCreate(false); loadCampaigns(); }}
+        />
+      )}
       {editing && (
         <CampaignModal
           key={editing.id}
@@ -379,7 +394,16 @@ export default function CampaignsPage() {
     </div>
   );
 }
-function CampaignModal({ campaign, onClose }: { campaign?: Campaign | null; onClose: () => void }) {
+function CampaignModal({
+  campaign,
+  channel = "sms",
+  onClose,
+}: {
+  campaign?: Campaign | null;
+  channel?: "sms" | "email";
+  onClose: () => void;
+}) {
+  const isEmail = (campaign?.channel || channel) === "email";
   // One modal for both create and edit: the fields, the validation and the
   // segment counter are identical, and keeping two copies in sync is how they
   // drift apart.
@@ -398,6 +422,18 @@ function CampaignModal({ campaign, onClose }: { campaign?: Campaign | null; onCl
   const [fillTemplateId, setFillTemplateId] = useState("");
   const [sequenceId, setSequenceId] = useState(campaign?.sequence_id ? String(campaign.sequence_id) : "");
   const [sequences, setSequences] = useState<any[]>([]);
+  const [subject, setSubject] = useState((campaign as any)?.subject ?? "");
+  const [htmlBody, setHtmlBody] = useState((campaign as any)?.html_body ?? "");
+  const [emailAccountId, setEmailAccountId] = useState(
+    (campaign as any)?.email_account_id ? String((campaign as any).email_account_id) : ""
+  );
+  const [fallbackAccountId, setFallbackAccountId] = useState(
+    (campaign as any)?.fallback_email_account_id
+      ? String((campaign as any).fallback_email_account_id)
+      : ""
+  );
+  const [emailAccounts, setEmailAccounts] = useState<EmailAccount[]>([]);
+  const [attachments, setAttachments] = useState<AttachmentPayload[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const messageRef = useRef<HTMLTextAreaElement>(null);
@@ -408,6 +444,14 @@ function CampaignModal({ campaign, onClose }: { campaign?: Campaign | null; onCl
       setSequences(s.data.items);
     }).catch(() => toast.error("Could not load sequences"));
   }, []);
+
+  useEffect(() => {
+    if (!isEmail) return;
+    emailApi
+      .listAccounts()
+      .then((data) => setEmailAccounts(data.items))
+      .catch(() => toast.error("Could not load your Brevo senders"));
+  }, [isEmail]);
 
   // GSM-7 vs UCS-2: one emoji or curly quote drops the limit from 160 to 70,
   // so count the way the carrier will rather than assuming 160.
@@ -437,12 +481,15 @@ function CampaignModal({ campaign, onClose }: { campaign?: Campaign | null; onCl
     // Guard here as well as on the server: a campaign with no message used to
     // be creatable and only failed later, mid-send.
     if (!sequenceId) {
-      if (mode === "write" && !messageBody.trim()) {
+      if (mode === "write" && !messageBody.trim() && !htmlBody.trim()) {
         toast.error("Write a message, or switch to Use template"); return;
       }
       if (mode === "template" && !templateId) {
         toast.error("Choose a template, or switch to Write message"); return;
       }
+    }
+    if (isEmail && !subject.trim()) {
+      toast.error("An email campaign needs a subject"); return;
     }
     setSubmitting(true);
     // Send only the one the user actually chose, so precedence is never
@@ -456,6 +503,16 @@ function CampaignModal({ campaign, onClose }: { campaign?: Campaign | null; onCl
       template_id: !sequenceId && mode === "template" && templateId ? parseInt(templateId) : null,
       message_body: !sequenceId && mode === "write" && messageBody.trim() ? messageBody : null,
       sequence_id: sequenceId ? parseInt(sequenceId) : null,
+      ...(isEmail
+        ? {
+            channel: "email",
+            subject: subject.trim(),
+            html_body: htmlBody.trim() || null,
+            attachments: attachments.length ? attachments : null,
+            email_account_id: emailAccountId ? Number(emailAccountId) : null,
+            fallback_email_account_id: fallbackAccountId ? Number(fallbackAccountId) : null,
+          }
+        : { channel: "sms" }),
     };
     try {
       if (editing) {
@@ -548,6 +605,16 @@ function CampaignModal({ campaign, onClose }: { campaign?: Campaign | null; onCl
                     className="flex-1 min-w-[220px]"
                   />
                 </div>
+                {isEmail ? (
+                  <RichEmailEditor
+                    body={messageBody}
+                    onBody={setMessageBody}
+                    html={htmlBody}
+                    onHtml={setHtmlBody}
+                    attachments={attachments}
+                    onAttachments={setAttachments}
+                  />
+                ) : (
                 <textarea
                   ref={messageRef}
                   className="input font-mono text-sm"
@@ -556,6 +623,7 @@ function CampaignModal({ campaign, onClose }: { campaign?: Campaign | null; onCl
                   onChange={(e) => setMessageBody(e.target.value)}
                   placeholder={"Hi {{first_name}}, ..."}
                 />
+                )}
                 <div className="flex flex-wrap items-center gap-1.5 mt-2">
                   <span className="text-xs text-gray-500 mr-1">Insert:</span>
                   <ShortcodePicker
@@ -575,7 +643,7 @@ function CampaignModal({ campaign, onClose }: { campaign?: Campaign | null; onCl
                     </button>
                   ))}
                 </div>
-                <p className="text-xs text-gray-400 mt-2">
+                <p className={`text-xs text-gray-400 mt-2 ${isEmail ? "hidden" : ""}`}>
                   {len} chars · {segments} SMS{segments === 1 ? "" : "s"}
                   {unicode && " · unicode (70/SMS)"}
                   {segments > 3 && " · long messages cost more"}
@@ -599,6 +667,58 @@ function CampaignModal({ campaign, onClose }: { campaign?: Campaign | null; onCl
             )}
           </div>
 
+          {isEmail && (
+            <>
+              <div>
+                <label className="label">Subject *</label>
+                <input
+                  className="input"
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  placeholder="Quick question about {{company}}"
+                />
+              </div>
+              <div className="grid sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="label">Send through</label>
+                  <select
+                    className="input"
+                    value={emailAccountId}
+                    onChange={(e) => setEmailAccountId(e.target.value)}
+                  >
+                    <option value="">Default sender</option>
+                    {emailAccounts.map((a) => (
+                      <option key={a.id} value={a.id} disabled={!a.is_active}>
+                        {a.name} — {a.from_email}
+                        {a.is_active ? "" : " (off)"}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Fallback sender</label>
+                  <select
+                    className="input"
+                    value={fallbackAccountId}
+                    onChange={(e) => setFallbackAccountId(e.target.value)}
+                  >
+                    <option value="">None</option>
+                    {emailAccounts.map((a) => (
+                      <option
+                        key={a.id}
+                        value={a.id}
+                        disabled={String(a.id) === emailAccountId}
+                      >
+                        {a.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </>
+          )}
+
+          {!isEmail && (
           <div>
             <label className="label">Sequence (optional)</label>
             <select className="input" value={sequenceId} onChange={(e) => setSequenceId(e.target.value)}>
@@ -612,6 +732,7 @@ function CampaignModal({ campaign, onClose }: { campaign?: Campaign | null; onCl
               </p>
             )}
           </div>
+          )}
 
           <div className="flex flex-col-reverse sm:flex-row gap-2 pt-2">
             <button type="button" onClick={onClose} className="btn-secondary flex-1">Cancel</button>
