@@ -59,10 +59,12 @@ export default function RichEmailEditor({
   onBody: (value: string) => void;
   html: string;
   onHtml: (value: string) => void;
-  attachments: AttachmentPayload[];
-  onAttachments: (value: AttachmentPayload[]) => void;
+  /** Optional: when omitted, the attach button is hidden (e.g. ad creatives). */
+  attachments?: AttachmentPayload[];
+  onAttachments?: (value: AttachmentPayload[]) => void;
   variables?: string[];
 }) {
+  const files = attachments ?? [];
   const textRef = useRef<HTMLTextAreaElement>(null);
   const [showHtml, setShowHtml] = useState(false);
   const [preview, setPreview] = useState(false);
@@ -221,7 +223,7 @@ export default function RichEmailEditor({
       });
     }
     if (accepted.length) {
-      onAttachments([...attachments, ...accepted].slice(0, 10));
+      onAttachments?.([...(attachments ?? []), ...accepted].slice(0, 10));
       toast.success(`${accepted.length} file(s) attached`);
     }
   };
@@ -256,19 +258,23 @@ export default function RichEmailEditor({
             <Icon size={15} />
           </button>
         ))}
-        <span className="w-px h-5 bg-gray-200 dark:bg-gray-700 mx-1" />
-        <label className="p-1.5 rounded text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer" title="Attach files">
-          <Paperclip size={15} />
-          <input
-            type="file"
-            multiple
-            className="hidden"
-            onChange={(e) => {
-              readFiles(e.target.files);
-              e.target.value = "";
-            }}
-          />
-        </label>
+        {onAttachments && (
+          <>
+            <span className="w-px h-5 bg-gray-200 dark:bg-gray-700 mx-1" />
+            <label className="p-1.5 rounded text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer" title="Attach files">
+              <Paperclip size={15} />
+              <input
+                type="file"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  readFiles(e.target.files);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+          </>
+        )}
         <button
           type="button"
           title="Edit the raw HTML"
@@ -349,9 +355,9 @@ export default function RichEmailEditor({
         ))}
       </div>
 
-      {(attachments.length > 0 || html.trim()) && (
+      {files.length > 0 && (
         <div className="space-y-1">
-          {attachments.map((file, index) => (
+          {files.map((file, index) => (
             <div key={`${file.name}-${index}`} className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
               <Paperclip size={12} />
               <span className="truncate">{file.name}</span>
@@ -361,7 +367,7 @@ export default function RichEmailEditor({
               <button
                 type="button"
                 className="text-gray-400 hover:text-red-500"
-                onClick={() => onAttachments(attachments.filter((_, i) => i !== index))}
+                onClick={() => onAttachments?.(files.filter((_, i) => i !== index))}
               >
                 <X size={12} />
               </button>
@@ -381,10 +387,10 @@ export default function RichEmailEditor({
           ) : (
             <p className="whitespace-pre-wrap text-sm">{body}</p>
           )}
-          {attachments.length > 0 && (
+          {files.length > 0 && (
             <p className="text-xs text-gray-500 mt-3">
-              {attachments.length} attachment{attachments.length === 1 ? "" : "s"}:{" "}
-              {attachments.map((a) => a.name).join(", ")}
+              {files.length} attachment{files.length === 1 ? "" : "s"}:{" "}
+              {files.map((a) => a.name).join(", ")}
             </p>
           )}
         </div>

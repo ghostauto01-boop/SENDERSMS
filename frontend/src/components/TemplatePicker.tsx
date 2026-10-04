@@ -21,6 +21,8 @@ interface Props {
   disabled?: boolean;
   showPreview?: boolean;
   className?: string;
+  /** When set, only templates for this channel are listed ("sms" | "email"). */
+  channel?: string;
 }
 
 export default function TemplatePicker({
@@ -32,6 +34,7 @@ export default function TemplatePicker({
   disabled = false,
   showPreview = true,
   className = "",
+  channel,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -50,7 +53,9 @@ export default function TemplatePicker({
       let page = 1;
       let total = 0;
       do {
-        const { data } = await api.get("/templates/", { params: { page, per_page: 100 } });
+        const { data } = await api.get("/templates/", {
+          params: { page, per_page: 100, ...(channel ? { channel } : {}) },
+        });
         all.push(...(data.items || []));
         total = data.total ?? all.length;
         page += 1;
@@ -62,7 +67,7 @@ export default function TemplatePicker({
     } finally {
       if (!quiet) setLoading(false);
     }
-  }, []);
+  }, [channel]);
 
   useEffect(() => {
     load();

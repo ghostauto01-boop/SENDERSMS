@@ -60,7 +60,10 @@ export default function SMSManagerPage() {
 
   const load = useCallback(async () => {
     try {
-      const [c, o] = await Promise.all([adsApi.listCampaigns({ per_page: 100 }), adsApi.overview()]);
+      const [c, o] = await Promise.all([
+        adsApi.listCampaigns({ per_page: 100, channel: "sms" }),
+        adsApi.overview({ channel: "sms" }),
+      ]);
       setCampaigns(c.items);
       setOverview(o);
     } catch {
@@ -150,6 +153,7 @@ export default function SMSManagerPage() {
       {creating && (
         <CampaignBuilder
           objectives={reference?.objectives || []}
+          channel="sms"
           close={() => setCreating(false)}
           saved={(id) => {
             setCreating(false);
@@ -162,6 +166,7 @@ export default function SMSManagerPage() {
         <CampaignDetail
           campaignId={openId}
           reference={reference}
+          channel="sms"
           onClose={() => setOpenId(null)}
           onChanged={load}
         />
@@ -330,7 +335,7 @@ function CampaignsSection({
             </option>
           ))}
         </select>
-        <a className="btn-secondary btn-sm" href={adsApi.exportUrl("campaigns")}>
+        <a className="btn-secondary btn-sm" href={adsApi.exportUrl("campaigns", undefined, "sms")}>
           <Download size={15} className="mr-1" /> Export
         </a>
       </div>
@@ -472,7 +477,7 @@ function FollowUpsSection() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setItems((await adsApi.followups(bucket)).items);
+      setItems((await adsApi.followups(bucket, "sms")).items);
     } finally {
       setLoading(false);
     }
@@ -509,7 +514,7 @@ function FollowUpsSection() {
           ))}
         </div>
         <div className="flex gap-2">
-          <a className="btn-secondary btn-sm" href={adsApi.exportUrl("followups")}>
+          <a className="btn-secondary btn-sm" href={adsApi.exportUrl("followups", undefined, "sms")}>
             <Download size={15} className="mr-1" /> Export
           </a>
           <button
@@ -581,7 +586,7 @@ function CalendarSection() {
   const [view, setView] = useState<"agenda" | "week" | "month">("agenda");
 
   const load = useCallback(async () => {
-    setItems((await adsApi.calendar()).items);
+    setItems((await adsApi.calendar({ channel: "sms" })).items);
   }, []);
   useEffect(() => {
     load();
@@ -956,7 +961,7 @@ function SuppressModal({ close, saved }: { close: () => void; saved: () => void 
 function ActivitySection() {
   const [items, setItems] = useState<any[]>([]);
   useEffect(() => {
-    adsApi.activity().then((r) => setItems(r.items));
+    adsApi.activity("sms").then((r) => setItems(r.items));
   }, []);
   if (items.length === 0) return <Empty title="No activity recorded yet" />;
   return (

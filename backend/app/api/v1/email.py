@@ -440,14 +440,27 @@ async def overview(
         )
     ).scalar() or 0
 
+    # Recent EMAIL MANAGER (ads) campaigns — the campaigns users now create on
+    # the Email Manager's Campaigns tab. Legacy list-blast campaigns still
+    # live on the Campaigns page and are intentionally not listed here.
+    from app.models.ads import AdsAssignment, AdsCampaign
+    from app.services import ads_service as ads_svc
+
     campaigns = (
         await db.execute(
-            select(Campaign)
-            .where(func.coalesce(Campaign.channel, "sms") == "email")
-            .order_by(Campaign.id.desc())
+            select(AdsCampaign)
+            .where(AdsCampaign.channel == "email")
+            .order_by(AdsCampaign.id.desc())
             .limit(8)
         )
     ).scalars().all()
+    campaign_stats: dict[int, dict] = {}
+    for ads_campaign in campaigns:
+        campaign_stats[ads_campaign.id] = await ads_svc._counts_for(
+            db,
+            [AdsAssignment.campaign_id == ads_campaign.id],
+            campaign_id=ads_campaign.id,
+        )
 
     events = (
         await db.execute(
@@ -471,10 +484,10 @@ async def overview(
                 "name": c.name,
                 "status": c.status,
                 "subject": c.subject,
-                "messages_sent": c.messages_sent or 0,
-                "messages_delivered": c.messages_delivered or 0,
-                "messages_failed": c.messages_failed or 0,
-                "replies": c.replies or 0,
+                "messages_sent": campaign_stats.get(c.id, {}).get("sent", 0),
+                "messages_delivered": campaign_stats.get(c.id, {}).get("delivered", 0),
+                "messages_failed": campaign_stats.get(c.id, {}).get("failed", 0),
+                "replies": campaign_stats.get(c.id, {}).get("replies", 0),
                 "created_at": _iso(c.created_at),
             }
             for c in campaigns

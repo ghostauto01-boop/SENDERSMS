@@ -452,6 +452,7 @@ async def preview_filters(
                 "name": " ".join(filter(None, [c.first_name, c.last_name])).strip()
                 or c.business_name,
                 "phone_number": c.phone_number,
+                "email_address": c.email,
             }
             for c in eligible[:sample_size]
         ],
@@ -2437,8 +2438,18 @@ async def duplicate_campaign(
         description=campaign.description,
         objective=campaign.objective,
         status="draft",
+        # A clone keeps the channel and the email sender/subject: duplicating
+        # an email campaign must produce an email campaign, not an SMS one.
+        channel=campaign.channel or "sms",
+        email_account_id=campaign.email_account_id,
+        fallback_email_account_id=campaign.fallback_email_account_id,
+        subject=campaign.subject,
+        track_opens=campaign.track_opens if campaign.track_opens is not None else True,
+        track_clicks=campaign.track_clicks if campaign.track_clicks is not None else True,
         daily_limit=campaign.daily_limit,
         total_limit=campaign.total_limit,
+        start_date=campaign.start_date,
+        end_date=campaign.end_date,
         send_start_hour=campaign.send_start_hour,
         send_end_hour=campaign.send_end_hour,
         send_days=campaign.send_days,
@@ -2506,7 +2517,11 @@ async def duplicate_campaign(
                 cta=creative.cta,
                 tracking_link=creative.tracking_link,
                 allocation=creative.allocation,
+                send_quota=creative.send_quota,
                 template_id=creative.template_id,
+                subject=creative.subject,
+                html_body=creative.html_body,
+                email_account_id=creative.email_account_id,
                 current_version=1,
             )
             db.add(new_creative)
@@ -2525,6 +2540,7 @@ async def duplicate_campaign(
                 condition=step.condition,
                 action=step.action,
                 body=step.body,
+                subject=step.subject,
                 action_value=step.action_value,
                 is_active=step.is_active,
             )
@@ -2598,7 +2614,11 @@ async def duplicate_set(
             cta=creative.cta,
             tracking_link=creative.tracking_link,
             allocation=creative.allocation,
+            send_quota=creative.send_quota,
             template_id=creative.template_id,
+            subject=creative.subject,
+            html_body=creative.html_body,
+            email_account_id=creative.email_account_id,
             current_version=1,
         )
         db.add(new_creative)
@@ -2762,6 +2782,7 @@ async def preview_saved_audience(
                 "name": " ".join(filter(None, [c.first_name, c.last_name])).strip()
                 or c.business_name,
                 "phone_number": c.phone_number,
+                "email_address": c.email,
             }
             for c in eligible[:sample_size]
         ],

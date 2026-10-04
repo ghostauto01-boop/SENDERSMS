@@ -4,22 +4,32 @@ import { useNavigate } from "react-router-dom";
 import {
   Activity,
   BarChart3,
+  CalendarDays,
   CheckCircle2,
+  Clock3,
+  Copy,
+  Download,
   Eye,
   FileText,
   Inbox,
   KeyRound,
+  LayoutGrid,
   Mail,
   Megaphone,
   MousePointerClick,
+  Pause,
+  Play,
   Plus,
   RefreshCw,
+  Search,
   Send,
-  Paperclip,
   ShieldCheck,
   ShieldOff,
+  Sparkles,
   Trash2,
   UserRound,
+  Users,
+  Wand2,
   XCircle,
 } from "lucide-react";
 import {
@@ -33,24 +43,49 @@ import {
 } from "recharts";
 import api from "../api/client";
 import emailApi, { EmailAccount, EmailMessage } from "../api/email";
+import adsApi, { AdsCampaign } from "../api/ads";
+import CampaignBuilder from "./ads/CampaignBuilder";
+import CampaignDetail from "./ads/CampaignDetail";
 import EmailSendPanel from "../components/EmailSendPanel";
 import RichEmailEditor from "../components/RichEmailEditor";
-import { Badge, Empty, Field, Metric, Modal, Stat, fmtDate } from "./ads/ui";
+import {
+  Badge,
+  Empty,
+  Field,
+  Metric,
+  Modal,
+  Stat,
+  fmtDate,
+  fmtDay,
+  fromLocalInput,
+} from "./ads/ui";
 
 /**
  * EMAIL MANAGER
  *
- * The email twin of the SMS Manager. Sending lives on Brevo, and any number of
- * Brevo keys can be saved at once — the Senders tab is where they are added,
- * tested and picked as the default, and every campaign can override which one
- * it sends through.
+ * The email twin of the SMS Ads Manager: email campaigns -> email sets ->
+ * creatives -> audiences -> A/B testing -> budgets -> drip -> follow-ups ->
+ * Andromeda auto-optimization -> calendar -> analytics. Sending lives on
+ * Brevo, and any number of Brevo keys can be saved at once — the Senders tab
+ * is where they are added, tested and picked as the default, and every
+ * campaign can override which one it sends through.
+ *
+ * The second half of the tabs (Senders, Quick Send, Templates,
+ * Deliverability, Suppression, Activity) are the email channel extras the SMS
+ * side does not need: Brevo senders, one-off sends, the template library,
+ * domain authentication and the Brevo event stream.
  */
 
 const SECTIONS = [
-  { key: "Overview", icon: BarChart3 },
-  { key: "Senders", icon: KeyRound },
-  { key: "Send", icon: Send },
+  { key: "Overview", icon: LayoutGrid },
   { key: "Campaigns", icon: Megaphone },
+  { key: "Audience", icon: Users },
+  { key: "Automation", icon: Wand2 },
+  { key: "Follow-Ups", icon: Clock3 },
+  { key: "Calendar", icon: CalendarDays },
+  { key: "Analytics", icon: BarChart3 },
+  { key: "Senders", icon: KeyRound },
+  { key: "Quick Send", icon: Send },
   { key: "Templates", icon: FileText },
   { key: "Deliverability", icon: ShieldCheck },
   { key: "Suppression", icon: ShieldOff },
@@ -76,19 +111,30 @@ export default function EmailManagerPage() {
   const [section, setSection] = useState<Section>("Overview");
   const navigate = useNavigate();
 
-  const [overview, setOverview] = useState<any>(null);
+  const [campaigns, setCampaigns] = useState<AdsCampaign[]>([]);
+  const [adsOverview, setAdsOverview] = useState<any>(null);
+  const [emailOverview, setEmailOverview] = useState<any>(null);
   const [accounts, setAccounts] = useState<EmailAccount[]>([]);
-  const [reference, setReference] = useState<any>(null);
+  const [adsReference, setAdsReference] = useState<any>(null);
+  const [emailReference, setEmailReference] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [openId, setOpenId] = useState<number | null>(null);
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const [accountModal, setAccountModal] = useState<null | { editing?: EmailAccount }>(null);
 
   const load = useCallback(async () => {
     try {
-      const [o, a] = await Promise.all([
+      const [c, ao, eo, a] = await Promise.all([
+        adsApi.listCampaigns({ per_page: 100, channel: "email" }),
+        adsApi.overview({ channel: "email" }),
         emailApi.overview({ days: 30 }),
         emailApi.listAccounts(),
       ]);
-      setOverview(o);
+      setCampaigns(c.items);
+      setAdsOverview(ao);
+      setEmailOverview(eo);
       setAccounts(a.items);
     } catch {
       toast.error("Could not load the Email Manager");
@@ -99,8 +145,19 @@ export default function EmailManagerPage() {
 
   useEffect(() => {
     load();
-    emailApi.reference().then(setReference).catch(() => {});
+    adsApi.reference().then(setAdsReference).catch(() => {});
+    emailApi.reference().then(setEmailReference).catch(() => {});
   }, [load]);
+
+  const filtered = useMemo(
+    () =>
+      campaigns.filter(
+        (c) =>
+          (!statusFilter || c.status === statusFilter) &&
+          (!query || c.name.toLowerCase().includes(query.toLowerCase()))
+      ),
+    [campaigns, query, statusFilter]
+  );
 
   if (loading) {
     return (
@@ -110,29 +167,31 @@ export default function EmailManagerPage() {
     );
   }
 
-  const totals = overview?.totals || {};
-
   return (
     <div className="space-y-5 max-w-6xl mx-auto">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-sm font-medium text-primary-600 mb-1 flex items-center gap-1">
-            <Mail size={15} /> EMAIL CHANNEL · BREVO
+            <Mail size={15} /> EMAIL CHANNEL · BREVO · <Sparkles size={13} /> ADVANCED
           </p>
           <h1 className="text-2xl sm:text-3xl font-bold">Email Manager</h1>
           <p className="text-gray-500 mt-1">
-            Senders, email campaigns, templates, inbox, suppression and delivery analytics.
+            Email campaigns, email sets, creatives, A/B testing, Andromeda, follow-ups and
+            analytics — plus senders, templates and deliverability.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button className="btn-secondary" onClick={() => navigate("/email-inbox")}>
             <Inbox size={17} className="mr-1" /> Email inbox
-            {overview?.unread_conversations ? (
-              <span className="ml-2 badge-red">{overview.unread_conversations}</span>
+            {emailOverview?.unread_conversations ? (
+              <span className="ml-2 badge-red">{emailOverview.unread_conversations}</span>
             ) : null}
           </button>
-          <button className="btn-primary" onClick={() => setAccountModal({})}>
+          <button className="btn-secondary" onClick={() => setAccountModal({})}>
             <Plus size={17} className="mr-1" /> Add sender
+          </button>
+          <button className="btn-primary" onClick={() => setCreating(true)}>
+            <Plus size={17} className="mr-1" /> Create campaign
           </button>
         </div>
       </div>
@@ -170,7 +229,40 @@ export default function EmailManagerPage() {
       </div>
 
       {section === "Overview" && (
-        <OverviewTab overview={overview} totals={totals} accounts={accounts} navigate={navigate} />
+        <ManagerOverview
+          ads={adsOverview}
+          email={emailOverview}
+          accounts={accounts}
+          campaigns={campaigns}
+          onOpen={setOpenId}
+          onCreate={() => setCreating(true)}
+          onAddSender={() => setAccountModal({})}
+          goSenders={() => setSection("Senders")}
+        />
+      )}
+      {section === "Campaigns" && (
+        <ManagerCampaigns
+          campaigns={filtered}
+          query={query}
+          setQuery={setQuery}
+          statusFilter={statusFilter}
+          setStatusFilter={setStatusFilter}
+          accounts={accounts}
+          onOpen={setOpenId}
+          reload={load}
+          create={() => setCreating(true)}
+        />
+      )}
+      {section === "Audience" && (
+        <ManagerAudience reference={adsReference} campaigns={campaigns} />
+      )}
+      {section === "Automation" && (
+        <ManagerAutomation campaigns={campaigns} onOpen={setOpenId} />
+      )}
+      {section === "Follow-Ups" && <ManagerFollowUps />}
+      {section === "Calendar" && <ManagerCalendar />}
+      {section === "Analytics" && (
+        <ManagerAnalytics campaigns={campaigns} onOpen={setOpenId} />
       )}
       {section === "Senders" && (
         <SendersTab
@@ -180,13 +272,36 @@ export default function EmailManagerPage() {
           onAdd={() => setAccountModal({})}
         />
       )}
-      {section === "Send" && <SendTab reference={reference} accounts={accounts} />}
-      {section === "Campaigns" && <CampaignsTab reference={reference} accounts={accounts} />}
-      {section === "Templates" && <TemplatesTab reference={reference} />}
+      {section === "Quick Send" && <SendTab reference={emailReference} accounts={accounts} />}
+      {section === "Templates" && <TemplatesTab reference={emailReference} />}
       {section === "Deliverability" && <DeliverabilityTab accounts={accounts} />}
       {section === "Suppression" && <SuppressionTab />}
       {section === "Activity" && <ActivityTab accounts={accounts} />}
 
+      {creating && (
+        <CampaignBuilder
+          objectives={adsReference?.objectives || []}
+          channel="email"
+          emailAccounts={accounts}
+          defaultEmailAccountId={emailOverview?.default_account_id ?? null}
+          close={() => setCreating(false)}
+          saved={(id) => {
+            setCreating(false);
+            load();
+            setOpenId(id);
+          }}
+        />
+      )}
+      {openId !== null && (
+        <CampaignDetail
+          campaignId={openId}
+          reference={adsReference}
+          channel="email"
+          backLabel="Email Manager"
+          onClose={() => setOpenId(null)}
+          onChanged={load}
+        />
+      )}
       {accountModal && (
         <AccountModal
           account={accountModal.editing}
@@ -205,19 +320,26 @@ export default function EmailManagerPage() {
 /* Overview                                                                    */
 /* ========================================================================== */
 
-function OverviewTab({ overview, totals, accounts, navigate }: any) {
-  const series = overview?.series || [];
+function ManagerOverview({ ads, email, accounts, campaigns, onOpen, onCreate, onAddSender, goSenders }: any) {
+  const totals = email?.totals || {};
+  const adsTotals = ads?.totals || {};
+  const series = email?.series || [];
+  const active = campaigns.filter((c: AdsCampaign) => c.status === "active");
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
         <Stat label="Sent (30d)" value={totals.sent ?? 0} />
         <Stat label="Delivered" value={totals.delivered ?? 0} hint={`${totals.delivery_rate ?? 0}%`} />
-        <Stat label="Opened" value={totals.opened ?? 0} hint={`${totals.open_rate ?? 0}%`} />
-        <Stat label="Clicked" value={totals.clicked ?? 0} hint={`${totals.click_rate ?? 0}%`} />
+        <Stat label="Opened" value={totals.opened ?? 0} hint={`${totals.open_rate ?? 0}% · Brevo`} />
+        <Stat label="Clicked" value={totals.clicked ?? 0} hint={`${totals.click_rate ?? 0}% · Brevo`} />
         <Stat label="Replies" value={totals.replies ?? 0} hint={`${totals.reply_rate ?? 0}%`} />
         <Stat label="Failed / bounced" value={totals.failed ?? 0} hint={`${totals.failure_rate ?? 0}%`} />
+        <Stat label="Active campaigns" value={ads?.active_campaigns ?? 0} />
+        <Stat label="Follow-ups due" value={ads?.followups_due ?? 0} />
+        <Stat label="Positive replies" value={adsTotals.positive_replies ?? 0} />
+        <Stat label="Meetings" value={ads?.meetings ?? 0} />
         <Stat label="In queue" value={totals.queued ?? 0} />
-        <Stat label="Unsubscribed" value={overview?.suppressed_total ?? 0} />
+        <Stat label="Unsubscribed" value={email?.suppressed_total ?? 0} />
       </div>
 
       <div className="card">
@@ -242,11 +364,37 @@ function OverviewTab({ overview, totals, accounts, navigate }: any) {
         )}
       </div>
 
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="font-semibold">Running now</h3>
+          <button className="btn-primary btn-sm" onClick={onCreate}>
+            <Plus size={15} className="mr-1" /> Create campaign
+          </button>
+        </div>
+        {active.length === 0 ? (
+          <Empty
+            title="No active email campaigns"
+            body="Create one with email sets and creatives, launch it, and Andromeda can auto-shift spend to the winner."
+            action={
+              <button className="btn-primary" onClick={onCreate}>
+                <Plus size={16} className="mr-1" /> Create campaign
+              </button>
+            }
+          />
+        ) : (
+          <div className="grid gap-3">
+            {active.map((c: AdsCampaign) => (
+              <EmailCampaignRow key={c.id} campaign={c} onOpen={onOpen} accounts={accounts} />
+            ))}
+          </div>
+        )}
+      </div>
+
       <div className="grid lg:grid-cols-2 gap-4">
         <div className="card">
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-semibold">Sender health</h3>
-            <button className="text-sm text-primary-600" onClick={() => navigate("/email-manager")}>
+            <button className="text-sm text-primary-600" onClick={goSenders}>
               Manage
             </button>
           </div>
@@ -275,54 +423,643 @@ function OverviewTab({ overview, totals, accounts, navigate }: any) {
               ))}
             </div>
           ) : (
-            <Empty title="No senders yet" body="Add a Brevo API key to start sending." />
+            <Empty
+              title="No senders yet"
+              body="Add a Brevo API key to start sending."
+              action={
+                <button className="btn-primary" onClick={onAddSender}>
+                  <Plus size={16} className="mr-1" /> Add sender
+                </button>
+              }
+            />
           )}
         </div>
 
         <div className="card">
-          <h3 className="font-semibold mb-3">Recent email campaigns</h3>
-          {overview?.recent_campaigns?.length ? (
-            <div className="space-y-3">
-              {overview.recent_campaigns.map((c: any) => (
-                <div key={c.id} className="text-sm">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="font-medium truncate">{c.name}</p>
-                    <Badge value={c.status} />
+          <h3 className="font-semibold mb-3">Latest Brevo events</h3>
+          {email?.recent_events?.length ? (
+            <div className="divide-y divide-gray-100 dark:divide-gray-800">
+              {email.recent_events.map((e: any) => (
+                <div key={e.id} className="py-2 flex items-center justify-between gap-3 text-sm">
+                  <div className="min-w-0">
+                    <span className="font-medium">{e.event_type}</span>{" "}
+                    <span className="text-gray-500 truncate">{e.email_address}</span>
                   </div>
-                  <p className="text-xs text-gray-500 truncate">{c.subject || "—"}</p>
-                  <p className="text-xs text-gray-500">
-                    {c.messages_sent} sent · {c.messages_delivered} delivered · {c.replies} replies
-                  </p>
+                  <span className="text-xs text-gray-400 shrink-0">{fmtDate(e.created_at)}</span>
                 </div>
               ))}
             </div>
           ) : (
-            <Empty title="No email campaigns yet" body="Create one from the Campaigns tab." />
+            <Empty
+              title="No webhook events yet"
+              body="Paste each sender's webhook URL into Brevo (Transactional webhook + inbound parsing) to receive opens, clicks and replies."
+            />
           )}
         </div>
       </div>
+    </div>
+  );
+}
 
-      <div className="card">
-        <h3 className="font-semibold mb-3">Latest Brevo events</h3>
-        {overview?.recent_events?.length ? (
-          <div className="divide-y divide-gray-100 dark:divide-gray-800">
-            {overview.recent_events.map((e: any) => (
-              <div key={e.id} className="py-2 flex items-center justify-between gap-3 text-sm">
-                <div className="min-w-0">
-                  <span className="font-medium">{e.event_type}</span>{" "}
-                  <span className="text-gray-500 truncate">{e.email_address}</span>
-                </div>
-                <span className="text-xs text-gray-400 shrink-0">{fmtDate(e.created_at)}</span>
-              </div>
+/* ========================================================================== */
+/* Campaigns (ads engine: email sets + creatives + Andromeda)                  */
+/* ========================================================================== */
+
+function EmailCampaignRow({
+  campaign,
+  accounts,
+  onOpen,
+  reload,
+}: {
+  campaign: AdsCampaign;
+  accounts: EmailAccount[];
+  onOpen: (id: number) => void;
+  reload?: () => void;
+}) {
+  const s = campaign.stats;
+  const sender = accounts.find((a) => a.id === campaign.email_account_id);
+  const act = async (fn: () => Promise<any>, msg: string) => {
+    try {
+      await fn();
+      toast.success(msg);
+      reload?.();
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || "Action failed");
+    }
+  };
+  return (
+    <div className="card p-4 sm:p-5">
+      <div className="flex flex-wrap gap-3 items-start justify-between">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h3 className="font-semibold text-lg break-words">{campaign.name}</h3>
+            <Badge value={campaign.status} />
+            {campaign.state && campaign.state !== campaign.status && <Badge value={campaign.state} />}
+            {campaign.test_mode && <span className="badge-yellow">Test</span>}
+          </div>
+          <p className="text-sm text-gray-500 mt-1">
+            {campaign.subject || campaign.description || campaign.objective.replace(/_/g, " ")}
+          </p>
+          {sender && (
+            <p className="text-xs text-gray-400 mt-0.5">
+              via {sender.name} · {sender.from_email}
+            </p>
+          )}
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          <button className="btn-secondary btn-sm" onClick={() => onOpen(campaign.id)}>
+            Open
+          </button>
+          {reload && campaign.status === "active" && (
+            <button className="btn-secondary btn-sm" onClick={() => act(() => adsApi.pause(campaign.id), "Paused")}>
+              <Pause size={14} />
+            </button>
+          )}
+          {reload && campaign.status === "paused" && (
+            <button className="btn-primary btn-sm" onClick={() => act(() => adsApi.resume(campaign.id), "Resumed")}>
+              <Play size={14} />
+            </button>
+          )}
+          {reload && (
+            <button
+              className="btn-secondary btn-sm"
+              onClick={() => act(() => adsApi.duplicate(campaign.id), "Duplicated")}
+            >
+              <Copy size={14} />
+            </button>
+          )}
+        </div>
+      </div>
+      <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 mt-4 pt-3 border-t border-gray-100 dark:border-gray-700 text-sm">
+        <Metric label="Audience" value={s?.assigned ?? 0} />
+        <Metric label="Sent" value={s?.sent ?? 0} />
+        <Metric label="Opens" value={`${s?.opens ?? 0} (${s?.open_rate ?? 0}%)`} />
+        <Metric label="Clicks" value={`${s?.clicks ?? 0} (${s?.click_rate ?? 0}%)`} />
+        <Metric label="Replies" value={s?.replies ?? 0} />
+        <Metric label="Last activity" value={fmtDay(campaign.last_activity_at || campaign.updated_at)} />
+      </div>
+    </div>
+  );
+}
+
+function ManagerCampaigns({
+  campaigns,
+  query,
+  setQuery,
+  statusFilter,
+  setStatusFilter,
+  accounts,
+  onOpen,
+  reload,
+  create,
+}: any) {
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-2 items-center">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            className="input !pl-9"
+            placeholder="Search email campaigns…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </div>
+        <select className="input !w-auto" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+          <option value="">All statuses</option>
+          {["draft", "scheduled", "active", "paused", "completed", "archived"].map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
+        <a className="btn-secondary btn-sm" href={adsApi.exportUrl("campaigns", undefined, "email")}>
+          <Download size={15} className="mr-1" /> Export
+        </a>
+      </div>
+      {campaigns.length === 0 ? (
+        <Empty
+          icon={<Megaphone size={40} />}
+          title="No email campaigns yet"
+          body="A campaign holds email sets, each set holds creatives (subject + body + HTML), and the audience is split between them automatically. Andromeda can shift spend to the winner."
+          action={
+            <button className="btn-primary" onClick={create}>
+              <Plus size={16} className="mr-1" /> Create campaign
+            </button>
+          }
+        />
+      ) : (
+        <div className="grid gap-3">
+          {campaigns.map((c: AdsCampaign) => (
+            <EmailCampaignRow key={c.id} campaign={c} accounts={accounts} onOpen={onOpen} reload={reload} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ========================================================================== */
+/* Audience                                                                    */
+/* ========================================================================== */
+
+function ManagerAudience({ reference, campaigns }: { reference: any; campaigns: AdsCampaign[] }) {
+  const totalAssigned = campaigns.reduce((a, c) => a + (c.stats?.assigned || 0), 0);
+  const [audiences, setAudiences] = useState<any[]>([]);
+  useEffect(() => {
+    adsApi.listAudiences().then((r) => setAudiences(r.items)).catch(() => {});
+  }, []);
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <Stat label="Emailable contacts" value={reference?.emailable_contacts ?? 0} />
+        <Stat label="Lists" value={reference?.lists?.length ?? 0} />
+        <Stat label="Saved audiences" value={audiences.length} />
+        <Stat label="Assigned across campaigns" value={totalAssigned} />
+      </div>
+      <div className="card p-5">
+        <div className="flex flex-wrap justify-between items-center gap-2 mb-3">
+          <h3 className="font-semibold">Saved audiences</h3>
+          <a className="btn-primary btn-sm" href="/audiences">
+            <Plus size={15} className="mr-1" /> Build audience
+          </a>
+        </div>
+        {audiences.length === 0 ? (
+          <p className="text-sm text-gray-500">
+            No saved audiences yet. Combine lists and contacts into a reusable audience — like a Meta saved
+            audience — then attach it to any campaign with one click.
+          </p>
+        ) : (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            {audiences.map((a) => (
+              <a
+                key={a.id}
+                href="/audiences"
+                className="p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50 flex justify-between text-sm hover:ring-1 hover:ring-primary-500"
+              >
+                <span className="truncate mr-2">{a.name}</span>
+                <b className="shrink-0">{a.match_count ?? "—"}</b>
+              </a>
             ))}
           </div>
-        ) : (
-          <Empty
-            title="No webhook events yet"
-            body="Paste each sender's webhook URL into Brevo (Transactional webhook + inbound parsing) to receive opens, clicks and replies."
-          />
         )}
       </div>
+      <div className="card p-5">
+        <h3 className="font-semibold mb-3">Lists available for targeting</h3>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
+          {(reference?.lists || []).map((l: any) => (
+            <div key={l.id} className="p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50 flex justify-between text-sm">
+              <span>{l.name}</span>
+              <b>{l.count}</b>
+            </div>
+          ))}
+        </div>
+        <p className="text-xs text-gray-500 mt-3">
+          Email sets stay empty until you add at least one list, contact, audience or filter — nothing is ever
+          pulled in automatically. Contacts without an email address are screened out before sending.
+        </p>
+      </div>
+      <div className="card p-5">
+        <h3 className="font-semibold mb-3">Tags</h3>
+        <div className="flex flex-wrap gap-2">
+          {(reference?.tags || []).map((t: string) => (
+            <span key={t} className="badge-gray">
+              {t}
+            </span>
+          ))}
+          {(reference?.tags || []).length === 0 && <p className="text-sm text-gray-500">No tags yet.</p>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ========================================================================== */
+/* Automation                                                                  */
+/* ========================================================================== */
+
+function ManagerAutomation({ campaigns, onOpen }: { campaigns: AdsCampaign[]; onOpen: (id: number) => void }) {
+  return (
+    <div className="space-y-3">
+      <div className="card p-5 text-sm text-gray-500">
+        Follow-up workflows live inside each campaign so their conditions (opened, clicked, replied…) can see
+        that campaign's replies and creatives. Open a campaign and use the <b>Automation</b> tab.
+      </div>
+      {campaigns.length === 0 ? (
+        <Empty title="No campaigns yet" />
+      ) : (
+        <div className="grid gap-2">
+          {campaigns.map((c) => (
+            <button
+              key={c.id}
+              className="card p-4 text-left hover:border-primary-500 transition"
+              onClick={() => onOpen(c.id)}
+            >
+              <div className="flex justify-between items-center">
+                <span className="font-medium">{c.name}</span>
+                <Badge value={c.status} />
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ========================================================================== */
+/* Follow-Ups                                                                  */
+/* ========================================================================== */
+
+const FOLLOWUP_BUCKETS = ["today", "overdue", "upcoming", "waiting", "completed", "cancelled"];
+
+function ManagerFollowUps() {
+  const [bucket, setBucket] = useState("today");
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      setItems((await adsApi.followups(bucket, "email")).items);
+    } finally {
+      setLoading(false);
+    }
+  }, [bucket]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const act = async (id: number, action: string, params?: any) => {
+    try {
+      await adsApi.followupAction(id, action, params);
+      toast.success("Updated");
+      load();
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || "Action failed");
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-2 justify-between">
+        <div className="flex gap-1 overflow-x-auto scrollbar-none">
+          {FOLLOWUP_BUCKETS.map((b) => (
+            <button
+              key={b}
+              onClick={() => setBucket(b)}
+              className={`px-3 py-1.5 rounded-lg text-sm capitalize ${
+                bucket === b ? "bg-primary-600 text-white" : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
+              }`}
+            >
+              {b}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          <a className="btn-secondary btn-sm" href={adsApi.exportUrl("followups", undefined, "email")}>
+            <Download size={15} className="mr-1" /> Export
+          </a>
+          <button
+            className="btn-secondary btn-sm"
+            onClick={async () => {
+              const r = await adsApi.processFollowups();
+              toast.success(`Processed: ${r.sent} sent, ${r.cancelled} stopped`);
+              load();
+            }}
+          >
+            Run due follow-ups
+          </button>
+        </div>
+      </div>
+      {loading ? (
+        <div className="card p-8 text-center text-gray-500">Loading…</div>
+      ) : items.length === 0 ? (
+        <Empty title={`Nothing ${bucket}`} body="Follow-ups appear here as email campaigns send." />
+      ) : (
+        <div className="grid gap-2">
+          {items.map((i) => (
+            <div key={i.id} className="card p-4">
+              <div className="flex flex-wrap gap-3 justify-between items-start">
+                <div>
+                  <p className="font-medium">{i.contact}</p>
+                  <p className="text-sm text-gray-500">
+                    {i.business ? `${i.business} · ` : ""}
+                    {i.email_address || i.phone_number} · {i.campaign || "Manual"}
+                  </p>
+                  {i.body && <p className="text-sm text-gray-600 dark:text-gray-300 mt-2">{i.body}</p>}
+                  <p className="text-xs text-gray-400 mt-1">Due {fmtDate(i.due_at)}</p>
+                </div>
+                {i.status === "pending" && (
+                  <div className="flex flex-wrap gap-2">
+                    <button className="btn-primary btn-sm" onClick={() => act(i.id, "send-now")}>
+                      Send now
+                    </button>
+                    <button className="btn-secondary btn-sm" onClick={() => act(i.id, "complete")}>
+                      Complete
+                    </button>
+                    <button
+                      className="btn-secondary btn-sm"
+                      onClick={() => {
+                        const when = prompt("Reschedule to (YYYY-MM-DD HH:MM)");
+                        if (when) act(i.id, "reschedule", { due_at: new Date(when).toISOString() });
+                      }}
+                    >
+                      Reschedule
+                    </button>
+                    <button className="btn-ghost btn-sm text-red-600" onClick={() => act(i.id, "cancel")}>
+                      Cancel
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ========================================================================== */
+/* Calendar                                                                    */
+/* ========================================================================== */
+
+function ManagerCalendar() {
+  const [items, setItems] = useState<any[]>([]);
+  const [creating, setCreating] = useState(false);
+  const [view, setView] = useState<"agenda" | "week" | "month">("agenda");
+
+  const load = useCallback(async () => {
+    setItems((await adsApi.calendar({ channel: "email" })).items);
+  }, []);
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const grouped = useMemo(() => {
+    const map: Record<string, any[]> = {};
+    items.forEach((i) => {
+      const key = new Date(i.starts_at).toDateString();
+      (map[key] = map[key] || []).push(i);
+    });
+    return map;
+  }, [items]);
+
+  const now = new Date();
+  const windowDays = view === "week" ? 7 : view === "month" ? 31 : 3650;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-2 justify-between">
+        <div className="flex gap-1">
+          {(["agenda", "week", "month"] as const).map((v) => (
+            <button
+              key={v}
+              onClick={() => setView(v)}
+              className={`px-3 py-1.5 rounded-lg text-sm capitalize ${
+                view === v ? "bg-primary-600 text-white" : "bg-gray-100 dark:bg-gray-700"
+              }`}
+            >
+              {v}
+            </button>
+          ))}
+        </div>
+        <button className="btn-primary btn-sm" onClick={() => setCreating(true)}>
+          <Plus size={15} className="mr-1" /> New event
+        </button>
+      </div>
+      {items.length === 0 ? (
+        <Empty
+          icon={<CalendarDays size={40} />}
+          title="No events yet"
+          body="Book meetings, calls, tasks and reminders — from here or straight from a contact."
+          action={
+            <button className="btn-primary" onClick={() => setCreating(true)}>
+              <Plus size={16} className="mr-1" /> Create event
+            </button>
+          }
+        />
+      ) : (
+        <div className="space-y-3">
+          {Object.entries(grouped)
+            .filter(([day]) => {
+              const diff = (new Date(day).getTime() - now.getTime()) / 86400000;
+              return diff > -1 && diff < windowDays;
+            })
+            .map(([day, events]) => (
+              <div className="card p-4" key={day}>
+                <h3 className="font-semibold mb-2">{day}</h3>
+                <div className="space-y-2">
+                  {events.map((e) => (
+                    <div
+                      key={e.id}
+                      className="flex flex-wrap gap-2 justify-between items-center p-2 rounded-lg bg-gray-50 dark:bg-gray-700/50"
+                    >
+                      <div>
+                        <p className="font-medium text-sm">{e.title}</p>
+                        <p className="text-xs text-gray-500">
+                          {new Date(e.starts_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} ·{" "}
+                          {e.event_type}
+                          {e.contact ? ` · ${e.contact}` : ""}
+                        </p>
+                      </div>
+                      <button
+                        className="btn-ghost btn-sm text-red-600"
+                        onClick={async () => {
+                          await adsApi.deleteEvent(e.id);
+                          load();
+                        }}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+        </div>
+      )}
+      {creating && (
+        <ManagerEventModal
+          close={() => setCreating(false)}
+          saved={() => {
+            setCreating(false);
+            load();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function ManagerEventModal({ close, saved }: { close: () => void; saved: () => void }) {
+  const [form, setForm] = useState<any>({
+    title: "",
+    event_type: "meeting",
+    starts_at: "",
+    duration_minutes: 30,
+    notes: "",
+    priority: "normal",
+  });
+  const set = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }));
+  return (
+    <Modal title="New calendar event" close={close}>
+      <form
+        className="space-y-4"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          if (!form.title.trim() || !form.starts_at) return toast.error("Add a title and date");
+          try {
+            await adsApi.createEvent({
+              ...form,
+              starts_at: fromLocalInput(form.starts_at),
+              duration_minutes: Number(form.duration_minutes),
+            });
+            toast.success("Event created");
+            saved();
+          } catch (err: any) {
+            toast.error(err.response?.data?.detail || "Could not create event");
+          }
+        }}
+      >
+        <Field label="Title">
+          <input className="input" value={form.title} onChange={(e) => set("title", e.target.value)} autoFocus />
+        </Field>
+        <div className="grid sm:grid-cols-2 gap-3">
+          <Field label="Type">
+            <select className="input" value={form.event_type} onChange={(e) => set("event_type", e.target.value)}>
+              {["meeting", "call", "followup", "task", "reminder"].map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="When">
+            <input
+              type="datetime-local"
+              className="input"
+              value={form.starts_at}
+              onChange={(e) => set("starts_at", e.target.value)}
+            />
+          </Field>
+          <Field label="Duration (minutes)">
+            <input
+              type="number"
+              className="input"
+              value={form.duration_minutes}
+              onChange={(e) => set("duration_minutes", e.target.value)}
+            />
+          </Field>
+          <Field label="Priority">
+            <select className="input" value={form.priority} onChange={(e) => set("priority", e.target.value)}>
+              <option value="high">High</option>
+              <option value="normal">Normal</option>
+              <option value="low">Low</option>
+            </select>
+          </Field>
+        </div>
+        <Field label="Notes">
+          <textarea className="input" rows={3} value={form.notes} onChange={(e) => set("notes", e.target.value)} />
+        </Field>
+        <div className="flex gap-2">
+          <button type="button" className="btn-secondary flex-1" onClick={close}>
+            Cancel
+          </button>
+          <button className="btn-primary flex-1">Create event</button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+/* ========================================================================== */
+/* Analytics                                                                   */
+/* ========================================================================== */
+
+function ManagerAnalytics({ campaigns, onOpen }: { campaigns: AdsCampaign[]; onOpen: (id: number) => void }) {
+  const ranked = [...campaigns].sort((a, b) => (b.score || 0) - (a.score || 0));
+  if (campaigns.length === 0) return <Empty title="No email campaigns to analyse yet" />;
+  return (
+    <div className="card overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead className="text-left text-gray-500 border-b border-gray-100 dark:border-gray-700">
+          <tr>
+            <th className="p-3">Campaign</th>
+            <th className="p-3">Status</th>
+            <th className="p-3">Audience</th>
+            <th className="p-3">Sent</th>
+            <th className="p-3">Opens</th>
+            <th className="p-3">Clicks</th>
+            <th className="p-3">Replies</th>
+            <th className="p-3">Score</th>
+            <th className="p-3" />
+          </tr>
+        </thead>
+        <tbody>
+          {ranked.map((c) => (
+            <tr key={c.id} className="border-b border-gray-50 dark:border-gray-700/50">
+              <td className="p-3 font-medium">{c.name}</td>
+              <td className="p-3">
+                <Badge value={c.status} />
+              </td>
+              <td className="p-3">{c.stats?.assigned ?? 0}</td>
+              <td className="p-3">{c.stats?.sent ?? 0}</td>
+              <td className="p-3">{c.stats?.open_rate ?? 0}%</td>
+              <td className="p-3">{c.stats?.click_rate ?? 0}%</td>
+              <td className="p-3">{c.stats?.replies ?? 0}</td>
+              <td className="p-3 font-semibold">{c.score ?? 0}</td>
+              <td className="p-3">
+                <button className="btn-secondary btn-sm" onClick={() => onOpen(c.id)}>
+                  Open
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -820,309 +1557,6 @@ function SendTab({ reference, accounts }: any) {
 }
 
 /* ========================================================================== */
-/* Campaigns                                                                  */
-/* ========================================================================== */
-
-const emptyCampaign = {
-  name: "",
-  list_id: "",
-  template_id: "",
-  subject: "",
-  message_body: "",
-  html_body: "",
-  email_account_id: "",
-  fallback_email_account_id: "",
-  scheduled_start_at: "",
-  track_opens: true,
-  track_clicks: true,
-};
-
-function CampaignsTab({ reference, accounts }: any) {
-  const [campaigns, setCampaigns] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [creating, setCreating] = useState(false);
-  const [busyId, setBusyId] = useState<number | null>(null);
-
-  const load = useCallback(async () => {
-    try {
-      const { data } = await api.get("/campaigns", { params: { channel: "email", per_page: 100 } });
-      setCampaigns(data.items || data || []);
-    } catch {
-      toast.error("Could not load email campaigns");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const act = async (campaign: any, action: string) => {
-    setBusyId(campaign.id);
-    try {
-      if (action === "delete") {
-        if (!window.confirm(`Delete the campaign "${campaign.name}"?`)) return;
-        await api.delete(`/campaigns/${campaign.id}`);
-      } else if (action === "schedule") {
-        await api.post(`/campaigns/${campaign.id}/validate`);
-      } else {
-        await api.post(`/campaigns/${campaign.id}/${action}`);
-      }
-      toast.success(`Campaign ${action === "delete" ? "deleted" : action + "ed"}`);
-      load();
-    } catch (err: any) {
-      toast.error(err.response?.data?.detail || `Could not ${action} this campaign`);
-    } finally {
-      setBusyId(null);
-    }
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-gray-500">
-          List-based email campaigns with a subject, an optional HTML body and a chosen Brevo sender.
-        </p>
-        <button className="btn-primary" onClick={() => setCreating(true)}>
-          <Plus size={16} className="mr-1" /> New email campaign
-        </button>
-      </div>
-
-      {loading ? (
-        <div className="py-10 text-center text-gray-500">Loading…</div>
-      ) : campaigns.length === 0 ? (
-        <Empty title="No email campaigns yet" body="Create one to send a list through Brevo." />
-      ) : (
-        <div className="space-y-3">
-          {campaigns.map((c) => (
-            <div key={c.id} className="card">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <h3 className="font-semibold flex items-center gap-2">
-                    {c.name} <Badge value={c.status} />
-                  </h3>
-                  <p className="text-sm text-gray-500 truncate">{c.subject || "No subject yet"}</p>
-                  <p className="text-xs text-gray-400">
-                    {c.messages_sent ?? 0} sent · {c.messages_delivered ?? 0} delivered ·{" "}
-                    {c.messages_failed ?? 0} failed · {c.replies ?? 0} replies
-                    {c.scheduled_start_at ? ` · starts ${fmtDate(c.scheduled_start_at)}` : ""}
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {(c.status === "draft" || c.status === "failed") && (
-                    <button className="btn-secondary text-sm" onClick={() => act(c, "validate")} disabled={busyId === c.id}>
-                      Schedule
-                    </button>
-                  )}
-                  {(c.status === "scheduled" || c.status === "paused") && (
-                    <button className="btn-primary text-sm" onClick={() => act(c, "start")} disabled={busyId === c.id}>
-                      Start
-                    </button>
-                  )}
-                  {c.status === "running" && (
-                    <button className="btn-secondary text-sm" onClick={() => act(c, "pause")} disabled={busyId === c.id}>
-                      Pause
-                    </button>
-                  )}
-                  {["running", "paused"].includes(c.status) && (
-                    <button className="btn-secondary text-sm" onClick={() => act(c, "stop")} disabled={busyId === c.id}>
-                      Stop
-                    </button>
-                  )}
-                  <button className="text-gray-400 hover:text-red-500 text-sm px-2" onClick={() => act(c, "delete")}>
-                    <Trash2 size={15} />
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {creating && (
-        <CampaignModal
-          reference={reference}
-          accounts={accounts}
-          close={() => setCreating(false)}
-          saved={() => {
-            setCreating(false);
-            load();
-          }}
-        />
-      )}
-    </div>
-  );
-}
-
-function CampaignModal({ reference, accounts, close, saved }: any) {
-  const [form, setForm] = useState<any>({ ...emptyCampaign });
-  const [saving, setSaving] = useState(false);
-  const set = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }));
-
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.name.trim()) return toast.error("Give the campaign a name");
-    if (!form.subject.trim()) return toast.error("An email campaign needs a subject");
-    if (!(form.message_body.trim() || form.html_body.trim() || form.template_id))
-      return toast.error("Write the email body or choose a template");
-
-    const payload: any = {
-      name: form.name.trim(),
-      channel: "email",
-      list_id: form.list_id ? Number(form.list_id) : null,
-      template_id: form.template_id ? Number(form.template_id) : null,
-      message_body: form.message_body || null,
-      subject: form.subject,
-      html_body: form.html_body || null,
-      email_account_id: form.email_account_id ? Number(form.email_account_id) : null,
-      fallback_email_account_id: form.fallback_email_account_id
-        ? Number(form.fallback_email_account_id)
-        : null,
-      track_opens: !!form.track_opens,
-      track_clicks: !!form.track_clicks,
-      scheduled_start_at: form.scheduled_start_at
-        ? new Date(form.scheduled_start_at).toISOString()
-        : null,
-    };
-    setSaving(true);
-    try {
-      await api.post("/campaigns", payload);
-      toast.success("Email campaign created — schedule it when the copy is ready");
-      saved();
-    } catch (err: any) {
-      toast.error(err.response?.data?.detail || "Could not create this campaign");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <Modal title="New email campaign" close={close} wide>
-      <form onSubmit={submit} className="space-y-4">
-        <Field label="Campaign name">
-          <input className="input" value={form.name} onChange={(e) => set("name", e.target.value)} autoFocus />
-        </Field>
-
-        <div className="grid sm:grid-cols-2 gap-3">
-          <Field label="List">
-            <select className="input" value={form.list_id} onChange={(e) => set("list_id", e.target.value)}>
-              <option value="">Choose a list…</option>
-              {(reference?.lists || []).map((l: any) => (
-                <option key={l.id} value={l.id}>
-                  {l.name} ({l.contact_count ?? 0})
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Template (optional)">
-            <select
-              className="input"
-              value={form.template_id}
-              onChange={(e) => {
-                set("template_id", e.target.value);
-                const tpl = (reference?.templates || []).find((t: any) => String(t.id) === e.target.value);
-                if (tpl?.subject && !form.subject) set("subject", tpl.subject);
-              }}
-            >
-              <option value="">Write it here</option>
-              {(reference?.templates || []).map((t: any) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
-          </Field>
-        </div>
-
-        <Field label="Subject">
-          <input className="input" value={form.subject} onChange={(e) => set("subject", e.target.value)} />
-        </Field>
-
-        <Field label="Message">
-          <textarea
-            className="input min-h-[150px]"
-            value={form.message_body}
-            onChange={(e) => set("message_body", e.target.value)}
-            placeholder={"Hi {{first_name}},\n\n…"}
-          />
-        </Field>
-
-        <details className="text-sm">
-          <summary className="cursor-pointer text-gray-500">HTML body (optional)</summary>
-          <textarea
-            className="input min-h-[120px] mt-2 font-mono text-xs"
-            value={form.html_body}
-            onChange={(e) => set("html_body", e.target.value)}
-          />
-        </details>
-
-        <div className="grid sm:grid-cols-2 gap-3">
-          <Field label="Send through">
-            <select
-              className="input"
-              value={form.email_account_id}
-              onChange={(e) => set("email_account_id", e.target.value)}
-            >
-              <option value="">Default sender</option>
-              {accounts.map((a: EmailAccount) => (
-                <option key={a.id} value={a.id}>
-                  {a.name} — {a.from_email}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Fallback sender (optional)">
-            <select
-              className="input"
-              value={form.fallback_email_account_id}
-              onChange={(e) => set("fallback_email_account_id", e.target.value)}
-            >
-              <option value="">None</option>
-              {accounts.map((a: EmailAccount) => (
-                <option key={a.id} value={a.id} disabled={String(a.id) === String(form.email_account_id)}>
-                  {a.name} — {a.from_email}
-                </option>
-              ))}
-            </select>
-          </Field>
-        </div>
-
-        <div className="grid sm:grid-cols-2 gap-3">
-          <Field label="Start at (optional)">
-            <input
-              className="input"
-              type="datetime-local"
-              value={form.scheduled_start_at}
-              onChange={(e) => set("scheduled_start_at", e.target.value)}
-            />
-          </Field>
-          <div className="flex items-end gap-4 text-sm pb-2">
-            <label className="flex items-center gap-2">
-              <input type="checkbox" checked={!!form.track_opens} onChange={(e) => set("track_opens", e.target.checked)} />
-              Track opens
-            </label>
-            <label className="flex items-center gap-2">
-              <input type="checkbox" checked={!!form.track_clicks} onChange={(e) => set("track_clicks", e.target.checked)} />
-              Track clicks
-            </label>
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-2">
-          <button type="button" className="btn-secondary" onClick={close}>
-            Cancel
-          </button>
-          <button className="btn-primary" type="submit" disabled={saving}>
-            {saving ? "Creating…" : "Create campaign"}
-          </button>
-        </div>
-      </form>
-    </Modal>
-  );
-}
-
-/* ========================================================================== */
 /* Templates                                                                  */
 /* ========================================================================== */
 
@@ -1566,20 +2000,23 @@ function SuppressionTab() {
 /* ========================================================================== */
 
 function ActivityTab({ accounts }: any) {
-  const [tab, setTab] = useState<"events" | "history">("events");
+  const [tab, setTab] = useState<"events" | "history" | "campaigns">("events");
   const [events, setEvents] = useState<any[]>([]);
   const [history, setHistory] = useState<EmailMessage[]>([]);
+  const [campaignLog, setCampaignLog] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [e, h] = await Promise.all([
+      const [e, h, a] = await Promise.all([
         emailApi.events({ per_page: 100 }),
         emailApi.history({ per_page: 100 }),
+        adsApi.activity("email"),
       ]);
       setEvents(e.items);
       setHistory(h.items);
+      setCampaignLog(a.items);
     } catch {
       toast.error("Could not load email activity");
     } finally {
@@ -1619,6 +2056,12 @@ function ActivityTab({ accounts }: any) {
           >
             <Mail size={15} className="mr-1" /> Messages
           </button>
+          <button
+            className={tab === "campaigns" ? "btn-primary text-sm" : "btn-secondary text-sm"}
+            onClick={() => setTab("campaigns")}
+          >
+            <Megaphone size={15} className="mr-1" /> Campaign log
+          </button>
         </div>
         <button className="btn-secondary text-sm" onClick={load}>
           <RefreshCw size={15} className="mr-1" /> Refresh
@@ -1647,6 +2090,24 @@ function ActivityTab({ accounts }: any) {
                   </p>
                 </div>
                 <span className="text-xs text-gray-400 shrink-0">{fmtDate(e.created_at)}</span>
+              </div>
+            ))}
+          </div>
+        )
+      ) : tab === "campaigns" ? (
+        campaignLog.length === 0 ? (
+          <Empty title="No campaign activity yet" body="Launches, pauses, Andromeda runs and edits show up here." />
+        ) : (
+          <div className="card divide-y divide-gray-100 dark:divide-gray-700">
+            {campaignLog.map((i) => (
+              <div key={i.id} className="p-3 flex flex-wrap gap-2 justify-between text-sm">
+                <div>
+                  <b>{i.action.replace(/_/g, " ")}</b>
+                  {i.detail && <span className="text-gray-500"> — {i.detail}</span>}
+                </div>
+                <span className="text-xs text-gray-400">
+                  {i.actor} · {fmtDate(i.created_at)}
+                </span>
               </div>
             ))}
           </div>

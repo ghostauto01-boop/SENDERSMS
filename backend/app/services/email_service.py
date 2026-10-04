@@ -1829,4 +1829,19 @@ async def account_stats(db: AsyncSession, account_id: int) -> dict:
             select(func.count()).select_from(Campaign).where(Campaign.email_account_id == account_id)
         )
     ).scalar() or 0
+    # ... plus the Email Manager (ads) campaigns sending through this account,
+    # as primary OR fallback sender.
+    from app.models.ads import AdsCampaign
+
+    campaigns += (
+        await db.execute(
+            select(func.count()).select_from(AdsCampaign).where(
+                AdsCampaign.channel == "email",
+                or_(
+                    AdsCampaign.email_account_id == account_id,
+                    AdsCampaign.fallback_email_account_id == account_id,
+                ),
+            )
+        )
+    ).scalar() or 0
     return {"sent_total": total_out, "failed_total": failed, "campaigns_using": campaigns}
