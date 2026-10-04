@@ -12,6 +12,10 @@ class ScheduledMessage(Base):
     phone_number: Mapped[str | None] = mapped_column(String(20), nullable=True)
     #: Email channel: the recipient address when this is not tied to a contact.
     to_address: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    #: Copied recipients for a scheduled email, so the poller can still CC them
+    #: hours later (comma separated, same shape as messages.cc_addresses).
+    cc_addresses: Mapped[str | None] = mapped_column(Text, nullable=True)
+    bcc_addresses: Mapped[str | None] = mapped_column(Text, nullable=True)
     list_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("contact_lists.id"), nullable=True)
     body: Mapped[str] = mapped_column(Text, nullable=False)
     #: "sms" or "email".

@@ -554,22 +554,49 @@ function AccountModal({
       : {}),
   });
   const [saving, setSaving] = useState(false);
-  const [senders, setSenders] = useState<string[]>([]);
+  const [senders, setSenders] = useState<any[]>([]);
+  const [domains, setDomains] = useState<any[]>([]);
   const [loadingSenders, setLoadingSenders] = useState(false);
+  const [probeNote, setProbeNote] = useState<string | null>(null);
   const set = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }));
 
+  /** Ask Brevo about the key — before saving it when it is brand new.
+   *
+   * Using an address Brevo has already verified (ideally on an authenticated
+   * domain) is what keeps mail out of spam, so the picker is deliberately part
+   * of the add-sender flow rather than a step you have to remember later.
+   */
   const loadSenders = async () => {
-    if (!account) return;
+    const typed = form.api_key.trim();
     setLoadingSenders(true);
+    setProbeNote(null);
     try {
-      const result = await emailApi.verifiedSenders(account.id);
-      const list = (result.items || [])
-        .map((s: any) => s?.email || s?.Email || s?.emailAddress)
-        .filter(Boolean);
-      setSenders(list);
-      if (!list.length) toast("Brevo returned no verified senders for this key");
+      const result = typed
+        ? await emailApi.sendersPreview(typed)
+        : account
+        ? await (async () => {
+            const list = await emailApi.verifiedSenders(account.id);
+            return {
+              success: true,
+              error: null,
+              senders: (list.items || []).map((s: any) => ({
+                email: s?.email || s?.Email || s?.emailAddress,
+                name: s?.name || s?.Name || "",
+                active: s?.active ?? true,
+              })),
+              domains: [] as any[],
+            };
+          })()
+        : { success: false, error: "Paste the API key first", senders: [], domains: [] };
+
+      setSenders((result.senders || []).filter((s: any) => s.email));
+      setDomains(result.domains || []);
+      if (result.error) setProbeNote(result.error);
+      else if (!(result.senders || []).length) {
+        setProbeNote("Brevo has no verified sender under this key yet.");
+      }
     } catch (err: any) {
-      toast.error(err.response?.data?.detail || "Could not read the verified senders");
+      toast.error(err.response?.data?.detail || "Could not read the senders from Brevo");
     } finally {
       setLoadingSenders(false);
     }
@@ -646,22 +673,6 @@ function AccountModal({
           </Field>
         </div>
 
-        {account && senders.length > 0 && (
-          <div className="text-xs text-gray-500">
-            Verified in Brevo:{" "}
-            {senders.map((s) => (
-              <button
-                type="button"
-                key={s}
-                className="underline mr-2"
-                onClick={() => set("from_email", s)}
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-        )}
-
         <Field label={account ? "Brevo API key (leave blank to keep the saved key)" : "Brevo API key"}>
           <input
             className="input font-mono"
@@ -671,10 +682,80 @@ function AccountModal({
             autoComplete="off"
           />
         </Field>
-        {account && (
-          <button type="button" className="text-sm text-primary-600" onClick={loadSenders} disabled={loadingSenders}>
-            {loadingSenders ? "Reading Brevo…" : "Check which addresses Brevo has verified"}
-          </button>
+        <button
+          type="button"
+          className="text-sm text-primary-600 -mt-2"
+          onClick={loadSenders}
+          disabled={loadingSenders}
+        >
+          {loadingSenders ? "Reading Brevo…" : "Check Brevo's verified senders & domains"}
+        </button>
+
+        {probeNote && (
+          <p className="text-xs text-amber-600 -mt-2">{probeNote}</p>
+        )}
+
+        {senders.length > 0 && (
+          <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-3 space-y-2">
+            <p className="text-xs font-medium text-gray-600 dark:text-gray-300">
+              Addresses Brevo has already verified — pick one and mail leaves from a warm sender:
+            </p>
+            {senders.map((s: any) => {
+              const chosen = form.from_email.trim().toLowerCase() === (s.email || "").toLowerCase();
+              return (
+                <button
+                  type="button"
+                  key={s.email}
+                  onClick={() => {
+                    set("from_email", s.email);
+                    if (s.name && !form.from_name.trim()) set("from_name", s.name);
+                  }}
+                  className={`w-full flex items-center justify-between gap-2 text-left text-sm px-2 py-1.5 rounded ${
+                    chosen ? "bg-primary-50 dark:bg-primary-900/20" : "hover:bg-gray-50 dark:hover:bg-gray-800"
+                  }`}
+                >
+                  <span className="truncate">
+                    <span className="font-medium">{s.email}</span>
+                    {s.name ? <span className="text-gray-400"> · {s.name}</span> : null}
+                  </span>
+                  <span className="flex items-center gap-1 shrink-0">
+                    {s.recommended ? (
+                      <span className="badge-green">warm</span>
+                    ) : s.domain_verified ? (
+                      <span className="badge-yellow">verified</span>
+                    ) : (
+                      <span className="badge-yellow">domain not authenticated</span>
+                    )}
+                  </span>
+                </button>
+              );
+            })}
+            {form.from_email.includes("@") &&
+              !senders.some(
+                (s: any) =>
+                  (s.email || "").toLowerCase() === form.from_email.trim().toLowerCase()
+              ) && (
+                <p className="text-xs text-amber-600">
+                  {form.from_email} is not in this key's verified list — Brevo will reject it or
+                  it will land in spam. Verify it in Brevo → Senders &amp; IP first.
+                </p>
+              )}
+            {domains.length > 0 && (
+              <div className="text-xs text-gray-500 pt-1 border-t border-gray-100 dark:border-gray-800">
+                Domain authentication:{" "}
+                {domains.map((d: any) => (
+                  <span key={d.domain} className="mr-2">
+                    <span className="font-mono">{d.domain}</span>{" "}
+                    {d.dkim ? (
+                      <span className="text-green-600">SPF/DKIM ✓</span>
+                    ) : (
+                      <span className="text-amber-600">not authenticated</span>
+                    )}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
         )}
 
         <div className="grid sm:grid-cols-2 gap-3">

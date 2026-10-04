@@ -37,6 +37,24 @@ class EmailTestSendIn(BaseModel):
     subject: Optional[str] = Field(default=None, max_length=500)
 
 
+class EmailComposerTestIn(BaseModel):
+    """Send the email currently in the composer to one address (a test).
+
+    Brevo's editor has the same button: it mails the real thing — variables
+    rendered, HTML, attachments — to you instead of to the list.
+    """
+
+    to: str = Field(..., max_length=255)
+    subject: Optional[str] = Field(default=None, max_length=500)
+    body: Optional[str] = None
+    html_body: Optional[str] = None
+    attachments: Optional[list[dict]] = None
+    email_account_id: Optional[int] = None
+    template_id: Optional[int] = None
+    #: When given, ``{{variables}}`` are rendered with that contact's data.
+    contact_id: Optional[int] = None
+
+
 class EmailSendIn(BaseModel):
     """One-off email send from the Send page / Email Manager compose."""
 
@@ -51,6 +69,9 @@ class EmailSendIn(BaseModel):
     email_account_id: Optional[int] = None
     #: Files to attach: [{"name": "...", "content_base64": "..."}].
     attachments: Optional[list[dict]] = None
+    #: Copied recipients, like any mail client.
+    cc: Optional[list[str]] = None
+    bcc: Optional[list[str]] = None
     #: ISO-8601; when set the email is scheduled instead of sent now.
     schedule_at: Optional[str] = None
 
@@ -63,6 +84,8 @@ class EmailReplyIn(BaseModel):
     email_account_id: Optional[int] = None
     #: Attach files to the reply, exactly like a normal mail client.
     attachments: Optional[list[dict]] = None
+    cc: Optional[list[str]] = None
+    bcc: Optional[list[str]] = None
 
 
 class EmailSuppressionIn(BaseModel):

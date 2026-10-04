@@ -40,6 +40,7 @@ from app.security.encryption import decrypt_value
 from app.utils.urls import public_base_url
 from app.schemas.email import (
     EmailAccountIn,
+    EmailComposerTestIn,
     EmailAccountPatch,
     EmailPreviewIn,
     EmailReplyIn,
@@ -92,6 +93,8 @@ def _message_dict(message: Message, contact: Optional[Contact] = None,
         "bounced_hard": bool(message.bounced_hard),
         "is_auto_reply": bool(message.is_auto_reply),
         "attachments": email_service.attachment_summary(message.attachments),
+        "cc": email_service.clean_addresses(getattr(message, "cc_addresses", None)),
+        "bcc": email_service.clean_addresses(getattr(message, "bcc_addresses", None)),
         "rfc_message_id": message.rfc_message_id,
         "in_reply_to": message.in_reply_to,
         "retry_count": message.retry_count or 0,
@@ -272,6 +275,120 @@ async def test_send(
     result = await email_service.send_test_email(db, account, data.to, subject=data.subject)
     await db.commit()
     return {"success": bool(result.get("success")), "error": result.get("error")}
+
+
+@router.post("/senders-preview")
+async def senders_preview(
+    data: dict,
+    cu: User = Depends(get_current_user),
+):
+    """What Brevo says about a key the user just typed (nothing is saved yet).
+
+    Answers the question that decides deliverability: which From addresses has
+    this key already verified, and is the domain behind them authenticated?
+    Using a warm, verified sender is the single biggest thing a sender can do.
+    """
+    from app.providers.brevo import list_domains, list_senders
+
+    api_key = (data or {}).get("api_key") or ""
+    if not api_key.strip():
+        raise HTTPException(422, "Paste the Brevo API key first")
+
+    senders_result = await list_senders(api_key.strip())
+    domains_result = await list_domains(api_key.strip())
+
+    domains = domains_result.get("domains") or []
+    by_domain = {str(d.get("domain") or "").lower(): d for d in domains}
+
+    senders = []
+    # ``list_senders`` returns "senders"; the account endpoint re-labels it as
+    # "items". Accept either so this probe cannot silently return nothing.
+    for item in (senders_result.get("senders") or senders_result.get("items") or []):
+        address = (item.get("email") or item.get("Email") or "").strip()
+        if not address:
+            continue
+        domain = address.split("@")[-1].lower()
+        info = by_domain.get(domain) or {}
+        senders.append({
+            "email": address,
+            "name": item.get("name") or item.get("Name") or "",
+            "active": bool(item.get("active", True)),
+            "domain": domain,
+            "domain_verified": bool(
+                info.get("verified") or info.get("authenticated")
+            ),
+            "spf": bool(info.get("spf")),
+            "dkim": bool(info.get("dkim")),
+            # A verified address on an authenticated domain is the one to use.
+            "recommended": bool(
+                (info.get("verified") or info.get("authenticated")) and info.get("dkim")
+            ),
+        })
+
+    error = None
+    if not senders_result.get("success"):
+        error = senders_result.get("error") or "Brevo rejected this API key"
+    elif not senders:
+        error = (
+            "Brevo accepted the key but has no verified sender in it yet. Add and "
+            "verify a sender (or a whole domain) in Brevo → Senders & IP first."
+        )
+
+    return {
+        "success": not error,
+        "error": error,
+        "senders": senders,
+        "domains": domains,
+        "domains_error": None if domains_result.get("success") else domains_result.get("error"),
+    }
+
+
+@router.post("/test-send")
+async def composer_test_send(
+    data: EmailComposerTestIn,
+    db: AsyncSession = Depends(get_db),
+    cu: User = Depends(get_current_user),
+):
+    """Mail what is in the composer to one address, before it goes to a list."""
+    account = await email_service.get_account(db, data.email_account_id)
+    if account is None:
+        account = await email_service.get_default_account(db)
+    if account is None:
+        raise HTTPException(400, "No email sender configured yet")
+
+    subject, body, html = data.subject or "", data.body or "", data.html_body
+    attachments = data.attachments
+    if data.template_id:
+        template = (
+            await db.execute(select(Template).where(Template.id == data.template_id))
+        ).scalar_one_or_none()
+        if template is None:
+            raise HTTPException(404, "Template not found")
+        subject = subject or template.subject or ""
+        body = body or template.body or ""
+        html = html or template.html_body
+        if not attachments:
+            attachments = email_service.load_attachments(template.attachments)
+
+    contact = None
+    if data.contact_id:
+        contact = (
+            await db.execute(select(Contact).where(Contact.id == data.contact_id))
+        ).scalar_one_or_none()
+
+    result = await email_service.send_composer_test(
+        db,
+        account=account,
+        to_address=data.to,
+        subject=subject,
+        text_body=body,
+        html_body=html,
+        attachments=attachments,
+        contact=contact,
+    )
+    if not result.get("success"):
+        raise HTTPException(400, result.get("error") or "The test email failed")
+    return result
 
 
 @router.get("/accounts/{account_id}/senders")
@@ -559,6 +676,8 @@ async def send_email(
             # Kept on the scheduled row so the inline poller can attach them
             # hours later without the browser having to be open.
             attachments=email_service.dump_attachments(attachments),
+            cc_addresses=", ".join(email_service.clean_addresses(data.cc)) or None,
+            bcc_addresses=", ".join(email_service.clean_addresses(data.bcc)) or None,
             to_address=None if target_contact_id else (data.email or None),
             list_id=data.list_id,
             body=body,
@@ -629,6 +748,8 @@ async def send_email(
             db, contact, subject=subject, text_body=body, html_body=html, account=account,
             attachments=attachments,
             bulk=bulk,
+            cc=data.cc,
+            bcc=data.bcc,
         )
         if message is None:
             skipped += 1
@@ -944,6 +1065,8 @@ async def reply(
     message, result = await email_service.send_now(
         db, contact, subject=subject, text_body=body, html_body=html, account=account,
         attachments=data.attachments,
+        cc=data.cc,
+        bcc=data.bcc,
     )
     if message is None:
         raise HTTPException(400, "This contact cannot be emailed (opted out or suppressed)")
@@ -1385,4 +1508,165 @@ async def deliverability(
         "score": round(
             100 * sum(1 for c in checks if c["ok"]) / max(len(checks), 1)
         ),
+    }
+
+
+# ===========================================================================
+# Engagement — the "did they open it, what did they click" view
+# ===========================================================================
+
+
+@router.get("/messages/{message_id}/events")
+async def message_events(
+    message_id: int,
+    db: AsyncSession = Depends(get_db),
+    cu: User = Depends(get_current_user),
+):
+    """Everything Brevo reported about one email, newest first.
+
+    This is the per-message equivalent of Brevo's recipient activity: the
+    delivery, every open, every link that was clicked (with the URL), bounces
+    and complaints.
+    """
+    message = (
+        await db.execute(select(Message).where(Message.id == message_id))
+    ).scalar_one_or_none()
+    if message is None:
+        raise HTTPException(404, "Message not found")
+
+    rows = (
+        await db.execute(
+            select(EmailEvent)
+            .where(EmailEvent.message_id == message_id)
+            .order_by(EmailEvent.id.desc())
+            .limit(200)
+        )
+    ).scalars().all()
+
+    return {
+        "message_id": message_id,
+        "summary": {
+            "status": message.status,
+            "sent_at": _iso(message.sent_at),
+            "delivered_at": _iso(message.delivered_at),
+            "first_opened_at": _iso(message.opened_at),
+            "first_clicked_at": _iso(message.clicked_at),
+            "bounced_at": _iso(message.bounced_at),
+            "open_count": message.open_count or 0,
+            "click_count": message.click_count or 0,
+            # Opens/clicks are counted by Brevo; a mail-client privacy proxy can
+            # inflate opens, so the UI says so rather than over-claiming.
+            "unique_links_clicked": len({e.link for e in rows if e.link}),
+        },
+        "events": [
+            {
+                "id": e.id,
+                "event_type": e.event_type,
+                "link": e.link,
+                "detail": e.detail,
+                "created_at": _iso(e.created_at),
+            }
+            for e in rows
+        ],
+    }
+
+
+@router.get("/contacts/{contact_id}/engagement")
+async def contact_engagement(
+    contact_id: int,
+    db: AsyncSession = Depends(get_db),
+    cu: User = Depends(get_current_user),
+):
+    """One contact's email history in the shape Brevo shows it.
+
+    Every message, how it ended, opens/clicks per message, and the links that
+    were actually clicked — so a prospect who is reading but not replying is
+    visible instead of invisible.
+    """
+    contact = (
+        await db.execute(select(Contact).where(Contact.id == contact_id))
+    ).scalar_one_or_none()
+    if contact is None:
+        raise HTTPException(404, "Contact not found")
+
+    messages = (
+        await db.execute(
+            select(Message)
+            .where(Message.channel == "email", Message.contact_id == contact_id)
+            .order_by(Message.id.desc())
+            .limit(50)
+        )
+    ).scalars().all()
+
+    sent = sum(1 for m in messages if m.direction == "outgoing")
+    opened = sum(1 for m in messages if (m.open_count or 0) > 0)
+    clicked = sum(1 for m in messages if (m.click_count or 0) > 0)
+    bounced = sum(1 for m in messages if m.bounced_at is not None)
+
+    links = (
+        await db.execute(
+            select(EmailEvent.link, func.count())
+            .where(
+                EmailEvent.contact_id == contact_id,
+                EmailEvent.event_type == "clicked",
+                EmailEvent.link.isnot(None),
+            )
+            .group_by(EmailEvent.link)
+            .order_by(func.count().desc())
+            .limit(20)
+        )
+    ).all()
+
+    events = (
+        await db.execute(
+            select(EmailEvent)
+            .where(EmailEvent.contact_id == contact_id)
+            .order_by(EmailEvent.id.desc())
+            .limit(40)
+        )
+    ).scalars().all()
+
+    def rate(part: int, whole: int) -> float:
+        return round(part / whole * 100, 1) if whole else 0.0
+
+    return {
+        "contact_id": contact_id,
+        "email": contact.email,
+        "is_email_opted_out": bool(contact.is_email_opted_out),
+        "is_email_undeliverable": bool(contact.is_email_undeliverable),
+        "email_status": contact.email_status,
+        "emails_sent": contact.emails_sent or sent,
+        "last_emailed_at": _iso(contact.last_emailed_at),
+        "totals": {
+            "sent": sent,
+            "opened": opened,
+            "clicked": clicked,
+            "bounced": bounced,
+            "open_rate": rate(opened, sent),
+            "click_rate": rate(clicked, sent),
+        },
+        "links": [{"url": url, "clicks": clicks} for url, clicks in links],
+        "messages": [
+            {
+                "id": m.id,
+                "subject": m.subject,
+                "direction": m.direction,
+                "status": m.status,
+                "open_count": m.open_count or 0,
+                "click_count": m.click_count or 0,
+                "created_at": _iso(m.created_at),
+                "campaign_id": m.campaign_id,
+            }
+            for m in messages
+        ],
+        "events": [
+            {
+                "id": e.id,
+                "event_type": e.event_type,
+                "link": e.link,
+                "subject": e.subject,
+                "created_at": _iso(e.created_at),
+            }
+            for e in events
+        ],
     }

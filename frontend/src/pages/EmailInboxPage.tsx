@@ -35,6 +35,79 @@ const STATUS_FILTERS = [
   { key: "closed", label: "Closed" },
 ];
 
+/** Collapsible "what happened to this email" panel, per message.
+ *
+ * Brevo reports opens and clicks per recipient; this shows the same thing in
+ * the thread, including which link was clicked, loaded only when expanded.
+ */
+function MessageActivity({
+  message,
+  onOpen,
+  outgoing,
+}: {
+  message: EmailMessage;
+  onOpen: () => Promise<any>;
+  outgoing: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+
+  const opens = message.open_count || 0;
+  const clicks = message.click_count || 0;
+  if (!outgoing || (opens === 0 && clicks === 0 && message.status !== "delivered")) {
+    return null;
+  }
+
+  const toggle = async () => {
+    const next = !open;
+    setOpen(next);
+    if (next && !data) {
+      setLoading(true);
+      try {
+        setData(await onOpen());
+      } catch {
+        toast.error("Could not load this email's activity");
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  return (
+    <div className="mt-2">
+      <button
+        type="button"
+        onClick={toggle}
+        className={`text-[11px] underline decoration-dotted ${
+          outgoing ? "text-primary-100" : "text-gray-500"
+        }`}
+      >
+        {opens > 0 ? `${opens} open${opens === 1 ? "" : "s"}` : "no opens yet"}
+        {" · "}
+        {clicks > 0 ? `${clicks} click${clicks === 1 ? "" : "s"}` : "no clicks yet"}
+        {open ? " ▲" : " ▼"}
+      </button>
+      {open && (
+        <div className="mt-1 space-y-1">
+          {loading && <p className="text-[11px] opacity-70">Reading Brevo…</p>}
+          {(data?.events || []).map((e: any) => (
+            <p key={e.id} className="text-[11px] opacity-80 truncate">
+              {e.event_type}
+              {e.link ? `: ${e.link}` : ""}
+            </p>
+          ))}
+          {(data?.summary?.unique_links_clicked || 0) > 0 && (
+            <p className="text-[11px] opacity-70">
+              {data.summary.unique_links_clicked} different link(s) clicked
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function EmailInboxPage() {
   const [conversations, setConversations] = useState<EmailConversation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -333,12 +406,28 @@ export default function EmailInboxPage() {
                               }`}
                             >
                               <Paperclip size={11} />
-                              <span className="truncate">{a.name}</span>
+                              {a.url ? (
+                                <a
+                                  href={a.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="truncate underline"
+                                >
+                                  {a.name}
+                                </a>
+                              ) : (
+                                <span className="truncate">{a.name}</span>
+                              )}
                               {a.size ? <span>({Math.max(1, Math.round(a.size / 1024))} KB)</span> : null}
                             </div>
                           ))}
                         </div>
                       )}
+                      <MessageActivity
+                        message={m}
+                        onOpen={() => emailApi.messageEvents(m.id)}
+                        outgoing={m.direction === "outgoing"}
+                      />
                       <div className="flex flex-wrap items-center gap-2 mt-2">
                         <span
                           className={`text-[10px] ${

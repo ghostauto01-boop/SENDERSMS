@@ -130,6 +130,10 @@ class Message(Base):
     #: True for campaign/audience mail (which gets List-Unsubscribe headers,
     #: required by Gmail/Yahoo for bulk senders) and False for one-to-one mail.
     bulk_send: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    #: Comma-separated CC / BCC lists, kept on the row so a queued or scheduled
+    #: send still copies the same people hours later.
+    cc_addresses: Mapped[str | None] = mapped_column(Text, nullable=True)
+    bcc_addresses: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     #: Filled in by the Brevo webhook: opens/clicks are what "engagement"
     #: means for an email campaign.

@@ -28,9 +28,13 @@ export default function EmailSendPanel({
     html_body: "",
     template_id: "",
     email_account_id: "",
+    cc: "",
+    bcc: "",
     schedule_at: "",
   });
   const [attachments, setAttachments] = useState<AttachmentPayload[]>([]);
+  const [testTo, setTestTo] = useState("");
+  const [testing, setTesting] = useState(false);
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<any>(null);
   const set = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }));
@@ -53,6 +57,9 @@ export default function EmailSendPanel({
         attachments: attachments.length ? attachments : null,
         email_account_id: form.email_account_id ? Number(form.email_account_id) : null,
         template_id: form.template_id ? Number(form.template_id) : null,
+        // Blank stays blank; the server normalises and drops typos.
+        cc: form.cc.trim() ? form.cc.split(/[,;\s]+/).filter(Boolean) : null,
+        bcc: form.bcc.trim() ? form.bcc.split(/[,;\s]+/).filter(Boolean) : null,
       };
       if (form.mode === "email") payload.email = form.email.trim();
       else payload.list_id = Number(form.list_id);
@@ -70,6 +77,30 @@ export default function EmailSendPanel({
       toast.error(err.response?.data?.detail || "Could not send this email");
     } finally {
       setSending(false);
+    }
+  };
+
+  /** Send what is in the composer to one address before it goes to a list. */
+  const sendTest = async () => {
+    if (!testTo.includes("@")) return toast.error("Enter the address to test to");
+    if (!(form.body.trim() || form.html_body.trim())) return toast.error("Write the email body");
+    setTesting(true);
+    try {
+      await emailApi.testComposer({
+        to: testTo.trim(),
+        subject: form.subject,
+        body: form.body,
+        html_body: form.html_body || null,
+        attachments: attachments.length ? attachments : null,
+        email_account_id: form.email_account_id ? Number(form.email_account_id) : null,
+        template_id: form.template_id ? Number(form.template_id) : null,
+        contact_id: form.mode === "contact" && form.contact_id ? Number(form.contact_id) : null,
+      });
+      toast.success(`Test sent to ${testTo.trim()} — check that inbox`);
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || "The test email failed");
+    } finally {
+      setTesting(false);
     }
   };
 
@@ -144,6 +175,10 @@ export default function EmailSendPanel({
         </Field>
 
         <Field label="Message">
+          <p className="text-xs text-gray-500 -mt-1 mb-1">
+            Everything a mail client can send: formatting, headings, links, images, buttons,
+            tables, raw HTML and attachments.
+          </p>
           <RichEmailEditor
             body={form.body}
             onBody={(value) => set("body", value)}
@@ -153,6 +188,25 @@ export default function EmailSendPanel({
             onAttachments={setAttachments}
           />
         </Field>
+
+        <div className="grid sm:grid-cols-2 gap-3">
+          <Field label="CC (optional)">
+            <input
+              className="input"
+              value={form.cc}
+              onChange={(e) => set("cc", e.target.value)}
+              placeholder="colleague@your-domain.com, boss@your-domain.com"
+            />
+          </Field>
+          <Field label="BCC (optional)">
+            <input
+              className="input"
+              value={form.bcc}
+              onChange={(e) => set("bcc", e.target.value)}
+              placeholder="crm@your-domain.com"
+            />
+          </Field>
+        </div>
 
         <div className="grid sm:grid-cols-2 gap-3">
           <Field label="Send through">
@@ -185,11 +239,30 @@ export default function EmailSendPanel({
           </Field>
         </div>
 
-        <div className="flex justify-end">
-          <button className="btn-primary" type="submit" disabled={sending}>
-            <Send size={16} className="mr-1" />{" "}
-            {sending ? "Sending…" : form.schedule_at ? "Schedule" : "Send now"}
+        {/* Brevo's editor has the same button: mail this to yourself first. */}
+        <div className="flex flex-col sm:flex-row sm:items-end gap-2 pt-2 border-t border-gray-100 dark:border-gray-800">
+          <Field label="Send a test to (optional)">
+            <input
+              className="input"
+              value={testTo}
+              onChange={(e) => setTestTo(e.target.value)}
+              placeholder="you@your-domain.com"
+            />
+          </Field>
+          <button
+            type="button"
+            className="btn-secondary whitespace-nowrap"
+            onClick={sendTest}
+            disabled={testing}
+          >
+            {testing ? "Sending test…" : "Send test"}
           </button>
+          <div className="flex justify-end flex-1">
+            <button className="btn-primary" type="submit" disabled={sending}>
+              <Send size={16} className="mr-1" />{" "}
+              {sending ? "Sending…" : form.schedule_at ? "Schedule" : "Send now"}
+            </button>
+          </div>
         </div>
       </form>
 

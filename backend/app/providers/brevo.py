@@ -89,6 +89,8 @@ async def send_email(
     headers: dict | None = None,
     params: dict | None = None,
     attachments: list[dict] | None = None,
+    cc: list[str] | None = None,
+    bcc: list[str] | None = None,
 ) -> dict:
     """Send one transactional email through Brevo.
 
@@ -103,6 +105,7 @@ async def send_email(
     * ``headers`` — ``In-Reply-To`` / ``References`` keep a reply inside the
       recipient's existing thread; ``List-Unsubscribe`` +
       ``List-Unsubscribe-Post`` are what Gmail/Yahoo require from bulk senders.
+    * ``cc`` / ``bcc`` — copied recipients, same as any mail client.
 
     Returns ``{"success": True, "provider_message_id": ..., "raw": {...}}`` or
     ``{"success": False, "error": "...", "status_code": ...}``.
@@ -131,6 +134,14 @@ async def send_email(
         payload["textContent"] = text
     if not html and not text:
         payload["textContent"] = " "
+    if cc:
+        copied = _parse_recipients(cc)
+        if copied:
+            payload["cc"] = copied
+    if bcc:
+        blind = _parse_recipients(bcc)
+        if blind:
+            payload["bcc"] = blind
     if reply_to:
         payload["replyTo"] = {"email": reply_to}
     if tags:

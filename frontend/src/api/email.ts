@@ -75,7 +75,9 @@ export type EmailMessage = {
   bounced_hard: boolean;
   is_auto_reply: boolean;
   //: Attachment metadata (name/content_type/size) — never the payload.
-  attachments?: { name?: string; content_type?: string; size?: number }[];
+  attachments?: { name?: string; content_type?: string; size?: number; url?: string }[];
+  cc?: string[];
+  bcc?: string[];
   rfc_message_id?: string | null;
   in_reply_to?: string | null;
   retry_count: number;
@@ -195,6 +197,9 @@ export type EmailSendInput = {
   //: [{"name": "...", "content_base64": "..."}] — ignored when a template
   //: already carries its own attachments.
   attachments?: { name: string; content_base64: string; content_type?: string }[] | null;
+  //: Copied recipients, like any mail client.
+  cc?: string[] | null;
+  bcc?: string[] | null;
   schedule_at?: string | null;
 };
 
@@ -213,6 +218,19 @@ const emailApi = {
     (await api.post(`/email/accounts/${id}/test`)).data,
   testSend: async (id: number, to: string, subject?: string) =>
     (await api.post(`/email/accounts/${id}/test-send`, { to, subject })).data,
+  //: Mail the composer's current content to one address, exactly as Brevo's
+  //: editor does — variables rendered, HTML, attachments.
+  testComposer: async (payload: {
+    to: string;
+    subject?: string | null;
+    body?: string | null;
+    html_body?: string | null;
+    attachments?: { name: string; content_base64: string; content_type?: string }[] | null;
+    email_account_id?: number | null;
+    template_id?: number | null;
+    contact_id?: number | null;
+  }): Promise<{ success: boolean; to: string }> =>
+    (await api.post("/email/test-send", payload)).data,
   verifiedSenders: async (id: number) =>
     (await api.get(`/email/accounts/${id}/senders`)).data,
 
@@ -288,6 +306,8 @@ const emailApi = {
       subject?: string;
       email_account_id?: number;
       attachments?: { name: string; content_base64: string; content_type?: string }[];
+      cc?: string[] | null;
+      bcc?: string[] | null;
     }
   ) => (await api.post(`/email/inbox/conversations/${id}/reply`, payload)).data,
   markRead: async (id: number) => (await api.post(`/email/inbox/conversations/${id}/read`)).data,
@@ -302,6 +322,66 @@ const emailApi = {
   addSuppression: async (payload: { email_address: string; reason?: string; source?: string }) =>
     (await api.post("/email/suppression", payload)).data,
   removeSuppression: async (id: number) => (await api.delete(`/email/suppression/${id}`)).data,
+  //: Check a Brevo key the user just typed: which From addresses it has
+  //: verified and whether their domains are authenticated. Nothing is saved.
+  sendersPreview: async (apiKey: string): Promise<{
+    success: boolean;
+    error: string | null;
+    senders: {
+      email: string;
+      name?: string;
+      active?: boolean;
+      domain?: string;
+      domain_verified?: boolean;
+      spf?: boolean;
+      dkim?: boolean;
+      recommended?: boolean;
+    }[];
+    domains: { domain?: string; verified?: boolean; authenticated?: boolean; dkim?: boolean; spf?: boolean }[];
+    domains_error?: string | null;
+  }> => (await api.post("/email/senders-preview", { api_key: apiKey })).data,
+  //: Per-message activity: delivery, opens, the links that were clicked.
+  messageEvents: async (
+    messageId: number
+  ): Promise<{
+    message_id: number;
+    summary: {
+      status: string;
+      open_count: number;
+      click_count: number;
+      unique_links_clicked: number;
+      sent_at?: string | null;
+      delivered_at?: string | null;
+      first_opened_at?: string | null;
+      first_clicked_at?: string | null;
+      bounced_at?: string | null;
+    };
+    events: { id: number; event_type: string; link?: string | null; detail?: string | null; created_at?: string | null }[];
+  }> => (await api.get(`/email/messages/${messageId}/events`)).data,
+  //: One contact's email history, the way Brevo shows it.
+  engagement: async (
+    contactId: number
+  ): Promise<{
+    contact_id: number;
+    email?: string | null;
+    is_email_opted_out: boolean;
+    is_email_undeliverable: boolean;
+    email_status?: string | null;
+    emails_sent: number;
+    last_emailed_at?: string | null;
+    totals: { sent: number; opened: number; clicked: number; bounced: number; open_rate: number; click_rate: number };
+    links: { url: string; clicks: number }[];
+    messages: {
+      id: number;
+      subject?: string | null;
+      direction: string;
+      status: string;
+      open_count: number;
+      click_count: number;
+      created_at?: string | null;
+    }[];
+    events: { id: number; event_type: string; link?: string | null; created_at?: string | null }[];
+  }> => (await api.get(`/email/contacts/${contactId}/engagement`)).data,
   deliverability: async (
     accountId: number,
     days = 30

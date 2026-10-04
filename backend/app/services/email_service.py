@@ -582,6 +582,24 @@ def clean_attachments(items) -> list[dict]:
     return cleaned
 
 
+def clean_addresses(items) -> list[str]:
+    """Normalise a CC/BCC list from JSON or a comma-separated string.
+
+    Anything without an ``@`` is dropped so a typo cannot make Brevo reject the
+    whole message, and the list is capped at 20 like the provider does.
+    """
+    if not items:
+        return []
+    if isinstance(items, str):
+        items = re.split(r"[,;\s]+", items)
+    seen: list[str] = []
+    for item in items:
+        value = normalize_email(item if isinstance(item, str) else None)
+        if value and value not in seen:
+            seen.append(value)
+    return seen[:20]
+
+
 def dump_attachments(items) -> str | None:
     """JSON for storage. Metadata stays queryable; the payload is kept so a
     failed send can be retried without asking the user to upload again."""
@@ -604,14 +622,62 @@ def load_attachments(raw) -> list[dict]:
 
 def attachment_summary(raw) -> list[dict]:
     """Attachment metadata without the base64 payload (for API responses)."""
-    return [
-        {
+    summary = []
+    for a in load_attachments(raw):
+        entry = {
             "name": a.get("name"),
             "content_type": a.get("content_type"),
             "size": a.get("size"),
         }
-        for a in load_attachments(raw)
-    ]
+        # Mail we RECEIVED has no base64 to show; Brevo gives a download link,
+        # and the inbox renders that as a clickable attachment.
+        if a.get("url") and not a.get("content"):
+            entry["url"] = a.get("url")
+        summary.append(entry)
+    return summary
+
+
+def parse_inbound_attachments(item: dict) -> list[dict]:
+    """Attachments Brevo forwarded with an inbound message.
+
+    Brevo's inbound payload carries metadata plus either a download URL (an
+    "attachment proxy" the account owner enables) or inline base64. Both shapes
+    are accepted; anything without a name or a way to fetch it is dropped so the
+    inbox never shows an empty paperclip.
+    """
+    raw = item.get("Attachments") or item.get("attachments") or []
+    if isinstance(raw, dict):
+        raw = [raw]
+    attachments: list[dict] = []
+    for entry in raw:
+        if not isinstance(entry, dict):
+            continue
+        name = str(entry.get("Name") or entry.get("name") or "").strip()
+        if not name:
+            continue
+        content = entry.get("Content") or entry.get("content")
+        url = (
+            entry.get("DownloadToken")
+            or entry.get("downloadToken")
+            or entry.get("Url")
+            or entry.get("url")
+        )
+        size = entry.get("ContentLength") or entry.get("contentLength") or entry.get("size")
+        record = {
+            "name": name[:255],
+            "content_type": str(
+                entry.get("ContentType") or entry.get("contentType") or "application/octet-stream"
+            )[:120],
+            "size": int(size) if str(size or "").isdigit() else None,
+        }
+        if content:
+            record["content"] = str(content)
+        elif url:
+            record["url"] = str(url)[:1000]
+        else:
+            continue
+        attachments.append(record)
+    return attachments[:10]
 
 
 def _unsubscribe_token(address: str) -> str:
@@ -770,6 +836,8 @@ async def queue_email(
     scheduled_message_id: int | None = None,
     attachments: list[dict] | None = None,
     bulk: bool = False,
+    cc: list[str] | str | None = None,
+    bcc: list[str] | str | None = None,
 ) -> Message | None:
     """Create the outbound email ``Message`` row (delivery happens elsewhere).
 
@@ -823,6 +891,8 @@ async def queue_email(
         rfc_message_id=_new_rfc_message_id(account.from_email),
         attachments=dump_attachments(cleaned_attachments),
         bulk_send=bool(bulk),
+        cc_addresses=", ".join(clean_addresses(cc)) or None,
+        bcc_addresses=", ".join(clean_addresses(bcc)) or None,
         direction="outgoing",
         body=rendered["text"],
         html_body=rendered["html"],
@@ -860,6 +930,8 @@ async def send_now(
     is_auto_reply: bool = False,
     attachments: list[dict] | None = None,
     bulk: bool = False,
+    cc: list[str] | str | None = None,
+    bcc: list[str] | str | None = None,
 ) -> tuple[Message | None, dict]:
     """Queue + deliver in one call. Used by the API's "send now" paths."""
     message = await queue_email(
@@ -867,6 +939,7 @@ async def send_now(
         subject=subject, text_body=text_body, html_body=html_body,
         account=account, campaign_id=campaign_id, ads_campaign_id=ads_campaign_id,
         is_auto_reply=is_auto_reply, attachments=attachments, bulk=bulk,
+        cc=cc, bcc=bcc,
     )
     if message is None:
         return None, {"success": False, "error": "contact_not_emailable"}
@@ -945,6 +1018,8 @@ async def _send_via_account(db: AsyncSession, account: EmailAccount, message: Me
         track_clicks=bool(account.track_clicks),
         headers=headers,
         attachments=load_attachments(message.attachments),
+        cc=clean_addresses(message.cc_addresses),
+        bcc=clean_addresses(message.bcc_addresses),
     )
 
     if result.get("success"):
@@ -1153,6 +1228,70 @@ async def _apply_bounce(db: AsyncSession, message: Message, event_type: str, dat
         ).scalar_one_or_none()
         if campaign is not None:
             campaign.messages_failed = (campaign.messages_failed or 0) + 1
+
+
+async def send_composer_test(
+    db: AsyncSession,
+    *,
+    account: EmailAccount,
+    to_address: str,
+    subject: str | None,
+    text_body: str | None,
+    html_body: str | None,
+    attachments: list[dict] | None = None,
+    contact: Contact | None = None,
+) -> dict:
+    """Mail the composer's current content to one address, as a test.
+
+    Deliberately does NOT create a Message/thread: a test must not look like
+    outreach in the inbox, must not bump a campaign and must not teach the
+    suppression logic anything. It goes through the same Brevo provider call,
+    so what arrives is what a real recipient would get.
+    """
+    from app.providers.brevo import send_email as brevo_send
+
+    address = normalize_email(to_address)
+    if not address:
+        return {"success": False, "error": "Enter a valid destination address"}
+    api_key = decrypt_value(account.api_key_encrypted or "")
+    if not api_key:
+        return {"success": False, "error": "This sender has no API key yet"}
+
+    if not (text_body or "").strip() and (html_body or "").strip():
+        text_body = html_to_text(html_body)
+
+    rendered_subject = subject or "(no subject)"
+    text, html = text_body or "", html_body
+    if contact is not None:
+        rendered = await render_email(
+            db, contact, subject=subject, text_body=text_body, html_body=html_body
+        )
+        rendered_subject = rendered["subject"]
+        text, html = rendered["text"], rendered["html"]
+    elif not html:
+        html = text_to_html(text)
+
+    files = clean_attachments(attachments)
+    result = await brevo_send(
+        api_key,
+        to_email=address,
+        to_name=None,
+        subject=f"[TEST] {rendered_subject}"[:500],
+        html=html,
+        text=text or " ",
+        from_email=account.from_email,
+        from_name=account.from_name,
+        reply_to=account.reply_to,
+        tags=["composer-test"],
+        track_opens=bool(account.track_opens),
+        track_clicks=bool(account.track_clicks),
+        attachments=files,
+    )
+    if result.get("success"):
+        return {"success": True, "to": address, "attachments": attachment_summary(
+            dump_attachments(files)
+        )}
+    return {"success": False, "error": result.get("error") or "Brevo rejected the test email"}
 
 
 async def unsubscribe_contact(
@@ -1411,6 +1550,7 @@ async def process_inbound_email(db: AsyncSession, payload: dict) -> dict:
             provider="brevo",
             provider_message_id=provider_id,
             in_reply_to=in_reply_to,
+            attachments=dump_attachments(parse_inbound_attachments(item)),
             idempotency_key=idem[:255],
         )
         message.created_at = received_at

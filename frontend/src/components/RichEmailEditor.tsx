@@ -4,13 +4,18 @@ import {
   Bold,
   Code2,
   Eye,
+  Heading1,
+  Heading2,
   Image as ImageIcon,
   Italic,
   Link2,
   List,
   ListOrdered,
+  Minus,
+  MousePointerClick,
   Paperclip,
   Quote,
+  Table2,
   Underline,
   X,
 } from "lucide-react";
@@ -123,6 +128,65 @@ export default function RichEmailEditor({
     toast.success("Image added to the HTML body");
   };
 
+  /** Insert a block of ready-made HTML (heading, button, divider, table). */
+  const insertHtmlBlock = (html_block: string, text_hint: string) => {
+    const el = textRef.current;
+    const start = el?.selectionStart ?? body.length;
+    onHtml(`${html}${html ? "\n" : ""}${html_block}`);
+    if (text_hint) {
+      onBody(`${body.slice(0, start)}${text_hint}\n${body.slice(start)}`);
+    }
+  };
+
+  const addHeading = (level: 1 | 2) => {
+    const el = textRef.current;
+    const start = el?.selectionStart ?? body.length;
+    const end = el?.selectionEnd ?? start;
+    const text = body.slice(start, end) || "Your headline";
+    const next = `${body.slice(0, start)}${text}\n${body.slice(end)}`;
+    onBody(next);
+    onHtml(`${html}\n<h${level} style="margin:0 0 12px">${text}</h${level}>`);
+  };
+
+  const addButton = () => {
+    const url = window.prompt("Where should the button link to?", "https://");
+    if (!url) return;
+    const label = window.prompt("Button label", "Book a call") || "Click here";
+    // Inline styles only: mail clients strip <style> blocks and classes.
+    insertHtmlBlock(
+      `<p style="margin:18px 0"><a href="${url}" style="background:#2563eb;color:#ffffff;` +
+        `padding:12px 22px;border-radius:6px;text-decoration:none;display:inline-block;` +
+        `font-weight:600">${label}</a></p>`,
+      `${label}: ${url}`
+    );
+  };
+
+  const addDivider = () => insertHtmlBlock('<hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0">', "----------");
+
+  const addTable = () => {
+    const rows = [
+      ["Item", "Quantity", "Price"],
+      ["", "", ""],
+      ["", "", ""],
+    ];
+    const cells = rows
+      .map(
+        (row, index) =>
+          `<tr>${row
+            .map((cell) =>
+              index === 0
+                ? `<th style="border:1px solid #e5e7eb;padding:8px;text-align:left">${cell}</th>`
+                : `<td style="border:1px solid #e5e7eb;padding:8px">${cell}</td>`
+            )
+            .join("")}</tr>`
+      )
+      .join("");
+    insertHtmlBlock(
+      `<table style="border-collapse:collapse;width:100%;margin:16px 0" role="presentation">${cells}</table>`,
+      "Item / Quantity / Price table added to the HTML body"
+    );
+  };
+
   const addLink = () => {
     const url = linkUrl.trim() || "https://";
     const el = textRef.current;
@@ -169,8 +233,13 @@ export default function RichEmailEditor({
     { icon: List, title: "Bullet list", run: () => insertLine("\n• item one\n• item two\n") },
     { icon: ListOrdered, title: "Numbered list", run: () => insertLine("\n1. first\n2. second\n") },
     { icon: Quote, title: "Quote", run: () => surround("\n> ", "\n", "quoted text") },
+    { icon: Heading1, title: "Heading", run: () => addHeading(1) },
+    { icon: Heading2, title: "Sub-heading", run: () => addHeading(2) },
     { icon: Link2, title: "Insert link", run: () => setShowLinkBox((v) => !v) },
-    { icon: ImageIcon, title: "Insert image", run: () => setShowImageBox((v) => !v) },
+    { icon: ImageIcon, title: "Insert image (by link)", run: () => setShowImageBox((v) => !v) },
+    { icon: MousePointerClick, title: "Button / call to action", run: addButton },
+    { icon: Table2, title: "Table (e.g. a price list)", run: addTable },
+    { icon: Minus, title: "Divider", run: addDivider },
   ];
 
   return (

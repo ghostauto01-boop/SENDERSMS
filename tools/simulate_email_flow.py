@@ -7,6 +7,7 @@ answer it from the inbox, one-click unsubscribe, and validate an email campaign.
 import base64
 import json
 import os
+import subprocess
 import sys
 
 import httpx
@@ -265,8 +266,6 @@ with httpx.Client(base_url=BASE, timeout=30, follow_redirects=True) as api:
         # the web-mode fallback runs the identical batch inline instead.
         step("start refuses without a broker (no stranded campaign)",
              start.status_code == 503 and "queue" in start.text.lower(), start.text[:120])
-        import subprocess
-
         run = subprocess.run(
             [sys.executable, "tools/run_campaign_now.py", str(camp_id)],
             capture_output=True, text=True, env={**os.environ},
@@ -288,6 +287,159 @@ with httpx.Client(base_url=BASE, timeout=30, follow_redirects=True) as api:
     # -------------------------------------------- bounce / suppression path
     api.post("/contacts/", json={"phone_number": "+2348012345002",
                                  "email": "bounce@acme-leads.io"})
+    # ------------------------------------------- Brevo verified senders ----
+    probe = api.post("/email/senders-preview", json={"api_key": "xkeysib-simulated-key"})
+    probe_body = probe.json()
+    step("probe reads the key's verified senders + domain auth",
+         probe.status_code == 200 and len(probe_body["senders"]) == 2
+         and probe_body["senders"][0]["domain_verified"] is True,
+         json.dumps(probe_body["senders"][:1])[:200])
+    step("probe marks the warm (authenticated-domain) address as recommended",
+         any(x["recommended"] for x in probe_body["senders"]),
+         str([x["email"] for x in probe_body["senders"] if x["recommended"]]))
+    bad = api.post("/email/senders-preview", json={"api_key": ""})
+    step("an empty key is refused", bad.status_code == 422, str(bad.status_code))
+
+    # ------------------------------------------------ composer test send ---
+    test = api.post("/email/test-send", json={
+        "to": "owner@acme-leads.io",
+        "subject": "Price list preview",
+        "body": "Hi {{first_name}}, here is the price list.",
+        "html_body": "<p>Hi {{first_name}}, here is the <b>price list</b>.</p>"
+                     "<p><a href=\"https://acme-leads.io/pricing\">Pricing</a></p>",
+        "attachments": [{"name": "test.txt",
+                         "content_base64": base64.b64encode(b"test file").decode()}],
+        "email_account_id": account_id,
+    })
+    step("composer test send works", test.status_code == 200, test.text[:200])
+    wire_now = httpx.get(f"{FAKE}/_log").json()["entries"]
+    test_payload = wire_now[-1]["body"]
+    step("test mail is marked as a test and carries the attachment",
+         test_payload["subject"].startswith("[TEST]")
+         and test_payload["attachment"][0]["name"] == "test.txt",
+         test_payload["subject"])
+    test_mails = [
+        m for m in api.get("/email/history").json()["items"]
+        if (m.get("subject") or "").startswith("[TEST]")
+    ]
+    step("test mail does NOT appear as outreach in the history",
+         not test_mails, f"{len(test_mails)} test message(s) in history")
+
+    # --------------------------------------------------- cc / bcc on send --
+    before_cc = len(httpx.get(f"{FAKE}/_log").json()["entries"])
+    cc_send = api.post("/email/send", json={
+        "email": "ada@acme-leads.io",
+        "subject": "CopyWith copy",
+        "body": "Looping in a colleague.",
+        "email_account_id": account_id,
+        "cc": ["colleague@acme-leads.io"],
+        "bcc": ["crm@acme-leads.io"],
+    })
+    wire_after = httpx.get(f"{FAKE}/_log").json()["entries"]
+    step("CC / BCC reach Brevo",
+         cc_send.status_code == 200 and len(wire_after) == before_cc + 1
+         and wire_after[-1]["body"]["cc"][0]["email"] == "colleague@acme-leads.io"
+         and wire_after[-1]["body"]["bcc"][0]["email"] == "crm@acme-leads.io",
+         json.dumps({k: wire_after[-1]["body"].get(k) for k in ("cc", "bcc")})[:160])
+
+    # ------------------------- engagement: opens / clicks / links ---------
+    message_id = api.get("/email/history").json()["items"][-1]["id"]
+    for event in (
+        {"event": "opened", "email": "ada@acme-leads.io",
+         "message-id": first["provider_message_id"], "event-id": f"open-{RUN}"},
+        {"event": "click", "email": "ada@acme-leads.io",
+         "message-id": first["provider_message_id"], "event-id": f"click-{RUN}",
+         "link": "https://acme-leads.io/pricing"},
+    ):
+        api.post(me_account["webhook_url"].split("/api/v1")[1], json=event)
+
+    events = api.get(f"/email/messages/{first['id']}/events").json()
+    step("per-message activity records the open",
+         any(e["event_type"] == "opened" for e in events["events"]),
+         json.dumps([e["event_type"] for e in events["events"]]))
+    step("per-message activity records WHICH link was clicked",
+         any(e["link"] == "https://acme-leads.io/pricing" for e in events["events"]),
+         str(events["summary"]["unique_links_clicked"]) + " unique link(s)")
+
+    engagement = api.get(f"/email/contacts/{contact_id}/engagement").json()
+    step("contact engagement shows opens, clicks and the clicked link",
+         engagement["totals"]["opened"] >= 1
+         and any(l["url"] == "https://acme-leads.io/pricing" for l in engagement["links"]),
+         json.dumps(engagement["totals"]))
+
+    # --------------------------------------- inbound mail with attachment --
+    await_attachment = {
+        "From": {"Address": "ada@acme-leads.io"},
+        "Subject": "The signed contract",
+        "TextBody": "Signed copy attached.",
+        "MessageId": f"<contract-{RUN}@acme-leads.io>",
+        "Headers": {"In-Reply-To": first["rfc_message_id"]},
+        "Attachments": [
+            {"Name": "contract.pdf", "ContentType": "application/pdf",
+             "ContentLength": 2048, "DownloadToken": "https://brevo.test/dl/abc123"},
+            {"Name": "notes.txt", "ContentType": "text/plain", "ContentLength": 12,
+             "Content": base64.b64encode(b"hello there").decode()},
+        ],
+    }
+    api.post(me_account["webhook_url"].split("/api/v1")[1], json=await_attachment)
+    detail = api.get(f"/email/inbox/conversations/{conv_id}").json()
+    received = [m for m in detail["messages"]
+                if m["direction"] == "incoming" and m.get("subject") == "The signed contract"]
+    names = [a.get("name") for a in (received[0]["attachments"] if received else [])]
+    step("received mail keeps its attachments",
+         names == ["contract.pdf", "notes.txt"], json.dumps(names))
+    step("a received attachment with only a Brevo download link stays clickable",
+         (received[0]["attachments"][0].get("url") if received else None)
+         == "https://brevo.test/dl/abc123",
+         json.dumps(received[0]["attachments"][0] if received else {})[:160])
+    step("received mail threaded under the message it answers",
+         bool(received) and received[0]["conversation_id"] == conv_id)
+
+    # ------------------------------------- follow-up stays in the thread ---
+    # The operator follow-up path (the "nudge this one prospect" button). It
+    # shares send_now with campaigns, so threading is proved once here.
+    import datetime as _dt
+
+    followup = api.post("/followups/", json={
+        "contact_id": contact_id,
+        "scheduled_at": (_dt.datetime.now(_dt.timezone.utc) + _dt.timedelta(minutes=5)).isoformat(),
+        "message_text": "Just floating this back to the top of your inbox.",
+        "channel": "email",
+        "subject": "Quick nudge",
+        "email_account_id": account_id,
+    })
+    step("email follow-up created", followup.status_code in (200, 201), followup.text[:200])
+    followup_id = followup.json().get("id")
+
+    queued = api.post(f"/followups/{followup_id}/send-now")
+    step("send-now refuses without a broker (no silent no-op)",
+         queued.status_code in (200, 503), str(queued.status_code))
+
+    # The mail client rule: a follow-up quotes the newest message already in
+    # the thread, so Gmail shows it inside that conversation.
+    thread_before = api.get(f"/email/inbox/conversations/{conv_id}").json()["messages"]
+    expected_parent = next(
+        m["rfc_message_id"] for m in reversed(thread_before)
+        if m["direction"] == "outgoing" and m.get("rfc_message_id")
+    )
+
+    sent_before = len(httpx.get(f"{FAKE}/_log").json()["entries"])
+    run = subprocess.run(
+        [sys.executable, "tools/run_followup_now.py", str(followup_id)],
+        capture_output=True, text=True, env={**os.environ},
+    )
+    wire_follow = httpx.get(f"{FAKE}/_log").json()["entries"]
+    follow_payload = wire_follow[-1]["body"] if len(wire_follow) > sent_before else {}
+    step("follow-up email goes out",
+         len(wire_follow) > sent_before, (run.stdout or run.stderr)[-160:].replace("\n", " "))
+    step("follow-up quotes the thread's latest message (same chat in Gmail)",
+         follow_payload.get("headers", {}).get("In-Reply-To") == expected_parent,
+         f"expected {expected_parent} got {follow_payload.get('headers', {}).get('In-Reply-To')}")
+    thread_check = api.get(f"/email/inbox/conversations/{conv_id}").json()
+    step("the follow-up is a message in the same chat",
+         any((m.get("subject") or "").startswith("Quick nudge") for m in thread_check["messages"]),
+         f"{len(thread_check['messages'])} messages in the thread")
+
     # ------------------------------- real one-click unsubscribe (last) -----
     # The signed link taken straight out of the header we actually sent.
     header = (first_unsub or "")

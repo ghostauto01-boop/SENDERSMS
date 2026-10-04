@@ -303,9 +303,12 @@ do not edit any file to set it up — everything is on the **Email Manager** pag
 
 1. In Brevo: **SMTP & API → API Keys → Create a new API key** (a v3 key starting
    `xkeysib-`). Copy it.
-2. In this app: **Email Manager → Senders → Add sender**. Paste the API key, the **From
-   name**, the **From address** and a **reply-to** address. Press **Test** — a green badge
-   means Brevo accepted the key.
+2. In this app: **Email Manager → Senders → Add sender**. Paste the API key, then press
+   **Check Brevo's verified senders &amp; domains**. The app asks Brevo which From addresses
+   that key has already verified and marks the ones on an authenticated domain as
+   **warm** — click one to use it (this is the address that reaches inboxes; a
+   hand-typed address Brevo has not verified will bounce or land in spam). Add a
+   **reply-to** address and press **Test**; a green badge means Brevo accepted the key.
 3. Add as many Brevo accounts as you like (a second key for when the first runs out of
    daily sends). Exactly one is the **default**; any campaign can pick a different one.
 4. **Receiving mail:** on the Email Manager page each sender shows a **webhook URL**.
@@ -314,6 +317,9 @@ do not edit any file to set it up — everything is on the **Email Manager** pag
    under the message they answer.
 5. **Deliverability tab** — shows whether your domain's SPF/DKIM are authenticated
    (read live from Brevo), your bounce/open/click rates, and what to fix.
+6. **Before any campaign goes out**: in the composer, type your own address in
+   **Send a test to** and press **Send test**. It mails exactly what you wrote —
+   variables, HTML, attachments — so you can see it in a real inbox first.
 
 **Two things worth knowing**
 

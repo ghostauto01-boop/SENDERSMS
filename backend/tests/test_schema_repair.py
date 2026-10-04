@@ -177,9 +177,14 @@ def test_real_models_repair_email_threading_and_attachment_columns(tmp_path):
     asyncio.run(_create_full())
 
     expected = {
-        "messages": {"rfc_message_id", "in_reply_to", "attachments", "bulk_send"},
+        "messages": {
+            "rfc_message_id", "in_reply_to", "attachments", "bulk_send",
+            "cc_addresses", "bcc_addresses",
+        },
         "templates": {"attachments", "include_unsubscribe"},
-        "scheduled_messages": {"attachments"},
+        "scheduled_messages": {
+            "attachments", "cc_addresses", "bcc_addresses",
+        },
         "campaigns": {"attachments"},
     }
     con = sqlite3.connect(db)

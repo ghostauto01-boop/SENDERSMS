@@ -261,4 +261,11 @@ ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS attachments TEXT;
 
 ALTER TABLE scheduled_messages ADD COLUMN IF NOT EXISTS attachments TEXT;
 
+-- CC/BCC on a message and on a scheduled email, so a queued or time-delayed
+-- send still copies the same people.
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS cc_addresses TEXT;
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS bcc_addresses TEXT;
+ALTER TABLE scheduled_messages ADD COLUMN IF NOT EXISTS cc_addresses TEXT;
+ALTER TABLE scheduled_messages ADD COLUMN IF NOT EXISTS bcc_addresses TEXT;
+
 COMMIT;

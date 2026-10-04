@@ -348,3 +348,133 @@ def test_html_to_text_strips_markup_and_entities():
     assert "Hi Ada" in text
     assert "See pricing" in text
     assert "<" not in text and "color:red" not in text
+
+
+@pytest.mark.asyncio
+async def test_cc_and_bcc_travel_with_the_message(db, monkeypatch):
+    """Copied recipients must reach Brevo, and survive a queued send."""
+    sent: list = []
+    _fake_brevo(monkeypatch, sent)
+    account = await _account(db)
+    db.add(Contact(phone_number="+15550000110", email="cc@acme-leads.io"))
+    await db.commit()
+    contact = (await db.execute(select(Contact))).scalar_one()
+
+    message, result = await email_service.send_now(
+        db, contact, subject="Looping someone in", text_body="Hello",
+        account=account,
+        cc=["colleague@acme-leads.io", "colleague@acme-leads.io", "not-an-email"],
+        bcc="crm@acme-leads.io, boss@acme-leads.io",
+    )
+    assert result["success"] is True
+    payload = sent[0]["payload"]
+    # Duplicates and junk are dropped before they can make Brevo reject it.
+    assert payload["cc"] == [{"email": "colleague@acme-leads.io"}]
+    assert [c["email"] for c in payload["bcc"]] == ["crm@acme-leads.io", "boss@acme-leads.io"]
+
+    # Stored on the row, which is what a queued/scheduled send reads later.
+    assert "colleague@acme-leads.io" in (message.cc_addresses or "")
+    assert "crm@acme-leads.io" in (message.bcc_addresses or "")
+
+
+def test_clean_addresses_normalises_and_caps():
+    assert email_service.clean_addresses("a@x.io, b@x.io; a@x.io") == ["a@x.io", "b@x.io"]
+    assert email_service.clean_addresses(["nope", None, "c@x.io"]) == ["c@x.io"]
+    assert email_service.clean_addresses(None) == []
+    assert len(email_service.clean_addresses([f"u{i}@x.io" for i in range(40)])) == 20
+
+
+def test_inbound_attachments_accept_a_download_link_or_base64():
+    parsed = email_service.parse_inbound_attachments({
+        "Attachments": [
+            {"Name": "contract.pdf", "ContentType": "application/pdf",
+             "ContentLength": 2048, "DownloadToken": "https://brevo.test/dl/abc"},
+            {"Name": "notes.txt", "ContentType": "text/plain",
+             "Content": "aGVsbG8="},
+            {"Name": "", "Content": "aGVsbG8="},          # nameless → dropped
+            {"Name": "nowhere.txt"},                       # unfetchable → dropped
+        ]
+    })
+    assert [a["name"] for a in parsed] == ["contract.pdf", "notes.txt"]
+    assert parsed[0]["url"] == "https://brevo.test/dl/abc"
+    assert parsed[1]["content"] == "aGVsbG8="
+    assert parsed[0]["size"] == 2048
+
+    summary = email_service.attachment_summary(email_service.dump_attachments(parsed))
+    assert summary[0]["url"] == "https://brevo.test/dl/abc"
+    # The base64 body is never echoed back to the browser.
+    assert "content" not in summary[0] and "content" not in summary[1]
+
+
+@pytest.mark.asyncio
+async def test_inbound_mail_with_attachment_is_stored_and_threaded(db, monkeypatch):
+    sent: list = []
+    _fake_brevo(monkeypatch, sent)
+    account = await _account(db)
+    await email_service.ensure_webhook_token(db, account)
+    db.add(Contact(phone_number="+15550000111", email="sender2@acme-leads.io"))
+    await db.commit()
+    contact = (await db.execute(select(Contact))).scalar_one()
+
+    outbound, _ = await email_service.send_now(
+        db, contact, subject="Your contract", text_body="Attached", account=account,
+    )
+
+    result = await email_service.process_inbound_email(db, {
+        "items": [{
+            "From": "sender2@acme-leads.io",
+            "Subject": "Re: Your contract",
+            "TextBody": "Signed copy attached.",
+            "Headers": {"In-Reply-To": outbound.rfc_message_id},
+            "Attachments": [{
+                "Name": "signed.pdf", "ContentType": "application/pdf",
+                "ContentLength": 999, "DownloadToken": "https://brevo.test/dl/signed",
+            }],
+        }]
+    })
+    await db.commit()
+    assert result["stored"] == 1
+
+    inbound = (
+        await db.execute(
+            select(Message).where(Message.direction == "incoming", Message.channel == "email")
+        )
+    ).scalar_one()
+    assert inbound.conversation_id == outbound.conversation_id
+    summary = email_service.attachment_summary(inbound.attachments)
+    assert summary[0]["name"] == "signed.pdf"
+    assert summary[0]["url"] == "https://brevo.test/dl/signed"
+
+
+@pytest.mark.asyncio
+async def test_composer_test_send_does_not_create_a_thread(db, monkeypatch):
+    sent: list = []
+    _fake_brevo(monkeypatch, sent)
+    account = await _account(db)
+    db.add(Contact(phone_number="+15550000112", email="tester@acme-leads.io",
+                    first_name="Ada"))
+    await db.commit()
+    contact = (await db.execute(select(Contact))).scalar_one()
+
+    result = await email_service.send_composer_test(
+        db,
+        account=account,
+        to_address="owner@acme-leads.io",
+        subject="Price list",
+        text_body="Hi {{first_name}}",
+        html_body="<p>Hi {{first_name}}</p>",
+        attachments=[{"name": "t.pdf",
+                      "content_base64": base64.b64encode(b"pdf").decode()}],
+        contact=contact,
+    )
+    assert result["success"] is True
+
+    payload = sent[0]["payload"]
+    # Marked as a test, and variables rendered for the contact it was sent for.
+    assert payload["subject"] == "[TEST] Price list"
+    assert "Hi Ada" in payload["htmlContent"]
+    assert payload["attachment"][0]["name"] == "t.pdf"
+
+    # Nothing was written: a test is not outreach.
+    assert (await db.execute(select(Message))).scalars().all() == []
+    assert (await db.execute(select(Conversation))).scalars().all() == []
