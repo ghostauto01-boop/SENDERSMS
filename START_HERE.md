@@ -32,6 +32,7 @@ decides what to send and keeps the records.
 | 7 | Connect the phone to the app | 5 min |
 | 8 | Fix an older database (**most people skip this**) | 5 min |
 | 9 | Turn on phone alerts + final test | 10 min |
+| 10 | (Optional) Let ChatGPT or Claude run the app | 5 min |
 
 ---
 
@@ -290,6 +291,47 @@ The script merges duplicate threads into the oldest one and keeps every message.
 wrapped in a transaction: if anything goes wrong it undoes itself and changes nothing.
 Running it twice is harmless.
 
+It also adds the email columns (thread ids, attachments, bulk-mail flag). If you skip it,
+the app adds those columns by itself on the next boot — the script just does it up front,
+with the indexes and the strict settings.
+
+---
+
+## Step 8b — Email through Brevo (optional)
+
+The app sends **and receives** email through your own **Brevo** account, next to SMS. You
+do not edit any file to set it up — everything is on the **Email Manager** page.
+
+1. In Brevo: **SMTP & API → API Keys → Create a new API key** (a v3 key starting
+   `xkeysib-`). Copy it.
+2. In this app: **Email Manager → Senders → Add sender**. Paste the API key, then press
+   **Check Brevo's verified senders &amp; domains**. The app asks Brevo which From addresses
+   that key has already verified and marks the ones on an authenticated domain as
+   **warm** — click one to use it (this is the address that reaches inboxes; a
+   hand-typed address Brevo has not verified will bounce or land in spam). Add a
+   **reply-to** address and press **Test**; a green badge means Brevo accepted the key.
+3. Add as many Brevo accounts as you like (a second key for when the first runs out of
+   daily sends). Exactly one is the **default**; any campaign can pick a different one.
+4. **Receiving mail:** on the Email Manager page each sender shows a **webhook URL**.
+   Paste it into Brevo under **Transactional → Settings → Webhook** (or *Inbound parsing*
+   for replies). Brevo then delivers replies straight into **Email Inbox**, threaded
+   under the message they answer.
+5. **Deliverability tab** — shows whether your domain's SPF/DKIM are authenticated
+   (read live from Brevo), your bounce/open/click rates, and what to fix.
+6. **Before any campaign goes out**: in the composer, type your own address in
+   **Send a test to** and press **Send test**. It mails exactly what you wrote —
+   variables, HTML, attachments — so you can see it in a real inbox first.
+
+**Two things worth knowing**
+
+* The webhook URL and the one-click unsubscribe link are absolute addresses, so the server
+  needs to know its own public address: set **`PUBLIC_BASE_URL`** (Render → your service →
+  Environment) to `https://your-app.onrender.com`. Without it, bulk mail still carries a
+  `mailto:` unsubscribe and replies still arrive, but the clickable link and the webhook
+  URL cannot be built.
+* Use a **verified sender domain** in Brevo (Senders & IP → Domains). Mail from an
+  unauthenticated domain lands in spam no matter what the app does.
+
 ---
 
 ## Step 9 — Phone alerts, then the real test
@@ -322,6 +364,39 @@ Running it twice is harmless.
 If all six happen, you are fully live.
 
 ---
+
+---
+
+## Step 10 — Let an AI run the app (optional)
+
+This app can be operated by an AI assistant — ChatGPT, Claude, or any tool that speaks
+**MCP** (Model Context Protocol). You can ask it in plain English to "import this CSV, write a
+campaign to the Abuja list, send a test to me first, then start it", and it will do it through
+the same pages-and-buttons logic you use, with the same opt-out and consent rules.
+
+1. In the app: **Settings → AI (MCP) → Create token**. Give it a name (`ChatGPT`), choose a
+   permission, and press **Create token**.
+   * **Read & write** — it can send. Use this when you want the AI to actually work.
+   * **Read only** — it can look and summarise, but every change is refused. Good for the
+     first day, or for an assistant you only want to ask questions of.
+   * **Copy the token immediately.** It is shown once and cannot be shown again (the app only
+     stores a fingerprint of it).
+2. In **ChatGPT** (Plus/Pro): *Settings → Connectors → Add custom connector*, paste the URL the
+   page shows you (it ends in `/mcp`), choose **API key** authentication and paste the token.
+   In **Claude**: *Settings → Connectors → Add custom connector*, same URL and token.
+3. Ask it: **"Run how_to_use_this_app first, then tell me what you can do."** That tool returns
+   this app's channels, its consent rules and the safe order of operations, so the assistant
+   starts from your rules instead of guessing.
+4. Watch what it does in **Settings → AI (MCP)**: every tool call it makes is listed with the
+   time, the endpoint it touched and whether it worked. If you change your mind, press
+   **Revoke** — it stops working immediately.
+
+**Two things worth knowing**
+
+* The assistant must be able to reach your app from the internet, so this only works once
+  Step 6 is done and `PUBLIC_BASE_URL` is set. HTTPS is required by ChatGPT and Claude.
+* A **read & write** token can really send messages to real people. Until you are comfortable,
+  create a read-only one; the AI can still search contacts, read replies and pull analytics.
 
 ## When something doesn't work
 

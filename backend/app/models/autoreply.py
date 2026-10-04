@@ -21,6 +21,13 @@ class AutoReplyRule(Base):
 
     name: Mapped[str] = mapped_column(String(120), nullable=False)
 
+    #: "sms" or "email" — a rule only ever answers traffic on its own channel.
+    channel: Mapped[str] = mapped_column(String(10), default="sms", nullable=False, index=True)
+    #: Email only: optional subject for the automatic reply.
+    subject: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    #: Email only: optional sender override.
+    email_account_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
     # Comma-separated triggers, e.g. "price, pricing, how much".
     # Ignored when match_type is "any" (a catch-all rule).
     keywords: Mapped[str | None] = mapped_column(Text, nullable=True)

@@ -29,6 +29,8 @@ export default function ContactsPage() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState(""); const [leadStatus, setLeadStatus] = useState("");
+  //: Email-only view of the same list: who can be emailed, who cannot, why.
+  const [emailState, setEmailState] = useState("");
   // Debounced search text — typing no longer fires a request per keystroke.
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [loading, setLoading] = useState(true); const [error, setError] = useState<string|null>(null);
@@ -46,10 +48,10 @@ export default function ContactsPage() {
   const [profileId, setProfileId] = useState<number|null>(null);
 
   useEffect(()=>{ const t=setTimeout(()=>{ setDebouncedSearch(search); },350); return ()=>clearTimeout(t); },[search]);
-  useEffect(()=>{loadContacts();},[page,debouncedSearch,leadStatus]);
+  useEffect(()=>{loadContacts();},[page,debouncedSearch,leadStatus,emailState]);
 
   const loadContacts = async () => {
-    try { setLoading(true); const {data}=await api.get<PaginatedResponse<Contact>>("/contacts/",{params:{page,per_page:25,search:debouncedSearch||undefined,lead_status:leadStatus||undefined}});
+    try { setLoading(true); const {data}=await api.get<PaginatedResponse<Contact>>("/contacts/",{params:{page,per_page:25,search:debouncedSearch||undefined,lead_status:leadStatus||undefined,email_state:emailState||undefined}});
       // Deleting the last row of a page must not leave the user stranded on
       // an empty page — step back one page and let the effect reload.
       if (data.items.length===0 && page>1) { setPage(p=>Math.max(1,p-1)); return; }
@@ -237,6 +239,13 @@ export default function ContactsPage() {
         <select className="bg-[#f0f2f5] dark:bg-[#111b21] text-[#54656f] dark:text-[#aebac1] rounded-full px-3 py-2.5 text-sm font-medium border-0 focus:ring-2 focus:ring-[#00a884]/20 outline-none" value={leadStatus} onChange={e=>{setLeadStatus(e.target.value);setPage(1);clearSelection();}}>
           <option value="">All</option>{LEAD_STATUSES.map(s=><option key={s} value={s}>{s}</option>)}
         </select>
+        <select className="bg-[#f0f2f5] dark:bg-[#111b21] text-[#54656f] dark:text-[#aebac1] rounded-full px-3 py-2.5 text-sm font-medium border-0 focus:ring-2 focus:ring-[#00a884]/20 outline-none" value={emailState} onChange={e=>{setEmailState(e.target.value);setPage(1);clearSelection();}} title="Filter by email eligibility">
+          <option value="">Email: all</option>
+          <option value="emailable">Emailable</option>
+          <option value="no_email">No email</option>
+          <option value="unsubscribed">Unsubscribed</option>
+          <option value="bounced">Bounced</option>
+        </select>
       </div>
 
       {/* MOBILE CARDS - WhatsApp style list */}
@@ -370,13 +379,14 @@ export default function ContactsPage() {
                 <th className="px-3 py-3 text-[11px] font-semibold text-[#667781] uppercase tracking-wider">Contact</th>
                 <th className="px-3 py-3 text-[11px] font-semibold text-[#667781] uppercase">Phone</th>
                 <th className="px-3 py-3 text-[11px] font-semibold text-[#667781] uppercase">Business</th>
+                <th className="px-3 py-3 text-[11px] font-semibold text-[#667781] uppercase">Email</th>
                 <th className="px-3 py-3 text-[11px] font-semibold text-[#667781] uppercase">Status</th>
                 <th className="px-3 py-3 text-[11px] font-semibold text-[#667781] uppercase text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-[#2a3942]">
-              {loading ? [...Array(5)].map((_,i)=>(<tr key={i}>{[...Array(6)].map((_,j)=>(<td key={j} className="px-4 py-3"><div className="h-4 bg-gray-100 dark:bg-gray-700 rounded animate-pulse"/></td>))}</tr>))
-              : contacts.length===0 ? (<tr><td colSpan={6} className="px-4 py-12 text-center text-[#667781]">{search||leadStatus?"No matches":"No contacts. Import or add one."}</td></tr>)
+              {loading ? [...Array(5)].map((_,i)=>(<tr key={i}>{[...Array(7)].map((_,j)=>(<td key={j} className="px-4 py-3"><div className="h-4 bg-gray-100 dark:bg-gray-700 rounded animate-pulse"/></td>))}</tr>))
+              : contacts.length===0 ? (<tr><td colSpan={7} className="px-4 py-12 text-center text-[#667781]">{search||leadStatus||emailState?"No matches":"No contacts. Import or add one."}</td></tr>)
               : contacts.map(c => (
                 <tr key={c.id} className={`hover:bg-[#f5f6f6] dark:hover:bg-[#111b21] ${allMatching||selected.has(c.id)?"bg-[#f0f9f6] dark:bg-[#0a332c]":""}`}>
                   <td className="px-4 py-3"><input type="checkbox" checked={allMatching||selected.has(c.id)} onChange={()=>toggleSelect(c.id)} title={allMatching?"Tap to keep this contact":"Select"} className="rounded accent-[#00a884]"/></td>
@@ -394,6 +404,21 @@ export default function ContactsPage() {
                         {c.tags.slice(0,3).map(t=>(<span key={t} className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#e7f3ff] text-[#0066cc]">{t}</span>))}
                         {c.tags.length > 3 && <span className="text-[10px] text-[#667781]">+{c.tags.length-3}</span>}
                       </div>
+                    )}
+                  </td>
+                  <td className="px-3 py-3 max-w-[170px]">
+                    {(c as any).email ? (
+                      <div className="truncate text-[12px] text-[#54656f] dark:text-[#aebac1]" title={(c as any).email}>
+                        {(c as any).email}
+                        {((c as any).is_email_opted_out || (c as any).email_status === "unsubscribed") && (
+                          <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">unsub</span>
+                        )}
+                        {(c as any).is_email_undeliverable || (c as any).email_status === "bounced" ? (
+                          <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded-full bg-red-100 text-red-700">bounced</span>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <span className="text-[12px] text-gray-400">—</span>
                     )}
                   </td>
                   <td className="px-3 py-3"><span className={`text-[11px] px-2 py-1 rounded-full font-medium ${statusBadge(c.lead_status)}`}>{c.lead_status}</span></td>

@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field, field_validator
 
 CONDITION_FIELDS = {"sentiment", "intent", "label", "keyword", "has_tag", "any"}
 ACTION_TYPES = {
-    "send_sms", "stop_sequence", "opt_out", "add_tag", "remove_tag",
+    "send_sms", "send_email", "stop_sequence", "opt_out", "add_tag", "remove_tag",
     "set_status", "delete_contact",
 }
 
@@ -18,6 +18,9 @@ class AutomationCreate(BaseModel):
     is_enabled: bool = True
     priority: int = 100
     trigger_type: str = "inbound_reply"
+    #: "sms" (default) or "email" — automations only fire on their own channel.
+    channel: str = "sms"
+    email_account_id: Optional[int] = None
     conditions: list[dict[str, Any]] = []
     match_all: bool = True
     actions: list[dict[str, Any]] = []
@@ -44,13 +47,15 @@ class AutomationCreate(BaseModel):
         for a in v:
             if a.get("type") not in ACTION_TYPES:
                 raise ValueError(f"Unknown action type: {a.get('type')}")
-            if a.get("type") == "send_sms" and not (a.get("body") or "").strip():
-                raise ValueError("send_sms action needs a message body")
+            if a.get("type") in ("send_sms", "send_email") and not (a.get("body") or "").strip():
+                raise ValueError(f"{a.get('type')} action needs a message body")
         return v
 
 
 class AutomationUpdate(BaseModel):
     name: Optional[str] = None
+    channel: Optional[str] = None
+    email_account_id: Optional[int] = None
     description: Optional[str] = None
     is_enabled: Optional[bool] = None
     priority: Optional[int] = None
@@ -67,6 +72,8 @@ class AutomationOut(BaseModel):
     is_enabled: bool
     priority: int
     trigger_type: str
+    channel: str = "sms"
+    email_account_id: Optional[int] = None
     conditions: list[dict[str, Any]]
     match_all: bool
     actions: list[dict[str, Any]]

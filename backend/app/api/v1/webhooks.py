@@ -431,6 +431,119 @@ async def callgate_webhook_get(): return {"ok": True}
 async def legacy(request: Request, db: AsyncSession = Depends(get_db)):
     return await smsgateway_webhook(request, db)
 
+# ==========================================================================
+# Brevo (email channel)
+# ==========================================================================
+
+#: Transactional webhook event names → the internal vocabulary. Brevo sends
+#: ``hard_bounce`` / ``soft_bounce`` / ``spam`` / ``blocked`` and the three
+#: engagement events below.
+BREVO_EVENT_MAP = {
+    "delivered": "delivered",
+    "opened": "opened",
+    "unique_opened": "opened",
+    "click": "clicked",
+    "clicked": "clicked",
+    "hard_bounce": "bounce",
+    "soft_bounce": "bounce",
+    "bounce": "bounce",
+    "blocked": "blocked",
+    "spam": "spam",
+    "unsubscribed": "unsubscribed",
+    "error": "error",
+    "deferred": "deferred",
+    "request": "sent",
+    "sent": "sent",
+}
+
+
+def _payload_account_id(token: str | None) -> int | None:
+    try:
+        return int(token) if token else None
+    except (TypeError, ValueError):
+        return None
+
+
+@router.post("/brevo")
+@router.post("/brevo/{account_id}")
+async def brevo_webhook(
+    request: Request,
+    account_id: int | None = None,
+    token: str | None = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """Brevo inbound-mail AND transactional-event webhook.
+
+    One URL handles both payload shapes (Brevo lets you point both at the same
+    address):
+
+    * **Inbound email** — ``{"items": [{"From": ..., "Subject": ...}]}`` becomes
+      an inbound ``Message`` on the contact's email thread.
+    * **Events** — ``{"event": "delivered"|"opened"|"click"|"hard_bounce"|...}``
+      updates the message, the contact and the campaign, and is journalled in
+      ``email_events``.
+
+    Security: the account's own ``webhook_token`` must be present as a query
+    parameter. Without it an anonymous caller could inject fake inbound mail
+    into the inbox and fake bounces onto real contacts.
+    """
+    raw = await request.body()
+    try:
+        payload = json.loads(raw.decode() or "{}")
+    except (ValueError, UnicodeDecodeError):
+        raise HTTPException(400, "Invalid JSON body")
+
+    # Resolve the account (the URL carries its id; the token proves ownership).
+    from app.models.email import EmailAccount
+    from app.services import email_service
+
+    account = None
+    if account_id:
+        account = (
+            await db.execute(select(EmailAccount).where(EmailAccount.id == account_id))
+        ).scalar_one_or_none()
+    if account is None:
+        raise HTTPException(404, "Unknown email sender account")
+
+    if not account.webhook_token or token != account.webhook_token:
+        logger.error("BREVO webhook rejected: bad/missing token for account %s", account.id)
+        raise HTTPException(403, "Invalid webhook token")
+
+    import uuid as _uuid
+
+    db.add(
+        WebhookEvent(
+            provider="brevo",
+            event_type=str(payload.get("event") or ("inbound" if payload.get("items") else "unknown")),
+            provider_event_id=str(payload.get("event-id") or payload.get("MessageId") or "")[:255] or None,
+            idempotency_key=f"brevo-{_uuid.uuid4().hex[:24]}",
+            payload=json.dumps(payload)[:8000],
+            status="received",
+            processed_at=datetime.now(timezone.utc),
+        )
+    )
+
+    try:
+        is_inbound = bool(payload.get("items")) or bool(payload.get("From") or payload.get("Subject"))
+        if is_inbound:
+            result = await email_service.process_inbound_email(db, payload)
+        else:
+            event_type = BREVO_EVENT_MAP.get(str(payload.get("event") or "").lower(), None)
+            if event_type is None:
+                logger.info("BREVO: ignoring unmapped event %r", payload.get("event"))
+                return {"success": True, "ignored": payload.get("event")}
+            result = await email_service.apply_event(db, event_type, payload)
+        await db.commit()
+    except Exception as exc:  # noqa: BLE001 — always answer 2xx-ish so Brevo
+        # does not hammer retries for a bug on our side; the raw body is kept in
+        # webhook_events above for a replay.
+        logger.exception("BREVO webhook processing failed: %s", exc)
+        await db.rollback()
+        return {"success": False, "error": str(exc)[:200]}
+
+    return {"success": True, **(result or {})}
+
+
 @router.get("/logs")
 async def logs(page: int=1, per_page: int=25, event_type: str=None,
                db: AsyncSession = Depends(get_db), cu: User = Depends(get_current_user)):

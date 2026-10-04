@@ -83,6 +83,32 @@ def _apply_contact_filters(query, search: Optional[str], lead_status: Optional[s
     return query
 
 
+def _apply_channel_filters(query, email_state: Optional[str]):
+    """Channel-specific contact filters used by the Email Manager.
+
+    * ``emailable``   — has an address and has not opted out or bounced
+    * ``no_email``    — has no usable address (nothing to send to)
+    * ``unsubscribed``/``bounced`` — the two states that block email
+    """
+    if not email_state:
+        return query
+    state = email_state.lower()
+    if state in ("emailable", "has_email"):
+        query = query.where(
+            Contact.email.isnot(None),
+            Contact.email != "",
+            Contact.is_email_opted_out.is_(False),
+            Contact.is_email_undeliverable.is_(False),
+        )
+    elif state == "no_email":
+        query = query.where(or_(Contact.email.is_(None), Contact.email == ""))
+    elif state == "unsubscribed":
+        query = query.where(Contact.is_email_opted_out.is_(True))
+    elif state == "bounced":
+        query = query.where(Contact.is_email_undeliverable.is_(True))
+    return query
+
+
 @router.get("/", response_model=ContactListOut)
 async def list_contacts(
     page: int = Query(default=1, ge=1),
@@ -91,6 +117,8 @@ async def list_contacts(
     lead_status: Optional[str] = None,
     tag: Optional[str] = None,
     undeliverable: Optional[str] = None,
+    #: emailable | no_email | unsubscribed | bounced | (empty = everyone)
+    email_state: Optional[str] = None,
     sort_by: str = "created_at",
     sort_dir: str = "desc",
     exclude_list_id: Optional[int] = None,
@@ -105,6 +133,7 @@ async def list_contacts(
     is.
     """
     query = _apply_contact_filters(select(Contact), search, lead_status, tag, undeliverable)
+    query = _apply_channel_filters(query, email_state)
     if exclude_list_id is not None:
         member_ids = select(ContactListMember.contact_id).where(
             ContactListMember.list_id == exclude_list_id
@@ -730,6 +759,54 @@ async def export_csv(
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=contacts.csv"},
     )
+
+
+@router.post("/{contact_id}/email-opt-out")
+async def email_opt_out(
+    contact_id: int,
+    reason: Optional[str] = Query(default=None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Unsubscribe a contact from EMAIL only (their SMS consent is untouched)."""
+    from app.services import email_service
+
+    contact = (await db.execute(select(Contact).where(Contact.id == contact_id))).scalar_one_or_none()
+    if not contact:
+        raise HTTPException(status_code=404, detail="Contact not found")
+    await email_service.unsubscribe_contact(
+        db,
+        contact_id=contact.id,
+        address=contact.email,
+        reason=reason or "Manual unsubscribe",
+        source="manual",
+    )
+    await db.commit()
+    return {"success": True, "is_email_opted_out": True, "email_status": contact.email_status}
+
+
+@router.post("/{contact_id}/email-opt-in")
+async def email_opt_in(
+    contact_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Re-subscribe a contact to email and clear the suppression entry."""
+    from app.services import email_service
+
+    contact = (await db.execute(select(Contact).where(Contact.id == contact_id))).scalar_one_or_none()
+    if not contact:
+        raise HTTPException(status_code=404, detail="Contact not found")
+    entry = await email_service.get_suppression(db, contact.email)
+    if entry is not None:
+        await email_service.unsuppress_email(db, entry)
+    contact.is_email_opted_out = False
+    contact.email_opted_out_at = None
+    contact.email_opt_out_reason = None
+    if contact.email_status in ("unsubscribed", "complained"):
+        contact.email_status = "active"
+    await db.commit()
+    return {"success": True, "is_email_opted_out": False, "email_status": contact.email_status}
 
 
 @router.get("/{contact_id}/activity")

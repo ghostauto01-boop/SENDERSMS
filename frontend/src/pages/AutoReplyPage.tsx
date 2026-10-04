@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import api from "../api/client";
 import { MessageSquareReply, Plus, Trash2, Pencil, FlaskConical } from "lucide-react";
+import { useChannel } from "../hooks/useChannel";
+import ChannelSwitch from "../components/ChannelSwitch";
+import emailApi, { EmailAccount } from "../api/email";
 
 interface AutoReplyRule {
   id: number;
@@ -14,6 +17,9 @@ interface AutoReplyRule {
   stop_on_match: boolean;
   times_triggered: number;
   last_triggered_at: string | null;
+  channel?: string | null;
+  subject?: string | null;
+  email_account_id?: number | null;
 }
 
 const MATCH_LABELS: Record<string, string> = {
@@ -28,6 +34,9 @@ const EMPTY = {
   keywords: "",
   match_type: "contains",
   reply_body: "",
+  channel: "sms" as "sms" | "email",
+  subject: "",
+  email_account_id: "" as string, 
   is_enabled: true,
   priority: 100,
   cooldown_minutes: 240,
@@ -36,10 +45,12 @@ const EMPTY = {
 
 function RuleModal({
   rule,
+  channel = "sms",
   onClose,
   onSaved,
 }: {
   rule: AutoReplyRule | null;
+  channel?: "sms" | "email";
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -54,11 +65,21 @@ function RuleModal({
           priority: rule.priority,
           cooldown_minutes: rule.cooldown_minutes,
           stop_on_match: rule.stop_on_match,
+          channel: (rule.channel as "sms" | "email") || channel,
+          subject: rule.subject || "",
+          email_account_id: rule.email_account_id ? String(rule.email_account_id) : "",
         }
-      : EMPTY,
+      : { ...EMPTY, channel },
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [accounts, setAccounts] = useState<EmailAccount[]>([]);
+  const isEmail = form.channel === "email";
+
+  useEffect(() => {
+    if (!isEmail) return;
+    emailApi.listAccounts().then((data) => setAccounts(data.items)).catch(() => {});
+  }, [isEmail]);
 
   const needsKeywords = form.match_type !== "any";
 
@@ -67,11 +88,17 @@ function RuleModal({
     if (!form.reply_body.trim()) return setError("Write the reply message.");
     if (needsKeywords && !form.keywords.trim())
       return setError("Add at least one keyword, or choose the catch-all match type.");
+    if (isEmail && !form.subject.trim())
+      return setError("An email auto-reply needs a subject line.");
 
     setSaving(true);
     setError("");
     try {
-      const payload = { ...form, keywords: needsKeywords ? form.keywords : null };
+      const payload = {
+        ...form,
+        keywords: needsKeywords ? form.keywords : null,
+        email_account_id: form.email_account_id ? Number(form.email_account_id) : null,
+      };
       if (rule) await api.put(`/autoreply/${rule.id}`, payload);
       else await api.post("/autoreply/", payload);
       onSaved();
@@ -91,6 +118,35 @@ function RuleModal({
         </h2>
 
         <div className="space-y-3">
+          {isEmail && (
+            <>
+              <div>
+                <label className="label">Subject line</label>
+                <input
+                  className="input text-base sm:text-sm"
+                  placeholder="Re: {{business_name}}"
+                  value={form.subject}
+                  onChange={(e) => setForm({ ...form, subject: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="label">Send the reply from</label>
+                <select
+                  className="input text-base sm:text-sm"
+                  value={form.email_account_id}
+                  onChange={(e) => setForm({ ...form, email_account_id: e.target.value })}
+                >
+                  <option value="">Default Brevo sender</option>
+                  {accounts.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name} — {a.from_email}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </>
+          )}
+
           <div>
             <label className="label">Rule name</label>
             <input
@@ -283,6 +339,7 @@ function TestModal({ onClose }: { onClose: () => void }) {
 }
 
 export default function AutoReplyPage() {
+  const { channel } = useChannel();
   const [rules, setRules] = useState<AutoReplyRule[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -292,7 +349,7 @@ export default function AutoReplyPage() {
   const load = async () => {
     setLoading(true);
     try {
-      const { data } = await api.get("/autoreply/");
+      const { data } = await api.get("/autoreply/", { params: { channel } });
       setRules(data.items || []);
     } finally {
       setLoading(false);
@@ -301,7 +358,7 @@ export default function AutoReplyPage() {
 
   useEffect(() => {
     load();
-  }, []);
+  }, [channel]);
 
   const toggle = async (rule: AutoReplyRule) => {
     await api.put(`/autoreply/${rule.id}`, { is_enabled: !rule.is_enabled });
@@ -318,9 +375,13 @@ export default function AutoReplyPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold">Auto-Reply</h1>
+          <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-3">
+            Auto-Reply
+            <ChannelSwitch size="sm" />
+          </h1>
           <p className="text-sm text-gray-500">
-            Answer incoming messages automatically, using your own rules.
+            Answer incoming {channel === "email" ? "emails" : "messages"} automatically, using your
+            own rules.
           </p>
         </div>
         <div className="flex gap-2">
@@ -353,7 +414,8 @@ export default function AutoReplyPage() {
           <MessageSquareReply size={48} className="mx-auto mb-3 opacity-30" />
           <p className="font-medium">No auto-reply rules yet</p>
           <p className="text-sm mt-1">
-            Incoming messages are not answered automatically until you add a rule.
+            Incoming {channel === "email" ? "emails" : "messages"} are not answered automatically
+            until you add a rule.
           </p>
           <button
             onClick={() => {
@@ -439,6 +501,7 @@ export default function AutoReplyPage() {
       {showModal && (
         <RuleModal
           rule={editing}
+          channel={channel}
           onClose={() => setShowModal(false)}
           onSaved={load}
         />

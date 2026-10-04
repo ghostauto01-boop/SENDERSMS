@@ -256,12 +256,41 @@ async def process_rule(db: AsyncSession, rule: CampaignFollowUp, *, limit: int =
             continue
 
         # --- Send ---
+        # The rule's channel (falling back to the campaign's) decides the
+        # provider: email rules go through Brevo with the email consent checks,
+        # SMS rules keep using the existing gateway path.
+        from app.services import email_service
         from app.services.sms_service import SMSService
 
+        channel = (getattr(rule, "channel", None) or getattr(campaign, "channel", "sms") or "sms")
         try:
-            message = await SMSService(db).send_message(
-                cc.contact_id, body, campaign_id=campaign.id
-            )
+            if channel == "email":
+                contact = (
+                    await db.execute(select(Contact).where(Contact.id == cc.contact_id))
+                ).scalar_one_or_none()
+                if contact is None:
+                    raise ValueError("Contact not found")
+                problem = await email_service.contact_email_problem(db, contact)
+                if problem:
+                    raise ValueError(f"Contact cannot receive email ({problem})")
+                account = await email_service.get_account(db, campaign.email_account_id)
+                if account is None:
+                    account = await email_service.get_default_account(db)
+                message, send_result = await email_service.send_now(
+                    db, contact,
+                    subject=rule.subject or campaign.subject or "Follow-up",
+                    text_body=body,
+                    account=account,
+                    campaign_id=campaign.id,
+                )
+                if message is None:
+                    raise ValueError("Contact cannot receive email")
+                if not send_result.get("success"):
+                    raise ValueError(send_result.get("error") or "Brevo rejected the email")
+            else:
+                message = await SMSService(db).send_message(
+                    cc.contact_id, body, campaign_id=campaign.id
+                )
         except Exception as exc:  # a gateway blow-up must not abort the sweep
             logger.error("Follow-up rule %s contact %s error: %s", rule.id, cc.contact_id, exc)
             message = None

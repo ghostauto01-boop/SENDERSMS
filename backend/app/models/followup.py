@@ -20,6 +20,11 @@ class FollowUp(Base):
     sequence_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("sequences.id"), nullable=True)
     sequence_step_order: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
+    #: "sms" or "email" — a follow-up goes out on the channel it was planned on.
+    channel: Mapped[str] = mapped_column(String(10), default="sms", nullable=False, index=True)
+    subject: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    email_account_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
     # Status: pending, sending, sent, delivered, failed, skipped, cancelled
     status: Mapped[str] = mapped_column(String(50), default="pending", nullable=False, index=True)
 

@@ -35,6 +35,9 @@ class CampaignIn(BaseModel):
     name: str = Field(..., max_length=255)
     description: Optional[str] = None
     objective: str = "replies"
+    #: "sms" (default) or "email" — decides the delivery provider AND which
+    #: audience rules apply (phone validation vs email validation).
+    channel: str = "sms"
     daily_limit: Optional[int] = None
     total_limit: Optional[int] = None
     start_date: Optional[datetime] = None
@@ -51,6 +54,12 @@ class CampaignIn(BaseModel):
     always_on: bool = False
     max_per_contact_per_day: Optional[int] = None
     max_per_contact_per_week: Optional[int] = None
+    channel: Optional[str] = None
+    email_account_id: Optional[int] = None
+    fallback_email_account_id: Optional[int] = None
+    subject: Optional[str] = Field(default=None, max_length=500)
+    track_opens: Optional[bool] = None
+    track_clicks: Optional[bool] = None
     optimization_mode: str = "manual"
     queued_edit_policy: str = "keep"
     priority: str = "normal"
@@ -60,6 +69,12 @@ class CampaignIn(BaseModel):
     optimize_min_sends: int = 30
     optimize_min_gap_pct: float = 25.0
     optimize_action: str = "shift"
+    # --- Email sender selection (multi-API) -----------------------------
+    email_account_id: Optional[int] = None
+    fallback_email_account_id: Optional[int] = None
+    subject: Optional[str] = Field(default=None, max_length=500)
+    track_opens: bool = True
+    track_clicks: bool = True
 
 
 class CampaignPatch(BaseModel):
@@ -100,6 +115,12 @@ class CampaignOut(BaseModel):
     description: Optional[str]
     objective: str
     status: str
+    channel: str = "sms"
+    email_account_id: Optional[int] = None
+    fallback_email_account_id: Optional[int] = None
+    subject: Optional[str] = None
+    track_opens: bool = True
+    track_clicks: bool = True
     daily_limit: Optional[int]
     total_limit: Optional[int]
     start_date: Optional[datetime]
@@ -298,6 +319,11 @@ class CreativeIn(BaseModel):
     send_quota: Optional[int] = Field(None, ge=0, description="Exact SMS count for quota split mode")
     status: str = "active"
     template_id: Optional[int] = None
+    # Email channel: subject + HTML variant + optional per-creative sender
+    # (so an A/B test can compare two Brevo accounts/domains).
+    subject: Optional[str] = Field(default=None, max_length=500)
+    html_body: Optional[str] = None
+    email_account_id: Optional[int] = None
 
 
 class CreativePatch(BaseModel):
@@ -309,6 +335,9 @@ class CreativePatch(BaseModel):
     send_quota: Optional[int] = Field(None, ge=0)
     status: Optional[str] = None
     template_id: Optional[int] = None
+    subject: Optional[str] = Field(default=None, max_length=500)
+    html_body: Optional[str] = None
+    email_account_id: Optional[int] = None
 
 
 class CreativeOut(BaseModel):
@@ -318,6 +347,9 @@ class CreativeOut(BaseModel):
     name: str
     status: str
     body: str
+    subject: Optional[str] = None
+    html_body: Optional[str] = None
+    email_account_id: Optional[int] = None
     cta: Optional[str]
     tracking_link: Optional[str]
     allocation: float
@@ -335,8 +367,11 @@ class FollowUpStepIn(BaseModel):
     name: Optional[str] = None
     wait_hours: int = 48
     condition: str = "no_reply"
+    #: send_sms | send_email | add_tag | remove_tag | change_status |
+    #: create_task | stop | suppress | notify
     action: str = "send_sms"
     body: Optional[str] = None
+    subject: Optional[str] = Field(default=None, max_length=500)
     action_value: Optional[str] = None
     is_active: bool = True
 

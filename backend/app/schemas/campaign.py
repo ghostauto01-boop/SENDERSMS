@@ -27,6 +27,9 @@ def _require_future(value: Optional[datetime]) -> Optional[datetime]:
 class CampaignCreate(BaseModel):
     name: str = Field(..., max_length=255)
     description: Optional[str] = None
+    #: "sms" (default) or "email" — the classic campaign engine is now
+    #: channel-aware; an email campaign is delivered through Brevo.
+    channel: str = "sms"
     list_id: Optional[int] = None
     template_id: Optional[int] = None
     # Write a message inline instead of selecting a saved template. When both
@@ -36,6 +39,18 @@ class CampaignCreate(BaseModel):
     gateway_setting_id: Optional[int] = None
     # Optional future launch time. NULL = send when started manually.
     scheduled_start_at: Optional[datetime] = None
+
+    # --- Email channel -------------------------------------------------
+    #: Brevo sender this campaign goes through (NULL = the default sender).
+    email_account_id: Optional[int] = None
+    #: Used automatically when the primary sender rejects a send.
+    fallback_email_account_id: Optional[int] = None
+    subject: Optional[str] = Field(default=None, max_length=500)
+    html_body: Optional[str] = None
+    #: [{"name": "...", "content_base64": "..."}] attached to every email.
+    attachments: Optional[list[dict]] = None
+    track_opens: bool = True
+    track_clicks: bool = True
 
     _check_future = field_validator("scheduled_start_at")(_require_future)
 
@@ -58,6 +73,15 @@ class CampaignUpdate(BaseModel):
     send_end_hour: Optional[int] = None
     allow_weekends: Optional[bool] = None
     scheduled_start_at: Optional[datetime] = None
+    #: Only changeable while the campaign has no messages queued.
+    channel: Optional[str] = None
+    email_account_id: Optional[int] = None
+    fallback_email_account_id: Optional[int] = None
+    subject: Optional[str] = Field(default=None, max_length=500)
+    html_body: Optional[str] = None
+    attachments: Optional[list[dict]] = None
+    track_opens: Optional[bool] = None
+    track_clicks: Optional[bool] = None
 
     _check_future = field_validator("scheduled_start_at")(_require_future)
 
@@ -67,6 +91,14 @@ class CampaignOut(BaseModel):
     name: str
     description: Optional[str]
     status: str
+    channel: str = "sms"
+    email_account_id: Optional[int] = None
+    fallback_email_account_id: Optional[int] = None
+    subject: Optional[str] = None
+    html_body: Optional[str] = None
+    attachments: Optional[list[dict]] = None
+    track_opens: bool = True
+    track_clicks: bool = True
     list_id: Optional[int]
     template_id: Optional[int]
     message_body: Optional[str]

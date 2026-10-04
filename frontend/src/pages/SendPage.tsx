@@ -3,11 +3,56 @@ import { useState, useEffect, useRef } from "react";
 import api from "../api/client";
 import toast from "react-hot-toast";
 import { Send, UserPlus, Search, X, Users, Phone, List, Clock, AlertCircle, CheckCircle2, Hourglass, RotateCcw, Trash2, Eye, Calendar, MessageSquare, ShieldCheck } from "lucide-react";
+import { useChannel } from "../hooks/useChannel";
+import ChannelSwitch from "../components/ChannelSwitch";
+import EmailSendPanel from "../components/EmailSendPanel";
+import emailApi from "../api/email";
 import ShortcodePicker from "../components/ShortcodePicker";
 import ListPicker from "../components/ListPicker";
 import TemplatePicker from "../components/TemplatePicker";
 
 export default function SendPage() {
+  return <SendPageInner />;
+}
+
+/**
+ * The Send page is channel-aware: the same route composes an SMS or an email,
+ * depending on the header switch (Send SMS / Send Email). Keeping one route —
+ * instead of two near-identical pages — means scheduling, contact picking and
+ * history stay in one place.
+ */
+function SendPageInner() {
+  const { isEmail } = useChannel();
+  const [emailRef, setEmailRef] = useState<any>(null);
+  const [emailAccounts, setEmailAccounts] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!isEmail) return;
+    Promise.all([emailApi.reference(), emailApi.listAccounts()])
+      .then(([ref, acc]) => {
+        setEmailRef(ref);
+        setEmailAccounts(acc.items);
+      })
+      .catch(() => toast.error("Could not load your Brevo senders"));
+  }, [isEmail]);
+
+  if (isEmail) {
+    return (
+      <div className="space-y-4 pb-20 lg:pb-0">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-[22px] font-bold text-[#111b21] dark:text-white flex items-center gap-2">
+            <span className="w-8 h-8 rounded-full bg-[#0ea5e9] flex items-center justify-center text-white">
+              <Send size={16} />
+            </span>
+            Send Email
+          </h1>
+          <ChannelSwitch navigateManagers />
+        </div>
+        <EmailSendPanel reference={emailRef} accounts={emailAccounts} />
+      </div>
+    );
+  }
+
   const [mode, setMode] = useState<"contact" | "number" | "list">("contact");
   const [sendType, setSendType] = useState<"now" | "scheduled">("now");
   const [contacts, setContacts] = useState<any[]>([]);
@@ -236,7 +281,8 @@ export default function SendPage() {
           <span className="w-8 h-8 rounded-full bg-[#00a884] flex items-center justify-center text-white"><Send size={16}/></span>
           Send SMS
         </h1>
-        <div className="flex items-center gap-1 text-xs">
+        <div className="flex items-center gap-2 text-xs">
+          <ChannelSwitch size="sm" navigateManagers />
           <span className="hidden sm:inline text-[#667781]">Gateway active</span>
           <span className="w-2 h-2 bg-[#00a884] rounded-full animate-pulse"/>
         </div>

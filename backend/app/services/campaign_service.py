@@ -36,7 +36,41 @@ class CampaignService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
+    async def _check_email_sender(self, campaign: Campaign) -> Optional[str]:
+        """Return an error string when an EMAIL campaign has no usable sender."""
+        from app.services import email_service
+
+        account = await email_service.get_account(self.db, campaign.email_account_id)
+        if account is None:
+            account = await email_service.get_default_account(self.db)
+        if account is None:
+            return (
+                "No email sender configured. Add a Brevo API key and From address on the "
+                "Email Senders page, then choose it for this campaign."
+            )
+        usable, why = await email_service.account_is_usable(account)
+        if not usable:
+            return f"Email sender '{account.name}' cannot send right now ({why})."
+        if not (campaign.subject or "").strip():
+            # A subject can also come from the chosen template; if none is set
+            # anywhere the email would arrive with "(no subject)".
+            template_subject = None
+            if campaign.template_id:
+                from app.models.template import Template
+
+                template = (
+                    await self.db.execute(
+                        select(Template).where(Template.id == campaign.template_id)
+                    )
+                ).scalar_one_or_none()
+                template_subject = template.subject if template else None
+            if not (template_subject or "").strip():
+                return "Add a subject line for this email campaign (or pick a template with one)."
+        return None
+
     async def _check_gateway(self, campaign: Campaign) -> Optional[str]:
+        if (campaign.channel or "sms") == "email":
+            return await self._check_email_sender(campaign)
         """Return an error string if no usable SMS gateway is available.
 
         A campaign may either point at an explicit GatewaySetting row or fall
@@ -74,11 +108,19 @@ class CampaignService:
         campaign = Campaign(
             name=data["name"],
             description=data.get("description"),
+            channel=data.get("channel") if data.get("channel") in ("sms", "email") else "sms",
             list_id=data.get("list_id"),
             template_id=data.get("template_id"),
             message_body=(data.get("message_body") or "").strip() or None,
             sequence_id=data.get("sequence_id"),
             gateway_setting_id=data.get("gateway_setting_id"),
+            email_account_id=data.get("email_account_id"),
+            fallback_email_account_id=data.get("fallback_email_account_id"),
+            attachments=data.get("attachments"),
+            subject=(data.get("subject") or "").strip() or None,
+            html_body=data.get("html_body"),
+            track_opens=bool(data.get("track_opens", True)),
+            track_clicks=bool(data.get("track_clicks", True)),
             # Optional future launch time; None means "start it manually".
             scheduled_start_at=data.get("scheduled_start_at"),
             status="draft",

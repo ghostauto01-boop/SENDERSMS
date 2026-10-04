@@ -53,10 +53,16 @@ async def _send_one(mid, final_on_failure=False, rate_wait_cap=_INLINE_RATE_WAIT
         m.status = "sending"
         await db.commit()
 
+        # Email has no SIM to protect: the SMS pacing gate exists to keep a
+        # handset/carrier happy, and Brevo enforces its own rate limits (a 429
+        # is retried by the normal retry path). Skipping it here also means an
+        # email campaign is never blocked by an SMS hourly cap and vice versa.
+        is_email = (m.channel or "sms") == "email"
+
         # Enforce sending limits + pacing before touching the gateway.
         from app.services.sending_limits import SendingGate
         gate = SendingGate(db)
-        check = await gate.check()
+        check = await gate.check() if not is_email else {"allowed": True}
         if not check["allowed"]:
             wait = int(check["wait_seconds"] or 60)
             if final_on_failure and 0 < wait <= rate_wait_cap:
@@ -71,6 +77,11 @@ async def _send_one(mid, final_on_failure=False, rate_wait_cap=_INLINE_RATE_WAIT
         from app.models.contact import Contact
         c=(await db.execute(select(Contact).where(Contact.id==m.contact_id))).scalar_one_or_none()
         if not c:m.status="failed";m.last_error="Contact not found";await db.commit();return False
+        if is_email:
+            # Everything below this point is SMS-specific (number validation,
+            # SIM selection, gateway failover). The email twin does the same
+            # job against Brevo, including account failover.
+            return await _send_one_email(db, m, c, final_on_failure=final_on_failure)
         # Last-chance pre-send filter: never bill the SIM for a number that
         # cannot receive. (Queued rows may predate the contact going bad.)
         from app.services.list_hygiene import contact_is_blocked_from_send, mark_undeliverable
@@ -117,6 +128,48 @@ async def _send_one(mid, final_on_failure=False, rate_wait_cap=_INLINE_RATE_WAIT
         return m.status=="retrying"
 
 
+async def _send_one_email(db, m, contact, *, final_on_failure=False):
+    """Deliver one claimed email ``Message`` through Brevo.
+
+    Mirrors the SMS branch's contract exactly (``False`` = settled, ``True`` =
+    retry shortly) so Celery retries, the inline sweep and the retry endpoints
+    keep working unchanged. Account fallback, suppression checks, per-account
+    daily ceilings and contact counters all live in ``email_service``.
+    """
+    from app.services import email_service
+
+    problem = await email_service.contact_email_problem(db, contact)
+    if problem:
+        m.status = "failed"
+        m.last_error = f"Filtered before send: {problem}"
+        m.failed_at = datetime.now(timezone.utc)
+        await _record_campaign_outcome(db, m, False)
+        await db.commit()
+        return False
+
+    result = await email_service.deliver(db, m)
+    if result.get("success"):
+        contact.emails_sent = (contact.emails_sent or 0) + 1
+        contact.last_emailed_at = datetime.now(timezone.utc)
+        await _record_campaign_outcome(db, m, True)
+    else:
+        m.retry_count = (m.retry_count or 0) + 1
+        m.status = "failed" if final_on_failure or m.retry_count >= 3 else "retrying"
+        if m.status == "failed":
+            m.failed_at = datetime.now(timezone.utc)
+        m.last_error = str(result.get("error") or "send failed")[:500]
+        # A hard rejection (bad key / banned sender / blocked recipient) will
+        # not fix itself; only a transient (429 / timeout) is worth retrying.
+        if result.get("status_code") in (400, 401, 402, 403):
+            m.status = "failed"
+            m.failed_at = m.failed_at or datetime.now(timezone.utc)
+            contact.email_fail_count = (contact.email_fail_count or 0) + 1
+            contact.email_last_error = m.last_error
+        await _record_campaign_outcome(db, m, False)
+    await db.commit()
+    return m.status == "retrying"
+
+
 async def _record_campaign_outcome(db,m,ok):
     """Roll a send result up onto the campaign and its CampaignContact row."""
     if not m.campaign_id:return
@@ -133,7 +186,13 @@ async def _record_campaign_outcome(db,m,ok):
             if cc.status=="queued":cc.status="sent"
         from app.models.contact import Contact
         ct=(await db.execute(select(Contact).where(Contact.id==m.contact_id))).scalar_one_or_none()
-        if ct:ct.messages_sent=(ct.messages_sent or 0)+1
+        if ct:
+            # The two channels keep separate counters so "how many SMS has this
+            # lead had?" is not inflated by email (and vice versa).
+            if (m.channel or "sms") == "email":
+                ct.emails_sent=(ct.emails_sent or 0)+1
+            else:
+                ct.messages_sent=(ct.messages_sent or 0)+1
     elif m.status=="failed":
         # Only settle as failed once retries are exhausted, otherwise a
         # transient blip would permanently mark the contact undeliverable.
@@ -186,7 +245,7 @@ def send_sms(self,mid):
 def sync_delivery_status():
     async def s():
         async with async_session_factory() as db:
-            ms=(await db.execute(select(Message).where(Message.status.in_(["sent","queued"]),Message.provider_message_id.isnot(None)).limit(100))).scalars().all()
+            ms=(await db.execute(select(Message).where(Message.status.in_(["sent","queued"]),Message.provider_message_id.isnot(None),Message.channel!="email").limit(100))).scalars().all()
             if not ms:return
             from app.providers.smsgate import SMSGateProvider
             p=SMSGateProvider()

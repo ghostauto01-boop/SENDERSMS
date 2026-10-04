@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import api from "../api/client";
 import toast from "react-hot-toast";
-import { Braces, Copy, Loader2, Phone, X } from "lucide-react";
+import { Braces, Copy, Loader2, Mail, MousePointerClick, Phone, X } from "lucide-react";
+import emailApi from "../api/email";
 import type { ContactProfile } from "../types";
 import ContactActions from "./ContactActions";
 
@@ -23,6 +24,9 @@ export default function ContactProfileModal({
   const [profile, setProfile] = useState<ContactProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  //: Email side of this contact — opens, clicks, the links clicked. Loaded in
+  //: parallel and shown only when the contact has email history.
+  const [engagement, setEngagement] = useState<any>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -38,6 +42,14 @@ export default function ContactProfileModal({
       }
     };
     load();
+    emailApi
+      .engagement(contactId)
+      .then((data) => {
+        if (!cancelled) setEngagement(data);
+      })
+      .catch(() => {
+        if (!cancelled) setEngagement(null);
+      });
     return () => {
       cancelled = true;
     };
@@ -91,6 +103,76 @@ export default function ContactProfileModal({
                 name={profile.display_name}
                 website={(profile.fields.find((f) => f.shortcode === "website") || {}).value as string | null | undefined}
               />
+              {engagement && (engagement.totals?.sent > 0 || engagement.email) && (
+                <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-3 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-medium flex items-center gap-1.5">
+                      <Mail size={14} /> Email
+                    </p>
+                    <div className="flex items-center gap-1">
+                      {engagement.is_email_opted_out && (
+                        <span className="badge badge-amber">unsubscribed</span>
+                      )}
+                      {engagement.is_email_undeliverable && (
+                        <span className="badge badge-red">bounced</span>
+                      )}
+                      {!engagement.is_email_opted_out && !engagement.is_email_undeliverable && engagement.email && (
+                        <span className="badge badge-gray">{engagement.email_status || "ok"}</span>
+                      )}
+                    </div>
+                  </div>
+                  {engagement.email && (
+                    <p className="text-xs text-gray-500 truncate">{engagement.email}</p>
+                  )}
+                  <div className="grid grid-cols-4 gap-2 text-center text-sm">
+                    <div>
+                      <p className="font-bold">{engagement.totals.sent}</p>
+                      <p className="text-[11px] text-gray-500">sent</p>
+                    </div>
+                    <div>
+                      <p className="font-bold">{engagement.totals.opened}</p>
+                      <p className="text-[11px] text-gray-500">opened ({engagement.totals.open_rate}%)</p>
+                    </div>
+                    <div>
+                      <p className="font-bold">{engagement.totals.clicked}</p>
+                      <p className="text-[11px] text-gray-500">clicked ({engagement.totals.click_rate}%)</p>
+                    </div>
+                    <div>
+                      <p className="font-bold">{engagement.totals.bounced}</p>
+                      <p className="text-[11px] text-gray-500">bounced</p>
+                    </div>
+                  </div>
+                  {(engagement.links || []).length > 0 && (
+                    <div className="pt-1 border-t border-gray-100 dark:border-gray-800 space-y-1">
+                      <p className="text-[11px] text-gray-500 flex items-center gap-1">
+                        <MousePointerClick size={11} /> Links they clicked
+                      </p>
+                      {engagement.links.slice(0, 5).map((l: any) => (
+                        <p key={l.url} className="text-[11px] truncate">
+                          <a href={l.url} target="_blank" rel="noreferrer" className="underline">
+                            {l.url}
+                          </a>{" "}
+                          <span className="text-gray-400">×{l.clicks}</span>
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                  {(engagement.messages || []).length > 0 && (
+                    <div className="pt-1 border-t border-gray-100 dark:border-gray-800 space-y-0.5">
+                      {engagement.messages.slice(0, 4).map((m: any) => (
+                        <p key={m.id} className="text-[11px] text-gray-500 truncate">
+                          {m.direction === "incoming" ? "↙" : "↗"} {m.subject || "(no subject)"}
+                          {" · "}
+                          {m.open_count} open{m.open_count === 1 ? "" : "s"}
+                          {" · "}
+                          {m.click_count} click{m.click_count === 1 ? "" : "s"}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-sm">
                 <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-700">
                   <p className="text-lg font-bold">{profile.messages_sent}</p>

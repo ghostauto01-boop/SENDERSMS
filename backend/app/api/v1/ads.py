@@ -66,6 +66,34 @@ from app.services.ads_service import removable_audience_filter
 router = APIRouter()
 
 
+CHANNELS = ("sms", "email")
+
+
+def _validate_channel(channel: str | None) -> str:
+    value = (channel or "sms").strip().lower()
+    if value not in CHANNELS:
+        raise HTTPException(422, f"channel must be one of {list(CHANNELS)}")
+    return value
+
+
+async def _require_email_sender(db: AsyncSession, campaign: AdsCampaign) -> None:
+    """An email campaign without a usable Brevo sender is a dead campaign."""
+    from app.services import email_service
+
+    account = await email_service.get_account(db, campaign.email_account_id)
+    if account is None:
+        account = await email_service.get_default_account(db)
+    if account is None:
+        raise HTTPException(
+            400,
+            "No email sender is configured. Add a Brevo API key and From address on the "
+            "Email Senders page, then choose it on this campaign.",
+        )
+    usable, why = await email_service.account_is_usable(account)
+    if not usable:
+        raise HTTPException(400, f"Email sender '{account.name}' cannot send ({why}).")
+
+
 async def _get_campaign(db: AsyncSession, campaign_id: int) -> AdsCampaign:
     row = (
         await db.execute(select(AdsCampaign).where(AdsCampaign.id == campaign_id))
@@ -120,11 +148,24 @@ async def _get_audience(db: AsyncSession, audience_id: int) -> AdsAudience:
 
 
 @router.get("/overview")
-async def overview(db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
-    campaigns = list((await db.execute(select(AdsCampaign))).scalars().all())
+async def overview(
+    channel: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Manager landing tab. ``channel`` scopes every number to SMS or email."""
+    campaign_query = select(AdsCampaign)
+    if channel and channel != "all":
+        _validate_channel(channel)
+        campaign_query = campaign_query.where(AdsCampaign.channel == channel)
+    campaigns = list((await db.execute(campaign_query)).scalars().all())
     active = [c for c in campaigns if c.status == "active"]
 
-    totals = await svc._counts_for(db, [AdsAssignment.id.is_not(None)])
+    campaign_ids = [c.id for c in campaigns]
+    where = (
+        [AdsAssignment.campaign_id.in_(campaign_ids)] if campaign_ids else [AdsAssignment.id.is_not(None)]
+    )
+    totals = await svc._counts_for(db, where)
     followups_due = (
         await db.execute(
             select(func.count()).select_from(AdsFollowUpTask).where(
@@ -165,7 +206,15 @@ async def overview(db: AsyncSession = Depends(get_db), user: User = Depends(get_
             else:
                 series[key]["replies"] += 1
 
+    from app.services import email_service
+
+    accounts = []
+    for account in await email_service.list_accounts(db):
+        await email_service.reset_daily_counter(account)
+        accounts.append(email_service.serialize_account(account))
+
     return {
+        "channel": channel or "all",
         "active_campaigns": len(active),
         "total_campaigns": len(campaigns),
         "totals": totals,
@@ -174,6 +223,9 @@ async def overview(db: AsyncSession = Depends(get_db), user: User = Depends(get_
         "suppressed": suppressed,
         "credits_used": totals["sent"],
         "series": list(series.values()),
+        # Email senders, so the Email Manager overview can show sender health
+        # (and which keys are burned) without a second request.
+        "email_accounts": accounts,
     }
 
 
@@ -186,12 +238,18 @@ async def overview(db: AsyncSession = Depends(get_db), user: User = Depends(get_
 async def list_campaigns(
     status: Optional[str] = None,
     search: Optional[str] = None,
+    #: "sms" (default) or "email" — the Ads Manager shows one channel at a
+    #: time so an SMS campaign is never listed next to an email one.
+    channel: Optional[str] = None,
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
     query = select(AdsCampaign)
+    if channel and channel != "all":
+        _validate_channel(channel)
+        query = query.where(AdsCampaign.channel == channel)
     if status:
         query = query.where(AdsCampaign.status == status)
     if search:
@@ -226,11 +284,17 @@ async def list_campaigns(
 async def create_campaign(
     data: CampaignIn, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)
 ):
-    campaign = AdsCampaign(**data.model_dump(), owner_id=user.id, status="draft")
+    payload = data.model_dump()
+    payload["channel"] = _validate_channel(payload.get("channel"))
+    campaign = AdsCampaign(**payload, owner_id=user.id, status="draft")
     db.add(campaign)
     await db.flush()
+    if campaign.channel == "email":
+        ## Refuse to create a campaign that could never send.
+        await _require_email_sender(db, campaign)
     svc.log_activity(
-        db, "campaign_created", campaign_id=campaign.id, actor=user.username, detail=campaign.name
+        db, "campaign_created", campaign_id=campaign.id, actor=user.username,
+        detail=f"{campaign.channel}: {campaign.name}",
     )
     await db.commit()
     await db.refresh(campaign)
@@ -308,14 +372,35 @@ async def update_campaign(
         "draft", "scheduled", "active", "paused", "completed", "archived", "error",
     ):
         raise HTTPException(400, "Invalid status")
+    if payload.get("channel") is not None:
+        payload["channel"] = _validate_channel(payload["channel"])
+        if payload["channel"] != campaign.channel:
+            # Switching channels mid-flight would send SMS copy as email (or
+            # vice versa) to contacts already assigned. Allow it only before
+            # anything has been queued.
+            queued = (
+                await db.execute(
+                    select(func.count()).select_from(AdsAssignment).where(
+                        AdsAssignment.campaign_id == campaign.id
+                    )
+                )
+            ).scalar() or 0
+            if queued:
+                raise HTTPException(
+                    409,
+                    "This campaign already has an audience assigned. Duplicate it to run "
+                    "the same campaign on another channel.",
+                )
+    for key, value in payload.items():
+        setattr(campaign, key, value)
     if "optimize_metric" in payload and payload["optimize_metric"] not in svc.OPTIMIZE_METRICS:
         raise HTTPException(400, f"Invalid optimize_metric, expected one of {svc.OPTIMIZE_METRICS}")
     if "optimize_action" in payload and payload["optimize_action"] not in svc.OPTIMIZE_ACTIONS:
         raise HTTPException(400, f"Invalid optimize_action, expected one of {svc.OPTIMIZE_ACTIONS}")
     if "optimize_min_sends" in payload and (payload["optimize_min_sends"] or 0) < 1:
         raise HTTPException(400, "optimize_min_sends must be at least 1")
-    for key, value in payload.items():
-        setattr(campaign, key, value)
+    if campaign.channel == "email" and not campaign.test_mode:
+        await _require_email_sender(db, campaign)
     campaign.updated_at = svc.now_utc()
     svc.log_activity(
         db,
@@ -952,12 +1037,26 @@ async def update_creative(
     payload = data.model_dump(exclude_unset=True)
     new_body = payload.pop("body", None)
     new_cta = payload.pop("cta", creative.cta)
+    # Email copy is versioned together with the SMS body: editing a subject or
+    # the HTML writes a new version, so queued contacts keep what they were
+    # promised and history stays attributable.
+    new_subject = payload.pop("subject", None)
+    new_html = payload.pop("html_body", None)
     if payload.get("template_id") is not None and not await _template_exists(db, payload["template_id"]):
         raise HTTPException(status_code=404, detail="Template not found")
     for key, value in payload.items():
         setattr(creative, key, value)
-    if new_body is not None and new_body != creative.body:
-        await svc.bump_version(db, creative, new_body, new_cta)
+    changed_body = new_body is not None and new_body != creative.body
+    changed_subject = new_subject is not None and new_subject != creative.subject
+    changed_html = new_html is not None and new_html != creative.html_body
+    if changed_body or changed_subject or changed_html:
+        await svc.bump_version(
+            db, creative,
+            new_body if new_body is not None else creative.body,
+            new_cta,
+            subject=new_subject if new_subject is not None else creative.subject,
+            html_body=new_html if new_html is not None else creative.html_body,
+        )
         svc.log_activity(
             db, "creative_version_created", campaign_id=creative.campaign_id,
             entity_type="creative", entity_id=creative.id, actor=user.username,
@@ -2124,7 +2223,9 @@ async def export(
 
 @router.get("/reference")
 async def reference(db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
-    """Lists, tags and statuses the campaign builder needs."""
+    """Lists, tags, senders and statuses the campaign builder needs."""
+    from app.config import settings as settings_obj
+
     lists = list((await db.execute(select(ContactList).order_by(ContactList.name))).scalars().all())
     counts = dict(
         (
@@ -2142,11 +2243,33 @@ async def reference(db: AsyncSession = Depends(get_db), user: User = Depends(get
         ).scalars().all()
     )
     total_contacts = (await db.execute(select(func.count()).select_from(Contact))).scalar() or 0
+    emailable = (
+        await db.execute(
+            select(func.count()).select_from(Contact).where(
+                Contact.email.isnot(None),
+                Contact.email != "",
+                Contact.is_email_opted_out == False,  # noqa: E712
+            )
+        )
+    ).scalar() or 0
+    from app.services import email_service
+
+    accounts = []
+    for account in await email_service.list_accounts(db):
+        await email_service.reset_daily_counter(account)
+        accounts.append(email_service.serialize_account(account))
     return {
         "lists": [{"id": l.id, "name": l.name, "count": counts.get(l.id, 0)} for l in lists],
         "tags": [t.name for t in tags],
         "statuses": sorted({s for s in statuses if s}),
         "total_contacts": total_contacts,
+        "emailable_contacts": emailable,
+        "channels": [
+            {"value": "sms", "label": "SMS", "available": bool(getattr(settings_obj, "smsgate_configured", False))},
+            {"value": "email", "label": "Email", "available": bool(accounts)},
+        ],
+        "email_accounts": accounts,
+        "default_email_account_id": next((a["id"] for a in accounts if a["is_default"]), None),
         "objectives": [
             {"value": "replies", "label": "Get replies"},
             {"value": "leads", "label": "Generate leads"},

@@ -40,12 +40,22 @@ def _validate(match_type: Optional[str], keywords: Optional[str]) -> None:
 
 @router.get("/", response_model=dict)
 async def list_rules(
+    channel: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """All rules, in the order they are evaluated."""
+    """Rules for one channel, in the order they are evaluated.
+
+    ``channel`` defaults to SMS so the existing screen and any old client keep
+    seeing exactly what they saw before; pass ``channel=email`` for the email
+    autoresponder, or ``channel=all`` for both.
+    """
+    query = select(AutoReplyRule)
+    wanted = (channel or "sms").lower()
+    if wanted != "all":
+        query = query.where(AutoReplyRule.channel == wanted)
     result = await db.execute(
-        select(AutoReplyRule).order_by(AutoReplyRule.priority.asc(), AutoReplyRule.id.asc())
+        query.order_by(AutoReplyRule.priority.asc(), AutoReplyRule.id.asc())
     )
     rules = result.scalars().all()
     return {"items": [AutoReplyRuleOut.model_validate(r).model_dump() for r in rules]}
@@ -58,7 +68,10 @@ async def create_rule(
     current_user: User = Depends(get_current_user),
 ):
     _validate(payload.match_type, payload.keywords)
-    rule = AutoReplyRule(**payload.model_dump())
+    data = payload.model_dump()
+    if data.get("channel") not in ("sms", "email"):
+        raise HTTPException(status_code=422, detail="channel must be 'sms' or 'email'")
+    rule = AutoReplyRule(**data)
     db.add(rule)
     await db.commit()
     await db.refresh(rule)

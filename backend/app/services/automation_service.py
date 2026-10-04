@@ -34,6 +34,7 @@ logger = logging.getLogger(__name__)
 
 # Allowed action types.
 SEND_SMS = "send_sms"
+SEND_EMAIL = "send_email"
 STOP_SEQUENCE = "stop_sequence"
 OPT_OUT = "opt_out"
 ADD_TAG = "add_tag"
@@ -110,12 +111,21 @@ class AutomationService:
     async def run_for_reply(self, contact: Contact, text: str, classification: dict) -> int:
         """Evaluate enabled automations against an inbound reply.
 
+        Only automations for the SAME channel run: an SMS rule never fires on
+        an email reply (and vice versa). ``classification['channel']`` selects
+        the channel; it defaults to SMS so every existing caller keeps working.
+
         Returns how many automations fired. Best-effort: a failure in one
         action never blocks the others or the inbound message itself.
         """
+        channel = (classification or {}).get("channel") or "sms"
         result = await self.db.execute(
             select(Automation)
-            .where(Automation.is_enabled == True, Automation.trigger_type == "inbound_reply")  # noqa: E712
+            .where(
+                Automation.is_enabled == True,  # noqa: E712
+                Automation.trigger_type == "inbound_reply",
+                Automation.channel == channel,
+            )
             .order_by(Automation.priority.asc(), Automation.id.asc())
         )
         automations = result.scalars().all()
@@ -156,10 +166,45 @@ class AutomationService:
 
     async def _execute(self, automation: Automation, contact: Contact, text: str) -> None:
         for action in load_json(automation.actions_json):
-            await self._run_action(action, contact)
+            await self._run_action(action, contact, automation)
 
-    async def _run_action(self, action: dict, contact: Contact) -> None:
+    async def _run_action(
+        self, action: dict, contact: Contact, automation: Automation | None = None
+    ) -> None:
         action_type = (action.get("type") or "").strip()
+
+        if action_type == SEND_EMAIL:
+            # Email twin of the "send the 2nd message" action.
+            body = (action.get("body") or "").strip()
+            if not body:
+                return
+            from app.services import email_service
+            from app.services.variable_service import render_for_contact
+
+            rendered = await render_for_contact(self.db, body, contact)
+            if not rendered.strip():
+                return
+            subject = (action.get("subject") or "").strip() or "Re: your reply"
+            delay_minutes = int(action.get("delay_minutes") or 0)
+            if delay_minutes and delay_minutes > 0:
+                self.db.add(FollowUp(
+                    contact_id=contact.id,
+                    channel="email",
+                    subject=subject,
+                    status="pending",
+                    scheduled_at=datetime.now(timezone.utc) + timedelta(minutes=delay_minutes),
+                    message_text=rendered,
+                    notify_on_due=False,
+                    email_account_id=getattr(automation, "email_account_id", None),
+                ))
+            else:
+                account = await email_service.get_account(
+                    self.db, getattr(automation, "email_account_id", None)
+                ) or await email_service.get_default_account(self.db)
+                await email_service.queue_email(
+                    self.db, contact, subject=subject, text_body=rendered, account=account
+                )
+            return
 
         if action_type == SEND_SMS:
             body = (action.get("body") or "").strip()

@@ -32,6 +32,12 @@ class Automation(Base):
     # Trigger type. "inbound_reply" is the only trigger today.
     trigger_type: Mapped[str] = mapped_column(String(40), default="inbound_reply", nullable=False)
 
+    #: "sms" or "email" — automations are channel-scoped so an SMS rule can
+    #: never silently start firing on email replies (and vice versa).
+    channel: Mapped[str] = mapped_column(String(10), default="sms", nullable=False, index=True)
+    #: Email only: sender used by "send_email" actions when set.
+    email_account_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
     # JSON list of conditions. All must pass when match_all is true (AND);
     # otherwise any one passing fires the automation (OR).
     conditions_json: Mapped[str | None] = mapped_column(Text, nullable=True)

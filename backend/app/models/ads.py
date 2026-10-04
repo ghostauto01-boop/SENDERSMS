@@ -90,6 +90,22 @@ class AdsCampaign(Base):
     objective: Mapped[str] = mapped_column(String(40), default="replies", nullable=False)
     status: Mapped[str] = mapped_column(String(30), default="draft", nullable=False, index=True)
 
+    #: "sms" or "email". The Ads Manager engine is channel-agnostic; the
+    #: channel decides how the queued messages are finally delivered
+    #: (SMS-Gate vs Brevo) and which suppression/validation rules apply.
+    channel: Mapped[str] = mapped_column(String(10), default="sms", nullable=False, index=True)
+
+    # ---- Email sender selection (multi-API) -------------------------------
+    #: Brevo account this campaign sends through. NULL = the default account.
+    email_account_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    #: Tried automatically when the primary account rejects the send (a burned
+    #: API key / banned domain / exhausted quota) so the campaign keeps going.
+    fallback_email_account_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    #: Subject used by creatives that do not set their own.
+    subject: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    track_opens: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    track_clicks: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
     owner_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     # --- Budget (SMS volume, not money) ---
@@ -317,6 +333,16 @@ class AdsCreative(Base):
     cta: Mapped[str | None] = mapped_column(String(255), nullable=True)
     tracking_link: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
+    # ---- Email channel ---------------------------------------------------
+    #: Email subject; falls back to the campaign's subject when empty.
+    subject: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    #: Rich HTML variant. When present the email is sent as multipart
+    #: (HTML + the plain-text `body` as fallback).
+    html_body: Mapped[str | None] = mapped_column(Text, nullable=True)
+    #: Per-creative sender override: lets an A/B test pit two different
+    #: Brevo accounts (domains) against each other.
+    email_account_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
     #: Optional saved template this creative was started from. It records where
     #: the text came from so the composer can show "synced to template" and
     #: offer a one-click re-sync when the template later changes. It is a
@@ -364,6 +390,10 @@ class AdsCreativeVersion(Base):
     version: Mapped[int] = mapped_column(Integer, nullable=False)
     body: Mapped[str] = mapped_column(Text, nullable=False)
     cta: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    #: Email snapshot, so an edit mid-campaign never rewrites what a queued
+    #: contact was promised (same guarantee the SMS body already gets).
+    subject: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    html_body: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
 
     creative: Mapped["AdsCreative"] = relationship("AdsCreative", back_populates="versions")
@@ -439,9 +469,13 @@ class AdsFollowUpStep(Base):
     #: no_reply | replied | positive | negative | interested | not_interested |
     #: link_clicked | link_not_clicked | meeting_scheduled | converted | always
     condition: Mapped[str] = mapped_column(String(30), default="no_reply", nullable=False)
-    #: send_sms | add_tag | remove_tag | change_status | create_task | stop | suppress | notify
+    #: send_sms | send_email | add_tag | remove_tag | change_status |
+    #: create_task | stop | suppress | notify
     action: Mapped[str] = mapped_column(String(30), default="send_sms", nullable=False)
     body: Mapped[str | None] = mapped_column(Text, nullable=True)
+    #: Email only: subject line for a send_email step (falls back to the
+    #: campaign subject when empty).
+    subject: Mapped[str | None] = mapped_column(String(500), nullable=True)
     action_value: Mapped[str | None] = mapped_column(String(255), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)

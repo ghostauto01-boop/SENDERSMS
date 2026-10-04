@@ -35,6 +35,10 @@ async def list_conversations(
     per_page:int=500,
     status:Optional[str]=None,
     search:Optional[str]=None,
+    # Which channel's inbox to list. Defaults to SMS, so the SMS inbox keeps
+    # showing exactly what it always did and never mixes in email threads.
+    # Use channel=email for the email inbox, or channel=all for everything.
+    channel:Optional[str]="sms",
     # Filter the inbox down to the leads a single campaign produced. The
     # Campaigns page links here with these set, so "see the replies" is one
     # click from the campaign card.
@@ -47,6 +51,11 @@ async def list_conversations(
     cu:User=Depends(get_current_user),
 ):
     query = select(Conversation)
+    wanted_channel = (channel or "sms").lower()
+    if wanted_channel != "all":
+        # Rows written before the channel column existed read NULL. They are
+        # all SMS, so coalesce instead of silently hiding the whole history.
+        query = query.where(func.coalesce(Conversation.channel, "sms") == wanted_channel)
     # "all" is what the UI sends for the default tab; treat it as no filter
     # rather than as a literal status nothing will ever match.
     if status and status != "all":
@@ -136,7 +145,7 @@ async def list_conversations(
 
 
 @router.get("/campaign-filters")
-async def campaign_filters(db:AsyncSession=Depends(get_db),cu:User=Depends(get_current_user)):
+async def campaign_filters(channel:Optional[str]="sms",db:AsyncSession=Depends(get_db),cu:User=Depends(get_current_user)):
     """Campaigns that have leads in the inbox, with their lead/reply counts.
 
     Powers the inbox's "filter by campaign" control. Only campaigns that
@@ -145,7 +154,11 @@ async def campaign_filters(db:AsyncSession=Depends(get_db),cu:User=Depends(get_c
     """
     from app.services.attribution import campaign_label_map
 
-    convs = list((await db.execute(select(Conversation))).scalars().all())
+    wanted_channel = (channel or "sms").lower()
+    conv_query = select(Conversation)
+    if wanted_channel != "all":
+        conv_query = conv_query.where(func.coalesce(Conversation.channel, "sms") == wanted_channel)
+    convs = list((await db.execute(conv_query)).scalars().all())
     labels = await campaign_label_map(db, convs)
 
     replied_ids = set(

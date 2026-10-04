@@ -40,6 +40,9 @@ class ContactUpdate(BaseModel):
     custom_fields: Optional[str] = None
     has_consented: Optional[bool] = None
     is_opted_out: Optional[bool] = None
+    # Email channel consent/state (separate from the SMS opt-out above).
+    is_email_opted_out: Optional[bool] = None
+    email_status: Optional[str] = None
 
 
 class ContactOut(BaseModel):
@@ -62,6 +65,15 @@ class ContactOut(BaseModel):
     is_undeliverable: bool = False
     undeliverable_reason: Optional[str] = None
     delivery_fail_count: int = 0
+    # Email channel state.
+    is_email_opted_out: bool = False
+    email_status: str = "active"
+    email_opted_out_at: Optional[datetime] = None
+    email_opt_out_reason: Optional[str] = None
+    is_email_undeliverable: bool = False
+    emails_sent: int = 0
+    emails_received: int = 0
+    last_emailed_at: Optional[datetime] = None
     # Opt-out audit trail. These were recorded in the DB but never returned by
     # the API, so the UI could not show WHY or WHEN a contact opted out.
     opt_out_reason: Optional[str] = None

@@ -1,6 +1,7 @@
 """Pydantic schemas for manually scheduled follow-ups."""
 
 from datetime import datetime
+from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -15,6 +16,10 @@ class FollowUpCreate(BaseModel):
     contact_id: int = Field(..., gt=0)
     scheduled_at: datetime
     message_text: str = Field(..., min_length=1, max_length=5000)
+    #: "sms" or "email" — an email follow-up needs a subject too.
+    channel: str = "sms"
+    subject: Optional[str] = Field(default=None, max_length=500)
+    email_account_id: Optional[int] = None
     notify_on_due: bool = False
     max_attempts: int = Field(default=3, ge=1, le=10)
 

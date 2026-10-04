@@ -118,7 +118,11 @@ async def _poll() -> int:
             msgs = await db.execute(
                 select(Message).where(
                     Message.provider_message_id.isnot(None),
-                    Message.status.in_(("sent","sending","queued"))
+                    Message.status.in_(("sent","sending","queued")),
+                    # Provider ids come from two different systems now: SMS-Gate
+                    # ids are pollable, Brevo ids are settled by its webhook.
+                    # Polling an email id against SMS-Gate would 404 forever.
+                    Message.channel != "email",
                 ).limit(100))
             ids = [m.provider_message_id for m in msgs.scalars().all()]
             if ids:
@@ -207,7 +211,8 @@ async def _pending_work_snapshot() -> tuple[bool, "float | None"]:
         settling = (await db.execute(
             select(func.count()).select_from(Message).where(
                 Message.provider_message_id.isnot(None),
-                Message.status.in_(("sent", "sending", "queued")))
+                Message.status.in_(("sent", "sending", "queued")),
+                Message.channel != "email")
         )).scalar() or 0
 
         candidates = []
@@ -467,6 +472,11 @@ async def _process_scheduled() -> int:
 
             for sm in scheduled:
                 try:
+                    # Email schedules take their own path: they deliver through
+                    # Brevo and never touch the SIM/gateway logic below.
+                    if (sm.channel or "sms") == "email":
+                        await _process_scheduled_email(db, sm)
+                        continue
                     # Resolve contact (create if phone-only)
                     contact = None
                     if sm.contact_id:
@@ -598,6 +608,99 @@ async def _process_scheduled() -> int:
     except Exception as e:
         logger.warning(f"Scheduled: {e}")
     return 0
+
+async def _process_scheduled_email(db, sm) -> None:
+    """Deliver one due scheduled EMAIL through the email pipeline.
+
+    Mirrors the SMS branch's bookkeeping: the ``ScheduledMessage`` row is the
+    record of intent, a ``Message(channel="email")`` row is what the inbox and
+    analytics read, and the two are linked with ``sm.message_id``.
+    """
+    from datetime import datetime as dt, timezone as tz
+    from sqlalchemy import select
+    from app.models.contact import Contact
+    from app.services import email_service
+
+    if await email_service.get_suppression(db, getattr(sm, "to_address", None)):
+        sm.status = "failed"
+        sm.error = "Address is on the email suppression list"
+        sm.executed_at = dt.now(tz.utc)
+        await db.flush()
+        return
+
+    contact = None
+    if sm.contact_id:
+        contact = (
+            await db.execute(select(Contact).where(Contact.id == sm.contact_id))
+        ).scalar_one_or_none()
+    if contact is None and sm.to_address:
+        target = email_service.normalize_email(sm.to_address)
+        if target:
+            from sqlalchemy import func
+
+            contact = (
+                await db.execute(select(Contact).where(func.lower(Contact.email) == target))
+            ).scalars().first()
+            if contact is None:
+                contact = Contact(
+                    email=target,
+                    phone_number=f"email:{target}"[:20],
+                    country="Nigeria",
+                    lead_status="new",
+                    source="scheduled_email",
+                )
+                db.add(contact)
+                await db.flush()
+
+    if contact is None:
+        sm.status = "failed"
+        sm.error = "No contact or recipient address for this scheduled email"
+        sm.executed_at = dt.now(tz.utc)
+        await db.flush()
+        return
+
+    problem = await email_service.contact_email_problem(db, contact)
+    if problem:
+        sm.status = "failed"
+        sm.error = f"Skipped: {problem}"
+        sm.executed_at = dt.now(tz.utc)
+        await db.flush()
+        return
+
+    account = await email_service.get_account(db, sm.email_account_id)
+    message = await email_service.queue_email(
+        db, contact,
+        subject=sm.subject or sm.body[:80],
+        text_body=sm.body,
+        html_body=sm.html_body,
+        account=account,
+        status="sending",
+        idempotency_key=f"scheduled-{sm.id}",
+        attachments=email_service.load_attachments(getattr(sm, "attachments", None)),
+        bulk=bool(sm.list_id),
+        cc=email_service.clean_addresses(getattr(sm, "cc_addresses", None)),
+        bcc=email_service.clean_addresses(getattr(sm, "bcc_addresses", None)),
+    )
+    if message is None:
+        sm.status = "failed"
+        sm.error = "Could not queue the email (no usable sender account?)"
+        sm.executed_at = dt.now(tz.utc)
+        await db.flush()
+        return
+
+    result = await email_service.deliver(db, message)
+    sm.message_id = message.id
+    sm.executed_at = dt.now(tz.utc)
+    if result.get("success"):
+        sm.status = "sent"
+        sm.error = None
+        contact.emails_sent = (contact.emails_sent or 0) + 1
+        contact.last_emailed_at = dt.now(tz.utc)
+    else:
+        sm.status = "failed"
+        sm.error = str(result.get("error"))[:500]
+    await db.flush()
+
 
 async def _create_scheduled_message_row(db, sm, contact, status, error):
     """Helper: create a failed Message bubble for a scheduled that never reached gateway."""
@@ -835,7 +938,7 @@ async def health_db():
     code = 200 if result.get("ok") else 503
     return JSONResponse(result, status_code=code, headers={"Cache-Control": "no-store"})
 
-from app.api.v1 import ads, auth, calendar, calls, contacts, lists, campaigns, sequences, followups, inbox, overview, templates, analytics, settings as settings_api, webhooks, dashboard, send, autoreply, automations, ai, variables, campaign_followups, notifications
+from app.api.v1 import ads, auth, calendar, calls, contacts, lists, campaigns, sequences, followups, inbox, overview, templates, analytics, settings as settings_api, webhooks, dashboard, send, autoreply, automations, ai, variables, campaign_followups, notifications, email as email_api, mcp as mcp_api
 app.include_router(auth.router, prefix="/api/v1/auth")
 app.include_router(dashboard.router, prefix="/api/v1/dashboard")
 app.include_router(contacts.router, prefix="/api/v1/contacts")
@@ -863,6 +966,12 @@ app.include_router(ads.router, prefix="/api/v1/ads")
 # Phone calls via CallGate (same handset as SMS-Gate).
 app.include_router(calls.router, prefix="/api/v1/calls")
 app.include_router(notifications.router, prefix="/api/v1/notifications")
+# Email channel (Brevo): senders, one-off sends, the email inbox and its stats.
+# The SMS routes above are untouched -- this is a parallel, additive surface.
+app.include_router(email_api.router, prefix="/api/v1/email")
+app.include_router(mcp_api.router, prefix="/api/v1/mcp")
+# The one address an AI assistant is pointed at: https://your-app/mcp
+app.include_router(mcp_api.protocol_router, prefix="/mcp")
 
 PUBLIC_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "public")
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist")

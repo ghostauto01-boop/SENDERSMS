@@ -36,12 +36,18 @@ async def list_campaigns(
     per_page: int = Query(default=25, ge=1, le=100),
     status: Optional[str] = None,
     search: Optional[str] = None,
+    #: sms | email | all — keeps each channel's list separate.
+    channel: Optional[str] = "sms",
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """List campaigns."""
+    """List campaigns for one channel (defaults to SMS)."""
     query = select(Campaign)
 
+    wanted = (channel or "sms").lower()
+    if wanted != "all":
+        # NULL (rows written before the column existed) means SMS.
+        query = query.where(func.coalesce(Campaign.channel, "sms") == wanted)
     if status:
         query = query.where(Campaign.status == status)
     if search:
@@ -56,8 +62,25 @@ async def list_campaigns(
 
     return {
         "total": total,
-        "items": [CampaignOut.model_validate(c) for c in campaigns],
+        "items": [_campaign_out(c) for c in campaigns],
     }
+
+
+def _campaign_out(campaign) -> dict:
+    """Campaign row → API shape.
+
+    ``attachments`` is a JSON string on the row and a list on the API. Every
+    campaign in a list response would otherwise carry the base64 payload of its
+    files, so the row is converted column-by-column and the field is replaced
+    with metadata only (name / type / size).
+    """
+    from app.services.email_service import attachment_summary
+
+    payload = {c.name: getattr(campaign, c.name) for c in campaign.__table__.columns}
+    payload.pop("attachments", None)
+    data = CampaignOut.model_validate(payload).model_dump()
+    data["attachments"] = attachment_summary(getattr(campaign, "attachments", None))
+    return data
 
 
 @router.get("/{campaign_id}", response_model=CampaignOut)
@@ -71,7 +94,7 @@ async def get_campaign(
     campaign = result.scalar_one_or_none()
     if not campaign:
         raise HTTPException(status_code=404, detail="Campaign not found")
-    return campaign
+    return _campaign_out(campaign)
 
 
 def _unique_copy_name(name: str, existing: set[str]) -> str:
@@ -96,9 +119,32 @@ async def create_campaign(
     current_user: User = Depends(get_current_user),
 ):
     """Create a new campaign (draft)."""
+    payload = data.model_dump()
+    if payload.get("channel") not in ("sms", "email"):
+        raise HTTPException(status_code=422, detail="channel must be 'sms' or 'email'")
+    if payload.get("channel") == "email":
+        from app.services import email_service
+
+        if payload.get("attachments") is not None:
+            payload["attachments"] = email_service.dump_attachments(
+                email_service.clean_attachments(payload["attachments"])
+            )
+        account = await email_service.get_account(db, payload.get("email_account_id"))
+        if account is None:
+            account = await email_service.get_default_account(db)
+        if account is None:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "No email sender configured. Add a Brevo API key and From address on the "
+                    "Email Senders page first."
+                ),
+            )
+        if not payload.get("email_account_id"):
+            payload["email_account_id"] = account.id
     service = CampaignService(db)
-    campaign = await service.create_campaign(data.model_dump())
-    return campaign
+    campaign = await service.create_campaign(payload)
+    return _campaign_out(campaign)
 
 
 @router.put("/{campaign_id}", response_model=CampaignOut)
@@ -129,6 +175,12 @@ async def update_campaign(
         )
 
     update_data = data.model_dump(exclude_unset=True)
+    if "attachments" in update_data:
+        from app.services import email_service
+
+        update_data["attachments"] = email_service.dump_attachments(
+            email_service.clean_attachments(update_data["attachments"])
+        )
 
     # Writing a message and picking a template are mutually exclusive choices.
     # Setting one clears the other, otherwise a campaign edited from template to
@@ -164,7 +216,7 @@ async def update_campaign(
 
     await db.flush()
     await db.refresh(campaign)
-    return campaign
+    return _campaign_out(campaign)
 
 
 @router.post("/{campaign_id}/validate")
@@ -666,6 +718,17 @@ async def duplicate_campaign(
         list_id=original.list_id,
         template_id=original.template_id,
         message_body=original.message_body,
+        # The channel and everything that makes an email an email used to be
+        # dropped here, so duplicating an email campaign produced an SMS
+        # campaign with no subject. Copy the whole definition.
+        channel=original.channel or "sms",
+        subject=original.subject,
+        html_body=original.html_body,
+        attachments=original.attachments,
+        email_account_id=original.email_account_id,
+        fallback_email_account_id=original.fallback_email_account_id,
+        track_opens=original.track_opens,
+        track_clicks=original.track_clicks,
         sequence_id=original.sequence_id,
         gateway_setting_id=original.gateway_setting_id,
         # Sending rules are part of what makes a campaign worth duplicating.
@@ -685,4 +748,4 @@ async def duplicate_campaign(
     db.add(new_campaign)
     await db.flush()
     await db.refresh(new_campaign)
-    return CampaignOut.model_validate(new_campaign)
+    return _campaign_out(new_campaign)

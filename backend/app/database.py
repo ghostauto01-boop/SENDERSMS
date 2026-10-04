@@ -31,6 +31,13 @@ def _normalize_database_url(raw: str) -> tuple[str, dict]:
         url = urlunparse(parsed._replace(query=urlencode(qs)))
         connect_args["timeout"] = 10
         connect_args["command_timeout"] = 30
+    elif parsed.scheme.startswith("sqlite"):
+        # SQLite (local runs, the simulator, the test suite) locks the whole file
+        # for a write. The default 5s busy timeout is short enough that a startup
+        # schema repair or a slow poll cycle makes an unrelated request fail with
+        # "database is locked"; waiting a little longer is always the right call
+        # here, because the alternative is a spurious 500.
+        connect_args["timeout"] = 20
     return url, connect_args
 
 
@@ -41,6 +48,7 @@ db_url, _connect_args = _normalize_database_url(settings.DATABASE_URL)
 _engine_kwargs = {"echo": False}
 if db_url.startswith("sqlite"):
     _engine_kwargs["pool_pre_ping"] = True
+    _engine_kwargs["connect_args"] = _connect_args
 else:
     _engine_kwargs.update(
         pool_size=5,

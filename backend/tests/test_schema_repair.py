@@ -156,6 +156,66 @@ def test_real_models_repair_campaign_scheduled_start_at(tmp_path):
     assert "scheduled_start_at" in _columns(db, "campaigns")
 
 
+def test_real_models_repair_email_threading_and_attachment_columns(tmp_path):
+    """The email pass added columns to four existing tables.
+
+    On a live database every one of them already exists with data, so these are
+    ALTER-only additions. If the repair misses one, sending an email blows up at
+    INSERT time with "no such column: messages.rfc_message_id".
+    """
+    from app.database import Base
+    import app.models  # noqa: F401
+
+    db = str(tmp_path / "email.db")
+    engine = create_async_engine(f"sqlite+aiosqlite:///{db}")
+
+    async def _create_full():
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        await engine.dispose()
+
+    asyncio.run(_create_full())
+
+    expected = {
+        "messages": {
+            "rfc_message_id", "in_reply_to", "attachments", "bulk_send",
+            "cc_addresses", "bcc_addresses",
+        },
+        "templates": {"attachments", "include_unsubscribe"},
+        "scheduled_messages": {
+            "attachments", "cc_addresses", "bcc_addresses",
+        },
+        "campaigns": {"attachments"},
+    }
+    con = sqlite3.connect(db)
+    for table, columns in expected.items():
+        for column in columns:
+            # SQLite refuses to drop a column an index still refers to; the
+            # index is part of what repair_ indexes later, so remove it first.
+            con.execute(f"DROP INDEX IF EXISTS ix_{table}_{column}")
+            con.execute(f"ALTER TABLE {table} DROP COLUMN {column}")
+    con.commit()
+    con.close()
+    for table, columns in expected.items():
+        assert not (columns & _columns(db, table)), f"{table} was not stripped"
+
+    added = asyncio.run(_run_repair(db, Base.metadata))
+
+    for table, columns in expected.items():
+        assert columns <= _columns(db, table), f"{table} still missing {columns}"
+        for column in columns:
+            assert f"{table}.{column}" in added
+
+    # The NOT NULL flag column must have been given a DEFAULT, otherwise every
+    # existing row would read back as NULL and campaign mail would lose its
+    # unsubscribe headers.
+    con = sqlite3.connect(db)
+    info = {r[1]: r[3] for r in con.execute("PRAGMA table_info(messages)")}
+    con.close()
+    # SQLite writes a boolean default as 1/0; PostgreSQL as FALSE/TRUE.
+    assert info["bulk_send"] not in (None, ""), info["bulk_send"]
+
+
 @pytest.mark.parametrize(
     "default, expected",
     [
