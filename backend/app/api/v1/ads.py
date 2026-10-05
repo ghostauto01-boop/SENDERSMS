@@ -154,10 +154,11 @@ async def overview(
     user: User = Depends(get_current_user),
 ):
     """Manager landing tab. ``channel`` scopes every number to SMS or email."""
+    scoped_channel: str | None = None
     campaign_query = select(AdsCampaign)
     if channel and channel != "all":
-        _validate_channel(channel)
-        campaign_query = campaign_query.where(AdsCampaign.channel == channel)
+        scoped_channel = _validate_channel(channel)
+        campaign_query = campaign_query.where(AdsCampaign.channel == scoped_channel)
     campaigns = list((await db.execute(campaign_query)).scalars().all())
     active = [c for c in campaigns if c.status == "active"]
 
@@ -166,13 +167,12 @@ async def overview(
         [AdsAssignment.campaign_id.in_(campaign_ids)] if campaign_ids else [AdsAssignment.id.is_not(None)]
     )
     totals = await svc._counts_for(db, where)
-    followups_due = (
-        await db.execute(
-            select(func.count()).select_from(AdsFollowUpTask).where(
-                AdsFollowUpTask.status == "pending", AdsFollowUpTask.due_at <= svc.now_utc()
-            )
-        )
-    ).scalar() or 0
+    followup_query = select(func.count()).select_from(AdsFollowUpTask).where(
+        AdsFollowUpTask.status == "pending", AdsFollowUpTask.due_at <= svc.now_utc()
+    )
+    if campaign_ids and scoped_channel:
+        followup_query = followup_query.where(AdsFollowUpTask.campaign_id.in_(campaign_ids))
+    followups_due = (await db.execute(followup_query)).scalar() or 0
     meetings = (
         await db.execute(
             select(func.count()).select_from(AdsCalendarEvent).where(
@@ -180,20 +180,24 @@ async def overview(
             )
         )
     ).scalar() or 0
-    suppressed = (await db.execute(select(func.count()).select_from(SuppressionEntry))).scalar() or 0
+    if scoped_channel == "email":
+        from app.models.email import EmailSuppression
+
+        suppressed = (
+            await db.execute(select(func.count()).select_from(EmailSuppression))
+        ).scalar() or 0
+    else:
+        suppressed = (await db.execute(select(func.count()).select_from(SuppressionEntry))).scalar() or 0
 
     # Sent-over-time series for the dashboard chart (last 14 days).
     since = svc.now_utc() - timedelta(days=13)
-    events = list(
-        (
-            await db.execute(
-                select(AdsEvent).where(
-                    AdsEvent.event_type.in_(("MESSAGE_SENT", "REPLY_RECEIVED")),
-                    AdsEvent.created_at >= since,
-                )
-            )
-        ).scalars().all()
+    event_query = select(AdsEvent).where(
+        AdsEvent.event_type.in_(("MESSAGE_SENT", "REPLY_RECEIVED")),
+        AdsEvent.created_at >= since,
     )
+    if campaign_ids and scoped_channel:
+        event_query = event_query.where(AdsEvent.campaign_id.in_(campaign_ids))
+    events = list((await db.execute(event_query)).scalars().all())
     series: dict[str, dict] = {}
     for i in range(14):
         day = (since + timedelta(days=i)).date().isoformat()
@@ -670,6 +674,7 @@ async def campaign_audience(
                     else ""
                 ),
                 "phone_number": contact.phone_number if contact else r.phone_number,
+                "email_address": contact.email if contact else None,
                 "creative_id": r.creative_id,
                 "creative": creatives.get(r.creative_id),
                 "send_status": r.send_status,
@@ -961,6 +966,7 @@ async def preview_set(
                 "id": c.id,
                 "name": " ".join(filter(None, [c.first_name, c.last_name])).strip() or c.business_name,
                 "phone_number": c.phone_number,
+                "email_address": c.email,
             }
             for c in eligible[:10]
         ],
@@ -1098,7 +1104,8 @@ async def creative_versions(
             )
         ).scalar() or 0
         out.append(
-            {"id": v.id, "version": v.version, "body": v.body, "cta": v.cta, "sent": sent,
+            {"id": v.id, "version": v.version, "body": v.body, "cta": v.cta,
+             "subject": v.subject, "html_body": v.html_body, "sent": sent,
              "created_at": svc.as_utc(v.created_at)}
         )
     return {"items": out}
@@ -1117,7 +1124,11 @@ async def duplicate_creative(
         cta=creative.cta,
         tracking_link=creative.tracking_link,
         allocation=creative.allocation,
+        send_quota=creative.send_quota,
         template_id=creative.template_id,
+        subject=creative.subject,
+        html_body=creative.html_body,
+        email_account_id=creative.email_account_id,
         status="draft",
     )
     db.add(clone)
@@ -1258,6 +1269,7 @@ async def creative_analytics(
         ).scalar() or 0
         version_rows.append(
             {"id": v.id, "version": v.version, "body": v.body, "cta": v.cta,
+             "subject": v.subject, "html_body": v.html_body,
              "sent": sent, "created_at": svc.as_utc(v.created_at)}
         )
     return {
@@ -1551,6 +1563,9 @@ async def delete_step(
 @router.get("/followups")
 async def list_followups(
     bucket: str = Query("today"),
+    #: "sms" | "email" | "all" — the Email Manager passes email so it only
+    #: sees follow-ups from email campaigns.
+    channel: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -1573,6 +1588,13 @@ async def list_followups(
         query = query.where(AdsFollowUpTask.status == "completed")
     elif bucket == "cancelled":
         query = query.where(AdsFollowUpTask.status == "cancelled")
+    if channel and channel != "all":
+        _validate_channel(channel)
+        query = query.where(
+            AdsFollowUpTask.campaign_id.in_(
+                select(AdsCampaign.id).where(AdsCampaign.channel == channel)
+            )
+        )
 
     rows = list((await db.execute(query.order_by(AdsFollowUpTask.due_at).limit(200))).scalars().all())
     contacts = {
@@ -1601,6 +1623,7 @@ async def list_followups(
                 ) if contact else "Unknown",
                 "business": contact.business_name if contact else None,
                 "phone_number": contact.phone_number if contact else None,
+                "email_address": contact.email if contact else None,
                 "campaign": campaigns.get(r.campaign_id),
                 "campaign_id": r.campaign_id,
                 "due_at": svc.as_utc(r.due_at),
@@ -1680,6 +1703,9 @@ async def process_followups_now(
 async def list_events(
     start: Optional[datetime] = None,
     end: Optional[datetime] = None,
+    #: Optional channel filter. Unlinked events (no campaign) always stay
+    #: visible — a meeting booked by hand belongs to both managers.
+    channel: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -1688,6 +1714,16 @@ async def list_events(
         query = query.where(AdsCalendarEvent.starts_at >= svc.as_utc(start))
     if end:
         query = query.where(AdsCalendarEvent.starts_at <= svc.as_utc(end))
+    if channel and channel != "all":
+        _validate_channel(channel)
+        query = query.where(
+            or_(
+                AdsCalendarEvent.campaign_id.is_(None),
+                AdsCalendarEvent.campaign_id.in_(
+                    select(AdsCampaign.id).where(AdsCampaign.channel == channel)
+                ),
+            )
+        )
     rows = list((await db.execute(query.order_by(AdsCalendarEvent.starts_at))).scalars().all())
     contacts = {
         c.id: c
@@ -2046,6 +2082,7 @@ async def global_search(
                 .where(
                     or_(
                         Contact.phone_number.ilike(term),
+                        Contact.email.ilike(term),
                         Contact.first_name.ilike(term),
                         Contact.last_name.ilike(term),
                         Contact.business_name.ilike(term),
@@ -2064,6 +2101,7 @@ async def global_search(
                 "id": c.id,
                 "name": " ".join(filter(None, [c.first_name, c.last_name])).strip() or c.business_name,
                 "phone_number": c.phone_number,
+                "email_address": c.email,
             }
             for c in contacts
         ],
@@ -2146,6 +2184,7 @@ async def bulk_contacts(
 async def export(
     kind: str,
     campaign_id: Optional[int] = None,
+    channel: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -2153,13 +2192,17 @@ async def export(
     writer = csv.writer(buffer)
 
     if kind == "campaigns":
-        writer.writerow(["id", "name", "status", "objective", "assigned", "sent", "replies", "score"])
-        for c in (await db.execute(select(AdsCampaign))).scalars().all():
+        writer.writerow(["id", "name", "status", "channel", "objective", "assigned", "sent", "replies", "score"])
+        campaign_query = select(AdsCampaign)
+        if channel and channel != "all":
+            _validate_channel(channel)
+            campaign_query = campaign_query.where(AdsCampaign.channel == channel)
+        for c in (await db.execute(campaign_query)).scalars().all():
             s = await svc._counts_for(
                 db, [AdsAssignment.campaign_id == c.id], campaign_id=c.id
             )
             writer.writerow(
-                [c.id, c.name, c.status, c.objective, s["assigned"], s["sent"], s["replies"],
+                [c.id, c.name, c.status, c.channel, c.objective, s["assigned"], s["sent"], s["replies"],
                  svc.performance_score(c.objective, s)]
             )
     elif kind == "creatives":
@@ -2197,12 +2240,24 @@ async def export(
     elif kind == "audience":
         if not campaign_id:
             raise HTTPException(400, "campaign_id is required")
-        writer.writerow(["contact_id", "phone_number", "creative_id", "send_status", "skip_reason", "reply_status", "sent_at"])
-        for r in (
-            await db.execute(select(AdsAssignment).where(AdsAssignment.campaign_id == campaign_id))
-        ).scalars().all():
+        writer.writerow(["contact_id", "phone_number", "email_address", "creative_id", "send_status", "skip_reason", "reply_status", "sent_at"])
+        rows = list(
+            (await db.execute(select(AdsAssignment).where(AdsAssignment.campaign_id == campaign_id))).scalars().all()
+        )
+        emails = {}
+        if rows:
+            emails = dict(
+                (
+                    await db.execute(
+                        select(Contact.id, Contact.email).where(
+                            Contact.id.in_([r.contact_id for r in rows])
+                        )
+                    )
+                ).all()
+            )
+        for r in rows:
             writer.writerow(
-                [r.contact_id, r.phone_number, r.creative_id, r.send_status, r.skip_reason,
+                [r.contact_id, r.phone_number, emails.get(r.contact_id), r.creative_id, r.send_status, r.skip_reason,
                  r.reply_status, svc.as_utc(r.sent_at)]
             )
     else:
@@ -2288,13 +2343,27 @@ async def reference(db: AsyncSession = Depends(get_db), user: User = Depends(get
 @router.get("/activity")
 async def global_activity(
     limit: int = Query(150, ge=1, le=500),
+    #: Optional channel filter. Entries without a campaign (audiences, global
+    #: actions) always stay visible.
+    channel: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
+    activity_query = select(AdsActivityLog)
+    if channel and channel != "all":
+        _validate_channel(channel)
+        activity_query = activity_query.where(
+            or_(
+                AdsActivityLog.campaign_id.is_(None),
+                AdsActivityLog.campaign_id.in_(
+                    select(AdsCampaign.id).where(AdsCampaign.channel == channel)
+                ),
+            )
+        )
     rows = list(
         (
             await db.execute(
-                select(AdsActivityLog).order_by(AdsActivityLog.created_at.desc()).limit(limit)
+                activity_query.order_by(AdsActivityLog.created_at.desc()).limit(limit)
             )
         ).scalars().all()
     )

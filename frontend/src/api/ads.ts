@@ -43,6 +43,12 @@ export type AdsCampaign = {
   description?: string | null;
   objective: string;
   status: string;
+  channel?: string;
+  email_account_id?: number | null;
+  fallback_email_account_id?: number | null;
+  subject?: string | null;
+  track_opens?: boolean;
+  track_clicks?: boolean;
   daily_limit?: number | null;
   total_limit?: number | null;
   start_date?: string | null;
@@ -131,6 +137,9 @@ export type AdsCreative = {
   name: string;
   status: string;
   body: string;
+  subject?: string | null;
+  html_body?: string | null;
+  email_account_id?: number | null;
   cta?: string | null;
   tracking_link?: string | null;
   allocation: number;
@@ -151,6 +160,7 @@ export type FollowUpStep = {
   condition: string;
   action: string;
   body?: string | null;
+  subject?: string | null;
   action_value?: string | null;
   is_active: boolean;
 };
@@ -164,10 +174,11 @@ export type CampaignDetail = AdsCampaign & {
 const unwrap = <T,>(p: Promise<{ data: T }>) => p.then((r) => r.data);
 
 export const adsApi = {
-  overview: () => unwrap<any>(api.get("/ads/overview")),
+  overview: (params: any = {}) => unwrap<any>(api.get("/ads/overview", { params })),
   reference: () => unwrap<any>(api.get("/ads/reference")),
   search: (q: string) => unwrap<any>(api.get("/ads/search", { params: { q } })),
-  activity: () => unwrap<any>(api.get("/ads/activity")),
+  activity: (channel?: string) =>
+    unwrap<any>(api.get("/ads/activity", { params: channel ? { channel } : {} })),
 
   listCampaigns: (params: any = {}) => unwrap<{ total: number; items: AdsCampaign[] }>(api.get("/ads/campaigns", { params })),
   createCampaign: (body: any) => unwrap<AdsCampaign>(api.post("/ads/campaigns", body)),
@@ -239,7 +250,8 @@ export const adsApi = {
   updateStep: (id: number, body: any) => unwrap<any>(api.patch(`/ads/followup-steps/${id}`, body)),
   deleteStep: (id: number) => unwrap<void>(api.delete(`/ads/followup-steps/${id}`)),
 
-  followups: (bucket: string) => unwrap<any>(api.get("/ads/followups", { params: { bucket } })),
+  followups: (bucket: string, channel?: string) =>
+    unwrap<any>(api.get("/ads/followups", { params: { bucket, ...(channel ? { channel } : {}) } })),
   createFollowup: (body: any) => unwrap<any>(api.post("/ads/followups", body)),
   followupAction: (id: number, action: string, params: any = {}) =>
     unwrap<any>(api.post(`/ads/followups/${id}/${action}`, null, { params })),
@@ -256,8 +268,13 @@ export const adsApi = {
   contactAction: (id: number, body: any) => unwrap<any>(api.post(`/ads/contacts/${id}/action`, body)),
   contactTimeline: (id: number) => unwrap<any>(api.get(`/ads/contacts/${id}/timeline`)),
 
-  exportUrl: (kind: string, campaignId?: number) =>
-    `/api/v1/ads/export/${kind}${campaignId ? `?campaign_id=${campaignId}` : ""}`,
+  exportUrl: (kind: string, campaignId?: number, channel?: string) => {
+    const params = new URLSearchParams();
+    if (campaignId) params.set("campaign_id", String(campaignId));
+    if (channel) params.set("channel", channel);
+    const query = params.toString();
+    return `/api/v1/ads/export/${kind}${query ? `?${query}` : ""}`;
+  },
 };
 
 export default adsApi;

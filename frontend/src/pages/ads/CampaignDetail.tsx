@@ -26,13 +26,14 @@ import adsApi, { AdsCreative, AdsSet, CampaignDetail as Detail } from "../../api
 import ShortcodePicker from "../../components/ShortcodePicker";
 import TemplatePicker from "../../components/TemplatePicker";
 import ContactPicker from "../../components/ContactPicker";
+import RichEmailEditor from "../../components/RichEmailEditor";
 import { smsCount } from "../../utils/sms";
 import { Badge, Bar, Empty, Field, Metric, Modal, Stat, Tabs, Toggle, WinnerBadge, fmtDate } from "./ui";
 import CampaignBuilder from "./CampaignBuilder";
 
-const TABS = [
+const BASE_TABS = [
   "Overview",
-  "SMS Sets",
+  "Sets",
   "Creatives",
   "Audience",
   "Sending",
@@ -48,11 +49,16 @@ export default function CampaignDetail({
   reference,
   onClose,
   onChanged,
+  channel = "sms",
+  backLabel,
 }: {
   campaignId: number;
   reference: any;
   onClose: () => void;
   onChanged: () => void;
+  /** "sms" (default) or "email" — the campaign's own channel wins once loaded. */
+  channel?: string;
+  backLabel?: string;
 }) {
   const [tab, setTab] = useState("Overview");
   const [detail, setDetail] = useState<Detail | null>(null);
@@ -97,6 +103,11 @@ export default function CampaignDetail({
   }
 
   const stats = analytics?.campaign;
+  const isEmail = (detail.channel || channel) === "email";
+  const TABS = BASE_TABS.map((t) => (t === "Sets" ? (isEmail ? "Email Sets" : "SMS Sets") : t));
+  const activeTab = tab === "Sets" ? (isEmail ? "Email Sets" : "SMS Sets") : tab;
+  const emailAccounts = reference?.email_accounts || [];
+  const defaultEmailAccountId = reference?.default_email_account_id ?? null;
 
   return (
     <div className="fixed inset-0 z-40 bg-gray-50 dark:bg-gray-900 overflow-y-auto">
@@ -104,12 +115,13 @@ export default function CampaignDetail({
         <div className="flex flex-wrap gap-3 items-start justify-between">
           <div className="min-w-0">
             <button className="text-sm text-primary-600 mb-2 flex items-center gap-1" onClick={onClose}>
-              <ArrowLeft size={15} /> SMS Ads Manager
+              <ArrowLeft size={15} /> {backLabel || (isEmail ? "Email Manager" : "SMS Ads Manager")}
             </button>
             <h1 className="text-2xl font-bold break-words">{detail.name}</h1>
             <div className="flex flex-wrap items-center gap-2 mt-2">
               <Badge value={detail.status} />
               {detail.state && detail.state !== detail.status && <Badge value={detail.state} />}
+              <span className={isEmail ? "badge-blue" : "badge-gray"}>{isEmail ? "Email" : "SMS"}</span>
               {detail.test_mode && <span className="badge-yellow">Test mode</span>}
               {detail.auto_optimize && (
                 <span className="badge-green inline-flex items-center gap-1">
@@ -118,6 +130,9 @@ export default function CampaignDetail({
               )}
               <span className="text-xs text-gray-500">{detail.objective}</span>
             </div>
+            {isEmail && detail.subject && (
+              <p className="text-sm text-gray-500 mt-1 truncate">Subject: {detail.subject}</p>
+            )}
           </div>
           <div className="flex flex-wrap gap-2">
             {detail.status === "draft" && (
@@ -194,7 +209,7 @@ export default function CampaignDetail({
             <button
               className="btn-secondary btn-sm"
               onClick={() => {
-                if (confirm(`Duplicate “${detail.name}” with all SMS sets, creatives and audience targeting?`)) {
+                if (confirm(`Duplicate “${detail.name}” with all ${isEmail ? "email" : "SMS"} sets, creatives and audience targeting?`)) {
                   act(() => adsApi.duplicate(campaignId, true), "Campaign duplicated");
                 }
               }}
@@ -222,22 +237,34 @@ export default function CampaignDetail({
           </div>
         )}
 
-        <Tabs tabs={TABS} active={tab} onChange={setTab} />
+        <Tabs tabs={TABS} active={activeTab} onChange={setTab} />
 
-        {tab === "Overview" && <OverviewTab detail={detail} stats={stats} />}
-        {tab === "SMS Sets" && (
-          <SetsTab detail={detail} reference={reference} reload={load} onChanged={onChanged} />
+        {activeTab === "Overview" && <OverviewTab detail={detail} stats={stats} isEmail={isEmail} />}
+        {(activeTab === "SMS Sets" || activeTab === "Email Sets") && (
+          <SetsTab detail={detail} reference={reference} reload={load} onChanged={onChanged} isEmail={isEmail} />
         )}
-        {tab === "Creatives" && <CreativesTab detail={detail} analytics={analytics} reload={load} />}
-        {tab === "Audience" && <AudienceTab detail={detail} reference={reference} reload={load} />}
-        {tab === "Sending" && <SendingTab detail={detail} stats={stats} />}
-        {tab === "Automation" && <AutomationTab detail={detail} reload={load} />}
-        {tab === "Optimization" && (
+        {activeTab === "Creatives" && (
+          <CreativesTab
+            detail={detail}
+            analytics={analytics}
+            reload={load}
+            isEmail={isEmail}
+            emailAccounts={emailAccounts}
+          />
+        )}
+        {activeTab === "Audience" && (
+          <AudienceTab detail={detail} reference={reference} reload={load} isEmail={isEmail} />
+        )}
+        {activeTab === "Sending" && <SendingTab detail={detail} stats={stats} isEmail={isEmail} />}
+        {activeTab === "Automation" && <AutomationTab detail={detail} reload={load} isEmail={isEmail} />}
+        {activeTab === "Optimization" && (
           <OptimizationTab detail={detail} reference={reference} reload={load} onChanged={onChanged} />
         )}
-        {tab === "Analytics" && <AnalyticsTab analytics={analytics} campaignId={campaignId} />}
-        {tab === "Activity" && <ActivityTab campaignId={campaignId} />}
-        {tab === "Settings" && (
+        {activeTab === "Analytics" && (
+          <AnalyticsTab analytics={analytics} campaignId={campaignId} isEmail={isEmail} />
+        )}
+        {activeTab === "Activity" && <ActivityTab campaignId={campaignId} />}
+        {activeTab === "Settings" && (
           <SettingsTab detail={detail} reload={load} onClose={onClose} onChanged={onChanged} />
         )}
       </div>
@@ -246,6 +273,9 @@ export default function CampaignDetail({
         <CampaignBuilder
           campaign={detail}
           objectives={reference?.objectives || []}
+          channel={detail.channel || channel}
+          emailAccounts={emailAccounts}
+          defaultEmailAccountId={defaultEmailAccountId}
           close={() => setEditing(false)}
           saved={() => {
             setEditing(false);
@@ -272,27 +302,35 @@ export default function CampaignDetail({
 
 /* ------------------------------------------------------------------ tabs */
 
-function OverviewTab({ detail, stats }: { detail: Detail; stats: any }) {
+function OverviewTab({ detail, stats, isEmail }: { detail: Detail; stats: any; isEmail: boolean }) {
   if (!stats) return null;
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Stat label="Contacts assigned" value={stats.assigned} />
-        <Stat label="SMS sent" value={stats.sent} />
+        <Stat label={isEmail ? "Emails sent" : "SMS sent"} value={stats.sent} />
         <Stat label="Delivery rate" value={`${stats.delivery_rate}%`} />
         <Stat label="Reply rate" value={`${stats.reply_rate}%`} />
-        <Stat label="Open rate" value={`${stats.open_rate ?? 0}%`} hint="Replied or tapped the link" />
-        <Stat label="Click rate" value={`${stats.click_rate ?? 0}%`} />
+        <Stat
+          label="Open rate"
+          value={`${stats.open_rate ?? 0}%`}
+          hint={isEmail ? "Measured by Brevo's tracking pixel" : "Replied or tapped the link"}
+        />
+        <Stat
+          label="Click rate"
+          value={`${stats.click_rate ?? 0}%`}
+          hint={isEmail ? "Measured by Brevo link tracking" : undefined}
+        />
         <Stat label="Positive replies" value={stats.positive_replies} />
         <Stat label="Follow-ups due" value={stats.followups_due} />
         <Stat label="Meetings" value={stats.meetings} />
-        <Stat label="Opt-outs" value={stats.opt_outs} />
+        <Stat label={isEmail ? "Unsubscribes" : "Opt-outs"} value={stats.opt_outs} />
       </div>
       <div className="card p-5 grid grid-cols-2 sm:grid-cols-4 gap-5">
         <Metric label="Pending" value={stats.pending} />
         <Metric label="Skipped" value={stats.skipped} />
         <Metric label="Failed" value={stats.failed} />
-        <Metric label="Credits used" value={stats.credits_used} />
+        <Metric label={isEmail ? "Emails used" : "Credits used"} value={stats.credits_used} />
         <Metric label="Daily limit" value={detail.daily_limit ?? "None"} />
         <Metric label="Total limit" value={detail.total_limit ?? "None"} />
         <Metric label="Drip" value={detail.drip_mode} />
@@ -311,12 +349,16 @@ function SetsTab({
   reference,
   reload,
   onChanged,
+  isEmail,
 }: {
   detail: Detail;
   reference: any;
   reload: () => void;
   onChanged: () => void;
+  isEmail: boolean;
 }) {
+  const setNoun = isEmail ? "Email set" : "SMS set";
+  const setNounPlural = isEmail ? "Email sets" : "SMS sets";
   const [editing, setEditing] = useState<AdsSet | null>(null);
   const [creating, setCreating] = useState(false);
   const [previews, setPreviews] = useState<Record<number, any>>({});
@@ -381,7 +423,7 @@ function SetsTab({
   return (
     <div className="space-y-3">
       <div className="flex justify-between items-center">
-        <h2 className="font-semibold">SMS sets</h2>
+        <h2 className="font-semibold">{setNounPlural}</h2>
         <button className="btn-primary btn-sm" onClick={() => setCreating(true)}>
           <Plus size={15} className="mr-1" /> New set
         </button>
@@ -389,11 +431,11 @@ function SetsTab({
       {detail.sets.length === 0 ? (
         <Empty
           icon={<Users size={40} />}
-          title="No SMS sets yet"
-          body="An SMS set is an audience plus its delivery rules. Create one per segment you want to compare."
+          title={`No ${setNounPlural.toLowerCase()} yet`}
+          body={`An ${setNoun.toLowerCase()} is an audience plus its delivery rules. Create one per segment you want to compare.`}
           action={
             <button className="btn-primary" onClick={() => setCreating(true)}>
-              <Plus size={16} className="mr-1" /> Create SMS set
+              <Plus size={16} className="mr-1" /> Create {setNoun.toLowerCase()}
             </button>
           }
         />
@@ -541,6 +583,7 @@ function SetsTab({
           campaignId={detail.id}
           adsSet={editing}
           reference={reference}
+          isEmail={isEmail}
           close={() => {
             setCreating(false);
             setEditing(null);
@@ -561,15 +604,18 @@ function SetEditor({
   campaignId,
   adsSet,
   reference,
+  isEmail,
   close,
   saved,
 }: {
   campaignId: number;
   adsSet: AdsSet | null;
   reference: any;
+  isEmail: boolean;
   close: () => void;
   saved: () => void;
 }) {
+  const setNoun = isEmail ? "Email set" : "SMS set";
   const [form, setForm] = useState<any>({
     name: adsSet?.name || "",
     status: adsSet?.status || "active",
@@ -662,7 +708,7 @@ function SetEditor({
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name.trim()) return toast.error("Name the SMS set");
+    if (!form.name.trim()) return toast.error(`Name the ${setNoun.toLowerCase()}`);
     const payload = {
       ...form,
       name: form.name.trim(),
@@ -682,7 +728,7 @@ function SetEditor({
     try {
       if (adsSet) await adsApi.updateSet(adsSet.id, payload);
       else await adsApi.createSet(campaignId, payload);
-      toast.success("SMS set saved");
+      toast.success(`${setNoun} saved`);
       saved();
     } catch (err: any) {
       toast.error(err.response?.data?.detail || "Could not save");
@@ -690,7 +736,7 @@ function SetEditor({
   };
 
   return (
-    <Modal title={adsSet ? "Edit SMS set" : "New SMS set"} close={close} wide>
+    <Modal title={adsSet ? `Edit ${setNoun.toLowerCase()}` : `New ${setNoun.toLowerCase()}`} close={close} wide>
       <form onSubmit={submit} className="space-y-4">
         <Field label="Set name">
           <input className="input" value={form.name} onChange={(e) => set("name", e.target.value)} autoFocus />
@@ -827,7 +873,7 @@ function SetEditor({
               <option value="equal">Equal split</option>
               <option value="percentage">Percentage split</option>
               <option value="weighted">Weighted</option>
-              <option value="quota">Exact SMS count per creative</option>
+              <option value="quota">{isEmail ? "Exact email count per creative" : "Exact SMS count per creative"}</option>
               <option value="random">Randomised</option>
             </select>
           </Field>
@@ -873,7 +919,7 @@ function SetEditor({
 /** Current template bodies, fetched once when any creative is template-bound.
  *  Lets the creatives list show "synced" vs "template changed" without an
  *  extra request per creative. */
-function useTemplateLibrary(creatives: AdsCreative[]) {
+function useTemplateLibrary(creatives: AdsCreative[], channel?: string) {
   const bound = creatives.some((c) => c.template_id);
   // Refetch when the set of bound creatives changes (add/sync/edit), not just
   // on first mount — a body change in the editor must re-derive the chips.
@@ -881,7 +927,10 @@ function useTemplateLibrary(creatives: AdsCreative[]) {
     .filter((c) => c.template_id)
     .map((c) => `${c.id}:${c.template_id}:${c.body.length}`)
     .join("|");
-  const [library, setLibrary] = useState<Record<number, { name: string; body: string }> | null>(null);
+  const [library, setLibrary] = useState<Record<
+    number,
+    { name: string; body: string; subject?: string | null }
+  > | null>(null);
   useEffect(() => {
     if (!bound) return;
     let cancelled = false;
@@ -891,14 +940,16 @@ function useTemplateLibrary(creatives: AdsCreative[]) {
         let page = 1;
         let total = 0;
         do {
-          const { data } = await api.get("/templates/", { params: { page, per_page: 100 } });
+          const { data } = await api.get("/templates/", {
+            params: { page, per_page: 100, ...(channel ? { channel } : {}) },
+          });
           all.push(...(data.items || []));
           total = data.total ?? all.length;
           page += 1;
         } while (all.length < total);
         if (!cancelled) {
-          const map: Record<number, { name: string; body: string }> = {};
-          all.forEach((t) => (map[t.id] = { name: t.name, body: t.body }));
+          const map: Record<number, { name: string; body: string; subject?: string | null }> = {};
+          all.forEach((t) => (map[t.id] = { name: t.name, body: t.body, subject: t.subject }));
           setLibrary(map);
         }
       } catch {
@@ -908,7 +959,7 @@ function useTemplateLibrary(creatives: AdsCreative[]) {
     return () => {
       cancelled = true;
     };
-  }, [bound, signature]);
+  }, [bound, signature, channel]);
   return library;
 }
 
@@ -918,7 +969,7 @@ function TemplateSyncChip({
   onClick,
 }: {
   creative: AdsCreative;
-  library: Record<number, { name: string; body: string }> | null;
+  library: Record<number, { name: string; body: string; subject?: string | null }> | null;
   onClick: () => void;
 }) {
   if (!creative.template_id) return null;
@@ -930,7 +981,8 @@ function TemplateSyncChip({
       </span>
     );
   }
-  const synced = tpl.body === creative.body;
+  const subjectSynced = !tpl.subject || !creative.subject || tpl.subject === creative.subject;
+  const synced = tpl.body === creative.body && subjectSynced;
   return (
     <button
       type="button"
@@ -952,7 +1004,19 @@ function TemplateSyncChip({
   );
 }
 
-function CreativesTab({ detail, analytics, reload }: { detail: Detail; analytics: any; reload: () => void }) {
+function CreativesTab({
+  detail,
+  analytics,
+  reload,
+  isEmail,
+  emailAccounts,
+}: {
+  detail: Detail;
+  analytics: any;
+  reload: () => void;
+  isEmail: boolean;
+  emailAccounts: any[];
+}) {
   const [editing, setEditing] = useState<AdsCreative | null>(null);
   const [creatingFor, setCreatingFor] = useState<number | null>(null);
   const [versionsFor, setVersionsFor] = useState<AdsCreative | null>(null);
@@ -965,10 +1029,15 @@ function CreativesTab({ detail, analytics, reload }: { detail: Detail; analytics
   const maxScore = Math.max(1, ...(analytics?.creatives || []).map((c: any) => c.score || 0));
   // Template bodies for the "synced / update available" chips on bound
   // creatives — fetched once per tab visit, shared by every card.
-  const templateLibrary = useTemplateLibrary(detail.creatives);
+  const templateLibrary = useTemplateLibrary(detail.creatives, isEmail ? "email" : "sms");
 
   if (detail.sets.length === 0)
-    return <Empty title="Create an SMS set first" body="Creatives live inside an SMS set." />;
+    return (
+      <Empty
+        title={isEmail ? "Create an email set first" : "Create an SMS set first"}
+        body={isEmail ? "Creatives live inside an email set." : "Creatives live inside an SMS set."}
+      />
+    );
 
   const pauseLosers = async (setId: number, setName: string) => {
     if (!confirm(`Pause every creative in “${setName}” except the winner? Pending contacts move to the winner.`))
@@ -1042,7 +1111,14 @@ function CreativesTab({ detail, analytics, reload }: { detail: Detail; analytics
                           )}
                           {s.split_mode === "quota" && (
                             <span className="text-xs font-medium text-primary-700 dark:text-primary-300 bg-primary-50 dark:bg-primary-900/30 px-2 py-0.5 rounded-full">
-                              {c.send_quota ? `${c.send_quota} SMS` : "no cap (takes the rest)"}
+                              {c.send_quota
+                                ? `${c.send_quota} ${isEmail ? "emails" : "SMS"}`
+                                : "no cap (takes the rest)"}
+                            </span>
+                          )}
+                          {isEmail && c.email_account_id != null && (
+                            <span className="text-xs text-gray-500">
+                              via {emailAccounts.find((a: any) => a.id === c.email_account_id)?.name || "sender"}
                             </span>
                           )}
                         </div>
@@ -1055,9 +1131,19 @@ function CreativesTab({ detail, analytics, reload }: { detail: Detail; analytics
                             />
                           </div>
                         )}
-                        <p className="text-sm text-gray-600 dark:text-gray-300 mt-2 whitespace-pre-wrap break-words">
+                        {isEmail && (
+                          <p className="text-sm font-medium mt-2 truncate">
+                            {c.subject || detail.subject || (
+                              <span className="text-amber-600">No subject — set one or add a campaign subject</span>
+                            )}
+                          </p>
+                        )}
+                        <p className="text-sm text-gray-600 dark:text-gray-300 mt-1 whitespace-pre-wrap break-words">
                           {c.body || <span className="text-gray-400">No message yet</span>}
                         </p>
+                        {isEmail && c.html_body && (
+                          <span className="badge-blue mt-1 inline-block">rich HTML</span>
+                        )}
                       </div>
                       <div className="flex flex-wrap gap-2">
                         <button
@@ -1145,6 +1231,9 @@ function CreativesTab({ detail, analytics, reload }: { detail: Detail; analytics
         <CreativeEditor
           creative={editing}
           setId={creatingFor ?? editing!.set_id}
+          isEmail={isEmail}
+          campaignSubject={detail.subject}
+          emailAccounts={emailAccounts}
           close={() => {
             setEditing(null);
             setCreatingFor(null);
@@ -1157,12 +1246,22 @@ function CreativesTab({ detail, analytics, reload }: { detail: Detail; analytics
         />
       )}
       {versionsFor && <VersionsModal creative={versionsFor} close={() => setVersionsFor(null)} />}
-      {analyticsFor && <CreativeAnalyticsModal creative={analyticsFor} close={() => setAnalyticsFor(null)} />}
+      {analyticsFor && (
+        <CreativeAnalyticsModal creative={analyticsFor} close={() => setAnalyticsFor(null)} isEmail={isEmail} />
+      )}
     </div>
   );
 }
 
-function CreativeAnalyticsModal({ creative, close }: { creative: AdsCreative; close: () => void }) {
+function CreativeAnalyticsModal({
+  creative,
+  close,
+  isEmail,
+}: {
+  creative: AdsCreative;
+  close: () => void;
+  isEmail: boolean;
+}) {
   const [data, setData] = useState<any>(null);
   useEffect(() => {
     adsApi.creativeAnalytics(creative.id).then(setData).catch(() => {});
@@ -1179,13 +1278,18 @@ function CreativeAnalyticsModal({ creative, close }: { creative: AdsCreative; cl
             {data.is_winner && <WinnerBadge />}
             {data.needs_more_data && <span className="badge-gray">Needs more sends for a verdict</span>}
           </div>
+          {isEmail && data.subject && <p className="text-sm font-medium">{data.subject}</p>}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <Stat label="Delivery rate" value={`${data.stats.delivery_rate}%`} />
             <Stat label="Reply rate" value={`${data.stats.reply_rate}%`} />
-            <Stat label="Open rate" value={`${data.stats.open_rate}%`} hint="Replied or tapped the link" />
+            <Stat
+              label="Open rate"
+              value={`${data.stats.open_rate}%`}
+              hint={isEmail ? "Measured by Brevo" : "Replied or tapped the link"}
+            />
             <Stat label="Click rate" value={`${data.stats.click_rate}%`} />
             <Stat label="Positive reply rate" value={`${data.stats.positive_reply_rate}%`} />
-            <Stat label="Opt-out rate" value={`${data.stats.opt_out_rate}%`} />
+            <Stat label={isEmail ? "Unsubscribe rate" : "Opt-out rate"} value={`${data.stats.opt_out_rate}%`} />
             <Stat label="Failure rate" value={`${data.stats.failure_rate}%`} />
             <Stat label="Score" value={data.stats.score} icon={<TrendingUp size={17} />} />
           </div>
@@ -1221,17 +1325,26 @@ function CreativeAnalyticsModal({ creative, close }: { creative: AdsCreative; cl
 function CreativeEditor({
   creative,
   setId,
+  isEmail,
+  campaignSubject,
+  emailAccounts,
   close,
   saved,
 }: {
   creative: AdsCreative | null;
   setId: number;
+  isEmail: boolean;
+  campaignSubject?: string | null;
+  emailAccounts: any[];
   close: () => void;
   saved: () => void;
 }) {
   const [form, setForm] = useState<any>({
     name: creative?.name || "",
     body: creative?.body || "",
+    subject: creative?.subject || "",
+    html_body: creative?.html_body || "",
+    email_account_id: creative?.email_account_id ?? "",
     cta: creative?.cta || "",
     tracking_link: creative?.tracking_link || "",
     allocation: creative?.allocation ?? 0,
@@ -1249,6 +1362,8 @@ function CreativeEditor({
     id: string;
     name: string;
     body: string;
+    subject?: string | null;
+    html_body?: string | null;
     deleted: boolean;
   } | null>(null);
   const [templateBusy, setTemplateBusy] = useState(false);
@@ -1268,7 +1383,14 @@ function CreativeEditor({
       .then(({ data }) => {
         if (cancelled) return;
         setTemplateId(String(data.id));
-        setTemplateMeta({ id: String(data.id), name: data.name, body: data.body, deleted: false });
+        setTemplateMeta({
+          id: String(data.id),
+          name: data.name,
+          body: data.body,
+          subject: data.subject,
+          html_body: data.html_body,
+          deleted: false,
+        });
       })
       .catch(() => {
         // Template was deleted: the pointer is stale. The save below unbinds
@@ -1312,11 +1434,24 @@ function CreativeEditor({
       setForm((f: any) => ({
         ...f,
         body: data.body,
-        // Auto-fill the name from the template, but never clobber a name the
-        // user already typed.
+        // Email templates bring their subject + HTML with them; the name is
+        // auto-filled but never clobbers a name the user already typed.
+        ...(isEmail
+          ? {
+              subject: f.subject?.trim() ? f.subject : data.subject || "",
+              html_body: f.html_body?.trim() ? f.html_body : data.html_body || "",
+            }
+          : {}),
         name: (f.name || "").trim() ? f.name : data.name,
       }));
-      setTemplateMeta({ id: String(data.id), name: data.name, body: data.body, deleted: false });
+      setTemplateMeta({
+        id: String(data.id),
+        name: data.name,
+        body: data.body,
+        subject: data.subject,
+        html_body: data.html_body,
+        deleted: false,
+      });
       setTemplateId(String(data.id));
       toast.success(`Template “${data.name}” loaded — edit freely or sync later`);
     } catch {
@@ -1329,20 +1464,41 @@ function CreativeEditor({
   // One-click re-sync after the template changed on the Templates page.
   const syncFromTemplate = () => {
     if (!templateMeta || templateMeta.deleted) return;
-    setForm((f: any) => ({ ...f, body: templateMeta.body }));
+    setForm((f: any) => ({
+      ...f,
+      body: templateMeta.body,
+      ...(isEmail
+        ? {
+            subject: templateMeta.subject || f.subject,
+            html_body: templateMeta.html_body || f.html_body,
+          }
+        : {}),
+    }));
     toast.success(`Synced to “${templateMeta.name}” — save to create a new version`);
   };
 
   // Banner logic: the template's live text vs. the text in the composer.
   const originalBody = creative?.body ?? null;
+  const originalSubject = creative?.subject ?? null;
   const editedSinceSave =
-    originalBody !== null && templateMeta !== null && !templateMeta.deleted && form.body !== originalBody;
+    originalBody !== null &&
+    templateMeta !== null &&
+    !templateMeta.deleted &&
+    (form.body !== originalBody || (isEmail && form.subject !== (originalSubject || "")));
   const templateChanged =
-    originalBody !== null && templateMeta !== null && !templateMeta.deleted && originalBody !== templateMeta.body;
+    originalBody !== null &&
+    templateMeta !== null &&
+    !templateMeta.deleted &&
+    (originalBody !== templateMeta.body ||
+      (isEmail && !!templateMeta.subject && (originalSubject || "") !== templateMeta.subject));
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name.trim() || !form.body.trim()) return toast.error("Add a name and message");
+    if (!form.name.trim()) return toast.error("Add a name");
+    if (!(form.body || "").trim() && !(isEmail && (form.html_body || "").trim()))
+      return toast.error("Add a message");
+    if (isEmail && !(form.subject || "").trim() && !(campaignSubject || "").trim())
+      return toast.error("Email creatives need a subject (here or on the campaign)");
     const payload: any = {
       ...form,
       name: form.name.trim(),
@@ -1350,6 +1506,12 @@ function CreativeEditor({
       send_quota: form.send_quota === "" || form.send_quota === null ? null : Math.max(0, Number(form.send_quota) || 0),
       cta: form.cta || null,
       tracking_link: form.tracking_link || null,
+      subject: isEmail ? (form.subject?.trim() || null) : form.subject?.trim() || null,
+      html_body: isEmail ? (form.html_body?.trim() || null) : null,
+      email_account_id:
+        isEmail && form.email_account_id !== "" && form.email_account_id != null
+          ? Number(form.email_account_id)
+          : null,
       // The template the composer is bound to. A binding whose template was
       // deleted (or a cleared picker) saves as null so nothing dangles.
       template_id:
@@ -1384,9 +1546,10 @@ function CreativeEditor({
           <TemplatePicker
             value={templateId}
             onChange={chooseTemplate}
+            channel={isEmail ? "email" : "sms"}
             allowNone
             noneLabel="No template — write from scratch"
-            placeholder="Choose a template…"
+            placeholder={isEmail ? "Choose an email template…" : "Choose a template…"}
             showPreview={false}
           />
           {templateBusy && (
@@ -1430,58 +1593,114 @@ function CreativeEditor({
           )}
         </div>
 
-        <div>
-          <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1">
-            <label className="label !mb-0">Message</label>
-            <span className="text-xs text-gray-500">
-              {count.chars} chars · {count.segments} SMS{count.segments === 1 ? "" : "s"}
-              {count.unicode && " · unicode (70/SMS)"}
-              {count.segments > 3 && " · long messages cost more"}
-            </span>
-          </div>
-          <textarea
-            ref={bodyRef}
-            className="input font-mono text-sm"
-            rows={6}
-            value={form.body}
-            onChange={(e) => set("body", e.target.value)}
-            placeholder="Hi {{first_name}}, I came across {{business_name}} and had a quick question…"
-          />
-          <div className="flex flex-wrap items-center gap-1.5 mt-2">
-            <ShortcodePicker
-              targetRef={bodyRef}
-              value={form.body}
-              onChange={(v) => set("body", v)}
-              label="Insert variable"
+        {isEmail && (
+          <Field
+            label="Subject"
+            hint={
+              campaignSubject
+                ? `Blank = the campaign subject (“${campaignSubject}”). Supports {{variables}}.`
+                : "Required unless the campaign sets a subject. Supports {{variables}}."
+            }
+          >
+            <input
+              className="input"
+              value={form.subject}
+              onChange={(e) => set("subject", e.target.value)}
+              placeholder={campaignSubject || "Hi {{first_name}}, a quick question…"}
             />
-            {[
-              "{{first_name}}",
-              "{{last_name}}",
-              "{{business_name}}",
-              "{{phone_number}}",
-              "{{city}}",
-              "{{state}}",
-              "{{website}}",
-              "{{industry}}",
-            ].map((v) => (
-              <button
-                key={v}
-                type="button"
-                onClick={() => set("body", (form.body ? form.body + " " : "") + v)}
-                className="text-xs px-2 py-0.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded font-mono text-gray-600 dark:text-gray-300"
-                title={`Insert ${v} at the end`}
-              >
-                {v}
-              </button>
-            ))}
+          </Field>
+        )}
+
+        {isEmail ? (
+          <div>
+            <label className="label">Message</label>
+            <RichEmailEditor
+              body={form.body}
+              onBody={(v) => set("body", v)}
+              html={form.html_body}
+              onHtml={(v) => set("html_body", v)}
+            />
           </div>
-        </div>
+        ) : (
+          <div>
+            <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1">
+              <label className="label !mb-0">Message</label>
+              <span className="text-xs text-gray-500">
+                {count.chars} chars · {count.segments} SMS{count.segments === 1 ? "" : "s"}
+                {count.unicode && " · unicode (70/SMS)"}
+                {count.segments > 3 && " · long messages cost more"}
+              </span>
+            </div>
+            <textarea
+              ref={bodyRef}
+              className="input font-mono text-sm"
+              rows={6}
+              value={form.body}
+              onChange={(e) => set("body", e.target.value)}
+              placeholder="Hi {{first_name}}, I came across {{business_name}} and had a quick question…"
+            />
+            <div className="flex flex-wrap items-center gap-1.5 mt-2">
+              <ShortcodePicker
+                targetRef={bodyRef}
+                value={form.body}
+                onChange={(v) => set("body", v)}
+                label="Insert variable"
+              />
+              {[
+                "{{first_name}}",
+                "{{last_name}}",
+                "{{business_name}}",
+                "{{phone_number}}",
+                "{{city}}",
+                "{{state}}",
+                "{{website}}",
+                "{{industry}}",
+              ].map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => set("body", (form.body ? form.body + " " : "") + v)}
+                  className="text-xs px-2 py-0.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded font-mono text-gray-600 dark:text-gray-300"
+                  title={`Insert ${v} at the end`}
+                >
+                  {v}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="grid sm:grid-cols-2 gap-3">
+          {isEmail && emailAccounts.length > 0 && (
+            <Field
+              label="Send this creative through"
+              hint="Override the campaign sender — lets an A/B test compare two domains."
+            >
+              <select
+                className="input"
+                value={form.email_account_id}
+                onChange={(e) => set("email_account_id", e.target.value)}
+              >
+                <option value="">Campaign sender</option>
+                {emailAccounts.map((a: any) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name} — {a.from_email}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
           <Field label="Call to action">
             <input className="input" value={form.cta} onChange={(e) => set("cta", e.target.value)} />
           </Field>
-          <Field label="Tracking link" hint="Taps are counted into click rate and open rate.">
+          <Field
+            label="Tracking link"
+            hint={
+              isEmail
+                ? "Optional note for this creative — opens and clicks are measured by Brevo."
+                : "Taps are counted into click rate and open rate."
+            }
+          >
             <input
               className="input"
               value={form.tracking_link}
@@ -1497,7 +1716,10 @@ function CreativeEditor({
               onChange={(e) => set("allocation", e.target.value)}
             />
           </Field>
-          <Field label="Exact SMS count" hint="Used with 'Exact SMS count' split. Blank = no cap (shares the remainder).">
+          <Field
+            label={isEmail ? "Exact email count" : "Exact SMS count"}
+            hint={`Used with '${isEmail ? "Exact email count" : "Exact SMS count"}' split. Blank = no cap (shares the remainder).`}
+          >
             <input
               type="number"
               min={0}
@@ -1518,8 +1740,9 @@ function CreativeEditor({
         </div>
         {creative && (
           <p className="text-xs text-gray-500">
-            Editing the text creates version {creative.current_version + 1}. Messages already sent keep their
-            version, so historical analytics do not change.
+            Editing the {isEmail ? "subject or message" : "text"} creates version{" "}
+            {creative.current_version + 1}. Messages already sent keep their version, so historical
+            analytics do not change.
           </p>
         )}
         <div className="flex gap-2">
@@ -1549,7 +1772,9 @@ function VersionsModal({ creative, close }: { creative: AdsCreative; close: () =
               <b>Version {v.version}</b>
               <span className="text-gray-500">{v.sent} sent</span>
             </div>
-            <p className="text-sm text-gray-600 dark:text-gray-300 mt-2 whitespace-pre-wrap">{v.body}</p>
+            {v.subject && <p className="text-sm font-medium mt-2">{v.subject}</p>}
+            <p className="text-sm text-gray-600 dark:text-gray-300 mt-1 whitespace-pre-wrap">{v.body}</p>
+            {v.html_body && <span className="badge-blue mt-1 inline-block">rich HTML</span>}
             <p className="text-xs text-gray-400 mt-1">{fmtDate(v.created_at)}</p>
           </div>
         ))}
@@ -1562,7 +1787,17 @@ function VersionsModal({ creative, close }: { creative: AdsCreative; close: () =
 
 const REMOVABLE = new Set(["pending", "skipped", "cancelled", "blocked"]);
 
-function AudienceTab({ detail, reference, reload }: { detail: Detail; reference: any; reload: () => void }) {
+function AudienceTab({
+  detail,
+  reference,
+  reload,
+  isEmail,
+}: {
+  detail: Detail;
+  reference: any;
+  reload: () => void;
+  isEmail: boolean;
+}) {
   const [rows, setRows] = useState<any>({ items: [], total: 0, removable: 0 });
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState("");
@@ -1715,7 +1950,11 @@ function AudienceTab({ detail, reference, reload }: { detail: Detail; reference:
       {rows.items.length === 0 ? (
         <Empty
           title="No contacts in this campaign yet"
-          body="Add a list to an SMS set (SMS Sets tab), attach a saved audience, or add contacts directly."
+          body={
+            isEmail
+              ? "Add a list to an email set (Email Sets tab), attach a saved audience, or add contacts directly."
+              : "Add a list to an SMS set (SMS Sets tab), attach a saved audience, or add contacts directly."
+          }
         />
       ) : (
         <div className="card overflow-x-auto">
@@ -1750,7 +1989,7 @@ function AudienceTab({ detail, reference, reload }: { detail: Detail; reference:
                   />
                 </th>
                 <th className="p-3">Contact</th>
-                <th className="p-3">Phone</th>
+                {isEmail ? <th className="p-3">Email</th> : <th className="p-3">Phone</th>}
                 <th className="p-3">Creative</th>
                 <th className="p-3">Status</th>
                 <th className="p-3">Reply</th>
@@ -1773,7 +2012,7 @@ function AudienceTab({ detail, reference, reload }: { detail: Detail; reference:
                     />
                   </td>
                   <td className="p-3">{r.name || "—"}</td>
-                  <td className="p-3 whitespace-nowrap">{r.phone_number}</td>
+                  <td className="p-3 whitespace-nowrap">{isEmail ? r.email_address || "—" : r.phone_number}</td>
                   <td className="p-3">{r.creative || "—"}</td>
                   <td className="p-3">
                     <Badge value={r.send_status} />
@@ -1824,6 +2063,7 @@ function AudienceTab({ detail, reference, reload }: { detail: Detail; reference:
         <AddContactsModal
           detail={detail}
           reference={reference}
+          isEmail={isEmail}
           close={() => setAdding(false)}
           done={() => {
             setAdding(false);
@@ -1839,11 +2079,13 @@ function AudienceTab({ detail, reference, reload }: { detail: Detail; reference:
 function AddContactsModal({
   detail,
   reference,
+  isEmail,
   close,
   done,
 }: {
   detail: Detail;
   reference: any;
+  isEmail: boolean;
   close: () => void;
   done: () => void;
 }) {
@@ -1901,7 +2143,7 @@ function AddContactsModal({
         </div>
       ) : (
         <div className="space-y-4">
-          <Field label="Add to SMS set">
+          <Field label={isEmail ? "Add to email set" : "Add to SMS set"}>
             <select className="input" value={setId} onChange={(e) => setSetId(Number(e.target.value))}>
               {detail.sets.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -1961,13 +2203,13 @@ function AddContactsModal({
   );
 }
 
-function SendingTab({ detail, stats }: { detail: Detail; stats: any }) {
+function SendingTab({ detail, stats, isEmail }: { detail: Detail; stats: any; isEmail: boolean }) {
   return (
     <div className="space-y-3">
       <div className="card p-5 grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
         <Metric label="Status" value={<Badge value={detail.state || detail.status} />} />
-        <Metric label="Daily SMS limit" value={detail.daily_limit ?? "No limit"} />
-        <Metric label="Total SMS limit" value={detail.total_limit ?? "No limit"} />
+        <Metric label={isEmail ? "Daily email limit" : "Daily SMS limit"} value={detail.daily_limit ?? "No limit"} />
+        <Metric label={isEmail ? "Total email limit" : "Total SMS limit"} value={detail.total_limit ?? "No limit"} />
         <Metric
           label="Sending window"
           value={
@@ -1998,8 +2240,19 @@ function SendingTab({ detail, stats }: { detail: Detail; stats: any }) {
       </div>
       <div className="card p-5 text-sm text-gray-500 space-y-2">
         <p>
-          Every message is re-validated immediately before it is sent: opt-out, suppression list, duplicate
-          protection, frequency caps, campaign and creative status, sending window and SMS balance.
+          {isEmail ? (
+            <>
+              Every email is re-validated immediately before it is sent: unsubscribed, suppression list,
+              hard bounce, duplicate protection, frequency caps, campaign and creative status, sending
+              window and sender health.
+            </>
+          ) : (
+            <>
+              Every message is re-validated immediately before it is sent: opt-out, suppression list,
+              duplicate protection, frequency caps, campaign and creative status, sending window and SMS
+              balance.
+            </>
+          )}
         </p>
         <p>
           Sending runs in the background — you can close this page. Global sending limits and pacing from
@@ -2010,7 +2263,7 @@ function SendingTab({ detail, stats }: { detail: Detail; stats: any }) {
   );
 }
 
-function AutomationTab({ detail, reload }: { detail: Detail; reload: () => void }) {
+function AutomationTab({ detail, reload, isEmail }: { detail: Detail; reload: () => void; isEmail: boolean }) {
   const [editing, setEditing] = useState<any>(null);
   const [creating, setCreating] = useState(false);
 
@@ -2026,7 +2279,11 @@ function AutomationTab({ detail, reload }: { detail: Detail; reload: () => void 
         <Empty
           icon={<Wand2 size={40} />}
           title="No follow-ups yet"
-          body="Chain automatic follow-ups: wait, check a condition, then send. They stop automatically when a contact replies, opts out or converts."
+          body={
+            isEmail
+              ? "Chain automatic follow-ups: wait, check a condition, then send. They stop automatically when a contact replies, unsubscribes, bounces or converts."
+              : "Chain automatic follow-ups: wait, check a condition, then send. They stop automatically when a contact replies, opts out or converts."
+          }
           action={
             <button className="btn-primary" onClick={() => setCreating(true)}>
               <Plus size={16} className="mr-1" /> Add first step
@@ -2047,11 +2304,14 @@ function AutomationTab({ detail, reload }: { detail: Detail; reload: () => void 
                 </div>
                 <p className="text-sm text-gray-500 mt-2">
                   Wait <b>{s.wait_hours}h</b> → if <b>{s.condition.replace(/_/g, " ")}</b> →{" "}
-                  <b>{s.action.replace(/_/g, " ")}</b>
+                  <b>{(isEmail && s.action === "send_sms" ? "send_email" : s.action).replace(/_/g, " ")}</b>
                   {s.action_value ? ` (${s.action_value})` : ""}
                 </p>
+                {isEmail && s.subject && (
+                  <p className="text-sm font-medium mt-2">{s.subject}</p>
+                )}
                 {s.body && (
-                  <p className="text-sm text-gray-600 dark:text-gray-300 mt-2 whitespace-pre-wrap">{s.body}</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-300 mt-1 whitespace-pre-wrap">{s.body}</p>
                 )}
               </div>
               <div className="flex gap-2">
@@ -2079,6 +2339,8 @@ function AutomationTab({ detail, reload }: { detail: Detail; reload: () => void 
           campaignId={detail.id}
           step={editing}
           nextOrder={detail.followup_steps.length + 1}
+          isEmail={isEmail}
+          campaignSubject={detail.subject}
           close={() => {
             setCreating(false);
             setEditing(null);
@@ -2098,12 +2360,16 @@ function StepEditor({
   campaignId,
   step,
   nextOrder,
+  isEmail,
+  campaignSubject,
   close,
   saved,
 }: {
   campaignId: number;
   step: any;
   nextOrder: number;
+  isEmail: boolean;
+  campaignSubject?: string | null;
   close: () => void;
   saved: () => void;
 }) {
@@ -2112,22 +2378,25 @@ function StepEditor({
     name: step?.name || "",
     wait_hours: step?.wait_hours ?? 48,
     condition: step?.condition || "no_reply",
-    action: step?.action || "send_sms",
+    action: step?.action || (isEmail ? "send_email" : "send_sms"),
     body: step?.body || "",
+    subject: step?.subject || "",
     action_value: step?.action_value || "",
     is_active: step?.is_active ?? true,
   });
   const set = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }));
+  const isSend = form.action === "send_sms" || form.action === "send_email";
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (form.action === "send_sms" && !form.body.trim()) return toast.error("Write the follow-up message");
+    if (isSend && !form.body.trim()) return toast.error("Write the follow-up message");
     const payload = {
       ...form,
       step_order: Number(form.step_order),
       wait_hours: Number(form.wait_hours),
       name: form.name || null,
       body: form.body || null,
+      subject: isEmail ? form.subject?.trim() || null : step?.subject ?? null,
       action_value: form.action_value || null,
     };
     try {
@@ -2174,6 +2443,7 @@ function StepEditor({
                 "negative",
                 "interested",
                 "not_interested",
+                ...(isEmail ? ["opened", "not_opened", "link_clicked", "link_not_clicked"] : ["link_clicked", "link_not_clicked"]),
                 "meeting_scheduled",
                 "converted",
                 "always",
@@ -2186,7 +2456,10 @@ function StepEditor({
           </Field>
           <Field label="Action">
             <select className="input" value={form.action} onChange={(e) => set("action", e.target.value)}>
-              {["send_sms", "add_tag", "remove_tag", "change_status", "suppress", "stop"].map((a) => (
+              {(isEmail
+                ? ["send_email", "add_tag", "remove_tag", "change_status", "suppress", "stop"]
+                : ["send_sms", "add_tag", "remove_tag", "change_status", "suppress", "stop"]
+              ).map((a) => (
                 <option key={a} value={a}>
                   {a.replace(/_/g, " ")}
                 </option>
@@ -2203,7 +2476,20 @@ function StepEditor({
             </Field>
           )}
         </div>
-        {form.action === "send_sms" && (
+        {isSend && isEmail && (
+          <Field
+            label="Subject"
+            hint={campaignSubject ? `Blank = the campaign subject (“${campaignSubject}”).` : undefined}
+          >
+            <input
+              className="input"
+              value={form.subject}
+              onChange={(e) => set("subject", e.target.value)}
+              placeholder={campaignSubject || "Re: …"}
+            />
+          </Field>
+        )}
+        {isSend && (
           <Field label="Message">
             <textarea className="input" rows={4} value={form.body} onChange={(e) => set("body", e.target.value)} />
           </Field>
@@ -2503,7 +2789,15 @@ function OptimizationTab({
 
 /* --------------------------------------------------------------- analytics */
 
-function AnalyticsTab({ analytics, campaignId }: { analytics: any; campaignId: number }) {
+function AnalyticsTab({
+  analytics,
+  campaignId,
+  isEmail,
+}: {
+  analytics: any;
+  campaignId: number;
+  isEmail: boolean;
+}) {
   if (!analytics) return null;
   const c = analytics.campaign;
   const maxSetScore = Math.max(1, ...analytics.sets.map((s: any) => s.score || 0));
@@ -2517,18 +2811,22 @@ function AnalyticsTab({ analytics, campaignId }: { analytics: any; campaignId: n
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Stat label="Delivery rate" value={`${c.delivery_rate}%`} />
         <Stat label="Reply rate" value={`${c.reply_rate}%`} />
-        <Stat label="Open rate" value={`${c.open_rate ?? 0}%`} hint="Replied or tapped the link" />
+        <Stat
+          label="Open rate"
+          value={`${c.open_rate ?? 0}%`}
+          hint={isEmail ? "Measured by Brevo" : "Replied or tapped the link"}
+        />
         <Stat label="Click rate" value={`${c.click_rate ?? 0}%`} />
         <Stat label="Positive reply rate" value={`${c.positive_reply_rate}%`} />
         <Stat label="Conversion rate" value={`${c.conversion_rate}%`} />
         <Stat label="Meeting rate" value={`${c.meeting_rate}%`} />
-        <Stat label="Opt-out rate" value={`${c.opt_out_rate}%`} />
+        <Stat label={isEmail ? "Unsubscribe rate" : "Opt-out rate"} value={`${c.opt_out_rate}%`} />
         <Stat label="Failure rate" value={`${c.failure_rate}%`} />
         <Stat label="Score" value={c.score} icon={<TrendingUp size={17} />} />
       </div>
 
       <div className="card p-5">
-        <h3 className="font-semibold mb-3">SMS set performance</h3>
+        <h3 className="font-semibold mb-3">{isEmail ? "Email set performance" : "SMS set performance"}</h3>
         <div className="space-y-3">
           {analytics.sets.map((s: any) => (
             <div key={s.id}>

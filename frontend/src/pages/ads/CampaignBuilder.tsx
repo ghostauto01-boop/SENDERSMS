@@ -13,12 +13,20 @@ export default function CampaignBuilder({
   objectives,
   close,
   saved,
+  channel = "sms",
+  emailAccounts = [],
+  defaultEmailAccountId = null,
 }: {
   campaign?: any;
   objectives: { value: string; label: string }[];
   close: () => void;
   saved: (id: number) => void;
+  /** "sms" (default) or "email" — decides delivery, audience rules and labels. */
+  channel?: string;
+  emailAccounts?: { id: number; name: string; from_email: string; is_default?: boolean }[];
+  defaultEmailAccountId?: number | null;
 }) {
+  const isEmail = (campaign?.channel || channel) === "email";
   const [form, setForm] = useState<any>({
     name: "",
     description: "",
@@ -47,6 +55,11 @@ export default function CampaignBuilder({
     optimize_min_sends: 30,
     optimize_min_gap_pct: 25,
     optimize_action: "shift",
+    email_account_id: "",
+    fallback_email_account_id: "",
+    subject: "",
+    track_opens: true,
+    track_clicks: true,
     ...(campaign || {}),
   });
   const [saving, setSaving] = useState(false);
@@ -61,6 +74,11 @@ export default function CampaignBuilder({
         total_limit: campaign.total_limit ?? "",
         max_per_contact_per_day: campaign.max_per_contact_per_day ?? "",
         max_per_contact_per_week: campaign.max_per_contact_per_week ?? "",
+        email_account_id: campaign.email_account_id ?? "",
+        fallback_email_account_id: campaign.fallback_email_account_id ?? "",
+        subject: campaign.subject ?? "",
+        track_opens: campaign.track_opens ?? true,
+        track_clicks: campaign.track_clicks ?? true,
       });
     }
   }, [campaign?.id]);
@@ -70,10 +88,13 @@ export default function CampaignBuilder({
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim()) return toast.error("Give the campaign a name");
-    const payload = {
+    if (isEmail && emailAccounts.length === 0 && !campaign)
+      return toast.error("Add a Brevo sender first (Email Manager → Senders)");
+    const payload: any = {
       name: form.name.trim(),
       description: form.description || null,
       objective: form.objective,
+      channel: campaign?.channel || channel,
       daily_limit: num(form.daily_limit),
       total_limit: num(form.total_limit),
       start_date: fromLocalInput(form.start_date),
@@ -99,6 +120,15 @@ export default function CampaignBuilder({
       optimize_min_gap_pct: Number(form.optimize_min_gap_pct) || 0,
       optimize_action: form.optimize_action || "shift",
     };
+    if (isEmail) {
+      payload.email_account_id = form.email_account_id ? Number(form.email_account_id) : null;
+      payload.fallback_email_account_id = form.fallback_email_account_id
+        ? Number(form.fallback_email_account_id)
+        : null;
+      payload.subject = form.subject?.trim() || null;
+      payload.track_opens = !!form.track_opens;
+      payload.track_clicks = !!form.track_clicks;
+    }
     setSaving(true);
     try {
       const result = campaign
@@ -124,7 +154,7 @@ export default function CampaignBuilder({
   };
 
   return (
-    <Modal title={campaign ? "Edit campaign" : "New campaign"} close={close} wide>
+    <Modal title={campaign ? "Edit campaign" : `New ${isEmail ? "email" : "SMS"} campaign`} close={close} wide>
       <form onSubmit={submit} className="space-y-5">
         <section className="space-y-3">
           <h3 className="font-semibold text-sm text-gray-500 uppercase tracking-wide">Campaign</h3>
@@ -133,7 +163,7 @@ export default function CampaignBuilder({
               className="input"
               value={form.name}
               onChange={(e) => set("name", e.target.value)}
-              placeholder="Lagos e-commerce outreach"
+              placeholder={isEmail ? "October newsletter + offer" : "Lagos e-commerce outreach"}
               autoFocus
             />
           </Field>
@@ -156,10 +186,96 @@ export default function CampaignBuilder({
           </Field>
         </section>
 
+        {isEmail && (
+          <section className="space-y-3">
+            <h3 className="font-semibold text-sm text-gray-500 uppercase tracking-wide">Email sender</h3>
+            {emailAccounts.length === 0 ? (
+              <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-sm text-amber-800 dark:text-amber-200">
+                No Brevo sender yet — add one under Email Manager → Senders first, or this campaign
+                can never send.
+              </div>
+            ) : (
+              <>
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <Field label="Send through" hint="NULL = the default sender.">
+                    <select
+                      className="input"
+                      value={form.email_account_id}
+                      onChange={(e) => set("email_account_id", e.target.value)}
+                    >
+                      <option value="">Default sender</option>
+                      {emailAccounts.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.name} — {a.from_email}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field
+                    label="Fallback sender (optional)"
+                    hint="Takes over automatically if the primary key is burned or rate-limited."
+                  >
+                    <select
+                      className="input"
+                      value={form.fallback_email_account_id}
+                      onChange={(e) => set("fallback_email_account_id", e.target.value)}
+                    >
+                      <option value="">None</option>
+                      {emailAccounts.map((a) => (
+                        <option
+                          key={a.id}
+                          value={a.id}
+                          disabled={String(a.id) === String(form.email_account_id)}
+                        >
+                          {a.name} — {a.from_email}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                </div>
+                <Field
+                  label="Campaign subject"
+                  hint="Used by creatives that do not set their own subject. Supports {{variables}}."
+                >
+                  <input
+                    className="input"
+                    value={form.subject || ""}
+                    onChange={(e) => set("subject", e.target.value)}
+                    placeholder="Hi {{first_name}}, a quick question…"
+                  />
+                </Field>
+                <div className="flex flex-wrap gap-4 text-sm">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={!!form.track_opens}
+                      onChange={(e) => set("track_opens", e.target.checked)}
+                    />
+                    Track opens
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={!!form.track_clicks}
+                      onChange={(e) => set("track_clicks", e.target.checked)}
+                    />
+                    Track clicks
+                  </label>
+                </div>
+              </>
+            )}
+          </section>
+        )}
+
         <section className="space-y-3">
-          <h3 className="font-semibold text-sm text-gray-500 uppercase tracking-wide">SMS budget</h3>
+          <h3 className="font-semibold text-sm text-gray-500 uppercase tracking-wide">
+            {isEmail ? "Email budget" : "SMS budget"}
+          </h3>
           <div className="grid sm:grid-cols-2 gap-3">
-            <Field label="Daily SMS limit" hint="Leave blank to send with no daily cap.">
+            <Field
+              label={isEmail ? "Daily email limit" : "Daily SMS limit"}
+              hint="Leave blank to send with no daily cap."
+            >
               <input
                 type="number"
                 min={1}
@@ -168,7 +284,10 @@ export default function CampaignBuilder({
                 onChange={(e) => set("daily_limit", e.target.value)}
               />
             </Field>
-            <Field label="Total SMS limit" hint="Campaign completes once this many are sent.">
+            <Field
+              label={isEmail ? "Total email limit" : "Total SMS limit"}
+              hint="Campaign completes once this many are sent."
+            >
               <input
                 type="number"
                 min={1}
@@ -414,7 +533,7 @@ export default function CampaignBuilder({
             <input type="checkbox" checked={!!form.test_mode} onChange={(e) => set("test_mode", e.target.checked)} />
             <span>
               <b>Test mode</b> — simulate everything (assignment, split, queue, limits, follow-ups) without
-              sending real SMS or using credits.
+              sending real {isEmail ? "emails" : "SMS"} or using credits.
             </span>
           </label>
         </section>

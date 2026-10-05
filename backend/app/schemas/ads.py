@@ -54,12 +54,12 @@ class CampaignIn(BaseModel):
     always_on: bool = False
     max_per_contact_per_day: Optional[int] = None
     max_per_contact_per_week: Optional[int] = None
-    channel: Optional[str] = None
+    # --- Email sender selection (multi-API) -----------------------------
     email_account_id: Optional[int] = None
     fallback_email_account_id: Optional[int] = None
     subject: Optional[str] = Field(default=None, max_length=500)
-    track_opens: Optional[bool] = None
-    track_clicks: Optional[bool] = None
+    track_opens: bool = True
+    track_clicks: bool = True
     optimization_mode: str = "manual"
     queued_edit_policy: str = "keep"
     priority: str = "normal"
@@ -69,12 +69,6 @@ class CampaignIn(BaseModel):
     optimize_min_sends: int = 30
     optimize_min_gap_pct: float = 25.0
     optimize_action: str = "shift"
-    # --- Email sender selection (multi-API) -----------------------------
-    email_account_id: Optional[int] = None
-    fallback_email_account_id: Optional[int] = None
-    subject: Optional[str] = Field(default=None, max_length=500)
-    track_opens: bool = True
-    track_clicks: bool = True
 
 
 class CampaignPatch(BaseModel):
@@ -82,6 +76,7 @@ class CampaignPatch(BaseModel):
     description: Optional[str] = None
     objective: Optional[str] = None
     status: Optional[str] = None
+    channel: Optional[str] = None
     daily_limit: Optional[int] = None
     total_limit: Optional[int] = None
     start_date: Optional[datetime] = None
@@ -98,6 +93,12 @@ class CampaignPatch(BaseModel):
     always_on: Optional[bool] = None
     max_per_contact_per_day: Optional[int] = None
     max_per_contact_per_week: Optional[int] = None
+    # --- Email sender selection (multi-API) -----------------------------
+    email_account_id: Optional[int] = None
+    fallback_email_account_id: Optional[int] = None
+    subject: Optional[str] = None
+    track_opens: Optional[bool] = None
+    track_clicks: Optional[bool] = None
     optimization_mode: Optional[str] = None
     queued_edit_policy: Optional[str] = None
     priority: Optional[str] = None
