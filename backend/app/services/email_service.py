@@ -146,11 +146,30 @@ def _aware(value: datetime | None) -> datetime | None:
 
 
 def _parse_ts(raw) -> datetime | None:
+    """Parse a timestamp from any of the doors an email can arrive through.
+
+    Two formats appear in practice and both must work, because a failure here is
+    silent: the message is stored with *now* as its time, so a reply that arrived
+    yesterday sorts above today's sends and the thread reads out of order.
+
+    * Brevo's inbound parser sends ``SentAtDate`` as an **RFC 822** string
+      (``Mon, 06 Oct 2025 09:14:22 +0100``).
+    * The Gmail provider normalizes to **ISO 8601**.
+    """
     if not raw:
         return None
+    text = str(raw).strip()
+    value: datetime | None = None
     try:
-        value = datetime.fromisoformat(str(raw).strip().replace("Z", "+00:00"))
+        value = datetime.fromisoformat(text.replace("Z", "+00:00"))
     except (TypeError, ValueError):
+        try:
+            from email.utils import parsedate_to_datetime
+
+            value = parsedate_to_datetime(text)
+        except (TypeError, ValueError, IndexError):
+            return None
+    if value is None:
         return None
     if value.tzinfo is None:
         value = value.replace(tzinfo=timezone.utc)
@@ -656,12 +675,13 @@ def parse_inbound_attachments(item: dict) -> list[dict]:
         if not name:
             continue
         content = entry.get("Content") or entry.get("content")
-        url = (
-            entry.get("DownloadToken")
-            or entry.get("downloadToken")
-            or entry.get("Url")
-            or entry.get("url")
-        )
+        # Brevo's inbound parser does not inline attachment bytes; it hands back a
+        # DownloadToken that only works against its own attachments endpoint (and
+        # only with the account's API key). Storing the bare token in `url` made
+        # the inbox render a paperclip that 404s, so the token is kept as a token
+        # and the real endpoint is built next to it.
+        token = entry.get("DownloadToken") or entry.get("downloadToken")
+        url = entry.get("Url") or entry.get("url")
         size = entry.get("ContentLength") or entry.get("contentLength") or entry.get("size")
         record = {
             "name": name[:255],
@@ -674,6 +694,20 @@ def parse_inbound_attachments(item: dict) -> list[dict]:
             record["content"] = str(content)
         elif url:
             record["url"] = str(url)[:1000]
+        elif token:
+            # An account with Brevo's "attachment proxy" switched on gets a full
+            # URL back in DownloadToken; a default account gets an opaque token
+            # that only resolves against Brevo's own attachments endpoint. Both
+            # are accepted, and the token case says so, because that download
+            # needs the account's API key and the browser cannot do it alone.
+            if str(token).startswith(("http://", "https://")):
+                record["url"] = str(token)[:1000]
+            else:
+                record["download_token"] = str(token)[:500]
+                record["url"] = (
+                    f"https://api.brevo.com/v3/inbound/attachments/{token}"[:1000]
+                )
+                record["requires_credentials"] = True
         else:
             continue
         attachments.append(record)
@@ -767,14 +801,70 @@ async def build_headers(
     return headers
 
 
-def _unsubscribe_footer(account: EmailAccount | None) -> str:
-    address = (account.reply_to if account else "") or (account.from_email if account else "")
-    if not address:
-        return ""
+#: The whole visible unsubscribe mechanism: one button, nothing else.
+#:
+#: Gmail's and Yahoo's bulk-sender rules require an *easy* unsubscribe, and the
+#: ``List-Unsubscribe`` + ``List-Unsubscribe-Post`` headers already satisfy the
+#: machine-readable half. What used to be appended here was a three-line
+#: sentence telling the reader to reply with the word UNSUBSCRIBE, which read
+#: like a newsletter disclaimer on mail that was meant to look personal, and
+#: which spam filters weigh as marketing copy. A button is what a real sender
+#: puts in the mail; the keyword unsubscribe still works if anybody replies with
+#: it (see ``looks_like_unsubscribe``), it is simply no longer advertised in a
+#: paragraph.
+_UNSUBSCRIBE_BUTTON = (
+    '<div style="margin-top:32px;text-align:center">'
+    '<a href="{url}" target="_blank" rel="noopener" style="display:inline-block;'
+    'padding:8px 18px;border:1px solid #d1d5db;border-radius:8px;background:#ffffff;'
+    'color:#6b7280;font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,Helvetica,'
+    'Arial,sans-serif;font-size:12px;line-height:18px;text-decoration:none">'
+    'Unsubscribe</a></div>'
+)
+
+
+def unsubscribe_button_html(url: str) -> str:
+    """The one-button unsubscribe block appended to bulk HTML mail."""
+    return _UNSUBSCRIBE_BUTTON.format(url=url)
+
+
+def unsubscribe_line_text(url: str) -> str:
+    """The plain-text equivalent: one line, no paragraph.
+
+    A text alternative is mandatory — HTML-only mail is a spam signal — but it is
+    a single short line rather than instructions.
+    """
+    return f"\n\nUnsubscribe: {url}"
+
+
+def apply_unsubscribe(
+    text: str, html: str | None, address: str | None
+) -> tuple[str, str | None]:
+    """Append the unsubscribe button to a rendered body, when there is a URL.
+
+    Returns the bodies unchanged when no signed unsubscribe URL can be built
+    (``PUBLIC_BASE_URL`` unset), because a button that goes nowhere is worse than
+    no button: the ``List-Unsubscribe`` header still carries the ``mailto:``
+    fallback in that case.
+    """
+    url = unsubscribe_url(address or "")
+    if not url:
+        return text or "", html
     return (
-        "\n\n—\nIf you would rather not hear from us again, reply to this email "
-        f"with the word UNSUBSCRIBE and you will be removed immediately ({address})."
+        unsubscribe_line_text(url) if (text or "").strip() else f"Unsubscribe: {url}",
+        (html or "") + unsubscribe_button_html(url) if html else html,
     )
+
+
+def _unsubscribe_footer(account: EmailAccount | None) -> str:
+    """Deprecated shim: the footer is a button now, not a sentence.
+
+    Kept as a thin wrapper so anything that imported it keeps working; it
+    returns the one-line text form only.
+    """
+    if account is None:
+        return ""
+    url = unsubscribe_url((account.reply_to or account.from_email or "").strip())
+    return unsubscribe_line_text(url) if url else ""
 
 
 async def render_email(
@@ -793,6 +883,10 @@ async def render_email(
     columns and operator-defined short codes behave identically on both
     channels. Any short code the contact has no value for is removed rather
     than mailed out verbatim.
+
+    ``append_unsubscribe`` adds the one-button unsubscribe (bulk mail only — a
+    personal one-to-one email carries no visible unsubscribe, exactly as it
+    carries no ``List-Unsubscribe`` header).
     """
     from app.services.variable_service import render_for_contact
 
@@ -803,20 +897,14 @@ async def render_email(
     if not rendered_subject.strip():
         rendered_subject = "(no subject)"
 
-    footer = _unsubscribe_footer(account) if append_unsubscribe else ""
-    if footer:
-        text = (text or "") + footer
-    if html:
-        if footer:
-            html = html + (
-                "<div style=\"margin-top:24px;padding-top:12px;border-top:1px solid #e5e7eb;"
-                "font-size:12px;color:#6b7280\">If you would rather not hear from us again, reply "
-                "with the word UNSUBSCRIBE and you will be removed immediately.</div>"
-            )
-    else:
+    if not (html or "").strip() and (text or "").strip():
         html = text_to_html(text or "")
 
-    return {"subject": rendered_subject, "text": text or "", "html": html}
+    if append_unsubscribe and account is not None:
+        address = (account.reply_to or account.from_email or "").strip()
+        text, html = apply_unsubscribe(text or "", html, address)
+
+    return {"subject": rendered_subject, "text": text or "", "html": html or ""}
 
 
 async def queue_email(
@@ -863,10 +951,13 @@ async def queue_email(
     if not (text_body or "").strip() and (html_body or "").strip():
         text_body = html_to_text(html_body)
 
+    # Only bulk mail carries a visible unsubscribe: a one-to-one email that ends
+    # in "click here to unsubscribe" reads as marketing, and Gmail reads it that
+    # way too. Bulk mail gets the button plus the List-Unsubscribe headers.
     rendered = await render_email(
         db, contact,
         subject=subject, text_body=text_body, html_body=html_body,
-        account=account, append_unsubscribe=True,
+        account=account, append_unsubscribe=bool(bulk),
     )
 
     conversation = await get_or_create_conversation(
@@ -947,15 +1038,99 @@ async def send_now(
     return message, result
 
 
-async def deliver(db: AsyncSession, message: Message) -> dict:
-    """Perform the actual Brevo delivery for an already-claimed message row.
+async def _send_via_mailbox(
+    db: AsyncSession, mailbox, message: Message, account: EmailAccount | None
+) -> dict:
+    """Deliver a one-to-one message through the operator's own connected mailbox.
 
-    Account resolution order: the message's account → the campaign's primary →
-    the campaign's fallback → the default account. A rejection that looks
-    permanent (invalid key, banned sender, blocked) falls through to the next
-    candidate; a transient error is reported so the caller can retry later.
+    Why this path exists at all: Brevo cannot authenticate as ``gmail.com``. A
+    campaign sent by Brevo with ``From: you@gmail.com`` fails DMARC for that
+    domain, and Gmail's answer is to treat the thread as spoofed — the prospect
+    sees it (bulk filters are more forgiving outbound) but when they press reply,
+    the *reply* is filed under Spam on the operator's side. Sending the reply
+    from the mailbox itself means Google signs it, DMARC aligns, it appears in
+    the operator's Sent folder, and the thread behaves like a normal
+    conversation.
+
+    Bulk campaign mail deliberately stays on Brevo: that is where the daily
+    ceilings, open/click tracking and List-Unsubscribe handling live.
+    """
+    from app.services import mailbox_service
+
+    contact = (
+        await db.execute(select(Contact).where(Contact.id == message.contact_id))
+    ).scalar_one_or_none()
+    headers = await build_headers(db, message, account, bulk=False)
+    result = await mailbox_service.send_via_mailbox(
+        db,
+        mailbox,
+        to_address=message.to_address or (contact.email if contact else "") or "",
+        to_name=contact_display_name(contact) if contact else None,
+        subject=message.subject or "",
+        text=message.body or "",
+        html=message.html_body,
+        in_reply_to=headers.get("In-Reply-To"),
+        references=headers.get("References"),
+        message_id=message.rfc_message_id,
+        from_name=(account.from_name if account else None) or None,
+        cc=clean_addresses(message.cc_addresses),
+        bcc=clean_addresses(message.bcc_addresses),
+        attachments=load_attachments(message.attachments),
+    )
+
+    if result.get("success"):
+        message.provider = mailbox.provider
+        message.provider_message_id = str(result.get("provider_message_id") or "")[:255] or None
+        # queue_email stamped the Brevo sender's From on the row; the message
+        # actually left from the mailbox, and the inbox should say so.
+        message.from_address = mailbox.email_address
+        message.status = "sent"
+        message.sent_at = _now()
+        message.failed_at = None
+        message.last_error = None
+        # Deliberately NOT account.sent_today/total_sent: those counters drive
+        # Brevo's daily ceiling. This message never touched Brevo, so charging it
+        # there would silently shorten the campaign allowance for the day. The
+        # mailbox keeps its own total_sent instead.
+        await _note_email_event(
+            db, "sent", message, account=account,
+            detail=f"sent from the connected mailbox ({mailbox.email_address})",
+        )
+        await db.flush()
+        return {"success": True, "provider": mailbox.provider,
+                "provider_message_id": message.provider_message_id}
+
+    logger.warning(
+        "EMAIL: mailbox %s send failed (%s); falling back to Brevo",
+        mailbox.email_address, result.get("error"),
+    )
+    return {**result, "_try_next": True}
+
+
+async def deliver(db: AsyncSession, message: Message) -> dict:
+    """Perform the actual delivery for an already-claimed message row.
+
+    Order: the operator's own connected mailbox (one-to-one replies only), then
+    Brevo. Brevo account resolution is the message's account → the campaign's
+    primary → the campaign's fallback → the default account. A rejection that
+    looks permanent (invalid key, banned sender, blocked) falls through to the
+    next candidate; a transient error is reported so the caller can retry later.
     """
     account = await resolve_account(db, message.email_account_id)
+
+    if settings.GMAIL_SEND_REPLIES:
+        from app.services import mailbox_service
+
+        try:
+            mailbox = await mailbox_service.mailbox_for_outgoing(db, message, account)
+        except Exception as exc:  # noqa: BLE001 — a mailbox problem must never block a send
+            logger.warning("EMAIL: mailbox lookup failed (%s)", exc)
+            mailbox = None
+        if mailbox is not None:
+            result = await _send_via_mailbox(db, mailbox, message, account)
+            if result.get("success"):
+                return result
+
     candidates: list[EmailAccount] = []
     if account is not None:
         candidates.append(account)
@@ -1429,18 +1604,38 @@ def _first_address(value) -> str | None:
 
 
 def _inbound_body(item: dict) -> tuple[str, str | None]:
-    """Return ``(plain_text, html)`` from whichever fields Brevo supplied."""
+    """Return ``(plain_text, html)`` from whichever fields the sender supplied.
+
+    Field names differ by door, and getting them wrong is silent: the message
+    stores with an empty body and the inbox shows a blank reply.
+
+    * **Brevo inbound parsing** posts ``ExtractedMarkdownMessage`` (the reply with
+      the quoted history and signature already split off — its MailClark parser),
+      ``RawTextBody`` and ``RawHtmlBody``. There is no ``TextBody`` field, which
+      is what this function used to look for.
+    * **Gmail** (API or IMAP) is normalized by :mod:`app.providers.gmail` into the
+      same shape, so it arrives as ``RawTextBody``/``RawHtmlBody`` too.
+    """
+    from app.providers.gmail import strip_quoted_reply
+
     html = item.get("RawHtmlBody") or item.get("HtmlBody") or item.get("body")
     text = (
         item.get("ExtractedMarkdownMessage")
+        or item.get("RawTextBody")
         or item.get("TextBody")
         or item.get("text")
         or ""
     )
+    text = str(text or "").strip()
     if not text and html:
         text = re.sub(r"<[^>]+>", " ", str(html))
         text = re.sub(r"\s+", " ", text).strip()
-    return (str(text or "").strip(), str(html) if html else None)
+    elif text and not item.get("ExtractedMarkdownMessage"):
+        # Nobody wants the quoted history in the inbox: strip it, but keep the
+        # original when stripping would leave nothing (a reply that is only a
+        # quote, or a client whose markers we do not recognise).
+        text = strip_quoted_reply(text) or text
+    return (text, str(html) if html else None)
 
 
 async def process_inbound_email(db: AsyncSession, payload: dict) -> dict:
@@ -1454,7 +1649,8 @@ async def process_inbound_email(db: AsyncSession, payload: dict) -> dict:
             item.get("From") or item.get("from") or item.get("Sender") or item.get("sender")
         )
         to_address = _first_address(
-            item.get("To") or item.get("to") or item.get("Recipient") or item.get("recipient")
+            item.get("To") or item.get("to") or item.get("Recipients")
+            or item.get("Recipient") or item.get("recipient")
         )
         subject = str(item.get("Subject") or item.get("subject") or "")[:500] or None
         # Threading headers Brevo forwards verbatim; either field name appears
@@ -1479,19 +1675,27 @@ async def process_inbound_email(db: AsyncSession, payload: dict) -> dict:
                     return str(item[key])
             return None
 
-        in_reply_to = _header("In-Reply-To", "inReplyTo")
-        references = _header("References", "references")
+        # Brevo's inbound parser forwards threading at the TOP LEVEL of the item
+        # as `InReplyTo`, not inside Headers — missing that meant every Brevo
+        # reply fell through to subject matching and often started a new thread.
+        in_reply_to = _header("In-Reply-To", "inReplyTo", "InReplyTo")
+        references = _header("References", "references", "References")
         body, html = _inbound_body(item)
         if not from_address or not (body or html):
             logger.info("EMAIL-IN: ignoring unusable item (from=%s)", from_address)
             continue
 
+        uuid_value = item.get("Uuid") or item.get("uuid")
+        if isinstance(uuid_value, (list, tuple)):
+            uuid_value = uuid_value[0] if uuid_value else ""
         provider_id = str(
-            item.get("MessageId") or item.get("messageId") or item.get("Uuid") or ""
-        ) or None
-        received_at = (
-            _parse_ts(item.get("Date") or item.get("date") or item.get("receivedAt")) or _now()
-        )
+            item.get("MessageId") or item.get("messageId") or uuid_value or ""
+        ).strip() or None
+        # Brevo calls it SentAtDate (RFC822); Gmail supplies an ISO timestamp.
+        received_at = _parse_ts(
+            item.get("SentAtDate") or item.get("sentAtDate") or item.get("Date")
+            or item.get("date") or item.get("receivedAt")
+        ) or _now()
         idem = f"email-in-{provider_id}" if provider_id else f"email-in-{uuid.uuid4().hex[:16]}"
         if (
             await db.execute(select(Message.id).where(Message.idempotency_key == idem[:255]))
@@ -1547,7 +1751,10 @@ async def process_inbound_email(db: AsyncSession, payload: dict) -> dict:
             from_address=from_address,
             to_address=to_address,
             status="delivered",
-            provider="brevo",
+            # Which door the reply came through: "brevo" for inbound parsing,
+            # "gmail"/"imap" for a connected mailbox. It is what tells the inbox
+            # whether the operator can answer from inside the app.
+            provider=str(item.get("_provider") or "brevo")[:20] or "brevo",
             provider_message_id=provider_id,
             in_reply_to=in_reply_to,
             attachments=dump_attachments(parse_inbound_attachments(item)),

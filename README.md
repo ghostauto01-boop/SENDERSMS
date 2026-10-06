@@ -53,17 +53,39 @@ The app is also a **Model Context Protocol** server, so ChatGPT, Claude or any M
 client can operate it — import contacts, write and send campaigns, answer the
 inbox, read analytics — using the app's own endpoints, rules and consent checks.
 
-* **Endpoint** — `POST https://your-app/mcp` (JSON-RPC 2.0 over Streamable HTTP;
-  a JSON reply, or one SSE event when the client asks for `text/event-stream`).
-* **Access** — Settings → **AI (MCP)** → *Create token*. The token is shown once
-  and stored only as a SHA-256 hash. Send it as `Authorization: Bearer <token>`
-  (`?token=<token>` also works for clients that cannot set headers). ChatGPT:
-  *Settings → Connectors → Add custom connector*. Claude: *Settings → Connectors*,
-  or `claude mcp add --transport http sendsms https://your-app/mcp --header "Authorization: Bearer <token>"`.
-* **Scope** — a `read` token can look at everything and change nothing; a `write`
-  token can do anything the app's UI can. Write tools are refused on a read token,
-  including through the escape hatch.
-* **~57 tools** in groups: guide, contacts (search/create/update, CSV import and
+* **One connector per client** — ChatGPT, Claude and Arena each get their own
+  endpoint, because each vendor's requirements differ and a single generic URL
+  fails silently in all three:
+
+  | Client | MCP URL | Auth | Tools |
+  | --- | --- | --- | --- |
+  | ChatGPT | `/connectors/chatgpt/mcp` | **OAuth 2.1 only** — OpenAI's connector platform accepts no API key, no client credentials and no pasted bearer token | focused set (33) |
+  | Claude | `/connectors/claude/mcp` | OAuth 2.1 + PKCE, or `Authorization: Bearer` in Claude Code | full (60) |
+  | Arena AI agent | `/connectors/arena/mcp` | bearer token or OAuth; Agent Mode has no connector screen, so it uses curl or the stdio bridge in `tools/arena-connector/` | full (60) |
+  | Any other MCP client | `/mcp` | bearer token or OAuth | full (60) |
+
+* **Sign-in happens on this app** — the OAuth 2.1 authorization server is built
+  in: dynamic client registration (RFC 7591), PKCE S256, Client ID Metadata
+  Documents for ChatGPT, and a login + consent screen that shows exactly which
+  permissions are being granted. Discovery is published where the specs say it
+  must be (`/.well-known/oauth-protected-resource/<path>`,
+  `/.well-known/oauth-authorization-server`, `/.well-known/openid-configuration`),
+  and an unauthenticated request gets a real `401` with
+  `WWW-Authenticate: Bearer resource_metadata="…"` — the challenge Claude refuses
+  to start a flow without.
+* **Tokens, for clients that can set a header** — Settings → **AI (MCP)** →
+  *Create token*. The token is shown once and stored only as a SHA-256 hash. Send
+  it as `Authorization: Bearer <token>` (`?token=<token>` also works for clients
+  that cannot set headers).
+* **"Run connection test"** — Settings → AI (MCP) replays the exact handshake that
+  client performs (discovery → registration → authorize → token → `tools/list` →
+  `tools/call`) against this deployment and reports every step, with the fix for
+  the first one that fails. That is the answer to "the connector is not working".
+* **Scope** — a `read` grant can look at everything and change nothing; a `write`
+  grant can do anything the app's UI can. Write tools are refused on a read-only
+  grant, including through the escape hatch. Refresh tokens rotate, and replaying
+  a rotated one revokes the client.
+* **60 tools** in groups: guide, contacts (search/create/update, CSV import and
   export, per-channel consent), lists, templates (+ preview with a real contact's
   values), campaigns (create/update/validate/start/pause/resume/duplicate flags/
   analytics/delete draft), sending (`send_sms_now`, `send_email_now`,
@@ -84,16 +106,57 @@ inbox, read analytics — using the app's own endpoints, rules and consent check
 
 ```bash
 # What an assistant does, from the outside:
-curl -s https://your-app/mcp \
+curl -s https://your-app/connectors/arena/mcp \
   -H "Authorization: Bearer mcp_…" -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
 ```
 
-Required environment for the absolute links (webhook URL, unsubscribe URL):
+An Arena agent gets the same thing through `tools/arena-connector/AGENTS.md`: the
+curl handshake, a dependency-free stdio↔HTTP bridge for hosts that can only
+launch a command, and `mcp.json` / `mcp.http.json` config blocks.
+
+Required environment for the absolute links (webhook URL, unsubscribe URL, OAuth
+metadata):
 
 | Variable | Why |
 | --- | --- |
-| `PUBLIC_BASE_URL` | Builds the Brevo webhook URL and the one-click unsubscribe link. Without it bulk mail falls back to a `mailto:` unsubscribe. |
+| `PUBLIC_BASE_URL` | Builds the Brevo webhook URL, the one-click unsubscribe link and every URL in the OAuth metadata. Without it bulk mail falls back to a `mailto:` unsubscribe and **no AI client can connect** — ChatGPT and Claude both reject a relative or mismatched `resource`. |
+| `MCP_OAUTH_ENABLED` | `true` (default). Set `false` to serve bearer tokens only. |
+| `MCP_OAUTH_REQUIRE_LOGIN` | Default `false`: the consent page offers the same one-tap sign-in as the app's own login wall. Set `true` to require the operator password first — do that on any deployment other people can reach. |
+
+## Replies come back into the app
+
+Campaigns leave through Brevo; replies come back through one of two doors, and
+Email Manager → **Replies** shows which are open:
+
+* **A connected mailbox** (the usual one). The app reads your Gmail over IMAP with
+  an app password, or over the Gmail API with OAuth: it pulls INBOX *and* Spam,
+  keeps only mail that answers something this app sent, threads it onto the right
+  conversation, and moves the ones Gmail filed as Spam back to the inbox. One-to-one
+  replies you write in the app then leave **from that same mailbox**, which is what
+  stops the next reply being treated as spoofed. Campaigns stay on Brevo.
+* **Brevo inbound parsing** — only for a domain whose MX points at Brevo, which
+  needs a domain you own.
+
+Why a reply lands in Spam in the first place: when the From/Reply-To is a freemail
+address (`@gmail.com`) on mail Brevo actually sent, Brevo cannot authenticate that
+domain, DMARC fails, and Gmail treats the whole thread as spoofed. The prospect
+still receives the campaign, but *their reply* is the thing that gets filed away.
+The Replies tab says this in plain words, and with the Gmail API connection it can
+install Gmail's own **Never send it to Spam** filters (`removeLabelIds: ["SPAM"]`)
+for the people who reply.
+
+Bulk mail carries a single small **Unsubscribe** button plus the `List-Unsubscribe`
+headers Gmail and Yahoo require; one-to-one mail carries neither, so a personal
+reply still reads as personal.
+
+| Variable | Why |
+| --- | --- |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Optional. Enables "Connect with Google" (Gmail API) — filters, labels and sending through the API. Without them, connect with an IMAP app password. |
+| `GMAIL_POLL_INTERVAL` | Seconds between mailbox checks (default 60). Each mailbox can override it. |
+| `GMAIL_RESCUE_FROM_SPAM` | `true` (default) moves recognised replies out of Spam. |
+| `GMAIL_SEND_REPLIES` | `true` (default) sends one-to-one replies from the connected mailbox instead of Brevo. |
 
 ### Local simulator (no real sends)
 

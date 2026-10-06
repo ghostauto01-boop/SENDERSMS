@@ -783,15 +783,52 @@ Beyond the usual `DATABASE_URL` / `REDIS_URL` / `SECRET_KEY`, this release adds:
 
 | Variable | Why it matters |
 |---|---|
-| `PUBLIC_BASE_URL` | The address registered with SMS-Gate as the inbound webhook target, **and** the base for the Brevo webhook URL and the email one-click unsubscribe link. **Without it you receive no replies.** On Render, `RENDER_EXTERNAL_URL` is used as a fallback. |
+| `PUBLIC_BASE_URL` | The address registered with SMS-Gate as the inbound webhook target, **and** the base for the Brevo webhook URL, the email one-click unsubscribe link, and every URL in the MCP OAuth metadata. **Without it you receive no inbound SMS replies and no AI client can connect.** On Render, `RENDER_EXTERNAL_URL` is used as a fallback. |
 | `SMSGATE_WEBHOOK_SECRET` | Inbound webhooks are rejected with `401` unless their HMAC-SHA256 signature matches. Found on the device under Settings → Webhooks → Signing Key. |
 | `SMSGATE_USERNAME` / `SMSGATE_PASSWORD` | Gateway credentials. These are now **env-only** — the previous hardcoded defaults were removed. |
 | `ENABLE_INLINE_POLLER` | Set to `true` only when running without a Celery worker. |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Optional. Enables "Connect with Google" for the reply mailbox (Gmail API). Without them the same mailbox connects over IMAP with an app password, which needs no Google Cloud project. |
+| `GMAIL_POLL_INTERVAL` | Seconds between mailbox checks for replies (default `60`). |
+| `GMAIL_RESCUE_FROM_SPAM` | Default `true`: move a recognised reply that Gmail filed in Spam back to the Inbox, then import it. |
+| `GMAIL_SEND_REPLIES` | Default `true`: send one-to-one replies from the connected mailbox instead of Brevo. Campaigns always use Brevo. |
+| `MCP_OAUTH_ENABLED` | Default `true`. Set `false` to serve only static bearer tokens on the MCP endpoints. |
+| `MCP_OAUTH_REQUIRE_LOGIN` | Default `false` (one-tap consent, matching the app's own login wall). Set `true` to require the operator password before the consent screen — do this on any deployment other people can reach. |
 
-There is nothing to configure for the **MCP** endpoint: it lives at `POST /mcp` and is
-authenticated by tokens you create in the app (Settings → AI (MCP)), not by an environment
-variable. It needs a **public HTTPS** address — the same one `PUBLIC_BASE_URL` describes — for
-ChatGPT or Claude to reach it.
+### Connecting an AI assistant (MCP)
+
+There is one endpoint **per client**, because their requirements are not the same and a
+generic URL fails silently in each of them:
+
+| Client | URL | Authentication |
+|---|---|---|
+| ChatGPT | `https://your-app/connectors/chatgpt/mcp` | OAuth 2.1 only — OpenAI's connector platform accepts no API key and no pasted token |
+| Claude | `https://your-app/connectors/claude/mcp` | OAuth 2.1 + PKCE, or `Authorization: Bearer` in Claude Code |
+| Arena AI agent | `https://your-app/connectors/arena/mcp` | Bearer token or OAuth. Agent Mode has no connector screen — see `tools/arena-connector/AGENTS.md` |
+| Any MCP client | `https://your-app/mcp` | Bearer token or OAuth |
+
+All of it is configured in the app under **Settings → AI (MCP)**, which also runs a
+*connection test*: it replays the handshake that client actually performs (discovery →
+registration → authorize → token → `tools/list` → `tools/call`) against this deployment and
+reports each step with the fix for the first failure. The only hard requirement is
+`PUBLIC_BASE_URL`, and it must be a **public HTTPS** address the assistant can reach — both
+ChatGPT and Claude reject OAuth metadata whose `resource` does not match the URL they were
+given. Tokens are created in the same screen; they are stored as a SHA-256 hash and shown once.
+
+### Reading email replies
+
+Replies are read from a mailbox you connect in **Email Manager → Replies**: either the Gmail
+API (needs `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`, and
+`<PUBLIC_BASE_URL>/api/v1/mailbox/google/callback` registered as an authorized redirect URI)
+or IMAP with a Google **app password** (2-Step Verification must be on; the account password
+itself is refused by IMAP). Credentials are encrypted with `CREDENTIAL_ENCRYPTION_KEY` and are
+never returned by the API.
+
+Replies are pulled by a Celery beat task (`app.tasks.mailbox_tasks.sync_mailboxes`, every 60s)
+and, when `ENABLE_INLINE_POLLER=true`, by the same in-web-process poller that drives campaigns —
+so a deployment with no worker still imports replies on its own. Each mailbox applies its own
+`poll_interval`, storage is idempotent on the provider message id, and the two paths can run
+side by side without duplicating anything. The **Import replies now** button on a mailbox does
+one pass immediately.
 
 In production (`APP_ENV=production`) the app **refuses to start** if
 `SECRET_KEY`, `CREDENTIAL_ENCRYPTION_KEY`, or `ADMIN_PASSWORD` are left at their

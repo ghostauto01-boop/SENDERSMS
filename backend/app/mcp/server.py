@@ -45,17 +45,22 @@ from fastapi import Request
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.mcp.registry import TOOLS, TOOLS_BY_NAME, Tool
+from app.config import settings
+from app.mcp import connectors as connector_profiles
+from app.mcp.connectors import ConnectorProfile
+from app.mcp.registry import TOOLS, TOOLS_BY_NAME, Tool, tools_for
 from app.models.mcp import McpCall, McpToken
 from app.security.auth import create_access_token, ensure_admin
 
 logger = logging.getLogger(__name__)
 
 SERVER_NAME = "sendersms"
-SERVER_VERSION = "1.0.0"
+SERVER_VERSION = "1.1.0"
 #: Newest first. The client's requested version is echoed when we support it.
-PROTOCOL_VERSIONS = ("2025-06-18", "2025-03-26", "2024-11-05")
-DEFAULT_PROTOCOL = PROTOCOL_VERSIONS[0]
+#: Shared with the connector profiles so the metadata documents and the
+#: handshake can never disagree about what this server speaks.
+PROTOCOL_VERSIONS = connector_profiles.PROTOCOL_VERSIONS
+DEFAULT_PROTOCOL = connector_profiles.DEFAULT_PROTOCOL
 
 WRITE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
@@ -72,16 +77,36 @@ CURRENT_ADMIN_ID: contextvars.ContextVar[int | None] = contextvars.ContextVar(
 
 @dataclass
 class TokenView:
-    """A detached, read-only view of the token, safe to use after its session closes."""
+    """A detached, read-only view of the caller's authority.
+
+    Safe to use after the session that read it closes. Two kinds of credential
+    arrive here:
+
+    * ``kind="static"`` — an ``mcp_…`` token created in Settings, backed by a
+      :class:`McpToken` row;
+    * ``kind="oauth"`` — a JWT from the OAuth 2.1 flow a ChatGPT or Claude
+      connector just completed, backed by :class:`McpOAuthToken`.
+
+    Both carry the same coarse ``scope`` switch, so the read/write fence in
+    :func:`run_tool` is one code path either way.
+    """
 
     id: int
     name: str
     scope: str
     prefix: str
+    #: static | oauth
+    kind: str = "static"
+    #: Which connector endpoint the request arrived on (chatgpt / claude / …).
+    connector: str = "generic"
+    #: The OAuth client_id, when this is an OAuth access token.
+    client_id: str | None = None
+    #: The resource the token was issued for; checked against the endpoint asked.
+    audience: str | None = None
 
     @property
     def can_write(self) -> bool:
-        return (self.scope or "write") == "write"
+        return (self.scope or "write") == "write" or "write" in set((self.scope or "").split())
 
 
 def hash_token(raw: str) -> str:
@@ -106,11 +131,26 @@ def token_from_request(request: Request) -> str | None:
     return query.strip() if query else None
 
 
-async def authenticate(db: AsyncSession, raw_token: str | None) -> TokenView | None:
-    """Look the token up. Read-only: the usage counter is written later, in its
-    own session, so this one can be closed before any tool runs."""
+async def authenticate(
+    db: AsyncSession,
+    raw_token: str | None,
+    *,
+    profile: ConnectorProfile | None = None,
+) -> TokenView | None:
+    """Look the caller up, by static token or by OAuth access token.
+
+    Read-only: usage counters are written later, in their own session, so this
+    one can be closed before any tool runs.
+
+    Order matters for one practical reason — a static token is a single indexed
+    lookup, while an OAuth token has to be signature-verified and then checked
+    against the revocation table. Trying the cheap one first keeps the common
+    case (Claude Code with ``--header``, the Arena bridge, curl) fast.
+    """
+    connector = profile.key if profile else "generic"
     if not raw_token:
         return None
+
     token = (
         await db.execute(
             select(McpToken).where(
@@ -119,14 +159,77 @@ async def authenticate(db: AsyncSession, raw_token: str | None) -> TokenView | N
             )
         )
     ).scalar_one_or_none()
-    if token is None:
+    if token is not None:
+        return TokenView(
+            id=token.id,
+            name=token.name or "AI assistant",
+            scope=token.scope or "write",
+            prefix=token.prefix or "",
+            kind="static",
+            connector=connector,
+        )
+
+    # OAuth 2.1 access token (what a ChatGPT or Claude connector presents).
+    from app.mcp import oauth as mcp_oauth
+
+    if "." not in raw_token:
         return None
-    return TokenView(id=token.id, name=token.name or "AI assistant",
-                     scope=token.scope or "write", prefix=token.prefix or "")
+    claims = await mcp_oauth.verify_access_token(
+        db, raw_token, audience=profile.resource if profile else None
+    )
+    if not claims:
+        return None
+    audience = str(claims.get("aud") or "")
+    if profile is not None and audience and audience.rstrip("/") != profile.resource.rstrip("/"):
+        # RFC 8707: the token was issued for a different resource. Refuse rather
+        # than let a connector's token be replayed against another endpoint.
+        logger.warning(
+            "MCP OAuth: token audience %r does not match %r", audience, profile.resource
+        )
+        return None
+    admin_id = int(claims.get("sub") or 0) or None
+    client_id = str(claims.get("client_id") or "")
+    scope = str(claims.get("scope") or "read")
+    client_name = client_id.split("/")[-1][:40] if client_id.startswith("http") else client_id[:24]
+    return TokenView(
+        id=admin_id or 0,
+        name=f"{profile.label if profile else 'AI'} ({client_name or 'OAuth'})",
+        scope=scope,
+        prefix=raw_token[:12],
+        kind="oauth",
+        connector=str(claims.get("connector") or connector),
+        client_id=client_id or None,
+        audience=audience or None,
+    )
 
 
 async def touch_token(db: AsyncSession, token: TokenView, error: str | None = None) -> None:
-    """Record that the token was used (and what went wrong, if anything)."""
+    """Record that the credential was used (and what went wrong, if anything)."""
+    if token.kind == "oauth":
+        # OAuth usage is counted on the connector row and on the access-token
+        # row; the error, if any, lands on the connection so the settings card
+        # can show it next to the client that caused it.
+        from app.mcp import oauth as mcp_oauth
+        from app.models.mcp_oauth import McpConnection
+
+        connection = await mcp_oauth.get_connection(db, token.connector)
+        connection.call_count = (connection.call_count or 0) + 1
+        connection.last_call_at = datetime.now(timezone.utc)
+        if error:
+            connection.last_error = f"{token.name}: {error}"[:500]
+            connection.status = "error"
+        await db.execute(
+            update(McpConnection)
+            .where(McpConnection.connector == connection.connector)
+            .values(
+                call_count=connection.call_count,
+                last_call_at=connection.last_call_at,
+                last_error=connection.last_error,
+                status=connection.status,
+            )
+        )
+        return
+
     values: dict[str, Any] = {
         "call_count": McpToken.call_count + 1,
         "last_used_at": datetime.now(timezone.utc),
@@ -472,7 +575,9 @@ async def _audit(
     try:
         db.add(
             McpCall(
-                token_id=token.id,
+                # An OAuth caller has no mcp_tokens row; the connection is named
+                # instead so the audit log still says who did it.
+                token_id=None if token.kind == "oauth" else token.id,
                 token_name=token.name,
                 tool=tool,
                 request=request,
@@ -504,8 +609,18 @@ def _rpc_error(msg_id: Any, code: int, message: str, data: Any = None) -> dict:
     return {"jsonrpc": "2.0", "id": msg_id, "error": error}
 
 
-def server_info() -> dict:
-    return {"name": SERVER_NAME, "version": SERVER_VERSION}
+def server_info(profile: ConnectorProfile | None = None) -> dict:
+    """The ``serverInfo`` block returned from ``initialize``.
+
+    ``title`` is what ChatGPT and Claude show as the connector's name when the
+    client did not get one from its own registration form.
+    """
+    info = {
+        "name": SERVER_NAME,
+        "version": SERVER_VERSION,
+        "title": f"{settings.APP_NAME} — {profile.label}" if profile else str(settings.APP_NAME),
+    }
+    return info
 
 
 def capabilities() -> dict:
@@ -516,7 +631,24 @@ def capabilities() -> dict:
     }
 
 
-async def dispatch(db: AsyncSession, token: TokenView, message: dict) -> dict | None:
+def negotiate_version(requested: Any) -> str:
+    """Echo the client's version when we speak it, else offer our newest.
+
+    A client on an older revision keeps working (the spec requires the server to
+    continue with the version it offered), and a client from the future gets the
+    newest one we implement rather than a hard failure.
+    """
+    value = str(requested or DEFAULT_PROTOCOL)
+    return value if value in PROTOCOL_VERSIONS else DEFAULT_PROTOCOL
+
+
+async def dispatch(
+    db: AsyncSession,
+    token: TokenView,
+    message: dict,
+    profile: ConnectorProfile | None = None,
+    toolset: str | None = None,
+) -> dict | None:
     """Handle one JSON-RPC message. Returns None for notifications."""
     method = message.get("method")
     msg_id = message.get("id")
@@ -527,24 +659,35 @@ async def dispatch(db: AsyncSession, token: TokenView, message: dict) -> dict | 
 
     # ------------------------------------------------------------- lifecycle
     if method == "initialize":
-        requested = str(params.get("protocolVersion") or DEFAULT_PROTOCOL)
-        version = requested if requested in PROTOCOL_VERSIONS else DEFAULT_PROTOCOL
         return _rpc_result(msg_id, {
-            "protocolVersion": version,
+            "protocolVersion": negotiate_version(params.get("protocolVersion")),
             "capabilities": capabilities(),
-            "serverInfo": server_info(),
+            "serverInfo": server_info(profile),
             "instructions": APP_GUIDE_SUMMARY,
         })
 
-    if method in ("notifications/initialized", "notifications/cancelled", "initialized"):
+    if method in ("notifications/initialized", "notifications/cancelled", "initialized",
+                  "notifications/root/list_changed"):
         return None
 
     if method == "ping":
         return _rpc_result(msg_id, {})
 
+    # The 2026-07-28 revision replaces the initialize handshake with an
+    # on-demand capability query. Answer it with the same block, so a client on
+    # the stateless core needs no handshake at all.
+    if method == "server/discover":
+        return _rpc_result(msg_id, {
+            "protocolVersion": DEFAULT_PROTOCOL,
+            "capabilities": capabilities(),
+            "serverInfo": server_info(profile),
+            "instructions": APP_GUIDE_SUMMARY,
+        })
+
     # ----------------------------------------------------------------- tools
+    published = tools_for(connector_profiles.tool_names(profile, toolset))
     if method == "tools/list":
-        return _rpc_result(msg_id, {"tools": [t.as_mcp() for t in TOOLS]})
+        return _rpc_result(msg_id, {"tools": [t.as_mcp() for t in published]})
 
     if method == "tools/call":
         name = str(params.get("name") or "")
@@ -552,6 +695,13 @@ async def dispatch(db: AsyncSession, token: TokenView, message: dict) -> dict | 
         tool = TOOLS_BY_NAME.get(name)
         if tool is None:
             return _rpc_error(msg_id, -32602, f"Unknown tool '{name}'")
+        if published and tool not in published:
+            return _rpc_error(
+                msg_id, -32602,
+                f"'{name}' is not published on the {profile.label if profile else 'this'} "
+                "connector (it exposes a focused tool set). Ask the operator to switch this "
+                "connector's tool set to 'full' in Settings → AI (MCP), or use app_api_request.",
+            )
         if not isinstance(args, dict):
             return _rpc_error(msg_id, -32602, "arguments must be an object")
         outcome = await run_tool(db, token, tool, args)

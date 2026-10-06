@@ -30,6 +30,7 @@ celery_app = Celery(
         "app.tasks.campaign_tasks",
         "app.tasks.notification_tasks",
         "app.tasks.ads_tasks",
+        "app.tasks.mailbox_tasks",
     ],
 )
 
@@ -103,6 +104,14 @@ celery_app.conf.beat_schedule = {
     "process-ads-manager": {
         "task": "app.tasks.ads_tasks.process_ads_manager",
         "schedule": timedelta(minutes=1),
+    },
+    # Email replies: pull every connected mailbox (Gmail API / IMAP) that is due,
+    # import the replies into the app inbox and move the ones Gmail filed under
+    # Spam back to the primary inbox. Every 60s; each mailbox still applies its
+    # own poll_interval, so an idle mailbox costs one indexed query per minute.
+    "sync-connected-mailboxes": {
+        "task": "app.tasks.mailbox_tasks.sync_mailboxes",
+        "schedule": timedelta(seconds=60),
     },
     "process-scheduled-messages": {
         "task": "app.tasks.sms_tasks.process_scheduled_messages",

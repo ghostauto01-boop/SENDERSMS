@@ -68,12 +68,53 @@ class Tool:
             schema["required"] = required
         return schema
 
-    def as_mcp(self) -> dict:
+    def title(self) -> str:
+        """A human title for the tool — required by Anthropic's directory rules.
+
+        Derived from the name so it can never drift out of sync with it:
+        ``send_email_now`` becomes "Send email now".
+        """
+        return self.name.replace("_", " ").strip().capitalize()
+
+    def annotations(self) -> dict:
+        """What the tool does to the world, in the MCP annotation vocabulary.
+
+        Anthropic's connector requirements make ``title`` plus the applicable
+        ``readOnlyHint``/``destructiveHint`` mandatory, and ChatGPT uses the same
+        hints to decide whether a call needs the user's confirmation. They are
+        derived from the declared scope and HTTP method rather than written by
+        hand per tool, so a new tool cannot forget them:
+
+        * ``readOnlyHint`` — a ``read``-scoped tool on a GET (or one of the
+          in-server pseudo-methods) changes nothing;
+        * ``destructiveHint`` — a DELETE, or the escape hatch, which can reach
+          any endpoint including deleting ones;
+        * ``idempotentHint`` — repeating a GET or a PUT is safe; repeating a
+          send is not;
+        * ``openWorldHint`` — every tool talks to this app's own database, never
+          to the open internet, so it is always False.
+        """
+        method = (self.method or "").upper()
+        escape_hatch = method == "REQUEST"
+        read_only = self.scope == "read" and method in ("GET", "GUIDE", "OPENAPI", "PREVIEW_TEMPLATE")
         return {
+            "title": self.title(),
+            "readOnlyHint": read_only and not escape_hatch,
+            "destructiveHint": method == "DELETE" or escape_hatch,
+            "idempotentHint": method in ("GET", "PUT", "GUIDE", "OPENAPI", "PREVIEW_TEMPLATE"),
+            "openWorldHint": False,
+        }
+
+    def as_mcp(self, *, annotations: bool = True) -> dict:
+        out = {
             "name": self.name,
+            "title": self.title(),
             "description": self.description,
             "inputSchema": self.input_schema(),
         }
+        if annotations:
+            out["annotations"] = self.annotations()
+        return out
 
 
 CHANNEL = Param(
@@ -793,3 +834,17 @@ TOOLS: list[Tool] = [
 ]
 
 TOOLS_BY_NAME = {tool.name: tool for tool in TOOLS}
+
+
+def tools_for(names: "set[str] | None") -> list[Tool]:
+    """The tools a connector publishes.
+
+    ``names`` is ``None`` for "everything", or the focused set a connector
+    profile asks for — ChatGPT gets :data:`app.mcp.connectors.CORE_TOOLS`,
+    because 60 tools of JSON Schema cost prompt budget and measurably degrade
+    tool choice, and OpenAI's own connector guidance is to publish what the
+    assistant will actually pick between.
+    """
+    if names is None:
+        return TOOLS
+    return [tool for tool in TOOLS if tool.name in names]

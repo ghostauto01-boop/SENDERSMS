@@ -25,7 +25,14 @@ from app.models.meeting import Meeting, MeetingAttendee
 from app.models.call import CallLog
 from app.models.push import PushSubscription
 from app.models.email import EmailAccount, EmailEvent, EmailSuppression
+from app.models.email_inbox import EmailMailbox
 from app.models.mcp import McpCall, McpToken
+from app.models.mcp_oauth import (
+    McpConnection,
+    McpOAuthClient,
+    McpOAuthCode,
+    McpOAuthToken,
+)
 from app.models.ads import (
     AdsAudience,
     AdsCampaign,
@@ -90,4 +97,11 @@ __all__ = [
     "AdsCalendarEvent",
     "AdsEvent",
     "AdsActivityLog",
+    "EmailMailbox",
+    "McpCall",
+    "McpToken",
+    "McpConnection",
+    "McpOAuthClient",
+    "McpOAuthCode",
+    "McpOAuthToken",
 ]

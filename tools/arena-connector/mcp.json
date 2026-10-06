@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "sendersms": {
+      "command": "python3",
+      "args": ["tools/arena-connector/arena_mcp_bridge.py"],
+      "env": {
+        "SENDERSMS_MCP_URL": "https://your-app.example.com/connectors/arena/mcp",
+        "SENDERSMS_MCP_TOKEN": "paste-a-token-from-Settings-AI-MCP"
+      }
+    }
+  }
+}

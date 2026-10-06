@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "sendersms": {
+      "type": "http",
+      "url": "https://your-app.example.com/connectors/arena/mcp",
+      "headers": {
+        "Authorization": "Bearer paste-a-token-from-Settings-AI-MCP"
+      }
+    }
+  }
+}
