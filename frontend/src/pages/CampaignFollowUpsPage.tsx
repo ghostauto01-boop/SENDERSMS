@@ -321,7 +321,7 @@ export default function CampaignFollowUpsPage() {
               </div>
             )}
             {selected && selected.status !== "running" && (
-              <p className="text-xs text-amber-600 mt-2 flex items-center gap-1.5">
+              <p className="text-xs text-warning-600 mt-2 flex items-center gap-1.5">
                 <AlertTriangle size={13} />
                 Follow-ups only send while the campaign is running or completed. This one is {selected.status}.
               </p>
@@ -397,9 +397,9 @@ export default function CampaignFollowUpsPage() {
 
                       {rule.stats && (
                         <div className="flex gap-3 mt-2 text-xs">
-                          <span className="text-green-600">sent {rule.stats.sent || 0}</span>
+                          <span className="text-success-600">sent {rule.stats.sent || 0}</span>
                           <span className="text-gray-500">stopped {rule.stats.stopped || 0}</span>
-                          {rule.stats.failed ? <span className="text-red-600">failed {rule.stats.failed}</span> : null}
+                          {rule.stats.failed ? <span className="text-danger-600">failed {rule.stats.failed}</span> : null}
                         </div>
                       )}
                     </div>
@@ -420,7 +420,7 @@ export default function CampaignFollowUpsPage() {
                       <button onClick={() => toggleRule(rule)} className="btn-secondary btn-sm" title={rule.is_active ? "Pause" : "Activate"}>
                         {rule.is_active ? <X size={14} /> : <Check size={14} />}
                       </button>
-                      <button onClick={() => deleteRule(rule)} className="btn-secondary btn-sm text-red-600" title="Delete">
+                      <button onClick={() => deleteRule(rule)} className="btn-secondary btn-sm text-danger-600" title="Delete">
                         <Trash2 size={14} />
                       </button>
                     </div>
@@ -625,16 +625,16 @@ export default function CampaignFollowUpsPage() {
             </div>
 
             <div className="grid grid-cols-4 gap-2 text-center text-sm">
-              <div className="p-2 rounded-lg bg-green-50 dark:bg-green-900/20">
-                <p className="text-xl font-bold text-green-700">{preview.counts.send}</p>
+              <div className="p-2 rounded-lg bg-success-50 dark:bg-success-900/20">
+                <p className="text-xl font-bold text-success-700">{preview.counts.send}</p>
                 <p className="text-xs">would send</p>
               </div>
               <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-700">
                 <p className="text-xl font-bold">{preview.counts.stop}</p>
                 <p className="text-xs">would stop</p>
               </div>
-              <div className="p-2 rounded-lg bg-amber-50 dark:bg-amber-900/20">
-                <p className="text-xl font-bold text-amber-700">{preview.counts.wait}</p>
+              <div className="p-2 rounded-lg bg-warning-50 dark:bg-warning-900/20">
+                <p className="text-xl font-bold text-warning-700">{preview.counts.wait}</p>
                 <p className="text-xs">waiting</p>
               </div>
               <div className="p-2 rounded-lg bg-gray-50 dark:bg-gray-700">

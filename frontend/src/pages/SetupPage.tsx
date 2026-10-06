@@ -32,13 +32,13 @@ const STATUS_META: Record<
   StepStatus,
   { label: string; chip: string; icon: any; colour: string }
 > = {
-  done: { label: "Done", chip: "badge-green", icon: CheckCircle2, colour: "text-green-500" },
-  todo: { label: "To do", chip: "badge-red", icon: AlertTriangle, colour: "text-red-500" },
+  done: { label: "Done", chip: "badge-green", icon: CheckCircle2, colour: "text-success-500" },
+  todo: { label: "To do", chip: "badge-red", icon: AlertTriangle, colour: "text-danger-500" },
   attention: {
     label: "Needs attention",
     chip: "badge-yellow",
     icon: AlertTriangle,
-    colour: "text-amber-500",
+    colour: "text-warning-500",
   },
   optional: { label: "Optional", chip: "badge-gray", icon: CircleDashed, colour: "text-gray-400" },
 };
@@ -113,10 +113,10 @@ function StepCard({
         <p
           className={`text-xs mt-2 rounded-lg p-2.5 leading-relaxed ${
             step.status === "done"
-              ? "bg-green-50 dark:bg-green-950/30 text-gray-700 dark:text-gray-300"
+              ? "bg-success-50 dark:bg-success-950/30 text-gray-700 dark:text-gray-300"
               : step.status === "optional"
                 ? "bg-gray-50 dark:bg-gray-800/40 text-gray-600 dark:text-gray-300"
-                : "bg-amber-50 dark:bg-amber-950/30 text-gray-700 dark:text-gray-200"
+                : "bg-warning-50 dark:bg-warning-950/30 text-gray-700 dark:text-gray-200"
           }`}
         >
           {step.detail}
@@ -252,7 +252,7 @@ export default function SetupPage() {
           <p className="font-semibold flex items-center gap-2">
             {progress.ready_to_send ? (
               <>
-                <Rocket size={17} className="text-green-600" /> You can send
+                <Rocket size={17} className="text-success-600" /> You can send
               </>
             ) : (
               <>
@@ -272,7 +272,7 @@ export default function SetupPage() {
         <div className="h-2.5 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
           <div
             className={`h-full rounded-full transition-all ${
-              blocking > 0 ? "bg-amber-400" : "bg-green-500"
+              blocking > 0 ? "bg-warning-400" : "bg-success-500"
             }`}
             style={{ width: `${progress.percent}%` }}
           />
@@ -322,7 +322,7 @@ export default function SetupPage() {
 
       {visible.length === 0 && (
         <div className="card p-10 text-center">
-          <CheckCircle2 size={28} className="mx-auto text-green-500 mb-3" />
+          <CheckCircle2 size={28} className="mx-auto text-success-500 mb-3" />
           <h3 className="font-semibold">Nothing left in this view</h3>
           <p className="text-sm text-gray-500 mt-1">
             Switch the filter to <em>Everything</em> to see the optional steps.

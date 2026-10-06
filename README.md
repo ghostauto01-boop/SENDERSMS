@@ -158,7 +158,7 @@ metadata):
 | --- | --- |
 | `PUBLIC_BASE_URL` | Builds the Brevo webhook URL, the one-click unsubscribe link and every URL in the OAuth metadata. Without it bulk mail falls back to a `mailto:` unsubscribe and **no AI client can connect** — ChatGPT and Claude both reject a relative or mismatched `resource`. |
 | `MCP_OAUTH_ENABLED` | `true` (default). Set `false` to serve bearer tokens only. |
-| `MCP_OAUTH_REQUIRE_LOGIN` | Default `false`: the consent page offers the same one-tap sign-in as the app's own login wall. Set `true` to require the operator password first — do that on any deployment other people can reach. |
+| `MCP_OAUTH_REQUIRE_LOGIN` | Default `true`: the connector's authorization page asks for the app password first, matching the login wall. Set `false` only on a deployment nobody else can reach, to get a one-tap "continue as the operator" button instead. |
 
 ## Replies come back into the app
 
@@ -218,4 +218,23 @@ python tools/mcp_smoke.py
 
 `BREVO_API_BASE` only exists so a test can point at that stand-in; production never
 sets it. `tools/run_campaign_now.py <id>` runs one campaign batch inline, the same
-code path the web-mode fallback uses when no Celery worker is available.
+code path the web-mode fallback uses when no Celery worker is available; it (and
+`tools/run_followup_now.py`) loads the app's own `.env` first, so it shares
+`CREDENTIAL_ENCRYPTION_KEY` with the server and can read the API keys the server
+wrote.
+
+### Browser walkthrough (a real user, through the real login)
+
+```bash
+npm run dev -- --host 0.0.0.0 --port 5173     # in one terminal
+node tools/e2e_walk.mjs                       # in another
+```
+
+It types a wrong password (and insists it is refused), signs in with
+`APP_PASSWORD` (default `12345678`), visits every page in the app, and fails if a
+page throws, renders an error state, or overflows a 390px phone screen. It also
+follows an email notification from the bell into its thread. `node tools/shot.mjs
+<url> <out.png> [w] [h] [ms] [--login]` saves a single screenshot instead.
+
+Both tools use the `puppeteer-core` + `@sparticuz/chromium` dev dependencies; on a
+machine without the bundled Chromium, set `CHROME_PATH` to a local Chrome.

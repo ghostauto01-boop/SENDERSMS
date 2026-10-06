@@ -25,8 +25,8 @@ export const contactName = (c: Partial<Contact> & { phone_number?: string }) =>
 
 export const avatarColor = (name: string) => {
   const colors = [
-    "bg-[#00a884]", "bg-[#128C7E]", "bg-[#075E54]", "bg-[#34B7F1]", "bg-[#FF8A65]",
-    "bg-[#BA68C8]", "bg-[#4DB6AC]", "bg-[#FFB74D]", "bg-[#F06292]", "bg-[#7986CB]",
+    "bg-primary-600", "bg-primary-700", "bg-primary-800", "bg-[#34B7F1]", "bg-warning-400",
+    "bg-accent-500", "bg-primary-400", "bg-warning-400", "bg-primary-500", "bg-primary-400",
   ];
   let h = 0;
   for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % colors.length;
@@ -140,10 +140,10 @@ export default function ContactPicker({
         onClick={() => setOpen(!open)}
         aria-haspopup="listbox"
         aria-expanded={open}
-        className="w-full flex items-center gap-2 px-2.5 py-2 bg-[#f0f2f5] dark:bg-[#111b21] rounded-xl text-sm text-left min-h-[44px] focus:outline-none focus:ring-2 focus-within:ring-[#00a884]/20 flex-wrap"
+        className="w-full flex items-center gap-2 px-2.5 py-2 bg-gray-100 dark:bg-gray-900 rounded-xl text-sm text-left min-h-[44px] focus:outline-none focus:ring-2 focus-within:ring-primary-600/20 flex-wrap"
       >
         {value.length === 0 ? (
-          <span className="flex items-center gap-2 text-[#667781] px-1">
+          <span className="flex items-center gap-2 text-gray-500 px-1">
             <User size={15} /> {placeholder}
           </span>
         ) : (
@@ -153,7 +153,7 @@ export default function ContactPicker({
             return (
               <span
                 key={id}
-                className="inline-flex items-center gap-1.5 text-xs pl-1 pr-1.5 py-1 rounded-full bg-white dark:bg-[#2a3942] text-[#111b21] dark:text-white font-medium shadow-sm"
+                className="inline-flex items-center gap-1.5 text-xs pl-1 pr-1.5 py-1 rounded-full bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-medium shadow-sm"
               >
                 <span className={`w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-semibold ${avatarColor(label)}`}>
                   {c ? contactInitials(c) : "?"}
@@ -173,7 +173,7 @@ export default function ContactPicker({
                       onChange(value.filter((v) => v !== id));
                     }
                   }}
-                  className="hover:text-red-500"
+                  className="hover:text-danger-500"
                 >
                   <X size={11} />
                 </span>
@@ -182,7 +182,7 @@ export default function ContactPicker({
           })
         )}
         {value.length > 8 && (
-          <span className="text-xs text-[#667781]">+{value.length - 8} more</span>
+          <span className="text-xs text-gray-500">+{value.length - 8} more</span>
         )}
       </button>
 
@@ -226,9 +226,9 @@ export default function ContactPicker({
                     </span>
                     <span className="flex-1 min-w-0">
                       <span className="block text-sm text-gray-800 dark:text-gray-100 truncate">{name}</span>
-                      <span className="block text-[11px] text-[#667781] font-mono">{c.phone_number}</span>
+                      <span className="block text-[11px] text-gray-500 font-mono">{c.phone_number}</span>
                     </span>
-                    {active && <Check size={15} className="text-[#00a884] flex-shrink-0" />}
+                    {active && <Check size={15} className="text-primary-600 flex-shrink-0" />}
                   </button>
                 );
               })}

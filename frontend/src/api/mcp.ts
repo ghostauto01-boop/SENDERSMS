@@ -48,6 +48,8 @@ export type McpCallRow = {
 export type ConnectorTestStep = {
   step: string;
   ok: boolean;
+  /** False marks advice: reported with a fix, but it does not fail the handshake. */
+  fatal?: boolean;
   status?: number | null;
   detail: string;
   fix?: string;
@@ -61,6 +63,8 @@ export type ConnectorTestReport = {
   error?: string | null;
   passed: number;
   total: number;
+  /** Steps that are worth fixing but did not break anything (e.g. PUBLIC_BASE_URL unset). */
+  advice?: number;
   ran_at: string;
   steps: ConnectorTestStep[];
 };
@@ -101,13 +105,27 @@ export type Connector = {
   last_call_at?: string | null;
 };
 
+export type ConnectorBridge = {
+  available: boolean;
+  download_url: string;
+  script: string;
+  endpoint: string;
+  run: string;
+  config: Record<string, unknown>;
+};
+
 export type ConnectorList = {
   items: Connector[];
   public_base_url?: string | null;
+  /** env | render | request | none — where the base URL came from. */
+  base_url_source?: string;
   ready: boolean;
   problem?: string | null;
+  /** Set when the base URL was detected from this browser session. */
+  note?: string | null;
   require_login: boolean;
   protocol_versions: string[];
+  bridge?: ConnectorBridge;
 };
 
 export type McpClientRow = {

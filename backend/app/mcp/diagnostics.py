@@ -50,7 +50,7 @@ from app.mcp import connectors as C
 from app.mcp import server as mcp_server
 from app.mcp.registry import tools_for
 from app.models.mcp import McpToken
-from app.utils.urls import public_base_url
+from app.utils.urls import public_base_url, public_base_url_source
 
 logger = logging.getLogger(__name__)
 
@@ -89,9 +89,18 @@ class _Report:
 
     def add(self, step: str, ok: bool, detail: str, *, status: int | None = None,
             fatal: bool = True, fix: str = "") -> bool:
+        """Record one step.
+
+        ``fatal=False`` marks advice: a step that is reported (with its fix) but
+        does not make the handshake a failure. That distinction matters — a
+        deployment that works perfectly with a base URL detected from the
+        request must not be shown as "handshake failed", or the operator goes
+        looking for a bug that is not there.
+        """
         self.steps.append({
             "step": step,
             "ok": bool(ok),
+            "fatal": bool(fatal),
             "status": status,
             "detail": detail[:400],
             "fix": fix[:400] if not ok else "",
@@ -101,7 +110,8 @@ class _Report:
         return ok
 
     def result(self) -> dict:
-        first_bad = next((s for s in self.steps if not s["ok"]), None)
+        first_bad = next((s for s in self.steps if not s["ok"] and s.get("fatal")), None)
+        advice = [s for s in self.steps if not s["ok"] and not s.get("fatal")]
         return {
             "connector": self.profile.key,
             "label": self.profile.label,
@@ -110,6 +120,7 @@ class _Report:
             "error": None if not first_bad else f"{first_bad['step']}: {first_bad['detail']}",
             "passed": sum(1 for s in self.steps if s["ok"]),
             "total": len(self.steps),
+            "advice": len(advice),
             "ran_at": datetime.now(timezone.utc).isoformat(),
             "steps": self.steps,
         }
@@ -121,17 +132,38 @@ async def run_connector_test(profile: C.ConnectorProfile, db: AsyncSession) -> d
 
     report = _Report(profile)
     base = public_base_url()
+    source = public_base_url_source()
 
+    # A base URL learned from the request is enough to run every OAuth step —
+    # and it is what makes the connector work on a deployment that never set
+    # PUBLIC_BASE_URL. It is reported as a non-fatal warning, because a client
+    # in *another* network must be able to reach the same host, which only the
+    # operator can confirm.
     if not report.add(
         "public-url",
         bool(base),
-        f"PUBLIC_BASE_URL = {base or '(not set)'}",
+        f"public URL = {base or '(not set)'} (source: {source})",
         fix=(
-            "Set PUBLIC_BASE_URL to this deployment's public https address and restart. Without it "
-            "the OAuth metadata contains relative URLs, and no client can reach them."
+            "Could not determine this deployment's public address from the request either. "
+            "Set PUBLIC_BASE_URL to the https address clients reach (e.g. "
+            "https://your-app.onrender.com) and restart."
         ),
     ):
         return report.result()
+
+    if source == "request":
+        report.add(
+            "public-url-configured",
+            False,
+            f"PUBLIC_BASE_URL is unset; using the address of this request ({base}).",
+            fatal=False,
+            fix=(
+                "Fine for a browser session — the URL is derived from the host that asked. Set "
+                "PUBLIC_BASE_URL to this deployment's permanent https address so the connector "
+                "keeps working when the app is opened on a different host (a custom domain, a "
+                "tunnel, or a phone on the same Wi-Fi)."
+            ),
+        )
 
     headers = {SELFTEST_HEADER: selftest_value()}
     transport = httpx.ASGITransport(app=fastapi_app, client=("127.0.0.1", 4242))

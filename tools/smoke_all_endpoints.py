@@ -6,14 +6,24 @@ page. This walks the app's own OpenAPI document and reports anything that is
 not a success, so a channel pass cannot leave a dead screen behind.
 
 Usage: python tools/smoke_all_endpoints.py
+
+Signs in first: the login screen is password-protected, so an anonymous walk of
+the API would report 76 unauthenticated endpoints as problems. The password is
+taken from ADMIN_PASSWORD / APP_PASSWORD, falling back to the shipped default.
+
+The session cookie that sign-in returns is reused for every request — and a 401
+is reported as its own problem, because it means the walk lost its session
+rather than that an endpoint is broken.
 """
 import json
+import os
 import sys
 
 import httpx
 
-BASE = "http://127.0.0.1:8000/api/v1"
-DOC = "http://127.0.0.1:8000/openapi.json"
+HOST = os.environ.get("SMS_API_BASE", "http://127.0.0.1:8000").rstrip("/")
+BASE = f"{HOST}/api/v1"
+DOC = f"{HOST}/openapi.json"
 
 # Endpoints that legitimately fail without live third-party credentials or a
 # broker, or that need a body/path parameter we cannot invent here.
@@ -24,13 +34,18 @@ EXPECTED = {
     "/calendar/day",
     "/email/unsubscribe",
     # Third-party credentials that a local run does not have.
+    "/mailbox/google/start",  # 400 until GOOGLE_CLIENT_ID/SECRET are set
     "/calls/webhooks",
     "/settings/callgate/webhooks",
     "/settings/gateway/webhooks",
 }
 
 with httpx.Client(base_url=BASE, timeout=30, follow_redirects=True) as api:
-    api.post("/auth/admin", json={})
+    password = os.environ.get("ADMIN_PASSWORD") or os.environ.get("APP_PASSWORD") or "12345678"
+    login = api.post("/auth/admin", json={"password": password})
+    if login.status_code >= 400:
+        print(f"RESULT: cannot sign in ({login.status_code}): {login.text[:160]}")
+        sys.exit(1)
     spec = httpx.get(DOC, timeout=30).json()
 
     targets: list[str] = []

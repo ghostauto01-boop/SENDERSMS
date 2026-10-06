@@ -518,8 +518,8 @@ export default function ListsPage() {
 
       {viewListId !== null && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4">
-          <div className="bg-white dark:bg-[#202c33] w-full sm:max-w-2xl max-h-[92vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl">
-            <div className="sticky top-0 z-10 bg-[#008069] dark:bg-[#202c33] px-4 py-3 flex items-center justify-between gap-3">
+          <div className="bg-white dark:bg-gray-800 w-full sm:max-w-2xl max-h-[92vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl">
+            <div className="sticky top-0 z-10 bg-primary-700 dark:bg-gray-800 px-4 py-3 flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <h2 className="text-white font-semibold truncate">Edit {viewListName}</h2>
                 <p className="text-white/70 text-xs">{listTotal} contact{listTotal === 1 ? "" : "s"} in this list</p>
@@ -536,7 +536,7 @@ export default function ListsPage() {
                 <button
                   onClick={openAddContacts}
                   disabled={listLoading}
-                  className="px-3 py-2 rounded-full bg-white text-[#008069] text-xs font-semibold flex items-center gap-1.5 disabled:opacity-50"
+                  className="px-3 py-2 rounded-full bg-white text-primary-700 text-xs font-semibold flex items-center gap-1.5 disabled:opacity-50"
                 >
                   <UserPlus size={14} /> Add Contacts
                 </button>
@@ -545,10 +545,10 @@ export default function ListsPage() {
             </div>
 
             <div className="p-4 sm:p-6 space-y-4">
-              <div className="rounded-xl border border-red-200 bg-red-50/60 dark:border-red-900/40 dark:bg-red-950/20 p-3 flex flex-col sm:flex-row items-center gap-2">
+              <div className="rounded-xl border border-danger-200 bg-danger-50/60 dark:border-danger-900/40 dark:bg-danger-950/20 p-3 flex flex-col sm:flex-row items-center gap-2">
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-red-700 dark:text-red-300">Delete this list</p>
-                  <p className="text-xs text-red-600/80 dark:text-red-400/80">
+                  <p className="text-sm font-semibold text-danger-700 dark:text-danger-300">Delete this list</p>
+                  <p className="text-xs text-danger-600/80 dark:text-danger-400/80">
                     Delete the list only, or also permanently delete every phone number in it.
                   </p>
                 </div>
@@ -556,14 +556,14 @@ export default function ListsPage() {
                   <button
                     onClick={() => handleDelete(viewListId)}
                     disabled={deletingList}
-                    className="px-3 py-1.5 rounded-full text-xs font-semibold bg-white dark:bg-[#2a3942] text-red-600 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/30 disabled:opacity-50"
+                    className="px-3 py-1.5 rounded-full text-xs font-semibold bg-white dark:bg-gray-700 text-danger-600 dark:text-danger-300 hover:bg-danger-100 dark:hover:bg-danger-900/30 disabled:opacity-50"
                   >
                     Delete list only
                   </button>
                   <button
                     onClick={handleDeleteListWithContacts}
                     disabled={deletingList}
-                    className="px-3 py-1.5 rounded-full text-xs font-semibold text-white bg-red-600 hover:bg-red-500 disabled:opacity-50"
+                    className="px-3 py-1.5 rounded-full text-xs font-semibold text-white bg-danger-600 hover:bg-danger-500 disabled:opacity-50"
                   >
                     {deletingList ? "Deleting…" : "Delete list + all numbers"}
                   </button>
@@ -571,10 +571,10 @@ export default function ListsPage() {
               </div>
 
               {showAddContacts && (
-                <div className="rounded-xl border border-gray-200 dark:border-[#2a3942] bg-gray-50 dark:bg-[#111b21] p-3 space-y-3">
+                <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-3 space-y-3">
                   <div className="flex items-center justify-between gap-2">
                     <h3 className="font-semibold text-sm">Add contacts to {viewListName}</h3>
-                    <button onClick={() => setShowAddContacts(false)} className="w-7 h-7 rounded-full bg-gray-200 dark:bg-[#2a3942] flex items-center justify-center text-gray-600 dark:text-gray-300"><X size={14} /></button>
+                    <button onClick={() => setShowAddContacts(false)} className="w-7 h-7 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-gray-600 dark:text-gray-300"><X size={14} /></button>
                   </div>
                   <p className="text-xs text-gray-500">
                     Search your contacts — results load as you type, so this stays fast even with
@@ -586,7 +586,7 @@ export default function ListsPage() {
                       value={addQuery}
                       onChange={(e) => changeAddQuery(e.target.value)}
                       placeholder="Search name, business or phone…"
-                      className="w-full pl-9 pr-3 py-2.5 bg-white dark:bg-[#2a3942] rounded-xl text-sm border border-gray-200 dark:border-[#2a3942] focus:outline-none focus:ring-2 focus:ring-[#00a884]/30"
+                      className="w-full pl-9 pr-3 py-2.5 bg-white dark:bg-gray-700 rounded-xl text-sm border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-600/30"
                       autoFocus
                     />
                   </div>
@@ -597,7 +597,7 @@ export default function ListsPage() {
                       </span>
                       <button
                         onClick={toggleAllToAdd}
-                        className="flex items-center gap-1.5 text-[13px] font-semibold text-[#00a884] dark:text-[#00dfa2] py-1 px-1"
+                        className="flex items-center gap-1.5 text-[13px] font-semibold text-primary-600 dark:text-primary-500 py-1 px-1"
                         title={allMatchingToAdd ? "Clear selection" : addPageAllSelected && addTotal > addItems.length ? `Select every contact matching “${addQuery.trim() || "this view"}”, on every page` : "Select all on this page"}
                       >
                         {allMatchingToAdd
@@ -606,7 +606,7 @@ export default function ListsPage() {
                       </button>
                     </div>
                   )}
-                  <div className="border dark:border-[#2a3942] rounded-xl overflow-hidden bg-white dark:bg-[#202c33] max-h-72 overflow-y-auto">
+                  <div className="border dark:border-gray-700 rounded-xl overflow-hidden bg-white dark:bg-gray-800 max-h-72 overflow-y-auto">
                     {addLoading ? (
                       <div className="py-8 text-center text-sm text-gray-500">Loading…</div>
                     ) : addItems.length === 0 ? (
@@ -616,17 +616,17 @@ export default function ListsPage() {
                           : "No contacts left to add — every contact is already in this list."}
                       </div>
                     ) : (
-                      <div className="divide-y divide-gray-100 dark:divide-[#2a3942]">
+                      <div className="divide-y divide-gray-100 dark:divide-gray-700">
                         {addItems.map((contact) => (
                           <label
                             key={contact.id}
-                            className="flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-[#111b21] cursor-pointer"
+                            className="flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-900 cursor-pointer"
                           >
                             <input
                               type="checkbox"
                               checked={allMatchingToAdd || selectedToAdd.has(contact.id)}
                               onChange={() => toggleToAdd(contact.id)}
-                              className="rounded accent-[#00a884] flex-shrink-0"
+                              className="rounded accent-primary-600 flex-shrink-0"
                             />
                             <div className="min-w-0 flex-1">
                               <p className="text-sm font-medium truncate">{displayName(contact)}</p>
@@ -635,7 +635,7 @@ export default function ListsPage() {
                             <button
                               type="button"
                               onClick={(e) => { e.preventDefault(); e.stopPropagation(); openWhatsappForCall(contact.phone_number, displayName(contact)); }}
-                              className="w-8 h-8 rounded-full bg-[#25D366] text-white flex items-center justify-center flex-shrink-0 hover:bg-[#1fb857]"
+                              className="w-8 h-8 rounded-full bg-primary-600 text-white flex items-center justify-center flex-shrink-0 hover:bg-primary-700"
                               title={`Call ${displayName(contact)} on WhatsApp`}
                             >
                               <PhoneCall size={14} />
@@ -652,7 +652,7 @@ export default function ListsPage() {
                         <button
                           onClick={() => { const p = Math.max(1, addPage - 1); setAddPage(p); loadAddPage(p, addQuery, true); }}
                           disabled={addPage <= 1 || addLoading}
-                          className="px-2 py-1 rounded-md bg-white dark:bg-[#2a3942] border disabled:opacity-40"
+                          className="px-2 py-1 rounded-md bg-white dark:bg-gray-700 border disabled:opacity-40"
                         >
                           <ChevronLeft size={14} />
                         </button>
@@ -660,7 +660,7 @@ export default function ListsPage() {
                         <button
                           onClick={() => { const p = Math.min(addPages, addPage + 1); setAddPage(p); loadAddPage(p, addQuery, true); }}
                           disabled={addPage >= addPages || addLoading}
-                          className="px-2 py-1 rounded-md bg-white dark:bg-[#2a3942] border disabled:opacity-40"
+                          className="px-2 py-1 rounded-md bg-white dark:bg-gray-700 border disabled:opacity-40"
                         >
                           <ChevronRight size={14} />
                         </button>
@@ -671,7 +671,7 @@ export default function ListsPage() {
                     <button
                       onClick={handleAddContacts}
                       disabled={addingToList || addLoading}
-                      className="w-full py-2.5 rounded-full bg-[#00a884] hover:bg-[#06cf9c] text-white text-sm font-semibold disabled:opacity-50"
+                      className="w-full py-2.5 rounded-full bg-primary-600 hover:bg-primary-500 text-white text-sm font-semibold disabled:opacity-50"
                     >
                       {addingToList
                         ? "Adding…"
@@ -693,7 +693,7 @@ export default function ListsPage() {
                         value={memberSearchInput}
                         onChange={(e) => { setMemberSearchInput(e.target.value); applyMemberSearch(e.target.value); }}
                         placeholder="Search this list…"
-                        className="pl-8 pr-2 py-1.5 rounded-full text-xs bg-gray-100 dark:bg-[#2a3942] border border-transparent focus:outline-none focus:ring-2 focus:ring-[#00a884]/30 w-44"
+                        className="pl-8 pr-2 py-1.5 rounded-full text-xs bg-gray-100 dark:bg-gray-700 border border-transparent focus:outline-none focus:ring-2 focus:ring-primary-600/30 w-44"
                       />
                     </div>
                     {listContacts.length > 0 && !listLoading && (
@@ -702,7 +702,7 @@ export default function ListsPage() {
                           type="checkbox"
                           checked={allMatchingInList || pageAllSelected}
                           onChange={toggleAllInList}
-                          className="rounded accent-[#00a884]"
+                          className="rounded accent-primary-600"
                         />
                         {allMatchingInList
                           ? "All matching selected"
@@ -715,37 +715,37 @@ export default function ListsPage() {
                 </div>
 
                 {selectionCount > 0 && (
-                  <div className="mb-2 rounded-xl border border-[#00a884]/30 bg-[#f0f9f6] dark:bg-[#0a332c]/20 p-2.5 flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-semibold text-[#008069] dark:text-[#00a884] flex-1 min-w-[80px]">
+                  <div className="mb-2 rounded-xl border border-primary-600/30 bg-primary-50 dark:bg-primary-950/20 p-2.5 flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-semibold text-primary-700 dark:text-primary-600 flex-1 min-w-[80px]">
                       {selectedLabel}
                     </span>
                     <button
                       onClick={handleBulkRemoveFromList}
                       disabled={removingBulk || deletingPermanently}
-                      className="px-3 py-1.5 rounded-full text-xs font-semibold bg-white dark:bg-[#2a3942] text-[#54656f] dark:text-[#aebac1] hover:bg-gray-100 disabled:opacity-50 flex items-center gap-1"
+                      className="px-3 py-1.5 rounded-full text-xs font-semibold bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-100 disabled:opacity-50 flex items-center gap-1"
                     >
                       {removingBulk ? "Removing…" : <><Minus size={12} /> Remove from list</>}
                     </button>
                     <button
                       onClick={handlePermanentDeleteInList}
                       disabled={removingBulk || deletingPermanently}
-                      className="px-3 py-1.5 rounded-full text-xs font-semibold text-white bg-red-600 hover:bg-red-500 disabled:opacity-50 flex items-center gap-1"
+                      className="px-3 py-1.5 rounded-full text-xs font-semibold text-white bg-danger-600 hover:bg-danger-500 disabled:opacity-50 flex items-center gap-1"
                     >
                       {deletingPermanently ? "Deleting…" : <><Trash2 size={12} /> Delete permanently</>}
                     </button>
                     <button
                       onClick={clearSelection}
-                      className="px-3 py-1.5 rounded-full text-xs font-semibold text-gray-500 hover:bg-gray-100 dark:hover:bg-[#2a3942]"
+                      className="px-3 py-1.5 rounded-full text-xs font-semibold text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"
                     >
                       Clear
                     </button>
                   </div>
                 )}
 
-                <div className="border dark:border-[#2a3942] rounded-xl overflow-hidden">
+                <div className="border dark:border-gray-700 rounded-xl overflow-hidden">
                   {listLoading ? (
                     <div className="py-10 text-center text-sm text-gray-500">
-                      <div className="w-7 h-7 border-2 border-[#00a884] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                      <div className="w-7 h-7 border-2 border-primary-600 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
                       Loading list…
                     </div>
                   ) : listContacts.length === 0 ? (
@@ -759,7 +759,7 @@ export default function ListsPage() {
                       <button onClick={openAddContacts} className="btn-primary btn-sm mt-3"><UserPlus size={14} className="mr-1" /> Add contacts</button>
                     </div>
                   ) : (
-                    <div className="divide-y dark:divide-[#2a3942]">
+                    <div className="divide-y dark:divide-gray-700">
                       {listContacts.map((contact) => {
                         const isSelected = allMatchingInList || selectedInList.has(contact.id);
                         const removing = busyRow === `remove-${contact.id}`;
@@ -767,13 +767,13 @@ export default function ListsPage() {
                         return (
                           <div
                             key={contact.id}
-                            className={`flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-[#111b21] ${isSelected ? "bg-[#f0f9f6] dark:bg-[#0a332c]/20" : ""}`}
+                            className={`flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-900 ${isSelected ? "bg-primary-50 dark:bg-primary-950/20" : ""}`}
                           >
                             <input
                               type="checkbox"
                               checked={isSelected}
                               onChange={() => toggleInList(contact.id)}
-                              className="rounded accent-[#00a884] flex-shrink-0"
+                              className="rounded accent-primary-600 flex-shrink-0"
                               title="Select this phone number"
                             />
                             <div className="min-w-0 flex-1">
@@ -793,7 +793,7 @@ export default function ListsPage() {
                             <button
                               onClick={() => openWhatsappForCall(contact.phone_number, displayName(contact))}
                               disabled={removing || deleting || removingBulk || deletingPermanently}
-                              className="w-8 h-8 rounded-full bg-[#25D366] text-white flex items-center justify-center flex-shrink-0 hover:bg-[#1fb857] disabled:opacity-40 sm:hidden"
+                              className="w-8 h-8 rounded-full bg-primary-600 text-white flex items-center justify-center flex-shrink-0 hover:bg-primary-700 disabled:opacity-40 sm:hidden"
                               title={`Call ${displayName(contact)} on WhatsApp`}
                             >
                               <PhoneCall size={13} />
@@ -802,15 +802,15 @@ export default function ListsPage() {
                               <button
                                 onClick={() => handleDeleteOneContact(contact)}
                                 disabled={removing || deleting || removingBulk || deletingPermanently}
-                                className="w-8 h-8 rounded-full text-red-600 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 flex items-center justify-center disabled:opacity-40"
+                                className="w-8 h-8 rounded-full text-danger-600 bg-danger-50 hover:bg-danger-100 dark:bg-danger-900/20 flex items-center justify-center disabled:opacity-40"
                                 title="Permanently delete this phone number (fast)"
                               >
-                                {deleting ? <span className="w-3 h-3 border-2 border-red-500 border-t-transparent rounded-full animate-spin" /> : <Trash2 size={13} />}
+                                {deleting ? <span className="w-3 h-3 border-2 border-danger-500 border-t-transparent rounded-full animate-spin" /> : <Trash2 size={13} />}
                               </button>
                               <button
                                 onClick={() => handleRemoveContact(contact)}
                                 disabled={removing || deleting || removingBulk || deletingPermanently}
-                                className="px-2.5 py-1.5 rounded-full text-xs font-semibold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-[#2a3942] hover:bg-gray-200 dark:hover:bg-[#3a4a54] flex items-center gap-1 disabled:opacity-40"
+                                className="px-2.5 py-1.5 rounded-full text-xs font-semibold text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 flex items-center gap-1 disabled:opacity-40"
                                 title="Remove from this list (keep the number)"
                               >
                                 {removing ? "Removing…" : "Remove"}
@@ -833,7 +833,7 @@ export default function ListsPage() {
                       <button
                         onClick={() => { const p = Math.max(1, memberPage - 1); setMemberPage(p); setSelectedInList(new Set()); setAllMatchingInList(false); if (viewListId) loadListContacts(viewListId, p, memberSearch, true); }}
                         disabled={memberPage <= 1 || listLoading}
-                        className="px-2.5 py-1 rounded-lg border bg-white dark:bg-[#2a3942] disabled:opacity-40 flex items-center gap-1"
+                        className="px-2.5 py-1 rounded-lg border bg-white dark:bg-gray-700 disabled:opacity-40 flex items-center gap-1"
                       >
                         <ChevronLeft size={14} /> Prev
                       </button>
@@ -841,7 +841,7 @@ export default function ListsPage() {
                       <button
                         onClick={() => { const p = Math.min(memberPages, memberPage + 1); setMemberPage(p); setSelectedInList(new Set()); setAllMatchingInList(false); if (viewListId) loadListContacts(viewListId, p, memberSearch, true); }}
                         disabled={memberPage >= memberPages || listLoading}
-                        className="px-2.5 py-1 rounded-lg border bg-white dark:bg-[#2a3942] disabled:opacity-40 flex items-center gap-1"
+                        className="px-2.5 py-1 rounded-lg border bg-white dark:bg-gray-700 disabled:opacity-40 flex items-center gap-1"
                       >
                         Next <ChevronRight size={14} />
                       </button>
@@ -893,7 +893,7 @@ export default function ListsPage() {
                       <h3 className="font-semibold truncate">{list.name}</h3>
                       {list.description && <p className="text-sm text-gray-500 mt-1 line-clamp-2">{list.description}</p>}
                     </div>
-                    <button onClick={() => handleDelete(list.id)} className="btn-ghost btn-sm text-red-600 flex-shrink-0" title="Delete list"><Trash2 size={14} /></button>
+                    <button onClick={() => handleDelete(list.id)} className="btn-ghost btn-sm text-danger-600 flex-shrink-0" title="Delete list"><Trash2 size={14} /></button>
                   </div>
                   <div className="flex items-center gap-2 mt-3 text-sm text-gray-500">
                     <Users size={14} />

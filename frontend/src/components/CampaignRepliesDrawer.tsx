@@ -25,8 +25,8 @@ import { openWhatsappForCall } from "../utils/call";
 
 const sentimentChip = (value?: string | null) => {
   const v = (value || "").toLowerCase();
-  if (v === "positive") return { cls: "bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300", icon: TrendingUp, label: "positive" };
-  if (v === "negative") return { cls: "bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300", icon: ThumbsDown, label: "negative" };
+  if (v === "positive") return { cls: "bg-success-100 text-success-700 dark:bg-success-900/50 dark:text-success-300", icon: TrendingUp, label: "positive" };
+  if (v === "negative") return { cls: "bg-danger-100 text-danger-700 dark:bg-danger-900/50 dark:text-danger-300", icon: ThumbsDown, label: "negative" };
   return null;
 };
 
@@ -210,7 +210,7 @@ export default function CampaignRepliesDrawer({
                             </span>
                           )}
                           {row.status === "interested" && (
-                            <span className="inline-flex items-center gap-0.5 text-[10px] text-yellow-600">
+                            <span className="inline-flex items-center gap-0.5 text-[10px] text-warning-600">
                               <Star size={10} /> interested
                             </span>
                           )}
@@ -238,7 +238,7 @@ export default function CampaignRepliesDrawer({
                         <div className="flex items-center gap-1">
                           <button
                             onClick={(e) => { e.stopPropagation(); openWhatsappForCall(row.contact_phone, row.contact_name); }}
-                            className="w-8 h-8 rounded-full bg-[#25D366] text-white flex items-center justify-center hover:bg-[#1fb857] transition-colors"
+                            className="w-8 h-8 rounded-full bg-primary-600 text-white flex items-center justify-center hover:bg-primary-700 transition-colors"
                             title={`Call ${row.contact_name} on WhatsApp`}
                           >
                             <PhoneCall size={14} />

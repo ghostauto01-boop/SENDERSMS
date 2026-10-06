@@ -243,7 +243,7 @@ export default function VariablesPage() {
               <p className="whitespace-pre-wrap">{analysis.preview || <em className="text-gray-400">empty</em>}</p>
             </div>
             {analysis.unknown.length > 0 && (
-              <p className="text-red-600 dark:text-red-400 flex items-start gap-1.5">
+              <p className="text-danger-600 dark:text-danger-400 flex items-start gap-1.5">
                 <AlertTriangle size={14} className="mt-0.5 shrink-0" />
                 <span>
                   Not a known short code and will be removed:{" "}
@@ -252,7 +252,7 @@ export default function VariablesPage() {
               </p>
             )}
             {analysis.empty.length > 0 && (
-              <p className="text-amber-600 dark:text-amber-400 flex items-start gap-1.5">
+              <p className="text-warning-600 dark:text-warning-400 flex items-start gap-1.5">
                 <AlertTriangle size={14} className="mt-0.5 shrink-0" />
                 <span>
                   Known, but empty for this contact (removed):{" "}
@@ -261,7 +261,7 @@ export default function VariablesPage() {
               </p>
             )}
             {analysis.unknown.length === 0 && analysis.empty.length === 0 && (
-              <p className="text-green-600 dark:text-green-400 flex items-center gap-1.5">
+              <p className="text-success-600 dark:text-success-400 flex items-center gap-1.5">
                 <Check size={14} /> Every short code in this message resolves.
               </p>
             )}
@@ -360,7 +360,7 @@ export default function VariablesPage() {
                       {variable.contact_count > 0 ? (
                         <span>{variable.contact_count}</span>
                       ) : (
-                        <span className="text-amber-600 text-xs">no data yet</span>
+                        <span className="text-warning-600 text-xs">no data yet</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300 max-w-[160px]">
@@ -383,7 +383,7 @@ export default function VariablesPage() {
                         {variable.source !== "standard" && (
                           <button
                             onClick={() => handleDelete(variable)}
-                            className="btn-secondary btn-sm text-red-600"
+                            className="btn-secondary btn-sm text-danger-600"
                             title="Remove"
                           >
                             <Trash2 size={14} />

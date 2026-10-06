@@ -220,7 +220,7 @@ export default function EmailManagerPage() {
       </div>
 
       {!accounts.length && (
-        <div className="card border-l-4 border-amber-400">
+        <div className="card border-l-4 border-warning-400">
           <h3 className="font-semibold flex items-center gap-2">
             <KeyRound size={17} /> Connect Brevo to start sending email
           </h3>
@@ -376,10 +376,10 @@ function ManagerOverview({ ads, email, accounts, campaigns, onOpen, onCreate, on
                 <XAxis dataKey="date" tick={{ fontSize: 11 }} />
                 <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
                 <Tooltip />
-                <Area type="monotone" dataKey="sent" name="Sent" stroke="#4f46e5" fill="#4f46e580" />
-                <Area type="monotone" dataKey="opened" name="Opens" stroke="#0ea5e9" fill="#0ea5e940" />
-                <Area type="monotone" dataKey="clicks" name="Clicks" stroke="#16a34a" fill="#16a34a40" />
-                <Area type="monotone" dataKey="replies" name="Replies" stroke="#f59e0b" fill="#f59e0b40" />
+                <Area type="monotone" dataKey="sent" name="Sent" stroke="#4f46e5" fill="#4f46e5" />
+                <Area type="monotone" dataKey="opened" name="Opens" stroke="#4163f6" fill="#0ea5e940" />
+                <Area type="monotone" dataKey="clicks" name="Clicks" stroke="#059669" fill="#059669" />
+                <Area type="monotone" dataKey="replies" name="Replies" stroke="#f59e0b" fill="#f59e0b" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -832,7 +832,7 @@ function ManagerFollowUps() {
                     >
                       Reschedule
                     </button>
-                    <button className="btn-ghost btn-sm text-red-600" onClick={() => act(i.id, "cancel")}>
+                    <button className="btn-ghost btn-sm text-danger-600" onClick={() => act(i.id, "cancel")}>
                       Cancel
                     </button>
                   </div>
@@ -930,7 +930,7 @@ function ManagerCalendar() {
                         </p>
                       </div>
                       <button
-                        className="btn-ghost btn-sm text-red-600"
+                        className="btn-ghost btn-sm text-danger-600"
                         onClick={async () => {
                           await adsApi.deleteEvent(e.id);
                           load();
@@ -1206,7 +1206,7 @@ function SendersTab({ accounts, reload, onEdit, onAdd }: any) {
             </div>
 
             {account.last_error && (
-              <p className="text-xs text-red-500 line-clamp-2" title={account.last_error}>
+              <p className="text-xs text-danger-500 line-clamp-2" title={account.last_error}>
                 {account.last_error}
               </p>
             )}
@@ -1238,7 +1238,7 @@ function SendersTab({ accounts, reload, onEdit, onAdd }: any) {
               <button className="text-gray-500 hover:text-primary-600 text-sm px-2" onClick={() => onEdit(account)}>
                 Edit
               </button>
-              <button className="text-gray-400 hover:text-red-500 text-sm px-2" onClick={() => remove(account)}>
+              <button className="text-gray-400 hover:text-danger-500 text-sm px-2" onClick={() => remove(account)}>
                 <Trash2 size={15} />
               </button>
             </div>
@@ -1453,7 +1453,7 @@ function AccountModal({
         </button>
 
         {probeNote && (
-          <p className="text-xs text-amber-600 -mt-2">{probeNote}</p>
+          <p className="text-xs text-warning-600 -mt-2">{probeNote}</p>
         )}
 
         {senders.length > 0 && (
@@ -1496,7 +1496,7 @@ function AccountModal({
                 (s: any) =>
                   (s.email || "").toLowerCase() === form.from_email.trim().toLowerCase()
               ) && (
-                <p className="text-xs text-amber-600">
+                <p className="text-xs text-warning-600">
                   {form.from_email} is not in this key's verified list — Brevo will reject it or
                   it will land in spam. Verify it in Brevo → Senders &amp; IP first.
                 </p>
@@ -1508,9 +1508,9 @@ function AccountModal({
                   <span key={d.domain} className="mr-2">
                     <span className="font-mono">{d.domain}</span>{" "}
                     {d.dkim ? (
-                      <span className="text-green-600">SPF/DKIM ✓</span>
+                      <span className="text-success-600">SPF/DKIM ✓</span>
                     ) : (
-                      <span className="text-amber-600">not authenticated</span>
+                      <span className="text-warning-600">not authenticated</span>
                     )}
                   </span>
                 ))}
@@ -1645,7 +1645,7 @@ function TemplatesTab({ reference }: any) {
                   <button className="text-sm text-primary-600 px-2" onClick={() => setEditing(t)}>
                     Edit
                   </button>
-                  <button className="text-gray-400 hover:text-red-500 px-2" onClick={() => remove(t)}>
+                  <button className="text-gray-400 hover:text-danger-500 px-2" onClick={() => remove(t)}>
                     <Trash2 size={15} />
                   </button>
                 </div>
@@ -1857,9 +1857,9 @@ function DeliverabilityTab({ accounts }: { accounts: EmailAccount[] }) {
             {data.checks.map((check: any) => (
               <div key={check.key} className="flex items-start gap-3 text-sm">
                 {check.ok ? (
-                  <CheckCircle2 size={17} className="text-green-500 mt-0.5 shrink-0" />
+                  <CheckCircle2 size={17} className="text-success-500 mt-0.5 shrink-0" />
                 ) : (
-                  <XCircle size={17} className="text-amber-500 mt-0.5 shrink-0" />
+                  <XCircle size={17} className="text-warning-500 mt-0.5 shrink-0" />
                 )}
                 <div>
                   <p className="font-medium">{check.label}</p>
@@ -1872,7 +1872,7 @@ function DeliverabilityTab({ accounts }: { accounts: EmailAccount[] }) {
           <div className="card space-y-2">
             <h3 className="font-semibold">Authenticated domains in Brevo</h3>
             {data.domains_error && (
-              <p className="text-sm text-amber-600">{data.domains_error}</p>
+              <p className="text-sm text-warning-600">{data.domains_error}</p>
             )}
             {data.domains.length === 0 ? (
               <p className="text-sm text-gray-500">
@@ -2008,7 +2008,7 @@ function SuppressionTab() {
                   {entry.reason || "—"} · {entry.source || "manual"} · {fmtDate(entry.created_at)}
                 </p>
               </div>
-              <button className="text-gray-400 hover:text-red-500 px-2" onClick={() => remove(entry)}>
+              <button className="text-gray-400 hover:text-danger-500 px-2" onClick={() => remove(entry)}>
                 <Trash2 size={15} />
               </button>
             </div>
@@ -2145,7 +2145,7 @@ function ActivityTab({ accounts }: any) {
               <div className="min-w-0">
                 <p className="font-medium truncate flex items-center gap-2">
                   {m.direction === "incoming" ? (
-                    <Inbox size={14} className="text-amber-500" />
+                    <Inbox size={14} className="text-warning-500" />
                   ) : (
                     <Send size={14} className="text-primary-500" />
                   )}
@@ -2180,10 +2180,10 @@ function ActivityTab({ accounts }: any) {
 }
 
 function EventIcon({ type }: { type: string }) {
-  if (type === "opened") return <Eye size={14} className="text-sky-500" />;
-  if (type === "clicked") return <MousePointerClick size={14} className="text-green-600" />;
-  if (type === "delivered" || type === "sent") return <CheckCircle2 size={14} className="text-green-500" />;
-  if (type === "bounce" || type === "blocked" || type === "error") return <XCircle size={14} className="text-red-500" />;
-  if (type === "unsubscribed") return <UserRound size={14} className="text-amber-500" />;
+  if (type === "opened") return <Eye size={14} className="text-primary-500" />;
+  if (type === "clicked") return <MousePointerClick size={14} className="text-success-600" />;
+  if (type === "delivered" || type === "sent") return <CheckCircle2 size={14} className="text-success-500" />;
+  if (type === "bounce" || type === "blocked" || type === "error") return <XCircle size={14} className="text-danger-500" />;
+  if (type === "unsubscribed") return <UserRound size={14} className="text-warning-500" />;
   return <Activity size={14} className="text-gray-400" />;
 }

@@ -253,7 +253,7 @@ function RuleModal({
             Stop checking other rules once this one matches
           </label>
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="text-sm text-danger-600">{error}</p>}
         </div>
 
         <div className="flex gap-2 mt-5">
@@ -314,10 +314,10 @@ function TestModal({ onClose }: { onClose: () => void }) {
         {result && (
           <div className="mt-4 text-sm">
             {result.error ? (
-              <p className="text-red-600">Could not run the test.</p>
+              <p className="text-danger-600">Could not run the test.</p>
             ) : result.matched ? (
-              <div className="rounded-lg bg-green-50 dark:bg-green-900/20 p-3">
-                <p className="font-medium text-green-800 dark:text-green-300">
+              <div className="rounded-lg bg-success-50 dark:bg-success-900/20 p-3">
+                <p className="font-medium text-success-800 dark:text-success-300">
                   Matches "{result.rule_name}"
                 </p>
                 <p className="mt-2 text-gray-700 dark:text-gray-300">{result.reply_body}</p>
@@ -468,7 +468,7 @@ export default function AutoReplyPage() {
                   </button>
                   <button
                     onClick={() => remove(rule)}
-                    className="btn-ghost btn-sm text-red-600"
+                    className="btn-ghost btn-sm text-danger-600"
                     title="Delete"
                   >
                     <Trash2 size={14} />

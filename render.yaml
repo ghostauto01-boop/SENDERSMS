@@ -38,8 +38,11 @@ services:
         generateValue: true
       - key: ADMIN_USERNAME
         sync: false
+      # The password the login screen asks for. Leave it to Render's prompt and
+      # set something only you know; the shipped default (12345678) is refused
+      # as a production value by the Setup Guide.
       - key: ADMIN_PASSWORD
-        sync: false
+        generateValue: true
       - key: APP_ENV
         value: production
       - key: LOG_LEVEL
@@ -56,8 +59,10 @@ services:
       #     relative or mismatched `resource`, so the connectors cannot connect)
       #   - the Gmail OAuth redirect URI
       # Render injects RENDER_EXTERNAL_URL automatically and the app falls back
-      # to it; set this explicitly if you serve the app behind a custom domain.
-      # The in-app Setup Guide (/setup) flags it if it is still missing.
+      # to it. Even with nothing set, the app derives the address from the
+      # request itself, so the in-app connector test passes from the browser
+      # you administer from. Set it explicitly for a custom domain, or when an
+      # AI client connects from outside your network.
       - key: PUBLIC_BASE_URL
         sync: false
       # --- Email replies (Gmail) -------------------------------------------
@@ -128,8 +133,11 @@ services:
         sync: false
       - key: ADMIN_USERNAME
         sync: false
+      # The password the login screen asks for. Leave it to Render's prompt and
+      # set something only you know; the shipped default (12345678) is refused
+      # as a production value by the Setup Guide.
       - key: ADMIN_PASSWORD
-        sync: false
+        generateValue: true
       - key: APP_ENV
         value: production
       - key: LOG_LEVEL

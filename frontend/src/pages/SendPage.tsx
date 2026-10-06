@@ -40,8 +40,8 @@ function SendPageInner() {
     return (
       <div className="space-y-4 pb-20 lg:pb-0">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-[22px] font-bold text-[#111b21] dark:text-white flex items-center gap-2">
-            <span className="w-8 h-8 rounded-full bg-[#0ea5e9] flex items-center justify-center text-white">
+          <h1 className="text-[22px] font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <span className="w-8 h-8 rounded-full bg-primary-500 flex items-center justify-center text-white">
               <Send size={16} />
             </span>
             Send Email
@@ -277,27 +277,27 @@ function SendPageInner() {
   return (
     <div className="space-y-3 pb-20 lg:pb-0">
       <div className="flex items-center justify-between">
-        <h1 className="text-[22px] font-bold text-[#111b21] dark:text-white flex items-center gap-2">
-          <span className="w-8 h-8 rounded-full bg-[#00a884] flex items-center justify-center text-white"><Send size={16}/></span>
+        <h1 className="text-[22px] font-bold text-gray-900 dark:text-white flex items-center gap-2">
+          <span className="w-8 h-8 rounded-full bg-primary-600 flex items-center justify-center text-white"><Send size={16}/></span>
           Send SMS
         </h1>
         <div className="flex items-center gap-2 text-xs">
           <ChannelSwitch size="sm" navigateManagers />
-          <span className="hidden sm:inline text-[#667781]">Gateway active</span>
-          <span className="w-2 h-2 bg-[#00a884] rounded-full animate-pulse"/>
+          <span className="hidden sm:inline text-gray-500">Gateway active</span>
+          <span className="w-2 h-2 bg-primary-600 rounded-full animate-pulse"/>
         </div>
       </div>
 
       {/* Top tabs like WhatsApp - Compose / Scheduled / Sent / Failed */}
-      <div className="bg-white dark:bg-[#202c33] rounded-xl p-1.5 flex gap-1 shadow-sm border border-gray-100 dark:border-[#2a3942] overflow-x-auto">
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-1.5 flex gap-1 shadow-sm border border-gray-100 dark:border-gray-700 overflow-x-auto">
         {[
           {id:"compose", label:"Compose", icon: Send, count: null},
           {id:"scheduled", label:"Scheduled", icon: Clock, count: scheduledTotal},
           {id:"sent", label:"Sent", icon: CheckCircle2, count: historyTotal},
           {id:"failed", label:"Failed", icon: AlertCircle, count: failedTotal},
         ].map(t=>(
-          <button key={t.id} onClick={()=>setActiveTab(t.id as any)} className={`flex-1 min-w-[80px] flex items-center justify-center gap-1.5 py-2.5 rounded-full text-sm font-medium transition-colors ${activeTab===t.id?"bg-[#00a884] text-white shadow-sm":"text-[#54656f] dark:text-[#8696a0] hover:bg-[#f0f2f5] dark:hover:bg-[#111b21]"}`}>
-            <t.icon size={14}/> {t.label} {t.count!==null && t.count>0 && <span className={`ml-1 px-1.5 py-0.5 rounded-full text-xs ${activeTab===t.id?"bg-white/20 text-white":"bg-[#fce8e6] text-[#c5221f] dark:bg-[#2a3942] dark:text-[#f15c6d]"}`}>{t.count}</span>}
+          <button key={t.id} onClick={()=>setActiveTab(t.id as any)} className={`flex-1 min-w-[80px] flex items-center justify-center gap-1.5 py-2.5 rounded-full text-sm font-medium transition-colors ${activeTab===t.id?"bg-primary-600 text-white shadow-sm":"text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-900"}`}>
+            <t.icon size={14}/> {t.label} {t.count!==null && t.count>0 && <span className={`ml-1 px-1.5 py-0.5 rounded-full text-xs ${activeTab===t.id?"bg-white/20 text-white":"bg-danger-100 text-danger-700 dark:bg-gray-700 dark:text-danger-500"}`}>{t.count}</span>}
           </button>
         ))}
       </div>
@@ -306,36 +306,36 @@ function SendPageInner() {
         <>
           <div className="flex gap-1.5 flex-wrap">
             {[{id:"contact" as const,label:"Pick Contact",icon:UserPlus},{id:"number" as const,label:"Enter Number",icon:Phone},{id:"list" as const,label:"Send to List",icon:List}].map(m=>(
-              <button key={m.id} onClick={()=>{setMode(m.id);setResult(null)}} className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium border ${mode===m.id?"bg-[#00a884] text-white border-[#00a884]":"bg-white dark:bg-[#202c33] text-[#54656f] dark:text-[#8696a0] border-gray-200 dark:border-[#2a3942]"}`}><m.icon size={14}/>{m.label}</button>
+              <button key={m.id} onClick={()=>{setMode(m.id);setResult(null)}} className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium border ${mode===m.id?"bg-primary-600 text-white border-primary-600":"bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700"}`}><m.icon size={14}/>{m.label}</button>
             ))}
-            <span className="hidden sm:block w-px bg-gray-200 dark:bg-[#2a3942] mx-1 self-stretch my-1"/>
-            <button onClick={()=>{setSendType("now");setResult(null)}} className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium border ${sendType==="now"?"bg-[#008069] text-white border-[#008069]":"bg-white dark:bg-[#202c33] text-[#54656f] dark:text-[#8696a0] border-gray-200 dark:border-[#2a3942]"}`}><Send size={14}/>Now</button>
-            <button onClick={()=>{setSendType("scheduled");setResult(null)}} className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium border ${sendType==="scheduled"?"bg-[#ffad1f] text-white border-[#ffad1f]":"bg-white dark:bg-[#202c33] text-[#54656f] dark:text-[#8696a0] border-gray-200 dark:border-[#2a3942]"}`}><Clock size={14}/>Schedule</button>
+            <span className="hidden sm:block w-px bg-gray-200 dark:bg-gray-700 mx-1 self-stretch my-1"/>
+            <button onClick={()=>{setSendType("now");setResult(null)}} className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium border ${sendType==="now"?"bg-primary-700 text-white border-primary-700":"bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700"}`}><Send size={14}/>Now</button>
+            <button onClick={()=>{setSendType("scheduled");setResult(null)}} className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium border ${sendType==="scheduled"?"bg-warning-500 text-white border-warning-500":"bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700"}`}><Clock size={14}/>Schedule</button>
           </div>
 
           {sendType === "scheduled" && (
-            <div className="bg-[#fff8c4] dark:bg-[#2a3942] border border-[#ffecb3] dark:border-[#2a3942] rounded-xl p-3 flex flex-wrap items-end gap-3">
-              <div><label className="text-xs font-medium text-[#54656f] dark:text-[#8696a0]">Date</label><input type="date" className="mt-1 px-3 py-2.5 bg-white dark:bg-[#111b21] rounded-xl text-sm w-full border-0 focus:ring-2 focus:ring-[#00a884]/20 outline-none" value={scheduleDate} onChange={e=>setScheduleDate(e.target.value)}/></div>
-              <div><label className="text-xs font-medium text-[#54656f] dark:text-[#8696a0]">Time</label><input type="time" className="mt-1 px-3 py-2.5 bg-white dark:bg-[#111b21] rounded-xl text-sm w-full border-0 focus:ring-2 focus:ring-[#00a884]/20 outline-none" value={scheduleTime} onChange={e=>setScheduleTime(e.target.value)}/></div>
-              <p className="text-xs text-[#667781] dark:text-[#8696a0] flex-1 min-w-[200px]">Will send automatically in your local timezone. You can cancel in <b>Scheduled</b> tab before it fires. Status moves to <b>Sent</b> or <b>Failed</b> afterwards.</p>
+            <div className="bg-warning-100 dark:bg-gray-700 border border-warning-200 dark:border-gray-700 rounded-xl p-3 flex flex-wrap items-end gap-3">
+              <div><label className="text-xs font-medium text-gray-600 dark:text-gray-400">Date</label><input type="date" className="mt-1 px-3 py-2.5 bg-white dark:bg-gray-900 rounded-xl text-sm w-full border-0 focus:ring-2 focus:ring-primary-600/20 outline-none" value={scheduleDate} onChange={e=>setScheduleDate(e.target.value)}/></div>
+              <div><label className="text-xs font-medium text-gray-600 dark:text-gray-400">Time</label><input type="time" className="mt-1 px-3 py-2.5 bg-white dark:bg-gray-900 rounded-xl text-sm w-full border-0 focus:ring-2 focus:ring-primary-600/20 outline-none" value={scheduleTime} onChange={e=>setScheduleTime(e.target.value)}/></div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 flex-1 min-w-[200px]">Will send automatically in your local timezone. You can cancel in <b>Scheduled</b> tab before it fires. Status moves to <b>Sent</b> or <b>Failed</b> afterwards.</p>
             </div>
           )}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-            <div className="bg-white dark:bg-[#202c33] rounded-xl p-4 space-y-3 shadow-sm border border-gray-100 dark:border-[#2a3942]">
-              <h2 className="font-semibold text-[#111b21] dark:text-white flex items-center gap-2"><Users size={16} className="text-[#00a884]"/> Recipients</h2>
-              {mode==="contact"&&(<><div className="relative"><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#667781]"/><input className="w-full pl-9 pr-3 py-2.5 bg-[#f0f2f5] dark:bg-[#111b21] rounded-full text-sm placeholder:text-[#667781] focus:outline-none focus:ring-2 focus:ring-[#00a884]/20" placeholder="Search contacts… e.g. Chicken Republic" value={search} onChange={e=>setSearch(e.target.value)}/></div><div className="max-h-64 overflow-y-auto space-y-1 border border-gray-100 dark:border-[#2a3942] rounded-xl p-1.5 bg-[#f0f2f5]/50 dark:bg-[#111b21]/50">{contactsLoading&&filtered.length===0?<p className="text-xs text-center py-4 text-[#667781]">Searching…</p>:<>{filtered.slice(0,50).map(c=>(<label key={c.id} className={`flex items-center gap-2.5 p-2.5 rounded-xl cursor-pointer ${selectedContacts.find(x=>x.id===c.id)?"bg-[#d9fdd3] dark:bg-[#0a332c] border border-[#00a884]/20":"hover:bg-white dark:hover:bg-[#202c33] border border-transparent"}`}><input type="checkbox" checked={!!selectedContacts.find(x=>x.id===c.id)} onChange={()=>toggleContact(c)} className="rounded accent-[#00a884] w-4 h-4"/><span className="text-sm font-medium text-[#111b21] dark:text-white truncate">{c.first_name} {c.last_name} {c.business_name?`• ${c.business_name}`:""}</span><span className="text-xs text-[#667781] ml-auto font-mono">{c.phone_number}</span></label>))}
-{filtered.length===0&&!contactsLoading&&<p className="text-xs text-center py-4 text-[#667781]">{search.trim()?"No contacts match your search":"No contacts yet — import a CSV first"}</p>}
-{filtered.length>0&&contactsTotal>filtered.length&&<p className="text-xs text-center py-2 text-[#667781] border-t border-gray-100 dark:border-[#2a3942]">Showing {filtered.length} of {contactsTotal} — keep typing to narrow the search</p>}</>}
-</div>{selectedContacts.length>0&&(<div className="flex flex-wrap gap-1.5">{selectedContacts.map(c=>(<span key={c.id} className="bg-[#e7f3ff] dark:bg-[#182533] text-[#008069] dark:text-[#53bdeb] text-xs px-2.5 py-1 rounded-full flex items-center gap-1.5 font-medium">{c.first_name||c.phone_number}<button onClick={()=>toggleContact(c)} className="hover:text-red-500"><X size={12}/></button></span>))}</div>)}</>)}
-              {mode==="number"&&(<div><label className="text-xs font-medium text-[#54656f]">Phone Number</label><input className="mt-1 w-full px-3 py-3 bg-[#f0f2f5] dark:bg-[#111b21] rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#00a884]/20" placeholder="08012345678" value={phoneNumber} onChange={e=>setPhoneNumber(e.target.value)}/><p className="text-xs text-[#667781] mt-1">International format auto-normalized to +234...</p></div>)}
-              {mode==="list"&&(<div><label className="text-xs font-medium text-[#54656f]">Contact List</label><div className="mt-1"><ListPicker value={selectedListId} onChange={(v)=>{setSelectedListId(v);setValidation(null);}} placeholder="Select a list… (or create one)" allowNone={false} /></div><p className="text-xs text-[#667781] mt-1">All contacts in list get the same personalized message.</p></div>)}
-              <button onClick={runValidation} disabled={validating} className="w-full py-2.5 rounded-xl border-2 border-dashed border-[#00a884]/40 hover:border-[#00a884] text-[#008069] text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-50">
-                {validating ? <span className="w-4 h-4 border-2 border-[#00a884] border-t-transparent rounded-full animate-spin"/> : <ShieldCheck size={16}/>}
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-4 space-y-3 shadow-sm border border-gray-100 dark:border-gray-700">
+              <h2 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2"><Users size={16} className="text-primary-600"/> Recipients</h2>
+              {mode==="contact"&&(<><div className="relative"><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"/><input className="w-full pl-9 pr-3 py-2.5 bg-gray-100 dark:bg-gray-900 rounded-full text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-600/20" placeholder="Search contacts… e.g. Chicken Republic" value={search} onChange={e=>setSearch(e.target.value)}/></div><div className="max-h-64 overflow-y-auto space-y-1 border border-gray-100 dark:border-gray-700 rounded-xl p-1.5 bg-gray-100/50 dark:bg-gray-900/50">{contactsLoading&&filtered.length===0?<p className="text-xs text-center py-4 text-gray-500">Searching…</p>:<>{filtered.slice(0,50).map(c=>(<label key={c.id} className={`flex items-center gap-2.5 p-2.5 rounded-xl cursor-pointer ${selectedContacts.find(x=>x.id===c.id)?"bg-primary-100 dark:bg-primary-950 border border-primary-600/20":"hover:bg-white dark:hover:bg-gray-800 border border-transparent"}`}><input type="checkbox" checked={!!selectedContacts.find(x=>x.id===c.id)} onChange={()=>toggleContact(c)} className="rounded accent-primary-600 w-4 h-4"/><span className="text-sm font-medium text-gray-900 dark:text-white truncate">{c.first_name} {c.last_name} {c.business_name?`• ${c.business_name}`:""}</span><span className="text-xs text-gray-500 ml-auto font-mono">{c.phone_number}</span></label>))}
+{filtered.length===0&&!contactsLoading&&<p className="text-xs text-center py-4 text-gray-500">{search.trim()?"No contacts match your search":"No contacts yet — import a CSV first"}</p>}
+{filtered.length>0&&contactsTotal>filtered.length&&<p className="text-xs text-center py-2 text-gray-500 border-t border-gray-100 dark:border-gray-700">Showing {filtered.length} of {contactsTotal} — keep typing to narrow the search</p>}</>}
+</div>{selectedContacts.length>0&&(<div className="flex flex-wrap gap-1.5">{selectedContacts.map(c=>(<span key={c.id} className="bg-primary-50 dark:bg-gray-800 text-primary-700 dark:text-primary-400 text-xs px-2.5 py-1 rounded-full flex items-center gap-1.5 font-medium">{c.first_name||c.phone_number}<button onClick={()=>toggleContact(c)} className="hover:text-danger-500"><X size={12}/></button></span>))}</div>)}</>)}
+              {mode==="number"&&(<div><label className="text-xs font-medium text-gray-600">Phone Number</label><input className="mt-1 w-full px-3 py-3 bg-gray-100 dark:bg-gray-900 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary-600/20" placeholder="08012345678" value={phoneNumber} onChange={e=>setPhoneNumber(e.target.value)}/><p className="text-xs text-gray-500 mt-1">International format auto-normalized to +234...</p></div>)}
+              {mode==="list"&&(<div><label className="text-xs font-medium text-gray-600">Contact List</label><div className="mt-1"><ListPicker value={selectedListId} onChange={(v)=>{setSelectedListId(v);setValidation(null);}} placeholder="Select a list… (or create one)" allowNone={false} /></div><p className="text-xs text-gray-500 mt-1">All contacts in list get the same personalized message.</p></div>)}
+              <button onClick={runValidation} disabled={validating} className="w-full py-2.5 rounded-xl border-2 border-dashed border-primary-600/40 hover:border-primary-600 text-primary-700 text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-50">
+                {validating ? <span className="w-4 h-4 border-2 border-primary-600 border-t-transparent rounded-full animate-spin"/> : <ShieldCheck size={16}/>}
                 {validating ? "Checking numbers…" : "Check numbers before sending"}
               </button>
               {validation && (
-                <div className={`rounded-xl p-3 text-sm border ${validation.blocked > 0 ? "bg-[#fff8c4] border-[#ffecb3]" : "bg-[#d9fdd3] border-[#a3e9a4]"}`}>
+                <div className={`rounded-xl p-3 text-sm border ${validation.blocked > 0 ? "bg-warning-100 border-warning-200" : "bg-primary-100 border-success-300"}`}>
                   <p className="font-semibold text-[13px]">
                     {validation.blocked > 0 ? <>🛡️ {validation.sendable}/{validation.total} can receive SMS — {validation.blocked} will be filtered out (no charge)</> : <>✅ All {validation.total} number(s) look good</>}
                   </p>
@@ -359,8 +359,8 @@ function SendPageInner() {
                 </div>
               )}
             </div>
-            <div className="bg-white dark:bg-[#202c33] rounded-xl p-4 space-y-3 shadow-sm border border-gray-100 dark:border-[#2a3942]">
-              <h2 className="font-semibold text-[#111b21] dark:text-white flex items-center gap-2"><MessageSquare size={16} className="text-[#00a884]"/> Message</h2>
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-4 space-y-3 shadow-sm border border-gray-100 dark:border-gray-700">
+              <h2 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2"><MessageSquare size={16} className="text-primary-600"/> Message</h2>
               <TemplatePicker
                 value=""
                 onChange={async (id) => {
@@ -375,34 +375,34 @@ function SendPageInner() {
                 showPreview={false}
               />
               <div className="relative">
-                <textarea ref={msgRef} className="w-full px-3 py-3 bg-[#f0f2f5] dark:bg-[#111b21] rounded-xl text-[15px] placeholder:text-[#667781] focus:outline-none focus:ring-2 focus:ring-[#00a884]/20 resize-none" rows={6} placeholder="Hi {{first_name}}, craving something tasty? 🍗 At Chicken Republic… Reply STOP to opt out" value={message} onChange={e=>setMessage(e.target.value)} maxLength={1600}/>
-                <span className="absolute bottom-2 right-2 text-[11px] bg-white dark:bg-[#2a3942] px-2 py-0.5 rounded-full text-[#667781] shadow-sm">{charCount} chars</span>
+                <textarea ref={msgRef} className="w-full px-3 py-3 bg-gray-100 dark:bg-gray-900 rounded-xl text-[15px] placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-600/20 resize-none" rows={6} placeholder="Hi {{first_name}}, craving something tasty? 🍗 At Chicken Republic… Reply STOP to opt out" value={message} onChange={e=>setMessage(e.target.value)} maxLength={1600}/>
+                <span className="absolute bottom-2 right-2 text-[11px] bg-white dark:bg-gray-700 px-2 py-0.5 rounded-full text-gray-500 shadow-sm">{charCount} chars</span>
               </div>
-              <div className="flex justify-between text-xs text-[#667781]">
+              <div className="flex justify-between text-xs text-gray-500">
                 <span>{charCount} chars • {segmentCount} SMS • ~{segmentCount*4} NGN {segmentCount>1&& segmentCount>3?"• long message costs more":""}</span>
-                <span className={charCount>140?"text-orange-500":""}>{charCount>160?"Multi-part":"Single"}</span>
+                <span className={charCount>140?"text-warning-500":""}>{charCount>160?"Multi-part":"Single"}</span>
               </div>
               <div className="flex flex-wrap gap-1.5 items-center">
                 <ShortcodePicker targetRef={msgRef} value={message} onChange={setMessage} label="Insert variable" />
-                {["{{first_name}}","{{business_name}}","{{city}}","{{state}}"].map(v=>(<button key={v} type="button" onClick={()=>setMessage(message+" "+v)} className="text-xs px-2.5 py-1 bg-[#f0f2f5] dark:bg-[#111b21] hover:bg-[#e9edef] dark:hover:bg-[#2a3942] rounded-full font-mono text-[#54656f] dark:text-[#8696a0]">{v}</button>))}</div>
-              <button onClick={handleSend} disabled={sending||!message.trim()} className={`w-full py-3 rounded-full font-semibold flex items-center justify-center gap-2 shadow-sm active:scale-[0.98] transition-transform ${sendType==="scheduled"?"bg-[#ffad1f] hover:bg-[#ff9f00] text-white":"bg-[#00a884] hover:bg-[#06cf9c] text-white"} disabled:opacity-50`}>
+                {["{{first_name}}","{{business_name}}","{{city}}","{{state}}"].map(v=>(<button key={v} type="button" onClick={()=>setMessage(message+" "+v)} className="text-xs px-2.5 py-1 bg-gray-100 dark:bg-gray-900 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full font-mono text-gray-600 dark:text-gray-400">{v}</button>))}</div>
+              <button onClick={handleSend} disabled={sending||!message.trim()} className={`w-full py-3 rounded-full font-semibold flex items-center justify-center gap-2 shadow-sm active:scale-[0.98] transition-transform ${sendType==="scheduled"?"bg-warning-500 hover:bg-warning-500 text-white":"bg-primary-600 hover:bg-primary-500 text-white"} disabled:opacity-50`}>
                 {sending? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"/> : sendType==="scheduled" ? <Calendar size={16}/> : <Send size={16}/>}
                 {sending?"Sending...":sendType==="scheduled"?`Schedule SMS${mode==="list"?" to List":" • "+selectedContacts.length||""}`:`Send Now${mode==="list"?" to List":""}`}
               </button>
               {result&&(<div className="space-y-2 pt-1">
                 {result.scheduled ? (
-                  <div className="p-3 rounded-xl text-sm bg-[#fff8c4] border border-[#ffecb3] text-[#8d5100] flex gap-2"><Hourglass size={16} className="flex-shrink-0 mt-0.5"/><div><strong>{result.count} scheduled</strong> for {new Date(result.schedule_at).toLocaleString()} • Watch <b>Scheduled</b> tab for status (pending → sent/failed).</div></div>
+                  <div className="p-3 rounded-xl text-sm bg-warning-100 border border-warning-200 text-warning-700 flex gap-2"><Hourglass size={16} className="flex-shrink-0 mt-0.5"/><div><strong>{result.count} scheduled</strong> for {new Date(result.schedule_at).toLocaleString()} • Watch <b>Scheduled</b> tab for status (pending → sent/failed).</div></div>
                 ) : (
-                  <><div className={`p-3 rounded-xl text-sm flex gap-2 ${result.failed>0?"bg-[#fce8e6] border border-[#f5c6cb] text-[#8a1c1c]":"bg-[#d9fdd3] border border-[#a3e9a4] text-[#0a332c]"}`}>{result.failed>0?<AlertCircle size={16} className="flex-shrink-0 mt-0.5"/>:<CheckCircle2 size={16} className="flex-shrink-0 mt-0.5"/>}<div><strong>{result.sent} sent</strong>{result.failed>0&&<>, {result.failed} failed</>}{result.total>0&&<> • {result.total} total</>}{result.filtered_count>0&&<> • 🛡️ {result.filtered_count} bad number(s) filtered (no charge)</>}{result.gateway_url&&<div className="text-xs mt-1 opacity-70">Gateway SIM {result.sim_used}</div>}</div></div>
+                  <><div className={`p-3 rounded-xl text-sm flex gap-2 ${result.failed>0?"bg-danger-100 border border-danger-200 text-danger-800":"bg-primary-100 border border-success-300 text-primary-950"}`}>{result.failed>0?<AlertCircle size={16} className="flex-shrink-0 mt-0.5"/>:<CheckCircle2 size={16} className="flex-shrink-0 mt-0.5"/>}<div><strong>{result.sent} sent</strong>{result.failed>0&&<>, {result.failed} failed</>}{result.total>0&&<> • {result.total} total</>}{result.filtered_count>0&&<> • 🛡️ {result.filtered_count} bad number(s) filtered (no charge)</>}{result.gateway_url&&<div className="text-xs mt-1 opacity-70">Gateway SIM {result.sim_used}</div>}</div></div>
                   {result.filtered_count>0 && (
-                    <details className="text-xs rounded-xl p-2.5 border bg-[#fff8c4] border-[#ffecb3]">
+                    <details className="text-xs rounded-xl p-2.5 border bg-warning-100 border-warning-200">
                       <summary className="cursor-pointer font-medium">🛡️ {result.filtered_count} filtered out before sending (saved your credit)</summary>
                       <div className="mt-1 space-y-1 max-h-32 overflow-y-auto">
                         {(result.filtered||[]).slice(0,20).map((f:any,i:number)=>(<p key={i} className="font-mono text-[11px]">{f.phone} — {(f.reason||"").replace(/_/g," ")}</p>))}
                       </div>
                     </details>
                   )}
-                  {result.results&&result.results.slice(0,5).map((r:any,i:number)=>(<details key={i} className={`text-xs rounded-xl p-2.5 border ${r.status==="sent"?"bg-[#d9fdd3]/50 border-[#a3e9a4]":"bg-[#fce8e6] border-[#f5c6cb]"}`}><summary className="cursor-pointer font-medium flex items-center gap-2">{r.phone}: {r.status==="sent"?<span className="text-[#00a884]">✅ Sent</span>:<span className="text-[#c5221f]">❌ Failed</span>}{r.error&&<span className="text-[#c5221f] truncate">— {r.error}</span>}</summary><pre className="mt-2 whitespace-pre-wrap text-[10px] opacity-70 bg-white/50 p-2 rounded">{JSON.stringify(r.api_response,null,2)}</pre></details>))}</>
+                  {result.results&&result.results.slice(0,5).map((r:any,i:number)=>(<details key={i} className={`text-xs rounded-xl p-2.5 border ${r.status==="sent"?"bg-primary-100/50 border-success-300":"bg-danger-100 border-danger-200"}`}><summary className="cursor-pointer font-medium flex items-center gap-2">{r.phone}: {r.status==="sent"?<span className="text-primary-600">✅ Sent</span>:<span className="text-danger-700">❌ Failed</span>}{r.error&&<span className="text-danger-700 truncate">— {r.error}</span>}</summary><pre className="mt-2 whitespace-pre-wrap text-[10px] opacity-70 bg-white/50 p-2 rounded">{JSON.stringify(r.api_response,null,2)}</pre></details>))}</>
                 )}
               </div>)}
             </div>
@@ -411,108 +411,108 @@ function SendPageInner() {
       )}
 
       {activeTab==="scheduled" && (
-        <div className="bg-white dark:bg-[#202c33] rounded-xl shadow-sm border border-gray-100 dark:border-[#2a3942] overflow-hidden">
-          <div className="px-4 py-3 flex items-center justify-between border-b border-gray-100 dark:border-[#2a3942] bg-[#f0f2f5] dark:bg-[#111b21]">
-            <h3 className="font-semibold text-[#111b21] dark:text-white flex items-center gap-2"><Clock size={16} className="text-[#ffad1f]"/> Scheduled Messages</h3>
-            <button onClick={loadScheduled} className="text-xs bg-white dark:bg-[#2a3942] px-3 py-1.5 rounded-full border">↻ Refresh</button>
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+          <div className="px-4 py-3 flex items-center justify-between border-b border-gray-100 dark:border-gray-700 bg-gray-100 dark:bg-gray-900">
+            <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2"><Clock size={16} className="text-warning-500"/> Scheduled Messages</h3>
+            <button onClick={loadScheduled} className="text-xs bg-white dark:bg-gray-700 px-3 py-1.5 rounded-full border">↻ Refresh</button>
           </div>
-          {loadingSched ? <div className="p-8 text-center"><div className="w-8 h-8 border-2 border-[#00a884] border-t-transparent rounded-full animate-spin mx-auto"/><p className="text-xs text-[#667781] mt-2">Loading…</p></div>
+          {loadingSched ? <div className="p-8 text-center"><div className="w-8 h-8 border-2 border-primary-600 border-t-transparent rounded-full animate-spin mx-auto"/><p className="text-xs text-gray-500 mt-2">Loading…</p></div>
             : scheduled.length===0 ? (
               <div className="p-10 text-center">
-                <Clock size={36} className="mx-auto text-[#ffad1f] opacity-40 mb-2"/>
-                <p className="font-medium text-[#111b21] dark:text-white text-sm">No pending scheduled messages</p>
-                <p className="text-xs text-[#667781] mt-1">Schedule from <b>Compose</b> tab — they appear here until sent. After firing they move to <b>Sent</b> or <b>Failed</b>.</p>
+                <Clock size={36} className="mx-auto text-warning-500 opacity-40 mb-2"/>
+                <p className="font-medium text-gray-900 dark:text-white text-sm">No pending scheduled messages</p>
+                <p className="text-xs text-gray-500 mt-1">Schedule from <b>Compose</b> tab — they appear here until sent. After firing they move to <b>Sent</b> or <b>Failed</b>.</p>
               </div>
             ) : (
-              <div className="divide-y divide-gray-100 dark:divide-[#2a3942]">
+              <div className="divide-y divide-gray-100 dark:divide-gray-700">
                 {scheduled.map((s:any)=>(
                   <div key={s.id} className="p-3 lg:p-4 flex gap-3">
-                    <div className="w-10 h-10 rounded-full bg-[#ffecb3] flex items-center justify-center flex-shrink-0"><Clock size={16} className="text-[#8d5100]"/></div>
+                    <div className="w-10 h-10 rounded-full bg-warning-200 flex items-center justify-center flex-shrink-0"><Clock size={16} className="text-warning-700"/></div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
-                        <p className="font-medium text-[13px] text-[#111b21] dark:text-white truncate">{s.contact_name || s.phone || "Unknown"} • <span className="font-mono text-[#00a884]">{s.phone}</span></p>
-                        <span className="text-[11px] bg-[#fff8c4] text-[#8d5100] px-2 py-0.5 rounded-full font-medium whitespace-nowrap flex items-center gap-1"><Hourglass size={10}/> pending</span>
+                        <p className="font-medium text-[13px] text-gray-900 dark:text-white truncate">{s.contact_name || s.phone || "Unknown"} • <span className="font-mono text-primary-600">{s.phone}</span></p>
+                        <span className="text-[11px] bg-warning-100 text-warning-700 px-2 py-0.5 rounded-full font-medium whitespace-nowrap flex items-center gap-1"><Hourglass size={10}/> pending</span>
                       </div>
-                      <p className="text-[13px] text-[#111b21] dark:text-[#e9edef] mt-1 line-clamp-2 bg-[#f0f2f5] dark:bg-[#111b21] rounded-lg px-2.5 py-1.5">{s.body}</p>
-                      <div className="flex items-center gap-2 mt-2 text-xs text-[#667781] flex-wrap">
+                      <p className="text-[13px] text-gray-900 dark:text-gray-200 mt-1 line-clamp-2 bg-gray-100 dark:bg-gray-900 rounded-lg px-2.5 py-1.5">{s.body}</p>
+                      <div className="flex items-center gap-2 mt-2 text-xs text-gray-500 flex-wrap">
                         <span className="flex items-center gap-1"><Calendar size={12}/> {new Date(s.schedule_at).toLocaleString()}</span>
                         <span>• SIM {s.sim_number}</span>
                         {s.list_id && <span>• list #{s.list_id}</span>}
                       </div>
                     </div>
-                    <button onClick={()=>cancelScheduled(s.id)} className="self-center w-8 h-8 rounded-full bg-[#fce8e6] hover:bg-red-500 hover:text-white text-[#c5221f] flex items-center justify-center flex-shrink-0" title="Cancel"><Trash2 size={14}/></button>
+                    <button onClick={()=>cancelScheduled(s.id)} className="self-center w-8 h-8 rounded-full bg-danger-100 hover:bg-danger-500 hover:text-white text-danger-700 flex items-center justify-center flex-shrink-0" title="Cancel"><Trash2 size={14}/></button>
                   </div>
                 ))}
               </div>
             )}
           {/* also show recently sent/failed scheduled for context */}
-          <div className="px-4 py-2 bg-[#f0f2f5] dark:bg-[#111b21] text-xs text-[#667781]">Total pending: {scheduledTotal} • Auto-refresh every 15s • Scheduled messages become Message rows on send so they appear in Inbox chat</div>
+          <div className="px-4 py-2 bg-gray-100 dark:bg-gray-900 text-xs text-gray-500">Total pending: {scheduledTotal} • Auto-refresh every 15s • Scheduled messages become Message rows on send so they appear in Inbox chat</div>
         </div>
       )}
 
       {activeTab==="sent" && (
-        <div className="bg-white dark:bg-[#202c33] rounded-xl shadow-sm border border-gray-100 dark:border-[#2a3942] overflow-hidden">
-          <div className="px-4 py-3 flex items-center justify-between border-b border-gray-100 dark:border-[#2a3942] bg-[#f0f2f5] dark:bg-[#111b21]">
-            <h3 className="font-semibold text-[#111b21] dark:text-white flex items-center gap-2"><CheckCircle2 size={16} className="text-[#00a884]"/> Sent History</h3>
-            <button onClick={loadHistory} className="text-xs bg-white dark:bg-[#2a3942] px-3 py-1.5 rounded-full border">↻ Refresh</button>
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+          <div className="px-4 py-3 flex items-center justify-between border-b border-gray-100 dark:border-gray-700 bg-gray-100 dark:bg-gray-900">
+            <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2"><CheckCircle2 size={16} className="text-primary-600"/> Sent History</h3>
+            <button onClick={loadHistory} className="text-xs bg-white dark:bg-gray-700 px-3 py-1.5 rounded-full border">↻ Refresh</button>
           </div>
-          {loadingHist ? <div className="p-8 text-center"><div className="w-8 h-8 border-2 border-[#00a884] border-t-transparent rounded-full animate-spin mx-auto"/></div>
+          {loadingHist ? <div className="p-8 text-center"><div className="w-8 h-8 border-2 border-primary-600 border-t-transparent rounded-full animate-spin mx-auto"/></div>
             : history.length===0 ? (
               <div className="p-10 text-center">
-                <CheckCircle2 size={36} className="mx-auto text-[#00a884] opacity-40 mb-2"/>
+                <CheckCircle2 size={36} className="mx-auto text-primary-600 opacity-40 mb-2"/>
                 <p className="font-medium text-sm">No sent messages yet</p>
-                <p className="text-xs text-[#667781] mt-1">Delivered messages appear here with double-blue checks in Inbox.</p>
+                <p className="text-xs text-gray-500 mt-1">Delivered messages appear here with double-blue checks in Inbox.</p>
               </div>
             ) : (
-              <div className="divide-y divide-gray-100 dark:divide-[#2a3942]">
+              <div className="divide-y divide-gray-100 dark:divide-gray-700">
                 {history.map((m:any)=>(
                   <div key={m.id} className="p-3 lg:p-4 flex gap-3">
-                    <div className="w-10 h-10 rounded-full bg-[#d9fdd3] flex items-center justify-center flex-shrink-0"><CheckCircle2 size={16} className="text-[#00a884]"/></div>
+                    <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0"><CheckCircle2 size={16} className="text-primary-600"/></div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
-                        <p className="font-medium text-[13px] truncate">{m.contact_name || m.phone || "Unknown"} <span className="font-mono text-[#00a884]">{m.phone}</span></p>
-                        <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${m.status==="delivered"?"bg-[#d9fdd3] text-[#008069]":"bg-[#e7f3ff] text-[#0066cc]"}`}>{m.status}</span>
+                        <p className="font-medium text-[13px] truncate">{m.contact_name || m.phone || "Unknown"} <span className="font-mono text-primary-600">{m.phone}</span></p>
+                        <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${m.status==="delivered"?"bg-primary-100 text-primary-700":"bg-primary-50 text-primary-600"}`}>{m.status}</span>
                       </div>
-                      <p className="text-[13px] bg-[#f0f2f5] dark:bg-[#111b21] rounded-lg px-2.5 py-1.5 mt-1 line-clamp-2">{m.body}</p>
-                      <p className="text-xs text-[#667781] mt-1.5">{new Date(m.created_at).toLocaleString()} {m.sent_at && `• sent ${new Date(m.sent_at).toLocaleTimeString()}`}</p>
+                      <p className="text-[13px] bg-gray-100 dark:bg-gray-900 rounded-lg px-2.5 py-1.5 mt-1 line-clamp-2">{m.body}</p>
+                      <p className="text-xs text-gray-500 mt-1.5">{new Date(m.created_at).toLocaleString()} {m.sent_at && `• sent ${new Date(m.sent_at).toLocaleTimeString()}`}</p>
                     </div>
                   </div>
                 ))}
               </div>
             )}
-          <div className="px-4 py-2 bg-[#f0f2f5] dark:bg-[#111b21] text-xs text-[#667781]">{historyTotal} sent • polling delivery receipts every 30s</div>
+          <div className="px-4 py-2 bg-gray-100 dark:bg-gray-900 text-xs text-gray-500">{historyTotal} sent • polling delivery receipts every 30s</div>
         </div>
       )}
 
       {activeTab==="failed" && (
-        <div className="bg-white dark:bg-[#202c33] rounded-xl shadow-sm border border-gray-100 dark:border-[#2a3942] overflow-hidden">
-          <div className="px-4 py-3 flex items-center justify-between border-b border-gray-100 dark:border-[#2a3942] bg-[#f0f2f5] dark:bg-[#111b21]">
-            <h3 className="font-semibold text-[#c5221f] flex items-center gap-2"><AlertCircle size={16}/> Failed Messages</h3>
-            <button onClick={loadFailed} className="text-xs bg-white dark:bg-[#2a3942] px-3 py-1.5 rounded-full border">↻ Refresh</button>
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+          <div className="px-4 py-3 flex items-center justify-between border-b border-gray-100 dark:border-gray-700 bg-gray-100 dark:bg-gray-900">
+            <h3 className="font-semibold text-danger-700 flex items-center gap-2"><AlertCircle size={16}/> Failed Messages</h3>
+            <button onClick={loadFailed} className="text-xs bg-white dark:bg-gray-700 px-3 py-1.5 rounded-full border">↻ Refresh</button>
           </div>
           {failed.length===0 ? (
             <div className="p-10 text-center">
-              <div className="w-12 h-12 rounded-full bg-[#d9fdd3] flex items-center justify-center mx-auto mb-2"><CheckCircle2 size={24} className="text-[#00a884]"/></div>
-              <p className="font-medium text-sm text-[#00a884]">No failures — great!</p>
-              <p className="text-xs text-[#667781] mt-1">Failed SMS (gateway rejected, device offline, bad number) appear here with error & retry. They also stay as red bubbles in Inbox.</p>
+              <div className="w-12 h-12 rounded-full bg-primary-100 flex items-center justify-center mx-auto mb-2"><CheckCircle2 size={24} className="text-primary-600"/></div>
+              <p className="font-medium text-sm text-primary-600">No failures — great!</p>
+              <p className="text-xs text-gray-500 mt-1">Failed SMS (gateway rejected, device offline, bad number) appear here with error & retry. They also stay as red bubbles in Inbox.</p>
             </div>
           ) : (
-            <div className="divide-y divide-gray-100 dark:divide-[#2a3942]">
+            <div className="divide-y divide-gray-100 dark:divide-gray-700">
               {failed.map((m:any)=>(
                 <div key={m.id} className="p-3 lg:p-4 flex gap-3">
-                  <div className="w-10 h-10 rounded-full bg-[#fce8e6] flex items-center justify-center flex-shrink-0"><AlertCircle size={16} className="text-[#c5221f]"/></div>
+                  <div className="w-10 h-10 rounded-full bg-danger-100 flex items-center justify-center flex-shrink-0"><AlertCircle size={16} className="text-danger-700"/></div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
-                      <p className="font-medium text-[13px] truncate">{m.contact_name || m.phone || "Unknown"} <span className="font-mono text-[#c5221f]">{m.phone}</span></p>
-                      <span className="text-[11px] bg-[#fce8e6] text-[#c5221f] px-2 py-0.5 rounded-full font-medium">failed</span>
+                      <p className="font-medium text-[13px] truncate">{m.contact_name || m.phone || "Unknown"} <span className="font-mono text-danger-700">{m.phone}</span></p>
+                      <span className="text-[11px] bg-danger-100 text-danger-700 px-2 py-0.5 rounded-full font-medium">failed</span>
                     </div>
-                    <p className="text-[13px] bg-[#fce8e6]/50 dark:bg-[#2a3942] rounded-lg px-2.5 py-1.5 mt-1 line-clamp-2 border border-[#f5c6cb]/50">{m.body || m.body_preview}</p>
-                    {m.error && <p className="text-xs text-[#c5221f] mt-1.5 bg-[#fce8e6] dark:bg-red-900/20 px-2 py-1 rounded">⚠ {m.error}</p>}
-                    <p className="text-xs text-[#667781] mt-1">{m.created_at ? new Date(m.created_at).toLocaleString() : m.schedule_at ? new Date(m.schedule_at).toLocaleString():""}</p>
+                    <p className="text-[13px] bg-danger-100/50 dark:bg-gray-700 rounded-lg px-2.5 py-1.5 mt-1 line-clamp-2 border border-danger-200/50">{m.body || m.body_preview}</p>
+                    {m.error && <p className="text-xs text-danger-700 mt-1.5 bg-danger-100 dark:bg-danger-900/20 px-2 py-1 rounded">⚠ {m.error}</p>}
+                    <p className="text-xs text-gray-500 mt-1">{m.created_at ? new Date(m.created_at).toLocaleString() : m.schedule_at ? new Date(m.schedule_at).toLocaleString():""}</p>
                   </div>
                   <div className="flex flex-col gap-1 self-center">
-                    <button onClick={()=> m._isScheduled ? retryFailed(m.id) : retryMessage(m.id)} className="w-8 h-8 rounded-full bg-[#00a884] hover:bg-[#06cf9c] text-white flex items-center justify-center" title="Retry now"><RotateCcw size={14}/></button>
-                    {m.conversation_id && <a href="/inbox" className="w-8 h-8 rounded-full bg-[#f0f2f5] dark:bg-[#111b21] flex items-center justify-center text-[#54656f]" title="View in Inbox"><Eye size={14}/></a>}
+                    <button onClick={()=> m._isScheduled ? retryFailed(m.id) : retryMessage(m.id)} className="w-8 h-8 rounded-full bg-primary-600 hover:bg-primary-500 text-white flex items-center justify-center" title="Retry now"><RotateCcw size={14}/></button>
+                    {m.conversation_id && <a href="/inbox" className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-900 flex items-center justify-center text-gray-600" title="View in Inbox"><Eye size={14}/></a>}
                   </div>
                 </div>
               ))}
@@ -520,7 +520,7 @@ function SendPageInner() {
           )}
           {/* Scheduled failed section if any */}
           <FailedScheduledSection />
-          <div className="px-4 py-2 bg-[#f0f2f5] dark:bg-[#111b21] text-xs text-[#667781]">{failedTotal} failed • tap ↻ to retry immediately. Failed scheduled also shown in “Scheduled → Failed” list.</div>
+          <div className="px-4 py-2 bg-gray-100 dark:bg-gray-900 text-xs text-gray-500">{failedTotal} failed • tap ↻ to retry immediately. Failed scheduled also shown in “Scheduled → Failed” list.</div>
         </div>
       )}
     </div>
@@ -532,18 +532,18 @@ function FailedScheduledSection(){
   useEffect(()=>{ api.get("/send/scheduled",{params:{status:"failed",per_page:20}}).then(r=>setItems(r.data.items||[])).catch(()=>{}); },[]);
   if(items.length===0) return null;
   return (
-    <div className="border-t border-gray-100 dark:border-[#2a3942]">
-      <div className="px-4 py-2 bg-[#fff8c4] text-xs font-semibold text-[#8d5100]">Scheduled that failed to send</div>
-      <div className="divide-y divide-gray-100 dark:divide-[#2a3942]">
+    <div className="border-t border-gray-100 dark:border-gray-700">
+      <div className="px-4 py-2 bg-warning-100 text-xs font-semibold text-warning-700">Scheduled that failed to send</div>
+      <div className="divide-y divide-gray-100 dark:divide-gray-700">
         {items.map((s:any)=>(
           <div key={s.id} className="p-3 flex gap-3">
-            <div className="w-8 h-8 rounded-full bg-[#fff8c4] flex items-center justify-center"><Clock size={14}/></div>
+            <div className="w-8 h-8 rounded-full bg-warning-100 flex items-center justify-center"><Clock size={14}/></div>
             <div className="flex-1 min-w-0">
-              <p className="text-[13px] font-medium">{s.phone} <span className="text-[#667781]">• scheduled {new Date(s.schedule_at).toLocaleString()}</span></p>
-              <p className="text-[12px] bg-[#f0f2f5] rounded px-2 py-1 mt-1 line-clamp-1">{s.body}</p>
-              {s.error&&<p className="text-xs text-[#c5221f] mt-1">⚠ {s.error}</p>}
+              <p className="text-[13px] font-medium">{s.phone} <span className="text-gray-500">• scheduled {new Date(s.schedule_at).toLocaleString()}</span></p>
+              <p className="text-[12px] bg-gray-100 rounded px-2 py-1 mt-1 line-clamp-1">{s.body}</p>
+              {s.error&&<p className="text-xs text-danger-700 mt-1">⚠ {s.error}</p>}
             </div>
-            <button onClick={async()=>{ try{await api.post(`/send/scheduled/${s.id}/retry`); toast.success("Queued"); }catch{ toast.error("Failed"); } }} className="w-8 h-8 rounded-full bg-[#00a884] text-white flex items-center justify-center"><RotateCcw size={12}/></button>
+            <button onClick={async()=>{ try{await api.post(`/send/scheduled/${s.id}/retry`); toast.success("Queued"); }catch{ toast.error("Failed"); } }} className="w-8 h-8 rounded-full bg-primary-600 text-white flex items-center justify-center"><RotateCcw size={12}/></button>
           </div>
         ))}
       </div>

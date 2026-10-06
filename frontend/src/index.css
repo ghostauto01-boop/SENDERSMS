@@ -2,9 +2,63 @@
 @tailwind components;
 @tailwind utilities;
 
+/**
+ * Global feel.
+ *
+ * Three rules hold the whole app together:
+ *  1. one palette — every colour resolves from tailwind.config.js, so a button
+ *     on the Contacts page and a button in the Email Inbox are the same blue;
+ *  2. gentle motion — short, small transitions that make the app feel like one
+ *     product, all of them switched off for anyone who asked their device for
+ *     reduced motion;
+ *  3. native-app behaviour on a phone — safe areas, no rubber-band bounce,
+ *     44px touch targets, no input zoom on iOS.
+ */
 @layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+
   body {
     @apply text-gray-900 dark:text-gray-100 antialiased;
+    @apply bg-canvas dark:bg-canvas-dark;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  /* Every focus ring in the app is the same brand ring — including the ones
+     Tailwind supplies, which would otherwise use the browser default. */
+  :focus-visible {
+    @apply outline-none ring-2 ring-primary-500/70 ring-offset-1 ring-offset-white dark:ring-offset-gray-900;
+  }
+
+  /* Tighter, calmer headings. */
+  h1, h2, h3, h4 {
+    @apply tracking-tight;
+  }
+
+  ::selection {
+    @apply bg-primary-200 text-primary-950;
+  }
+
+  /* One scrollbar look, everywhere. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(100, 116, 139, 0.35) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: rgba(100, 116, 139, 0.35);
+    border-radius: 999px;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: rgba(100, 116, 139, 0.55);
   }
 }
 
@@ -12,55 +66,112 @@
   .btn {
     /* min-h-[44px] on touch screens matches the ~44px target both Apple and
        Google recommend; pointer:fine devices keep the compact height. */
-    @apply inline-flex items-center justify-center px-4 py-2 min-h-[44px] sm:min-h-0 rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 min-h-[44px] sm:min-h-0 rounded-xl
+           font-medium transition-all duration-150 ease-gentle
+           active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100
+           focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2;
   }
   .btn-primary {
-    @apply btn bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500;
+    @apply btn bg-primary-600 text-white shadow-sm shadow-primary-600/20
+           hover:bg-primary-700 hover:shadow-md hover:shadow-primary-600/20;
   }
   .btn-secondary {
-    @apply btn bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600;
+    @apply btn bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200
+           border border-gray-200 dark:border-gray-700 shadow-card
+           hover:bg-gray-50 dark:hover:bg-gray-700/70 hover:border-gray-300 dark:hover:border-gray-600;
   }
   .btn-danger {
-    @apply btn bg-red-600 text-white hover:bg-red-700 focus:ring-red-500;
+    @apply btn bg-danger-600 text-white shadow-sm shadow-danger-600/20 hover:bg-danger-700;
+  }
+  .btn-success {
+    @apply btn bg-success-600 text-white shadow-sm shadow-success-600/20 hover:bg-success-700;
   }
   .btn-ghost {
     @apply btn text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800;
   }
   .btn-sm {
-    @apply px-3 py-1.5 text-sm min-h-[36px] sm:min-h-0;
+    @apply px-3 py-1.5 text-sm min-h-[36px] sm:min-h-0 rounded-lg;
   }
   .input {
     /* text-base on phones: iOS Safari force-zooms the whole page when a focused
        input renders below 16px, which then leaves the layout scrolled sideways.
        sm:text-sm restores the tighter desktop scale. */
-    @apply w-full px-3 py-2 text-base sm:text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-colors;
+    @apply w-full px-3 py-2.5 text-base sm:text-sm border border-gray-200 dark:border-gray-700
+           rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+           placeholder:text-gray-400 dark:placeholder:text-gray-500
+           focus:ring-2 focus:ring-primary-500/60 focus:border-primary-500 outline-none
+           transition-all duration-150 ease-gentle;
   }
   .label {
     @apply block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1;
   }
   .card {
-    @apply bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700;
+    @apply bg-white dark:bg-gray-800 rounded-2xl shadow-card border border-gray-200/80 dark:border-gray-700/70;
+  }
+  /* Cards that respond when you point at them (dashboards, pickers). */
+  .card-hover {
+    @apply card transition-all duration-200 ease-gentle hover:shadow-raised hover:-translate-y-0.5;
   }
   .badge {
-    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium;
   }
+  /* Status colours are meanings, not decoration — the only places green, amber
+     and red appear. */
   .badge-green {
-    @apply badge bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200;
+    @apply badge bg-success-50 text-success-700 dark:bg-success-950/60 dark:text-success-300;
   }
   .badge-red {
-    @apply badge bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200;
+    @apply badge bg-danger-50 text-danger-700 dark:bg-danger-950/60 dark:text-danger-300;
   }
   .badge-yellow {
-    @apply badge bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200;
+    @apply badge bg-warning-50 text-warning-700 dark:bg-warning-950/60 dark:text-warning-300;
   }
   .badge-blue {
-    @apply badge bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200;
+    @apply badge bg-primary-50 text-primary-700 dark:bg-primary-950/60 dark:text-primary-300;
   }
   .badge-gray {
-    @apply badge bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200;
+    @apply badge bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300;
   }
   .skeleton {
-    @apply animate-pulse bg-gray-200 dark:bg-gray-700 rounded;
+    /* Shimmer instead of a flat pulse: it reads as "loading", not "broken". */
+    @apply relative overflow-hidden bg-gray-200/80 dark:bg-gray-700/60 rounded;
+  }
+  .skeleton::after {
+    content: "";
+    @apply absolute inset-0 -translate-x-full animate-shimmer;
+    background-image: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0) 0,
+      rgba(255, 255, 255, 0.35) 20%,
+      rgba(255, 255, 255, 0.6) 60%,
+      rgba(255, 255, 255, 0)
+    );
+  }
+  .dark .skeleton::after {
+    background-image: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0) 0,
+      rgba(255, 255, 255, 0.06) 20%,
+      rgba(255, 255, 255, 0.12) 60%,
+      rgba(255, 255, 255, 0)
+    );
+  }
+  /* Section heading used by the redesigned pages. */
+  .page-title {
+    @apply text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white;
+  }
+  .page-subtitle {
+    @apply text-sm text-gray-500 dark:text-gray-400 mt-1;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium
+           border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300
+           transition-all duration-150 ease-gentle hover:border-primary-300 hover:text-primary-700
+           dark:hover:text-primary-300 active:scale-[0.97];
+  }
+  .chip-active {
+    @apply chip bg-primary-600 border-primary-600 text-white hover:text-white
+           hover:border-primary-600 shadow-sm shadow-primary-600/25;
   }
 }
 
@@ -108,6 +219,18 @@
   .safe-bottom {
     padding-bottom: max(env(safe-area-inset-bottom), 0px);
   }
+  .safe-top {
+    padding-top: max(env(safe-area-inset-top), 0px);
+  }
+  /* Room for the mobile tab bar so it never covers the last row of content. */
+  .pb-tabbar {
+    padding-bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));
+  }
+  @media (min-width: 1024px) {
+    .pb-tabbar {
+      padding-bottom: 1.5rem;
+    }
+  }
 
   /* The full-height inbox must behave like a native app: no rubber-band
      bounce on iOS, no pull-to-refresh fighting the scroll areas. */
@@ -117,4 +240,62 @@
     overscroll-behavior: none;
     overflow: hidden;
   }
+
+  /* Staggered list entrances: one attribute, no JS. Apply .stagger to a list
+     container and .stagger-item to its rows. */
+  .stagger-item {
+    @apply animate-fade-up;
+  }
+  .stagger > .stagger-item:nth-child(1) { animation-delay: 0ms; }
+  .stagger > .stagger-item:nth-child(2) { animation-delay: 30ms; }
+  .stagger > .stagger-item:nth-child(3) { animation-delay: 60ms; }
+  .stagger > .stagger-item:nth-child(4) { animation-delay: 90ms; }
+  .stagger > .stagger-item:nth-child(5) { animation-delay: 120ms; }
+  .stagger > .stagger-item:nth-child(6) { animation-delay: 150ms; }
+  .stagger > .stagger-item:nth-child(7) { animation-delay: 180ms; }
+  .stagger > .stagger-item:nth-child(8) { animation-delay: 210ms; }
+  .stagger > .stagger-item:nth-child(n + 9) { animation-delay: 240ms; }
+
+  /* The brand gradient, in one place (login screen, empty states, avatars). */
+  .brand-gradient {
+    background-image: linear-gradient(135deg, theme("colors.primary.600") 0%, theme("colors.accent.600") 100%);
+  }
+  .brand-gradient-text {
+    @apply bg-gradient-to-br from-primary-600 to-accent-600 bg-clip-text text-transparent;
+  }
+
+  /* Horizontal scroll rows (chips, tabs) that stop at the edge on mobile. */
+  .scroll-x {
+    @apply flex gap-2 overflow-x-auto scrollbar-none px-1 py-0.5 -mx-1;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Motion preferences: anyone who asked their device for less movement gets a
+   still app. Everything above is decorative, so nothing is lost.
+   -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Route-change transition, driven by the key on <main> in MainLayout. */
+.page-enter {
+  animation: fade-up 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* react-hot-toast, restyled onto the app's palette. */
+.toast-card {
+  @apply rounded-xl border border-gray-200/80 bg-white/95 text-gray-800 shadow-pop backdrop-blur
+         dark:border-gray-700/70 dark:bg-gray-800/95 dark:text-gray-100;
+  font-size: 0.875rem;
 }

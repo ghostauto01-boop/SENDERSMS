@@ -134,7 +134,7 @@ export default function OverviewPage() {
   if (error && !metrics) {
     return (
       <div className="text-center py-12">
-        <AlertTriangle size={44} className="mx-auto text-red-500 mb-3" />
+        <AlertTriangle size={44} className="mx-auto text-danger-500 mb-3" />
         <h2 className="text-lg font-semibold mb-1">Couldn't load the overview</h2>
         <p className="text-gray-500 mb-4 max-w-md mx-auto text-sm">{error}</p>
         <button onClick={() => load()} className="btn-primary">Retry</button>
@@ -183,45 +183,45 @@ export default function OverviewPage() {
         <StatCard
           label="Live campaigns" value={totals?.live ?? 0}
           sub={`${totals?.campaigns ?? 0} total`}
-          icon={Megaphone} tone="text-green-600 bg-green-50 dark:bg-green-900/40"
+          icon={Megaphone} tone="text-success-600 bg-success-50 dark:bg-success-900/40"
         />
         <StatCard
           label="Messages sent" value={msg?.sent ?? 0}
           sub={`${msg?.queued ?? 0} still queued`}
-          icon={Send} tone="text-blue-600 bg-blue-50 dark:bg-blue-900/40"
+          icon={Send} tone="text-primary-600 bg-primary-50 dark:bg-primary-900/40"
         />
         <StatCard
           label="Delivered" value={`${msg?.delivery_rate ?? 0}%`}
           sub={`${msg?.delivered ?? 0} confirmed`}
-          icon={CheckCircle2} tone="text-emerald-600 bg-emerald-50 dark:bg-emerald-900/40"
+          icon={CheckCircle2} tone="text-success-600 bg-success-50 dark:bg-success-900/40"
         />
         <StatCard
           label="Replies" value={msg?.replies ?? 0}
           sub={`${msg?.reply_rate ?? 0}% reply rate`}
-          icon={MessageCircle} tone="text-purple-600 bg-purple-50 dark:bg-purple-900/40"
+          icon={MessageCircle} tone="text-primary-600 bg-primary-50 dark:bg-primary-900/40"
           to="/inbox"
         />
         <StatCard
           label="Unread in inbox" value={inbox?.unread ?? 0}
           sub="waiting for you"
-          icon={InboxIcon} tone="text-amber-600 bg-amber-50 dark:bg-amber-900/40"
+          icon={InboxIcon} tone="text-warning-600 bg-warning-50 dark:bg-warning-900/40"
           to="/inbox"
         />
         <StatCard
           label="Interested leads" value={inbox?.interested ?? 0}
           sub="marked in the inbox"
-          icon={Star} tone="text-yellow-600 bg-yellow-50 dark:bg-yellow-900/40"
+          icon={Star} tone="text-warning-600 bg-warning-50 dark:bg-warning-900/40"
           to="/inbox?status=interested"
         />
         <StatCard
           label="Failed" value={msg?.failed ?? 0}
           sub={`${msg?.failure_rate ?? 0}% of attempts`}
-          icon={XCircle} tone="text-red-600 bg-red-50 dark:bg-red-900/40"
+          icon={XCircle} tone="text-danger-600 bg-danger-50 dark:bg-danger-900/40"
         />
         <StatCard
           label="Contacts" value={metrics?.audience.contacts ?? 0}
           sub={`${metrics?.audience.opted_out ?? 0} opted out`}
-          icon={Users} tone="text-indigo-600 bg-indigo-50 dark:bg-indigo-900/40"
+          icon={Users} tone="text-primary-600 bg-primary-50 dark:bg-primary-900/40"
           to="/contacts"
         />
       </div>
@@ -237,12 +237,12 @@ export default function OverviewPage() {
             <AreaChart data={metrics?.series || []}>
               <defs>
                 <linearGradient id="ovSent" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.35} />
-                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                  <stop offset="5%" stopColor="#4163f6" stopOpacity={0.35} />
+                  <stop offset="95%" stopColor="#4163f6" stopOpacity={0} />
                 </linearGradient>
                 <linearGradient id="ovReplies" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.4} />
-                  <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                  <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.4} />
+                  <stop offset="95%" stopColor="#4f46e5" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
@@ -253,8 +253,8 @@ export default function OverviewPage() {
                 labelFormatter={(d) => new Date(String(d)).toDateString()}
               />
               <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Area type="monotone" dataKey="sent" name="Sent" stroke="#3b82f6" fill="url(#ovSent)" strokeWidth={2} />
-              <Area type="monotone" dataKey="replies" name="Replies" stroke="#8b5cf6" fill="url(#ovReplies)" strokeWidth={2} />
+              <Area type="monotone" dataKey="sent" name="Sent" stroke="#4163f6" fill="url(#ovSent)" strokeWidth={2} />
+              <Area type="monotone" dataKey="replies" name="Replies" stroke="#4f46e5" fill="url(#ovReplies)" strokeWidth={2} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -269,9 +269,9 @@ export default function OverviewPage() {
           ) : (
             <div className="space-y-3">
               {([
-                { key: "positive", label: "Positive", value: sentiment.positive, colour: "bg-green-500", icon: TrendingUp },
+                { key: "positive", label: "Positive", value: sentiment.positive, colour: "bg-success-500", icon: TrendingUp },
                 { key: "neutral", label: "Neutral", value: sentiment.neutral, colour: "bg-gray-400", icon: MessageCircle },
-                { key: "negative", label: "Negative", value: sentiment.negative, colour: "bg-red-500", icon: ThumbsDown },
+                { key: "negative", label: "Negative", value: sentiment.negative, colour: "bg-danger-500", icon: ThumbsDown },
               ] as const).map((row) => {
                 const pct = Math.round((row.value / sentimentTotal) * 100);
                 return (
@@ -387,7 +387,7 @@ function CampaignCard({
             <p className="text-sm text-gray-500 mt-0.5 line-clamp-2">{c.description}</p>
           )}
           {c.status === "scheduled" && c.scheduled_start_at && (
-            <p className="text-xs text-blue-600 dark:text-blue-400 mt-1 flex items-center gap-1">
+            <p className="text-xs text-primary-600 dark:text-primary-400 mt-1 flex items-center gap-1">
               <Clock size={12} /> Sends {new Date(c.scheduled_start_at).toLocaleString()}
             </p>
           )}
@@ -424,7 +424,7 @@ function CampaignCard({
           </div>
           <div className="h-1.5 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
             <div
-              className={`h-full ${c.is_live ? "bg-green-500" : "bg-primary-600"}`}
+              className={`h-full ${c.is_live ? "bg-success-500" : "bg-primary-600"}`}
               style={{ width: `${progress}%` }}
             />
           </div>
@@ -434,10 +434,10 @@ function CampaignCard({
       <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 text-sm">
         <Metric label="Sent" value={c.sent} />
         <Metric label="Delivered" value={`${c.delivery_rate}%`} />
-        <Metric label="Failed" value={c.failed} tone={c.failed > 0 ? "text-red-600" : undefined} />
+        <Metric label="Failed" value={c.failed} tone={c.failed > 0 ? "text-danger-600" : undefined} />
         <Metric label="Replies" value={c.replied} />
         <Metric label="Reply rate" value={`${c.reply_rate}%`} />
-        <Metric label="Interested" value={c.interested} tone={c.interested > 0 ? "text-green-600" : undefined} />
+        <Metric label="Interested" value={c.interested} tone={c.interested > 0 ? "text-success-600" : undefined} />
       </div>
     </div>
   );

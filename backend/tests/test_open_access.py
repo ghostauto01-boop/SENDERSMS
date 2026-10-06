@@ -1,15 +1,20 @@
-"""A session cookie is still needed, but getting one takes no password.
+"""A session cookie is still needed, and the password is how you get one.
 
-The login screen is a single "Log in as admin" button (see
-``test_one_tap_admin_login``). These cases cover what is left of the
-credential path: an old client that still sends ADMIN_PASSWORD, the optional
-site password from Settings → Site access, and the stored hash following the
-environment when ADMIN_PASSWORD is rotated on Render.
+The login screen asks for the admin password (see
+``test_admin_password_login``). These cases cover the rest of the credential
+path: an older client that posts the username too, the optional site password
+from Settings → Site access, and the stored hash following the environment
+when ADMIN_PASSWORD is rotated on Render.
 """
 import pytest
 from httpx import ASGITransport, AsyncClient
 
+from app.config import settings
 from tests.test_inbound_receive import client, db  # noqa: F401
+
+#: Read from settings, never hardcoded: "the password this app is configured
+#: with works" is the property under test.
+APP_PASSWORD = settings.ADMIN_PASSWORD
 
 
 @pytest.fixture(autouse=True)
@@ -35,7 +40,7 @@ async def test_login_with_env_admin_credentials(client):
     """ADMIN_USERNAME + ADMIN_PASSWORD from the environment sign in."""
     r = await client.post(
         "/api/v1/auth/login",
-        json={"username": "admin", "password": "admin"},
+        json={"username": "admin", "password": APP_PASSWORD},
     )
     assert r.status_code == 200, r.text
     assert "sendsms_session" in r.headers.get("set-cookie", "")
@@ -78,7 +83,7 @@ async def test_changing_env_admin_password_takes_effect(client, db, monkeypatch)
 
     # The operator first signs in with the original env password.
     ok = await client.post(
-        "/api/v1/auth/login", json={"username": "admin", "password": "admin"}
+        "/api/v1/auth/login", json={"username": "admin", "password": APP_PASSWORD}
     )
     assert ok.status_code == 200, ok.text
 
@@ -86,7 +91,7 @@ async def test_changing_env_admin_password_takes_effect(client, db, monkeypatch)
     monkeypatch.setattr(settings, "ADMIN_PASSWORD", "brand-new-render-pass", raising=False)
 
     stale = await client.post(
-        "/api/v1/auth/login", json={"username": "admin", "password": "admin"}
+        "/api/v1/auth/login", json={"username": "admin", "password": APP_PASSWORD}
     )
     assert stale.status_code == 401
 
@@ -112,7 +117,7 @@ async def test_stale_admin_row_is_repaired_on_login(client, db):
     await db.flush()
 
     r = await client.post(
-        "/api/v1/auth/login", json={"username": "admin", "password": "admin"}
+        "/api/v1/auth/login", json={"username": "admin", "password": APP_PASSWORD}
     )
     assert r.status_code == 200, r.text
 
@@ -121,7 +126,7 @@ async def test_stale_admin_row_is_repaired_on_login(client, db):
 async def test_site_password_also_signs_in(client):
     """The optional extra password from Settings → Site access works too."""
     saved = await client.post(
-        "/api/v1/auth/login", json={"username": "admin", "password": "admin"}
+        "/api/v1/auth/login", json={"username": "admin", "password": APP_PASSWORD}
     )
     cookie = {"sendsms_session": saved.cookies["sendsms_session"]}
     put = await client.put(

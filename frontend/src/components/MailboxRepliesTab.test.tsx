@@ -1,6 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import MailboxRepliesTab from "./MailboxRepliesTab";
+
+/**
+ * The tab links to the Email Inbox, so it renders inside the router it lives in
+ * in the app — a bare `render()` would throw on `useContext(Router)`.
+ */
+const renderTab = (props: Record<string, unknown> = {}) =>
+  render(
+    <MemoryRouter>
+      <MailboxRepliesTab {...(props as any)} />
+    </MemoryRouter>
+  );
 
 /**
  * The Replies tab — the screen behind the complaint "the reply went to spam and
@@ -112,7 +124,7 @@ beforeEach(() => {
 
 describe("MailboxRepliesTab", () => {
   it("explains why the reply is in Spam, in words an operator can act on", async () => {
-    render(<MailboxRepliesTab />);
+    renderTab();
 
     await waitFor(() =>
       expect(screen.getByText("Why replies go missing")).toBeInTheDocument(),
@@ -126,7 +138,7 @@ describe("MailboxRepliesTab", () => {
   });
 
   it("shows all three doors a reply can come through, and which are open", async () => {
-    render(<MailboxRepliesTab />);
+    renderTab();
 
     await waitFor(() =>
       expect(screen.getByText("The three doors a reply can come through")).toBeInTheDocument(),
@@ -139,14 +151,16 @@ describe("MailboxRepliesTab", () => {
   });
 
   it("offers both ways to connect, and tells the truth about Google OAuth", async () => {
-    render(<MailboxRepliesTab />);
+    renderTab();
 
     await waitFor(() => expect(screen.getByText("No mailbox connected")).toBeInTheDocument());
     // One in the header, one in the empty state — both do the same thing.
     expect(screen.getAllByText("Connect with Google").length).toBeGreaterThan(0);
     expect(screen.getByText("Use an app password")).toBeInTheDocument();
-    // google_oauth_ready is false in the fixture, so the setup is spelled out.
-    expect(screen.getByText(/GOOGLE_CLIENT_ID/)).toBeInTheDocument();
+    // google_oauth_ready is false in the fixture, so the setup is spelled out
+    // (in the connect card and again in the "does Brevo read my Gmail?"
+    // explainer, hence getAllByText).
+    expect(screen.getAllByText(/GOOGLE_CLIENT_ID/).length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByText("Use an app password"));
     await waitFor(() =>
@@ -176,7 +190,7 @@ describe("MailboxRepliesTab", () => {
       return Promise.reject(new Error("unmocked GET " + url));
     });
 
-    render(<MailboxRepliesTab />);
+    renderTab();
     await waitFor(() =>
       expect(screen.getAllByText("Connect with Google").length).toBeGreaterThan(0),
     );
@@ -216,7 +230,7 @@ describe("MailboxRepliesTab", () => {
       return Promise.reject(new Error("unexpected POST " + url));
     });
 
-    render(<MailboxRepliesTab />);
+    renderTab();
     await waitFor(() =>
       expect(screen.getAllByText("me@gmail.com").length).toBeGreaterThan(0),
     );
@@ -245,7 +259,7 @@ describe("MailboxRepliesTab", () => {
       return Promise.reject(new Error("unmocked GET " + url));
     });
 
-    render(<MailboxRepliesTab />);
+    renderTab();
     await waitFor(() =>
       expect(screen.getAllByText("me@gmail.com").length).toBeGreaterThan(0),
     );
@@ -259,7 +273,7 @@ describe("MailboxRepliesTab", () => {
   });
 
   it("shows the banner the Google callback redirected here with", async () => {
-    render(<MailboxRepliesTab banner="me@gmail.com is connected. Replies to it now arrive in the Email Inbox." />);
+    renderTab({ banner: "me@gmail.com is connected. Replies to it now arrive in the Email Inbox." });
     await waitFor(() =>
       expect(
         screen.getByText(/is connected\. Replies to it now arrive in the Email Inbox/),
@@ -285,7 +299,7 @@ describe("MailboxRepliesTab", () => {
       return Promise.reject(new Error("unmocked GET " + url));
     });
 
-    render(<MailboxRepliesTab />);
+    renderTab();
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Disconnect me@gmail.com" })).toBeInTheDocument(),
     );

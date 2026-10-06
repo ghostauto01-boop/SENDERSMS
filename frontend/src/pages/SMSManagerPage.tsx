@@ -564,7 +564,7 @@ function FollowUpsSection() {
                     >
                       Reschedule
                     </button>
-                    <button className="btn-ghost btn-sm text-red-600" onClick={() => act(i.id, "cancel")}>
+                    <button className="btn-ghost btn-sm text-danger-600" onClick={() => act(i.id, "cancel")}>
                       Cancel
                     </button>
                   </div>
@@ -660,7 +660,7 @@ function CalendarSection() {
                         </p>
                       </div>
                       <button
-                        className="btn-ghost btn-sm text-red-600"
+                        className="btn-ghost btn-sm text-danger-600"
                         onClick={async () => {
                           await adsApi.deleteEvent(e.id);
                           load();
@@ -875,7 +875,7 @@ function SuppressionSection() {
                   <td className="p-3 whitespace-nowrap">{fmtDay(r.suppressed_at)}</td>
                   <td className="p-3">
                     <button
-                      className="btn-ghost btn-sm text-red-600"
+                      className="btn-ghost btn-sm text-danger-600"
                       onClick={async () => {
                         if (!confirm("Remove from suppression list?")) return;
                         await adsApi.removeSuppression(r.id);

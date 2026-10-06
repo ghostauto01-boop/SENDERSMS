@@ -1,29 +1,49 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams, Link } from "react-router-dom";
 import toast from "react-hot-toast";
-import { Link } from "react-router-dom";
 import {
   ArrowLeft,
+  ArrowUpRight,
   CheckCheck,
+  ChevronDown,
+  ChevronUp,
+  Clock,
+  Inbox,
   Mail,
+  MailOpen,
   MousePointerClick,
   Paperclip,
   RefreshCw,
+  Reply,
   Search,
   Send,
   Sparkles,
+  Star,
+  X,
   XCircle,
 } from "lucide-react";
 import emailApi, { EmailConversation, EmailMessage } from "../api/email";
-import { Badge, Empty, fmtDate } from "./ads/ui";
 import RichEmailEditor, { AttachmentPayload } from "../components/RichEmailEditor";
 
 /**
- * EMAIL INBOX
+ * EMAIL INBOX — the Gmail-shaped one.
  *
- * The email twin of the SMS inbox: threads on the left, the conversation on the
- * right, and a reply box that sends from the same Brevo sender the thread
- * started on. Opens and clicks are shown per message so the state of every
- * lead is obvious without leaving the thread.
+ * What makes an inbox usable at a glance, and what this page does:
+ *
+ * * the list reads like Gmail's: sender in bold while unread, then the subject
+ *   and the first line of the message on one line, with the time on the right
+ *   and a coloured dot for unread — so scanning 50 threads takes seconds;
+ * * the reading pane puts the subject first, then the conversation as
+ *   individual messages with the sender's name, address, time and the
+ *   delivery/open/click state for anything this app sent;
+ * * on a phone it is one column: the list fills the screen, tapping a thread
+ *   slides the conversation in full-width with a back button, and the composer
+ *   stays above the keyboard;
+ * * replies send from the same Brevo sender (or the connected mailbox) the
+ *   thread started on, in the same mail thread the prospect sees in Gmail.
+ *
+ * Status, search and the open thread all live in the URL, so a notification
+ * can deep-link straight to a conversation and a refresh keeps your place.
  */
 
 const STATUS_FILTERS = [
@@ -35,7 +55,69 @@ const STATUS_FILTERS = [
   { key: "closed", label: "Closed" },
 ];
 
-/** Collapsible "what happened to this email" panel, per message.
+const STATUS_TONE: Record<string, string> = {
+  interested: "badge-green",
+  active: "badge-blue",
+  unread: "badge-blue",
+  not_interested: "badge-gray",
+  closed: "badge-gray",
+};
+
+/** One colour per contact, derived from the address so it never changes. */
+const AVATAR_TONES = [
+  "bg-primary-100 text-primary-700 dark:bg-primary-950/70 dark:text-primary-300",
+  "bg-accent-100 text-accent-700 dark:bg-accent-950/70 dark:text-accent-300",
+  "bg-success-100 text-success-700 dark:bg-success-950/70 dark:text-success-300",
+  "bg-warning-100 text-warning-700 dark:bg-warning-950/70 dark:text-warning-300",
+];
+
+function initialsOf(name?: string | null, email?: string | null): string {
+  const source = (name || email || "?").trim();
+  if (name) {
+    const parts = source.split(/\s+/).filter(Boolean);
+    return ((parts[0]?.[0] || "") + (parts[1]?.[0] || "")).toUpperCase() || "?";
+  }
+  return source.slice(0, 2).toUpperCase();
+}
+
+function toneFor(key: string): string {
+  let hash = 0;
+  for (let i = 0; i < key.length; i += 1) hash = (hash * 31 + key.charCodeAt(i)) % 997;
+  return AVATAR_TONES[hash % AVATAR_TONES.length];
+}
+
+function when(value?: string | null): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const now = new Date();
+  const sameDay = date.toDateString() === now.toDateString();
+  if (sameDay) return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
+  if (date.getFullYear() === now.getFullYear()) {
+    return date.toLocaleDateString([], { day: "numeric", month: "short" });
+  }
+  return date.toLocaleDateString([], { day: "numeric", month: "short", year: "2-digit" });
+}
+
+function fullTime(value?: string | null): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString([], {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+/**
+ * Collapsible "what happened to this email" panel, per outgoing message.
  *
  * Brevo reports opens and clicks per recipient; this shows the same thing in
  * the thread, including which link was clicked, loaded only when expanded.
@@ -43,11 +125,9 @@ const STATUS_FILTERS = [
 function MessageActivity({
   message,
   onOpen,
-  outgoing,
 }: {
   message: EmailMessage;
   onOpen: () => Promise<any>;
-  outgoing: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [data, setData] = useState<any>(null);
@@ -55,9 +135,8 @@ function MessageActivity({
 
   const opens = message.open_count || 0;
   const clicks = message.click_count || 0;
-  if (!outgoing || (opens === 0 && clicks === 0 && message.status !== "delivered")) {
-    return null;
-  }
+  const outgoing = message.direction === "outgoing";
+  if (!outgoing) return null;
 
   const toggle = async () => {
     const next = !open;
@@ -79,26 +158,31 @@ function MessageActivity({
       <button
         type="button"
         onClick={toggle}
-        className={`text-[11px] underline decoration-dotted ${
-          outgoing ? "text-primary-100" : "text-gray-500"
-        }`}
+        className="chip py-1 px-2 text-[11px] text-gray-500 dark:text-gray-400"
       >
         {opens > 0 ? `${opens} open${opens === 1 ? "" : "s"}` : "no opens yet"}
-        {" · "}
+        <span className="text-gray-300 dark:text-gray-600">·</span>
         {clicks > 0 ? `${clicks} click${clicks === 1 ? "" : "s"}` : "no clicks yet"}
-        {open ? " ▲" : " ▼"}
+        {open ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
       </button>
       {open && (
-        <div className="mt-1 space-y-1">
-          {loading && <p className="text-[11px] opacity-70">Reading Brevo…</p>}
+        <div className="mt-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 p-2.5 space-y-1 animate-fade-in">
+          {loading && <p className="text-[11px] text-gray-500">Reading Brevo…</p>}
           {(data?.events || []).map((e: any) => (
-            <p key={e.id} className="text-[11px] opacity-80 truncate">
+            <p key={e.id} className="text-[11px] text-gray-600 dark:text-gray-400 break-anywhere">
+              <Clock size={10} className="inline mr-1 -mt-0.5" />
               {e.event_type}
-              {e.link ? `: ${e.link}` : ""}
+              {e.created_at ? ` · ${new Date(e.created_at).toLocaleString()}` : ""}
+              {e.link ? ` · ${e.link}` : ""}
             </p>
           ))}
+          {!loading && (data?.events || []).length === 0 && (
+            <p className="text-[11px] text-gray-500">
+              Delivered, but nothing opened yet. Brevo records opens the first time the images load.
+            </p>
+          )}
           {(data?.summary?.unique_links_clicked || 0) > 0 && (
-            <p className="text-[11px] opacity-70">
+            <p className="text-[11px] text-gray-500">
               {data.summary.unique_links_clicked} different link(s) clicked
             </p>
           )}
@@ -108,7 +192,129 @@ function MessageActivity({
   );
 }
 
+/** One message in the thread: who, when, what, and what happened to it. */
+function MessageCard({
+  message,
+  contactName,
+  defaultOpen,
+  onOpenActivity,
+}: {
+  message: EmailMessage;
+  contactName: string;
+  defaultOpen: boolean;
+  onOpenActivity: () => Promise<any>;
+}) {
+  const [expanded, setExpanded] = useState(defaultOpen);
+  const outgoing = message.direction === "outgoing";
+  const from = outgoing
+    ? message.from_address || "you"
+    : contactName || message.from_address || message.contact_email || "Unknown sender";
+
+  return (
+    <article
+      className={`card overflow-hidden animate-fade-up ${
+        outgoing ? "" : "border-l-2 border-l-primary-500"
+      }`}
+    >
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="w-full text-left p-3.5 flex items-start gap-3 hover:bg-gray-50/70 dark:hover:bg-gray-700/20 transition-colors"
+      >
+        <span
+          className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 ${
+            outgoing ? "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-200" : toneFor(from)
+          }`}
+        >
+          {initialsOf(from, message.from_address)}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{from}</p>
+            <span className="text-xs text-gray-400 truncate">
+              {outgoing ? "to " : "to "}
+              {outgoing ? message.to_address || message.contact_email : "you"}
+            </span>
+            <span className="ml-auto text-xs text-gray-400 shrink-0" title={fullTime(message.created_at)}>
+              {when(message.created_at)}
+            </span>
+          </div>
+          {!expanded && (
+            <p className="text-sm text-gray-500 dark:text-gray-400 truncate mt-0.5">
+              {message.body?.trim() || message.subject || "(no text)"}
+            </p>
+          )}
+          {expanded && (
+            <div className="mt-1 flex items-center gap-2 flex-wrap">
+              {message.is_auto_reply && <span className="badge-gray">auto-reply</span>}
+              <span className={outgoing ? "badge-blue" : "badge-gray"}>{message.status}</span>
+              {message.provider && (
+                <span className="text-[11px] text-gray-400">via {message.provider}</span>
+              )}
+              {message.open_count > 0 && (
+                <span className="text-[11px] text-primary-600 dark:text-primary-400 flex items-center gap-1">
+                  <CheckCheck size={11} /> opened {message.open_count}×
+                </span>
+              )}
+              {message.click_count > 0 && (
+                <span className="text-[11px] text-success-600 dark:text-success-400 flex items-center gap-1">
+                  <MousePointerClick size={11} /> clicked {message.click_count}×
+                </span>
+              )}
+              {message.bounced_hard && (
+                <span className="badge-red">hard bounce</span>
+              )}
+            </div>
+          )}
+        </div>
+        <span className="text-gray-400 shrink-0 mt-1">
+          {expanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+        </span>
+      </button>
+
+      {expanded && (
+        <div className="px-3.5 pb-3.5 animate-fade-in">
+          <div className="rounded-xl bg-gray-50 dark:bg-gray-900/40 p-3.5 text-sm text-gray-800 dark:text-gray-100">
+            {message.html_body ? (
+              <div
+                className="prose prose-sm max-w-none dark:prose-invert break-anywhere
+                           prose-a:text-primary-600 dark:prose-a:text-primary-400"
+                dangerouslySetInnerHTML={{ __html: message.html_body }}
+              />
+            ) : (
+              <p className="whitespace-pre-wrap break-anywhere">{message.body}</p>
+            )}
+          </div>
+
+          {(message.attachments?.length || 0) > 0 && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {message.attachments!.map((a, i) => (
+                <a
+                  key={`${a.name}-${i}`}
+                  href={a.url || undefined}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="chip"
+                >
+                  <Paperclip size={12} />
+                  <span className="truncate max-w-[12rem]">{a.name}</span>
+                  {a.size ? (
+                    <span className="text-gray-400">{Math.max(1, Math.round(a.size / 1024))} KB</span>
+                  ) : null}
+                </a>
+              ))}
+            </div>
+          )}
+
+          <MessageActivity message={message} onOpen={onOpenActivity} />
+        </div>
+      )}
+    </article>
+  );
+}
+
 export default function EmailInboxPage() {
+  const [params, setParams] = useSearchParams();
   const [conversations, setConversations] = useState<EmailConversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState("all");
@@ -119,39 +325,43 @@ export default function EmailInboxPage() {
   const [reply, setReply] = useState("");
   const [replyHtml, setReplyHtml] = useState("");
   const [replyAttachments, setReplyAttachments] = useState<AttachmentPayload[]>([]);
+  const [cc, setCc] = useState("");
+  const [showCc, setShowCc] = useState(false);
   const [sending, setSending] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await emailApi.conversations({
-        status: status === "all" ? undefined : status,
-        search: search || undefined,
-        per_page: 50,
-      });
-      setConversations(data.items);
-    } catch {
-      toast.error("Could not load the email inbox");
-    } finally {
-      setLoading(false);
-    }
-  }, [status, search]);
+  const deepLinkedId = params.get("conversation_id");
+
+  const load = useCallback(
+    async (opts: { quiet?: boolean } = {}) => {
+      if (!opts.quiet) setLoading(true);
+      try {
+        const data = await emailApi.conversations({
+          status: status === "all" ? undefined : status,
+          search: search || undefined,
+          per_page: 50,
+        });
+        setConversations(data.items);
+      } catch {
+        if (!opts.quiet) toast.error("Could not load the email inbox");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [status, search]
+  );
 
   useEffect(() => {
     load();
   }, [load]);
 
-  // Light polling keeps the unread badge and new mail fresh without a socket.
+  // 30 s refresh keeps the unread badge and new mail current without a socket.
   useEffect(() => {
-    const timer = window.setInterval(() => {
-      emailApi
-        .conversations({ status: status === "all" ? undefined : status, search: search || undefined, per_page: 50 })
-        .then((data) => setConversations(data.items))
-        .catch(() => {});
-    }, 30000);
+    const timer = window.setInterval(() => load({ quiet: true }), 30000);
     return () => window.clearInterval(timer);
-  }, [status, search]);
+  }, [load]);
 
   const open = useCallback(
     async (id: number) => {
@@ -160,6 +370,7 @@ export default function EmailInboxPage() {
       setReply("");
       setReplyHtml("");
       setReplyAttachments([]);
+      setCc("");
       try {
         const data = await emailApi.conversation(id);
         setDetail(data);
@@ -178,8 +389,27 @@ export default function EmailInboxPage() {
     []
   );
 
+  // Deep link: a notification (or a refresh) can name the thread to open.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (!deepLinkedId) return;
+    const id = Number(deepLinkedId);
+    if (!Number.isFinite(id) || id === openId) return;
+    open(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deepLinkedId]);
+
+  const closeThread = () => {
+    setOpenId(null);
+    setDetail(null);
+    if (deepLinkedId) {
+      const next = new URLSearchParams(params);
+      next.delete("conversation_id");
+      setParams(next, { replace: true });
+    }
+  };
+
+  useEffect(() => {
+    if (detail) bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [detail]);
 
   const sendReply = async () => {
@@ -190,13 +420,17 @@ export default function EmailInboxPage() {
         body: reply,
         html_body: replyHtml.trim() || null,
         attachments: replyAttachments.length ? replyAttachments : undefined,
+        cc: cc
+          .split(/[,;\s]+/)
+          .map((s) => s.trim())
+          .filter(Boolean),
       });
       setReply("");
       setReplyHtml("");
       setReplyAttachments([]);
       toast.success("Reply sent");
       await open(openId);
-      load();
+      load({ quiet: true });
     } catch (err: any) {
       toast.error(err.response?.data?.detail || "Could not send the reply");
     } finally {
@@ -211,7 +445,7 @@ export default function EmailInboxPage() {
       setDetail((d: any) =>
         d ? { ...d, conversation: { ...d.conversation, status: next } } : d
       );
-      load();
+      load({ quiet: true });
     } catch {
       toast.error("Could not change the status");
     }
@@ -222,127 +456,269 @@ export default function EmailInboxPage() {
     [conversations]
   );
 
+  const contactName = detail?.contact?.name || detail?.contact?.email || "";
+  const threadMessages: EmailMessage[] = detail?.messages || [];
+
   return (
-    <div className="space-y-5 max-w-6xl mx-auto">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <div className="max-w-7xl mx-auto">
+      {/* ---------- Header: title, count, mailbox links ---------- */}
+      <div className={`flex flex-wrap items-start justify-between gap-3 mb-4 ${openId ? "hidden lg:flex" : ""}`}>
         <div>
-          <p className="text-sm font-medium text-primary-600 mb-1 flex items-center gap-1">
-            <Mail size={15} /> EMAIL CHANNEL · BREVO
+          <p className="text-xs font-semibold tracking-wide text-primary-600 dark:text-primary-400 flex items-center gap-1.5">
+            <Mail size={14} /> EMAIL CHANNEL
           </p>
-          <h1 className="text-2xl sm:text-3xl font-bold">Email Inbox</h1>
-          <p className="text-gray-500 mt-1">
-            Every reply lands here. {unreadTotal > 0 ? `${unreadTotal} unread.` : "You are all caught up."}
+          <h1 className="page-title mt-1">Inbox</h1>
+          <p className="page-subtitle">
+            {loading
+              ? "Loading threads…"
+              : unreadTotal > 0
+              ? `${unreadTotal} unread · ${conversations.length} thread${conversations.length === 1 ? "" : "s"}`
+              : `You are all caught up · ${conversations.length} thread${conversations.length === 1 ? "" : "s"}`}
           </p>
         </div>
         <div className="flex gap-2">
-          <Link to="/email-manager" className="btn-secondary">
-            Email Manager
+          <Link to="/email-manager" className="btn-secondary btn-sm">
+            <Sparkles size={14} /> Senders &amp; tracking
           </Link>
-          <Link to="/inbox" className="btn-secondary">
+          <Link to="/inbox" className="btn-secondary btn-sm">
             SMS inbox
           </Link>
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-[320px_1fr] gap-4">
-        {/* Thread list */}
-        <div className="card p-0 overflow-hidden">
-          <div className="p-3 border-b border-gray-100 dark:border-gray-800 space-y-2">
+      <div className="grid lg:grid-cols-[22rem_1fr] gap-4">
+        {/* ---------- Thread list ---------- */}
+        <section
+          className={`card p-0 overflow-hidden lg:h-[calc(100dvh-11rem)] flex-col ${
+            openId ? "hidden lg:flex" : "flex"
+          }`}
+        >
+          <div className="p-3 border-b border-gray-100 dark:border-gray-700/70 space-y-2">
             <div className="relative">
-              <Search size={15} className="absolute left-3 top-2.5 text-gray-400" />
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
-                className="input pl-9"
-                placeholder="Search email threads…"
+                ref={searchRef}
+                className="input pl-9 pr-9"
+                placeholder="Search people, subject, text…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
+                aria-label="Search email threads"
               />
+              {search && (
+                <button
+                  onClick={() => {
+                    setSearch("");
+                    searchRef.current?.focus();
+                  }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-gray-400 hover:text-gray-600"
+                  aria-label="Clear search"
+                >
+                  <X size={14} />
+                </button>
+              )}
             </div>
-            <div className="flex gap-1 overflow-x-auto scrollbar-none">
+
+            {/* On a phone six filter chips do not fit: the active one plus a
+                picker. On sm+ they are a scrollable row. */}
+            <div className="sm:hidden">
+              <button className="chip w-full justify-between" onClick={() => setFilterOpen((v) => !v)}>
+                <span>
+                  {STATUS_FILTERS.find((f) => f.key === status)?.label || "All"}
+                  {unreadTotal > 0 && status !== "unread" ? ` · ${unreadTotal} unread` : ""}
+                </span>
+                <ChevronDown size={14} />
+              </button>
+              {filterOpen && (
+                <div className="mt-2 grid grid-cols-2 gap-1.5 animate-fade-in">
+                  {STATUS_FILTERS.map((f) => (
+                    <button
+                      key={f.key}
+                      onClick={() => {
+                        setStatus(f.key);
+                        setFilterOpen(false);
+                      }}
+                      className={status === f.key ? "chip-active justify-center" : "chip justify-center"}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="hidden sm:flex items-center gap-1.5 overflow-x-auto scrollbar-none">
               {STATUS_FILTERS.map((f) => (
                 <button
                   key={f.key}
                   onClick={() => setStatus(f.key)}
-                  className={`px-2 py-1 rounded text-xs whitespace-nowrap ${
-                    status === f.key ? "bg-primary-600 text-white" : "text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
-                  }`}
+                  className={status === f.key ? "chip-active" : "chip"}
                 >
                   {f.label}
                 </button>
               ))}
-              <button className="ml-auto text-gray-400 hover:text-primary-600 px-1" onClick={load}>
-                <RefreshCw size={14} />
+              <button
+                className="ml-auto p-1.5 rounded-lg text-gray-400 hover:text-primary-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                onClick={() => load()}
+                title="Refresh"
+                aria-label="Refresh threads"
+              >
+                <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
               </button>
             </div>
           </div>
 
-          <div className="max-h-[70vh] overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800">
-            {loading ? (
-              <div className="p-6 text-center text-sm text-gray-500">Loading…</div>
+          <div className="flex-1 overflow-y-auto divide-y divide-gray-50 dark:divide-gray-700/50 stagger">
+            {loading && conversations.length === 0 ? (
+              <div className="p-3 space-y-3">
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <div key={i} className="flex gap-3 items-start">
+                    <div className="skeleton w-9 h-9 rounded-full" />
+                    <div className="flex-1 space-y-2">
+                      <div className="skeleton h-3.5 w-32" />
+                      <div className="skeleton h-3 w-full" />
+                    </div>
+                  </div>
+                ))}
+              </div>
             ) : conversations.length === 0 ? (
-              <div className="p-6">
-                <Empty
-                  title="No email threads"
-                  body="Replies to your campaigns and inbound mail land here once a Brevo webhook is pointed at this app."
-                />
+              <div className="p-8 text-center">
+                <span className="mx-auto w-12 h-12 rounded-full bg-primary-50 text-primary-600 dark:bg-primary-950/60 dark:text-primary-300 flex items-center justify-center mb-3">
+                  <Inbox size={22} />
+                </span>
+                <p className="font-medium text-gray-800 dark:text-gray-200">
+                  {search ? "No thread matches that search" : "No email threads yet"}
+                </p>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                  {search
+                    ? "Try a different name, subject or word."
+                    : "Replies to your campaigns land here. Send one from the Email Manager, or connect a Gmail mailbox under Email Manager → Replies."}
+                </p>
               </div>
             ) : (
-              conversations.map((c) => (
-                <button
-                  key={c.id}
-                  onClick={() => open(c.id)}
-                  className={`w-full text-left p-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 ${
-                    openId === c.id ? "bg-primary-50 dark:bg-primary-900/20" : ""
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="font-medium truncate text-sm">{c.contact_name || c.contact_email}</p>
-                    <span className="text-[11px] text-gray-400 shrink-0">{fmtDate(c.last_message_at)}</span>
-                  </div>
-                  <p className="text-xs text-gray-500 truncate">{c.subject || "(no subject)"}</p>
-                  <p className="text-xs text-gray-400 truncate">{c.preview}</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    {c.unread_count > 0 && <span className="badge-red">{c.unread_count} new</span>}
-                    {c.status === "interested" && <span className="badge-green">interested</span>}
-                    {c.status === "not_interested" && <span className="badge-gray">not interested</span>}
-                    {c.email_account_name && (
-                      <span className="text-[11px] text-gray-400 truncate">{c.email_account_name}</span>
-                    )}
-                  </div>
-                </button>
-              ))
+              conversations.map((c) => {
+                const unread = c.unread_count > 0;
+                const active = openId === c.id;
+                return (
+                  <button
+                    key={c.id}
+                    onClick={() => open(c.id)}
+                    className={`stagger-item w-full text-left px-3 py-3 flex gap-3 items-start transition-colors ${
+                      active
+                        ? "bg-primary-50 dark:bg-primary-950/30"
+                        : "hover:bg-gray-50 dark:hover:bg-gray-700/30"
+                    }`}
+                  >
+                    <span className="relative shrink-0">
+                      <span
+                        className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold ${toneFor(
+                          c.contact_email || String(c.id)
+                        )}`}
+                      >
+                        {initialsOf(c.contact_name, c.contact_email)}
+                      </span>
+                      {unread && (
+                        <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-primary-500 ring-2 ring-white dark:ring-gray-800" />
+                      )}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-baseline gap-2">
+                        <span
+                          className={`truncate text-sm ${
+                            unread
+                              ? "font-bold text-gray-900 dark:text-white"
+                              : "font-medium text-gray-700 dark:text-gray-200"
+                          }`}
+                        >
+                          {c.contact_name || c.contact_email || "Unknown"}
+                        </span>
+                        <span className="ml-auto text-[11px] text-gray-400 shrink-0">
+                          {when(c.last_message_at)}
+                        </span>
+                      </span>
+                      <span className="block text-xs text-gray-600 dark:text-gray-400 truncate mt-0.5">
+                        <span className={unread ? "font-semibold text-gray-800 dark:text-gray-200" : ""}>
+                          {c.subject || "(no subject)"}
+                        </span>
+                        {c.preview ? <span className="text-gray-400"> — {c.preview}</span> : null}
+                      </span>
+                      <span className="flex items-center gap-1.5 mt-1 flex-wrap">
+                        {unread && <span className="badge-blue">{c.unread_count} new</span>}
+                        {c.status !== "active" && c.status !== "unread" && STATUS_TONE[c.status] && (
+                          <span className={STATUS_TONE[c.status]}>
+                            {STATUS_FILTERS.find((f) => f.key === c.status)?.label || c.status}
+                          </span>
+                        )}
+                        {c.message_count > 1 && (
+                          <span className="text-[11px] text-gray-400">{c.message_count} messages</span>
+                        )}
+                        {c.email_account_name && (
+                          <span className="text-[11px] text-gray-400 truncate">
+                            {c.email_account_name}
+                          </span>
+                        )}
+                      </span>
+                    </span>
+                  </button>
+                );
+              })
             )}
           </div>
-        </div>
+        </section>
 
-        {/* Thread */}
-        <div className="card p-0 overflow-hidden">
+        {/* ---------- Reading pane ---------- */}
+        <section
+          className={`card p-0 overflow-hidden lg:h-[calc(100dvh-11rem)] flex-col ${
+            openId ? "flex" : "hidden lg:flex"
+          }`}
+        >
           {!openId ? (
-            <div className="p-10">
-              <Empty title="Pick a thread" body="Choose an email on the left to read it and reply." />
+            <div className="flex-1 flex flex-col items-center justify-center text-center p-10">
+              <span className="w-14 h-14 rounded-2xl bg-primary-50 text-primary-600 dark:bg-primary-950/60 dark:text-primary-300 flex items-center justify-center mb-4">
+                <MailOpen size={26} />
+              </span>
+              <p className="font-medium text-gray-800 dark:text-gray-200">Pick a conversation</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 max-w-sm">
+                Choose an email on the left to read the whole thread, see whether it was opened or
+                clicked, and answer without leaving the app.
+              </p>
             </div>
-          ) : loadingDetail ? (
-            <div className="p-10 text-center text-gray-500">Loading conversation…</div>
+          ) : loadingDetail && !detail ? (
+            <div className="p-4 space-y-3">
+              <div className="skeleton h-5 w-2/3" />
+              <div className="skeleton h-24 w-full" />
+              <div className="skeleton h-24 w-full" />
+            </div>
           ) : detail ? (
-            <div className="flex flex-col max-h-[70vh]">
-              <div className="p-4 border-b border-gray-100 dark:border-gray-800 space-y-2">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <h2 className="font-semibold truncate">
-                      {detail.contact?.name || detail.contact?.email}
+            <>
+              {/* Thread header */}
+              <div className="p-3 sm:p-4 border-b border-gray-100 dark:border-gray-700/70 space-y-2">
+                <div className="flex items-start gap-2">
+                  <button
+                    className="lg:hidden p-2 -ml-1 rounded-xl text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 shrink-0"
+                    onClick={closeThread}
+                    aria-label="Back to threads"
+                  >
+                    <ArrowLeft size={18} />
+                  </button>
+                  <div className="min-w-0 flex-1">
+                    <h2 className="font-semibold text-gray-900 dark:text-white break-anywhere">
+                      {detail.conversation.subject || detail.contact?.name || "Conversation"}
                     </h2>
-                    <p className="text-sm text-gray-500 truncate">
-                      {detail.contact?.email} ·{" "}
-                      {detail.conversation.email_account_name || "no sender set"}
+                    <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1.5 flex-wrap">
+                      <span className="font-medium text-gray-700 dark:text-gray-300">
+                        {detail.contact?.name || "Unknown"}
+                      </span>
+                      <span className="text-gray-400">&lt;{detail.contact?.email}&gt;</span>
+                      {detail.conversation.email_account_name && (
+                        <span className="badge-gray">{detail.conversation.email_account_name}</span>
+                      )}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button className="lg:hidden btn-secondary text-sm" onClick={() => setOpenId(null)}>
-                      <ArrowLeft size={14} />
-                    </button>
+                  <div className="flex items-center gap-1.5 shrink-0">
                     <select
-                      className="input text-sm py-1"
+                      className="input py-1.5 text-sm w-auto max-w-[9.5rem]"
                       value={detail.conversation.status}
                       onChange={(e) => setConversationStatus(e.target.value)}
+                      aria-label="Conversation status"
                     >
                       {STATUS_FILTERS.filter((f) => !["all", "unread"].includes(f.key)).map((f) => (
                         <option key={f.key} value={f.key}>
@@ -352,117 +728,74 @@ export default function EmailInboxPage() {
                     </select>
                   </div>
                 </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    className="chip"
+                    onClick={() => setConversationStatus("interested")}
+                    title="Mark as interested"
+                  >
+                    <Star size={12} /> Interested
+                  </button>
+                  <button
+                    className="chip"
+                    onClick={() => setConversationStatus("closed")}
+                    title="Mark as closed"
+                  >
+                    <CheckCheck size={12} /> Done
+                  </button>
+                  {detail.contact?.phone_number && !detail.contact.phone_number.startsWith("email:") && (
+                    <span className="text-[11px] text-gray-400">{detail.contact.phone_number}</span>
+                  )}
+                </div>
                 {detail.contact?.is_email_opted_out && (
-                  <p className="text-xs text-amber-600 flex items-center gap-1">
-                    <XCircle size={13} /> This contact unsubscribed — replies will be blocked until they
+                  <p className="text-xs text-warning-600 dark:text-warning-400 flex items-center gap-1">
+                    <XCircle size={13} /> This contact unsubscribed — replies are blocked until they
                     are opted back in on the Contacts page.
                   </p>
                 )}
               </div>
 
-              <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 dark:bg-gray-900/40">
-                {(detail.messages || []).map((m: EmailMessage) => (
-                  <div
+              {/* Messages */}
+              <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 bg-gray-50/60 dark:bg-gray-900/30 wa-scrollbar">
+                {threadMessages.map((m, index) => (
+                  <MessageCard
                     key={m.id}
-                    className={`flex ${m.direction === "outgoing" ? "justify-end" : "justify-start"}`}
-                  >
-                    <div
-                      className={`max-w-[85%] rounded-lg p-3 text-sm shadow-sm ${
-                        m.direction === "outgoing"
-                          ? "bg-primary-600 text-white"
-                          : "bg-white dark:bg-gray-800"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-3 mb-1">
-                        <p className={`text-xs font-medium ${m.direction === "outgoing" ? "text-primary-100" : "text-gray-500"}`}>
-                          {m.direction === "outgoing"
-                            ? `From ${m.from_address || "you"}`
-                            : `From ${m.from_address || m.contact_email}`}
-                        </p>
-                        <span className={`text-[10px] ${m.direction === "outgoing" ? "text-primary-100" : "text-gray-400"}`}>
-                          {fmtDate(m.created_at)}
-                        </span>
-                      </div>
-                      {m.subject && (
-                        <p className={`font-semibold mb-1 ${m.direction === "outgoing" ? "text-white" : ""}`}>
-                          {m.subject}
-                        </p>
-                      )}
-                      {m.html_body ? (
-                        <div
-                          className="prose prose-sm max-w-none dark:prose-invert break-words"
-                          dangerouslySetInnerHTML={{ __html: m.html_body }}
-                        />
-                      ) : (
-                        <p className="whitespace-pre-wrap break-words">{m.body}</p>
-                      )}
-                      {(m.attachments?.length || 0) > 0 && (
-                        <div className="mt-2 space-y-1">
-                          {m.attachments!.map((a, i) => (
-                            <div
-                              key={`${a.name}-${i}`}
-                              className={`flex items-center gap-1.5 text-[11px] ${
-                                m.direction === "outgoing" ? "text-primary-100" : "text-gray-500"
-                              }`}
-                            >
-                              <Paperclip size={11} />
-                              {a.url ? (
-                                <a
-                                  href={a.url}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="truncate underline"
-                                >
-                                  {a.name}
-                                </a>
-                              ) : (
-                                <span className="truncate">{a.name}</span>
-                              )}
-                              {a.size ? <span>({Math.max(1, Math.round(a.size / 1024))} KB)</span> : null}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      <MessageActivity
-                        message={m}
-                        onOpen={() => emailApi.messageEvents(m.id)}
-                        outgoing={m.direction === "outgoing"}
-                      />
-                      <div className="flex flex-wrap items-center gap-2 mt-2">
-                        <span
-                          className={`text-[10px] ${
-                            m.direction === "outgoing" ? "text-primary-100" : "text-gray-400"
-                          }`}
-                        >
-                          {m.status}
-                        </span>
-                        {m.is_auto_reply && (
-                          <span className={`text-[10px] ${m.direction === "outgoing" ? "text-primary-100" : "text-gray-400"}`}>
-                            auto-reply
-                          </span>
-                        )}
-                        {m.open_count > 0 && (
-                          <span className="text-[10px] flex items-center gap-1 text-sky-500">
-                            <CheckCheck size={11} /> opened {m.open_count}x
-                          </span>
-                        )}
-                        {m.click_count > 0 && (
-                          <span className="text-[10px] flex items-center gap-1 text-green-500">
-                            <MousePointerClick size={11} /> clicked {m.click_count}x
-                          </span>
-                        )}
-                        {m.bounced_hard && <span className="text-[10px] text-red-400">hard bounce</span>}
-                      </div>
-                    </div>
-                  </div>
+                    message={m}
+                    contactName={contactName}
+                    // Only the newest message is open by default, like Gmail.
+                    defaultOpen={index === threadMessages.length - 1}
+                    onOpenActivity={() => emailApi.messageEvents(m.id)}
+                  />
                 ))}
                 <div ref={bottomRef} />
               </div>
 
-              <div className="p-3 border-t border-gray-100 dark:border-gray-800 space-y-2">
-                {/* Replies use the same editor as a campaign: formatting,
-                    links, images and attachments, from the same sender the
-                    thread started on — and the same mail thread in Gmail. */}
+              {/* Composer */}
+              <div className="border-t border-gray-100 dark:border-gray-700/70 p-3 sm:p-4 space-y-2 safe-bottom">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                    <Reply size={13} /> Reply
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      className="text-xs text-gray-500 hover:text-primary-600"
+                      onClick={() => setShowCc((v) => !v)}
+                    >
+                      Cc
+                    </button>
+                    <span className="text-[11px] text-gray-400 hidden sm:inline">
+                      sent from {detail.conversation.email_account_name || "the default sender"}
+                    </span>
+                  </div>
+                </div>
+                {showCc && (
+                  <input
+                    className="input animate-fade-in"
+                    placeholder="Cc — separate several addresses with a comma"
+                    value={cc}
+                    onChange={(e) => setCc(e.target.value)}
+                  />
+                )}
                 <RichEmailEditor
                   body={reply}
                   onBody={setReply}
@@ -471,20 +804,44 @@ export default function EmailInboxPage() {
                   attachments={replyAttachments}
                   onAttachments={setReplyAttachments}
                 />
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs text-gray-400 flex items-center gap-1">
-                    <Sparkles size={12} /> Ctrl/⌘ + Enter to send · sent from{" "}
-                    {detail.conversation.email_account_name || "the default sender"}
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-[11px] text-gray-400 hidden sm:flex items-center gap-1">
+                    <Sparkles size={12} /> Ctrl/⌘ + Enter sends
                   </p>
-                  <button className="btn-primary" onClick={sendReply} disabled={sending || !reply.trim()}>
-                    <Send size={15} className="mr-1" /> {sending ? "Sending…" : "Send reply"}
+                  <button
+                    className="btn-primary w-full sm:w-auto"
+                    onClick={sendReply}
+                    disabled={sending || !reply.trim()}
+                  >
+                    {sending ? (
+                      <>Sending…</>
+                    ) : (
+                      <>
+                        <Send size={15} /> Send reply
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
+            </>
+          ) : (
+            <div className="flex-1 flex items-center justify-center p-10 text-gray-500">
+              <span className="text-sm flex items-center gap-2">
+                <XCircle size={15} /> This conversation could not be loaded.
+                <button className="text-primary-600 hover:underline" onClick={() => openId && open(openId)}>
+                  Retry
+                </button>
+              </span>
             </div>
-          ) : null}
-        </div>
+          )}
+        </section>
       </div>
+
+      <p className="text-xs text-gray-400 mt-3 flex items-center gap-1.5">
+        <ArrowUpRight size={12} /> Opens and clicks are recorded by Brevo; when a Gmail mailbox is
+        connected under Email Manager → Replies, replies are sent from that mailbox so they thread
+        correctly in the prospect's Gmail.
+      </p>
     </div>
   );
 }

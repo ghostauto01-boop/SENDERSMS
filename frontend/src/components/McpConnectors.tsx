@@ -80,29 +80,102 @@ function StatusPill({ status }: { status: Connector["status"] }) {
 function TestReport({ report }: { report: ConnectorTestReport | { steps: any[] } }) {
   const steps = report.steps || [];
   if (!steps.length) return null;
+  // A step that failed without being fatal is advice (e.g. "PUBLIC_BASE_URL is
+  // unset but the URL was detected, so this works now"): amber with the fix,
+  // never a red cross that sends the operator hunting for a non-existent bug.
+  const advice = (s: any) => !s.ok && s.fatal === false;
+  const failures = steps.filter((s: any) => !s.ok && s.fatal !== false).length;
   return (
-    <div className="rounded-lg border border-gray-200 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-800 max-h-80 overflow-y-auto">
-      {steps.map((s: any, i: number) => (
-        <div key={i} className="p-3 text-xs flex items-start gap-2">
-          {s.ok ? (
-            <CheckCircle size={14} className="text-green-500 mt-0.5 shrink-0" />
-          ) : (
-            <XCircle size={14} className="text-red-500 mt-0.5 shrink-0" />
-          )}
-          <div className="min-w-0">
-            <p className="font-medium">
-              {s.step}
-              {s.status != null && <span className="text-gray-400"> · HTTP {s.status}</span>}
-            </p>
-            <p className="text-gray-600 dark:text-gray-400 break-words">{s.detail}</p>
-            {s.fix && (
-              <p className="text-amber-700 dark:text-amber-300 mt-1">
-                <strong>Fix:</strong> {s.fix}
-              </p>
+    <div className="space-y-2">
+      <p className="text-xs text-gray-500 flex items-center gap-2 flex-wrap">
+        <span className="badge-green">
+          {steps.filter((s: any) => s.ok).length} of {steps.length} steps pass
+        </span>
+        {failures > 0 && <span className="badge-red">{failures} blocking</span>}
+        {steps.filter(advice).length > 0 && (
+          <span className="badge-yellow">
+            {steps.filter(advice).length} improvement{steps.filter(advice).length === 1 ? "" : "s"}
+          </span>
+        )}
+      </p>
+      <div className="rounded-xl border border-gray-200 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-800 max-h-80 overflow-y-auto">
+        {steps.map((s: any, i: number) => (
+          <div key={i} className="p-3 text-xs flex items-start gap-2">
+            {s.ok ? (
+              <CheckCircle size={14} className="text-success-500 mt-0.5 shrink-0" />
+            ) : advice(s) ? (
+              <AlertTriangle size={14} className="text-warning-500 mt-0.5 shrink-0" />
+            ) : (
+              <XCircle size={14} className="text-danger-500 mt-0.5 shrink-0" />
             )}
+            <div className="min-w-0">
+              <p className="font-medium">
+                {s.step}
+                {s.status != null && <span className="text-gray-400"> · HTTP {s.status}</span>}
+              </p>
+              <p className="text-gray-600 dark:text-gray-400 break-words">{s.detail}</p>
+              {s.fix && (
+                <p className="text-warning-700 dark:text-warning-300 mt-1">
+                  <strong>{advice(s) ? "Improve it" : "Fix"}:</strong> {s.fix}
+                </p>
+              )}
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Where the OAuth metadata's absolute URLs come from, and whether that is fine. */
+function BaseUrlPanel({ data }: { data: ConnectorList }) {
+  const base = data.public_base_url || "";
+  const source = data.base_url_source || (data.ready ? "env" : "none");
+  const detected = source === "request";
+  const configured = source === "env" || source === "render";
+
+  if (!data.ready) {
+    return (
+      <div className="rounded-xl border border-danger-200 bg-danger-50 p-3 text-sm dark:border-danger-900 dark:bg-danger-950/30">
+        <p className="font-medium text-danger-700 dark:text-danger-300 flex items-center gap-2">
+          <AlertTriangle size={15} /> No public address could be determined
+        </p>
+        <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">{data.problem}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={`rounded-xl border p-3 text-sm ${
+        configured
+          ? "border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40"
+          : "border-primary-200 bg-primary-50 dark:border-primary-900 dark:bg-primary-950/30"
+      }`}
+    >
+      <p className="font-medium flex items-center gap-2 flex-wrap">
+        <CheckCircle size={15} className="text-success-500" />
+        Server address
+        <span className={configured ? "badge-green" : "badge-blue"}>
+          {configured ? `configured (${source})` : "detected from this session"}
+        </span>
+      </p>
+      <Code value={base} label="Address copied" />
+      {detected && (
+        <p className="mt-2 text-xs text-gray-600 dark:text-gray-300">
+          The connector works right now — every URL the AI client needs is built from the address
+          above, taken from the browser session you are using. To keep it working for a client that
+          reaches this app on a different host (a phone on the same Wi-Fi, a custom domain, a
+          tunnel), set{" "}
+          <code className="rounded bg-white px-1 dark:bg-gray-800">PUBLIC_BASE_URL={base}</code> in
+          the server environment and restart.
+        </p>
+      )}
+      {configured && (
+        <p className="mt-2 text-xs text-gray-500">
+          Set explicitly, so clients that connect from the internet resolve the same address.
+        </p>
+      )}
     </div>
   );
 }
@@ -111,10 +184,12 @@ function ConnectorCard({
   connector,
   changed,
   token,
+  bridge,
 }: {
   connector: Connector;
   changed: () => void;
   token: string | null;
+  bridge?: ConnectorList["bridge"];
 }) {
   const [testing, setTesting] = useState(false);
   const [report, setReport] = useState<ConnectorTestReport | null>(null);
@@ -185,15 +260,17 @@ function ConnectorCard({
       </div>
 
       {!connector.endpoint_ready && (
-        <div className="rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 p-3 text-sm">
-          <p className="font-medium text-red-700 dark:text-red-300 flex items-center gap-2">
-            <AlertTriangle size={15} /> This connector cannot work until PUBLIC_BASE_URL is set
+        <div className="rounded-xl bg-danger-50 dark:bg-danger-950/30 border border-danger-200 dark:border-danger-900 p-3 text-sm">
+          <p className="font-medium text-danger-700 dark:text-danger-300 flex items-center gap-2">
+            <AlertTriangle size={15} /> This address is not reachable from the internet
           </p>
           <p className="text-xs text-gray-600 dark:text-gray-300 mt-1">
-            Every URL in the OAuth metadata is built from it, and both ChatGPT and Claude refuse a
-            relative or mismatched <code>resource</code>. Set{" "}
-            <code>PUBLIC_BASE_URL={window.location.origin}</code> in the environment and restart the
-            server.
+            The URL below is built from the address this browser used. An AI client running in the
+            cloud has to be able to reach the same host, so on a local or LAN address set{" "}
+            <code className="rounded bg-white px-1 dark:bg-gray-800">
+              PUBLIC_BASE_URL=https://your-app.example.com
+            </code>{" "}
+            and restart the server.
           </p>
         </div>
       )}
@@ -231,7 +308,7 @@ function ConnectorCard({
       </div>
 
       {isChatgpt && (
-        <div className="rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900 p-3 text-xs space-y-1">
+        <div className="rounded-lg bg-primary-50 dark:bg-primary-950/30 border border-primary-200 dark:border-primary-900 p-3 text-xs space-y-1">
           <p className="font-medium text-sm">Why there is no token box for ChatGPT</p>
           <p className="text-gray-600 dark:text-gray-300">
             OpenAI's connector platform accepts OAuth 2.1 with PKCE only. There is no field for an
@@ -294,6 +371,26 @@ function ConnectorCard({
               token ? ` \\\n  -H "Authorization: Bearer ${token}"` : ""
             } \\\n  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'`}
           />
+          {bridge?.available && (
+            <>
+              <p className="text-xs text-gray-600 dark:text-gray-300">
+                The bridge is bundled with the app — download it here, no repository checkout needed:
+              </p>
+              <a
+                className="btn-secondary btn-sm inline-flex"
+                href={bridge.download_url}
+                download={bridge.script}
+              >
+                <ExternalLink size={13} /> Download {bridge.script}
+              </a>
+              <Code block label="Command copied" value={bridge.run} />
+              <Code
+                block
+                label="Config copied"
+                value={JSON.stringify(bridge.config, null, 2)}
+              />
+            </>
+          )}
           <p className="text-xs text-gray-500">
             <code>tools/arena-connector/mcp.json</code> is a ready-made config block for any MCP
             client that reads one, and <code>arena_mcp_bridge.py</code> needs nothing but Python 3.
@@ -361,7 +458,7 @@ function ConnectorCard({
         </p>
         {(connector.token_count > 0 || connector.status !== "unknown") && (
           <button
-            className="btn-secondary btn-sm text-red-600"
+            className="btn-secondary btn-sm text-danger-600"
             disabled={busy}
             onClick={async () => {
               if (!confirm(`Revoke every ${connector.label} grant? The assistant stops working until it signs in again.`))
@@ -387,7 +484,7 @@ function ConnectorCard({
             )}
           </button>
           {connector.last_error && !report && (
-            <p className="text-xs text-red-600">{connector.last_error}</p>
+            <p className="text-xs text-danger-600">{connector.last_error}</p>
           )}
           {showSteps && <TestReport report={lastReport} />}
         </div>
@@ -471,10 +568,42 @@ export default function McpConnectors() {
 
   return (
     <div className="space-y-4 max-w-4xl">
-      <div className="card p-6 space-y-2">
+      <div className="card p-6 space-y-3">
         <h2 className="text-lg font-semibold flex items-center gap-2">
           <Sparkles size={18} /> Let an AI operate this app
         </h2>
+        <div className="grid gap-2 sm:grid-cols-3">
+          {[
+            {
+              n: "1",
+              title: "ChatGPT / Claude",
+              body: "Copy the connector URL from the card below, paste it into the client, then approve the sign-in window that opens here.",
+            },
+            {
+              n: "2",
+              title: "Claude Code / Cursor",
+              body: "Create an access token, then add the server with the printed command or config block.",
+            },
+            {
+              n: "3",
+              title: "Any agent with bash",
+              body: "Download the stdio bridge (Arena card) and point it at the same URL with the same token.",
+            },
+          ].map((step) => (
+            <div
+              key={step.n}
+              className="rounded-xl border border-gray-200 dark:border-gray-700 p-3 space-y-1 animate-fade-up"
+            >
+              <p className="text-xs font-semibold text-primary-600 flex items-center gap-2">
+                <span className="w-5 h-5 rounded-full brand-gradient text-white text-[11px] flex items-center justify-center">
+                  {step.n}
+                </span>
+                {step.title}
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">{step.body}</p>
+            </div>
+          ))}
+        </div>
         <p className="text-sm text-gray-500">
           This app speaks the Model Context Protocol, so ChatGPT, Claude and any other MCP client can
           import contacts, build and send campaigns, answer the inbox and read analytics — the same
@@ -484,17 +613,11 @@ export default function McpConnectors() {
           Each client gets its <strong>own</strong> connector, because each one's requirements are
           different and a generic URL fails in a way that produces no error message anywhere.
         </p>
-        {data && !data.ready && (
-          <div className="rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 p-3 text-sm mt-2">
-            <p className="font-medium text-red-700 dark:text-red-300">
-              {data.problem || "PUBLIC_BASE_URL is not set."}
-            </p>
-          </div>
-        )}
-        <div className="flex items-center justify-between pt-2">
+        {data && <div className="mt-2"><BaseUrlPanel data={data} /></div>}
+        <div className="flex items-center justify-between pt-2 gap-3 flex-wrap">
           <p className="text-xs text-gray-500">
-            Protocol {data?.protocol_versions?.join(", ")} · sign-in
-            {data?.require_login ? " required" : " skipped (single-operator mode)"}
+            Protocol {data?.protocol_versions?.join(", ")} · sign-in through this app
+            {data?.require_login ? " asks for your password" : " is one tap"}
           </p>
           <button className="btn-secondary btn-sm" onClick={load}>
             <RefreshCw size={13} className="mr-1" /> Refresh
@@ -503,7 +626,7 @@ export default function McpConnectors() {
       </div>
 
       {items.map((c) => (
-        <ConnectorCard key={c.key} connector={c} changed={load} token={fresh} />
+        <ConnectorCard key={c.key} connector={c} changed={load} token={fresh} bridge={data?.bridge} />
       ))}
 
       <div className="card p-6 space-y-3">
@@ -542,8 +665,8 @@ export default function McpConnectors() {
         </div>
 
         {fresh && (
-          <div className="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-3 space-y-2">
-            <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+          <div className="rounded-lg bg-warning-50 dark:bg-warning-900/20 border border-warning-200 dark:border-warning-800 p-3 space-y-2">
+            <p className="text-sm font-medium text-warning-800 dark:text-warning-200">
               Copy this now — it is not stored and cannot be shown again.
             </p>
             <Code value={fresh} label="Token copied" />
@@ -572,12 +695,12 @@ export default function McpConnectors() {
                       : " · never used"}
                   </p>
                   {t.last_error && (
-                    <p className="text-xs text-red-500 mt-1 truncate">Last error: {t.last_error}</p>
+                    <p className="text-xs text-danger-500 mt-1 truncate">Last error: {t.last_error}</p>
                   )}
                 </div>
                 {t.is_active && (
                   <button
-                    className="btn-secondary btn-sm shrink-0 text-red-600"
+                    className="btn-secondary btn-sm shrink-0 text-danger-600"
                     onClick={() => revoke(t.id, t.name)}
                   >
                     <Trash2 size={13} className="mr-1" /> Revoke
@@ -623,7 +746,7 @@ export default function McpConnectors() {
                   </p>
                 </div>
                 <button
-                  className="btn-secondary btn-sm shrink-0 text-red-600"
+                  className="btn-secondary btn-sm shrink-0 text-danger-600"
                   onClick={async () => {
                     if (!confirm(`Cut off ${c.client_name || c.client_id}? Its tokens are revoked and it must register again.`))
                       return;
@@ -663,9 +786,9 @@ export default function McpConnectors() {
             {calls.map((c) => (
               <div key={c.id} className="py-2.5 flex items-start gap-3 text-sm">
                 {c.ok ? (
-                  <CheckCircle size={15} className="text-green-500 mt-0.5 shrink-0" />
+                  <CheckCircle size={15} className="text-success-500 mt-0.5 shrink-0" />
                 ) : (
-                  <XCircle size={15} className="text-red-500 mt-0.5 shrink-0" />
+                  <XCircle size={15} className="text-danger-500 mt-0.5 shrink-0" />
                 )}
                 <div className="min-w-0 flex-1">
                   <p className="font-medium flex items-center gap-2 flex-wrap">
@@ -676,7 +799,7 @@ export default function McpConnectors() {
                     )}
                   </p>
                   {c.request && <p className="text-xs text-gray-500 truncate">{c.request}</p>}
-                  {c.error && <p className="text-xs text-red-500 truncate">{c.error}</p>}
+                  {c.error && <p className="text-xs text-danger-500 truncate">{c.error}</p>}
                 </div>
                 <span className="text-xs text-gray-400 whitespace-nowrap">
                   {c.created_at ? new Date(c.created_at).toLocaleString() : ""}

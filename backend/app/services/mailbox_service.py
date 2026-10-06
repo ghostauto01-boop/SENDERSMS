@@ -617,18 +617,27 @@ async def sync_mailbox(db: AsyncSession, mailbox: EmailMailbox) -> dict:
 
 
 async def _notify(db: AsyncSession, mailbox: EmailMailbox, summary: dict) -> None:
-    """Tell the operator a reply arrived — especially one rescued from Spam."""
+    """Report what a sync rescued from Spam.
+
+    Individual replies are announced per message, with the sender's name and a
+    preview, by ``email_service.process_inbound_email`` — which is the one
+    place every reply passes through, whatever door it came in by. This summary
+    is therefore only for the thing the per-message notice cannot say: that
+    Gmail had filed a real reply as Spam and this app moved it back.
+    """
     try:
         from app.services.push_service import notify
 
         rescued = int(summary.get("rescued") or 0)
-        stored = int(summary.get("stored") or 0)
-        title = (
-            f"📬 {stored} new email repl{'y' if stored == 1 else 'ies'}"
-            + (f" ({rescued} pulled out of Spam)" if rescued else "")
+        if not rescued:
+            return
+        title = f"🛟 {rescued} repl{'y' if rescued == 1 else 'ies'} rescued from Spam"
+        body = (
+            f"{mailbox.email_address} had {rescued} real "
+            f"repl{'y' if rescued == 1 else 'ies'} in Spam. Moved to the inbox and into this "
+            "app's Email Inbox."
         )
-        body = f"From {mailbox.email_address}. Open the Email Inbox to answer them."
-        await notify(db, "email_reply", title, body, url="/email/inbox",
+        await notify(db, "email_reply", title, body, url="/email-inbox",
                      reference_id=mailbox.id, reference_type="mailbox")
     except Exception as exc:  # noqa: BLE001 — notifications must never break a sync
         logger.warning("MAILBOX notify failed: %s", exc)

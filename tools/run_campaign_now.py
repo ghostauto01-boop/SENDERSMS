@@ -12,6 +12,14 @@ import asyncio
 import os
 import sys
 
+# Load the app's own .env *first*: this process shares the database with the
+# server under test, so it has to share its CREDENTIAL_ENCRYPTION_KEY too.
+# Otherwise the API keys the server encrypted are unreadable here, and every
+# send fails with a message about a missing Brevo key.
+from dotenv import load_dotenv  # noqa: E402
+
+load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
+
 os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:////tmp/sim.db")
 os.environ.setdefault("APP_ENV", "development")
 os.environ.setdefault("SECRET_KEY", "sim-secret-key-not-for-production")

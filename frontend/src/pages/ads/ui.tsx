@@ -227,7 +227,7 @@ export function Tabs({
 export function Bar({ value, max, tone = "primary" }: { value: number; max: number; tone?: string }) {
   const pct = max > 0 ? Math.min((value / max) * 100, 100) : 0;
   const colour =
-    tone === "danger" ? "bg-red-500" : tone === "success" ? "bg-green-500" : "bg-primary-600";
+    tone === "danger" ? "bg-danger-500" : tone === "success" ? "bg-success-500" : "bg-primary-600";
   return (
     <div className="h-2 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
       <div className={`h-full ${colour}`} style={{ width: `${pct}%` }} />

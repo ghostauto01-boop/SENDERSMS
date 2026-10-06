@@ -78,10 +78,10 @@ const fromApiStep = (step: SequenceStep): BuilderStep => ({
 
 const stepIcon = (type: string) => {
   switch (type) {
-    case "send_sms": return <Send size={14} className="text-blue-500" />;
-    case "wait": return <Clock size={14} className="text-yellow-500" />;
-    case "condition": return <HelpCircle size={14} className="text-purple-500" />;
-    case "stop": return <StopCircle size={14} className="text-red-500" />;
+    case "send_sms": return <Send size={14} className="text-primary-500" />;
+    case "wait": return <Clock size={14} className="text-warning-500" />;
+    case "condition": return <HelpCircle size={14} className="text-primary-500" />;
+    case "stop": return <StopCircle size={14} className="text-danger-500" />;
     default: return null;
   }
 };
@@ -185,7 +185,7 @@ export default function SequencesPage() {
                 </div>
                 <div className="flex gap-1 flex-shrink-0">
                   <button onClick={() => setEditing(sequence)} className="btn-secondary btn-sm" title="Edit sequence"><Edit2 size={14} /></button>
-                  <button onClick={() => handleDelete(sequence.id)} className="btn-ghost btn-sm text-red-600" title="Delete sequence"><Trash2 size={14} /></button>
+                  <button onClick={() => handleDelete(sequence.id)} className="btn-ghost btn-sm text-danger-600" title="Delete sequence"><Trash2 size={14} /></button>
                 </div>
               </div>
 
@@ -321,8 +321,8 @@ function SequenceBuilderModal({ sequence, onClose }: { sequence: SequenceData | 
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4">
-      <div className="bg-white dark:bg-[#202c33] w-full sm:max-w-3xl max-h-[94vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl">
-        <div className="sticky top-0 z-10 bg-[#008069] dark:bg-[#202c33] px-4 py-3 flex items-center justify-between">
+      <div className="bg-white dark:bg-gray-800 w-full sm:max-w-3xl max-h-[94vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl">
+        <div className="sticky top-0 z-10 bg-primary-700 dark:bg-gray-800 px-4 py-3 flex items-center justify-between">
           <div>
             <h2 className="text-white font-semibold">{editing ? "Edit Sequence" : "Create Sequence"}</h2>
             <p className="text-white/70 text-xs">Wait steps become follow-ups and resume automatically.</p>
@@ -354,9 +354,9 @@ function SequenceBuilderModal({ sequence, onClose }: { sequence: SequenceData | 
             {steps.map((step, index) => {
               const laterSteps = steps.map((candidate, position) => ({ candidate, position })).filter(({ position }) => position > index);
               return (
-                <div key={index} className="border border-gray-200 dark:border-[#2a3942] rounded-xl overflow-hidden">
-                  <div className="px-3 py-2 bg-gray-50 dark:bg-[#111b21] flex items-center gap-2">
-                    <span className="w-6 h-6 rounded-full bg-[#00a884] text-white text-xs font-semibold flex items-center justify-center">{index + 1}</span>
+                <div key={index} className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+                  <div className="px-3 py-2 bg-gray-50 dark:bg-gray-900 flex items-center gap-2">
+                    <span className="w-6 h-6 rounded-full bg-primary-600 text-white text-xs font-semibold flex items-center justify-center">{index + 1}</span>
                     <select
                       className="input py-1.5 text-sm w-40"
                       value={step.step_type}
@@ -370,7 +370,7 @@ function SequenceBuilderModal({ sequence, onClose }: { sequence: SequenceData | 
                     <div className="ml-auto flex gap-1">
                       <button type="button" onClick={() => moveStep(index, -1)} disabled={index === 0} className="btn-ghost btn-sm" title="Move up"><ArrowUp size={13} /></button>
                       <button type="button" onClick={() => moveStep(index, 1)} disabled={index === steps.length - 1} className="btn-ghost btn-sm" title="Move down"><ArrowDown size={13} /></button>
-                      <button type="button" onClick={() => removeStep(index)} disabled={steps.length === 1} className="btn-ghost btn-sm text-red-600" title="Remove step"><Trash2 size={13} /></button>
+                      <button type="button" onClick={() => removeStep(index)} disabled={steps.length === 1} className="btn-ghost btn-sm text-danger-600" title="Remove step"><Trash2 size={13} /></button>
                     </div>
                   </div>
 
@@ -442,7 +442,7 @@ function SequenceBuilderModal({ sequence, onClose }: { sequence: SequenceData | 
                       </div>
                     )}
 
-                    {step.step_type === "stop" && <p className="text-sm text-gray-500 flex items-center gap-2"><StopCircle size={16} className="text-red-500" /> End automation for this contact.</p>}
+                    {step.step_type === "stop" && <p className="text-sm text-gray-500 flex items-center gap-2"><StopCircle size={16} className="text-danger-500" /> End automation for this contact.</p>}
                   </div>
                 </div>
               );

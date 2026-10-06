@@ -4,6 +4,7 @@ import { Bell, BellOff, CheckCheck, Loader2, Send } from "lucide-react";
 import toast from "react-hot-toast";
 import api from "../api/client";
 import { disablePush, enablePush, pushState, sendTestPush, type PushState } from "../utils/push";
+import { notificationDisplay, relativeTime } from "../utils/notificationDisplay";
 
 interface Item {
   id: number;
@@ -16,15 +17,14 @@ interface Item {
   created_at: string | null;
 }
 
-const ICONS: Record<string, string> = {
-  new_reply: "📱",
-  campaign_completed: "✅",
-  campaign_failed: "❌",
-  missed_call: "📞",
-  followup_due: "⏰",
-  test: "🔔",
-};
-
+/**
+ * The notification centre.
+ *
+ * Rows are grouped by day — today, yesterday, earlier — because "did this
+ * arrive while I was on the phone?" is the question you actually have. Each
+ * row shows the same sender/preview pair as the bell and the phone push, so a
+ * notification looks identical wherever it is read.
+ */
 export default function NotificationsPage() {
   const [items, setItems] = useState<Item[]>([]);
   const [unread, setUnread] = useState(0);
@@ -66,7 +66,7 @@ export default function NotificationsPage() {
     load(1, next);
   };
 
-  const openItem = async (it: Item) => {
+  const openItem = async (it: Item, href: string | null) => {
     if (!it.is_read) {
       try {
         await api.post(`/notifications/${it.id}/read`);
@@ -74,7 +74,7 @@ export default function NotificationsPage() {
         /* ignore */
       }
     }
-    if (it.url) navigate(it.url);
+    if (href) navigate(href);
     else load();
   };
 
@@ -121,18 +121,42 @@ export default function NotificationsPage() {
 
   const pages = Math.max(1, Math.ceil(total / PER));
 
+  /** Group rows under Today / Yesterday / Earlier, preserving API order. */
+  const groups = (() => {
+    const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    const today = startOfDay(new Date());
+    const buckets: { label: string; rows: Item[] }[] = [];
+    for (const item of items) {
+      const stamp = item.created_at ? new Date(item.created_at) : null;
+      const day = stamp ? startOfDay(stamp) : today;
+      const label =
+        day >= today ? "Today" : day >= today - 86400000 ? "Yesterday" : "Earlier";
+      const bucket = buckets.find((b) => b.label === label);
+      if (bucket) bucket.rows.push(item);
+      else buckets.push({ label, rows: [item] });
+    }
+    return buckets;
+  })();
+
   return (
-    <div className="max-w-3xl mx-auto space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-          Notifications {unread > 0 && <span className="text-sm font-normal text-red-500">({unread} unread)</span>}
-        </h1>
+    <div className="max-w-3xl mx-auto space-y-4 pb-tabbar">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="page-title">Notifications</h1>
+          <p className="page-subtitle">
+            {unread > 0 ? `${unread} unread` : "You are all caught up"}
+            {total ? ` · ${total} in total` : ""}
+          </p>
+        </div>
         <div className="flex gap-2">
-          <button onClick={toggleFilter} className={`btn-sm ${unreadOnly ? "btn-primary" : "btn-secondary"}`}>
-            {unreadOnly ? "Show all" : "Unread only"}
+          <button
+            onClick={toggleFilter}
+            className={unreadOnly ? "btn-primary btn-sm" : "btn-secondary btn-sm"}
+          >
+            {unreadOnly ? "Showing unread" : "Unread only"}
           </button>
           {unread > 0 && (
-            <button onClick={markAll} className="btn-secondary btn-sm flex items-center gap-1">
+            <button onClick={markAll} className="btn-secondary btn-sm">
               <CheckCheck size={14} /> Mark all read
             </button>
           )}
@@ -140,10 +164,18 @@ export default function NotificationsPage() {
       </div>
 
       <div className="card p-4">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-3">
-            {state === "on" ? <Bell size={20} className="text-green-600" /> : <BellOff size={20} className="text-gray-400" />}
-            <div>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <span
+              className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
+                state === "on"
+                  ? "bg-success-50 text-success-600 dark:bg-success-950/60 dark:text-success-300"
+                  : "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
+              }`}
+            >
+              {state === "on" ? <Bell size={18} /> : <BellOff size={18} />}
+            </span>
+            <div className="min-w-0">
               <p className="font-semibold text-sm text-gray-900 dark:text-white">
                 {state === "on" && "Push alerts ON for this browser"}
                 {state === "off" && "Push alerts OFF for this browser"}
@@ -151,8 +183,9 @@ export default function NotificationsPage() {
                 {state === "unsupported" && "Push not supported by this browser"}
                 {state === "unknown" && "Checking push status…"}
               </p>
-              <p className="text-xs text-gray-500">
-                Free forever — new replies, campaign results & missed calls land on your phone.
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Free forever — new SMS and email replies, campaign results and missed calls land on
+                your phone, with the sender and a preview.
               </p>
             </div>
           </div>
@@ -164,7 +197,7 @@ export default function NotificationsPage() {
             )}
             {state === "on" && (
               <>
-                <button onClick={sendTest} disabled={busy} className="btn-secondary btn-sm flex items-center gap-1">
+                <button onClick={sendTest} disabled={busy} className="btn-secondary btn-sm">
                   <Send size={13} /> Send test
                 </button>
                 <button onClick={togglePush} disabled={busy} className="btn-secondary btn-sm">
@@ -174,7 +207,8 @@ export default function NotificationsPage() {
             )}
             {state === "blocked" && (
               <span className="text-xs text-gray-500 max-w-[220px]">
-                Tap the 🔒/ⓘ icon in the address bar → Permissions → allow Notifications, then reload.
+                Tap the 🔒/ⓘ icon in the address bar → Permissions → allow Notifications, then
+                reload.
               </span>
             )}
           </div>
@@ -182,34 +216,87 @@ export default function NotificationsPage() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-10">
-          <Loader2 className="animate-spin text-gray-400" size={28} />
+        <div className="space-y-2">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="card p-4 flex gap-3 items-start">
+              <div className="skeleton w-9 h-9 rounded-full" />
+              <div className="flex-1 space-y-2">
+                <div className="skeleton h-3.5 w-40" />
+                <div className="skeleton h-3 w-full" />
+              </div>
+            </div>
+          ))}
         </div>
       ) : items.length === 0 ? (
-        <div className="card p-10 text-center text-gray-500">
-          {unreadOnly ? "No unread notifications. 🎉" : "No notifications yet."}
+        <div className="card p-10 text-center">
+          <span className="mx-auto w-12 h-12 rounded-full bg-primary-50 text-primary-600 dark:bg-primary-950/60 dark:text-primary-300 flex items-center justify-center mb-3">
+            <Bell size={22} />
+          </span>
+          <p className="font-medium text-gray-800 dark:text-gray-200">
+            {unreadOnly ? "No unread notifications" : "No notifications yet"}
+          </p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            Replies to your campaigns, finished sends and missed calls appear here — and on this
+            device once you enable them.
+          </p>
         </div>
       ) : (
-        <div className="card divide-y divide-gray-100 dark:divide-gray-700">
-          {items.map((it) => (
-            <button
-              key={it.id}
-              onClick={() => openItem(it)}
-              className={`w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 flex gap-3 items-start ${
-                it.is_read ? "" : "bg-primary-50/50 dark:bg-primary-900/10"
-              }`}
-            >
-              <span className="text-xl leading-6">{ICONS[it.event_type] ?? "🔔"}</span>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-gray-900 dark:text-white">{it.title}</p>
-                {it.body && <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">{it.body}</p>}
-                <p className="text-xs text-gray-400 mt-1">
-                  {it.created_at ? new Date(it.created_at).toLocaleString() : ""}
-                  {it.status === "failed" ? " · push failed" : ""}
-                </p>
+        <div className="space-y-4">
+          {groups.map((group) => (
+            <div key={group.label}>
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 px-1 mb-2">
+                {group.label}
+              </p>
+              <div className="card divide-y divide-gray-100 dark:divide-gray-700/70 overflow-hidden stagger">
+                {group.rows.map((it) => {
+                  const d = notificationDisplay(it);
+                  return (
+                    <button
+                      key={it.id}
+                      onClick={() => openItem(it, d.href)}
+                      className={`stagger-item w-full text-left px-4 py-3 flex gap-3 items-start transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/40 ${
+                        it.is_read ? "" : "bg-primary-50/50 dark:bg-primary-950/20"
+                      }`}
+                    >
+                      <span
+                        className={`mt-0.5 w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${d.iconClass}`}
+                      >
+                        <d.Icon size={16} />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-baseline gap-2">
+                          <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                            {d.sender}
+                          </p>
+                          <span className="ml-auto text-xs text-gray-400 shrink-0">
+                            {relativeTime(it.created_at)}
+                          </span>
+                        </div>
+                        {d.preview && (
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5 line-clamp-2">
+                            {d.preview}
+                          </p>
+                        )}
+                        <p className="text-[11px] text-gray-400 mt-1 flex items-center gap-2">
+                          {d.channel && <span className="uppercase tracking-wide">{d.channel}</span>}
+                          {it.status === "failed" && (
+                            <span className="text-danger-500">push failed</span>
+                          )}
+                          {it.created_at && (
+                            <span className="hidden sm:inline">
+                              {new Date(it.created_at).toLocaleString()}
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                      {!it.is_read && (
+                        <span className="mt-3 w-2 h-2 rounded-full bg-primary-500 shrink-0" />
+                      )}
+                    </button>
+                  );
+                })}
               </div>
-              {!it.is_read && <span className="mt-2 w-2 h-2 rounded-full bg-primary-500 shrink-0" />}
-            </button>
+            </div>
           ))}
         </div>
       )}

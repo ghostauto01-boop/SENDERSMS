@@ -39,7 +39,7 @@ function ContactActions({ contactId, phone, name, website, onSms, size = "sm", l
         <button
           onClick={doCall}
           disabled={calling}
-          className="flex-1 bg-[#00a884] hover:bg-[#06cf9c] text-white rounded-full py-2.5 text-[13px] font-semibold flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform disabled:opacity-60"
+          className="flex-1 bg-primary-600 hover:bg-primary-500 text-white rounded-full py-2.5 text-[13px] font-semibold flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform disabled:opacity-60"
           title={`Call ${phone} via your phone (SIM)`}
         >
           {calling ? <Loader2 size={14} className="animate-spin" /> : <Phone size={14} />} Call
@@ -47,7 +47,7 @@ function ContactActions({ contactId, phone, name, website, onSms, size = "sm", l
         {onSms && (
           <button
             onClick={onSms}
-            className="flex-1 bg-[#008069] hover:bg-[#00a884] text-white rounded-full py-2.5 text-[13px] font-semibold flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform"
+            className="flex-1 bg-primary-700 hover:bg-primary-600 text-white rounded-full py-2.5 text-[13px] font-semibold flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform"
           >
             <MessageSquare size={14} /> SMS
           </button>
@@ -55,14 +55,14 @@ function ContactActions({ contactId, phone, name, website, onSms, size = "sm", l
         <button
           onClick={() => openWhatsappForCall(phone, name)}
           title="Call on WhatsApp (opens the chat — tap the call icon)"
-          className="w-[52px] bg-[#25D366] hover:bg-[#1fb857] text-white rounded-full py-2.5 flex items-center justify-center active:scale-[0.98] transition-transform"
+          className="w-[52px] bg-primary-600 hover:bg-primary-700 text-white rounded-full py-2.5 flex items-center justify-center active:scale-[0.98] transition-transform"
         >
           <PhoneCall size={16} />
         </button>
         <button
           onClick={() => openWhatsappChat(phone)}
           title="Open WhatsApp chat"
-          className="w-[52px] bg-[#25D366]/15 hover:bg-[#25D366] hover:text-white text-[#128C7E] rounded-full py-2.5 flex items-center justify-center active:scale-[0.98] transition-transform"
+          className="w-[52px] bg-primary-600/15 hover:bg-primary-600 hover:text-white text-primary-700 rounded-full py-2.5 flex items-center justify-center active:scale-[0.98] transition-transform"
         >
           <MessageCircle size={16} />
         </button>
@@ -70,7 +70,7 @@ function ContactActions({ contactId, phone, name, website, onSms, size = "sm", l
           <button
             onClick={() => openWebsite(website)}
             title="Open website"
-            className="w-[52px] bg-[#e7f3ff] hover:bg-[#0066cc] hover:text-white text-[#0066cc] rounded-full py-2.5 flex items-center justify-center active:scale-[0.98] transition-transform"
+            className="w-[52px] bg-primary-50 hover:bg-primary-600 hover:text-white text-primary-600 rounded-full py-2.5 flex items-center justify-center active:scale-[0.98] transition-transform"
           >
             <Globe size={16} />
           </button>
@@ -84,7 +84,7 @@ function ContactActions({ contactId, phone, name, website, onSms, size = "sm", l
       <button
         onClick={doCall}
         disabled={calling}
-        className={`${btn} rounded-full bg-[#00a884]/10 hover:bg-[#00a884] hover:text-white text-[#00a884] flex items-center justify-center disabled:opacity-50`}
+        className={`${btn} rounded-full bg-primary-600/10 hover:bg-primary-600 hover:text-white text-primary-600 flex items-center justify-center disabled:opacity-50`}
         title={calling ? "Calling…" : `Call ${phone} (via your phone)`}
       >
         {calling ? <Loader2 size={icon} className="animate-spin" /> : <Phone size={icon} />}
@@ -92,7 +92,7 @@ function ContactActions({ contactId, phone, name, website, onSms, size = "sm", l
       {onSms && (
         <button
           onClick={onSms}
-          className={`${btn} rounded-full bg-[#008069]/10 hover:bg-[#008069] hover:text-white text-[#008069] flex items-center justify-center`}
+          className={`${btn} rounded-full bg-primary-700/10 hover:bg-primary-700 hover:text-white text-primary-700 flex items-center justify-center`}
           title="Send SMS"
         >
           <MessageSquare size={icon} />
@@ -100,14 +100,14 @@ function ContactActions({ contactId, phone, name, website, onSms, size = "sm", l
       )}
       <button
         onClick={() => openWhatsappForCall(phone, name)}
-        className={`${btn} rounded-full bg-[#25D366] text-white flex items-center justify-center hover:bg-[#1fb857]`}
+        className={`${btn} rounded-full bg-primary-600 text-white flex items-center justify-center hover:bg-primary-700`}
         title="Call on WhatsApp (opens the chat — tap the call icon)"
       >
         <PhoneCall size={icon} />
       </button>
       <button
         onClick={() => openWhatsappChat(phone)}
-        className={`${btn} rounded-full bg-[#25D366]/10 hover:bg-[#25D366] hover:text-white text-[#128C7E] flex items-center justify-center`}
+        className={`${btn} rounded-full bg-primary-600/10 hover:bg-primary-600 hover:text-white text-primary-700 flex items-center justify-center`}
         title="Open WhatsApp chat"
       >
         <MessageCircle size={icon} />
@@ -115,7 +115,7 @@ function ContactActions({ contactId, phone, name, website, onSms, size = "sm", l
       {hasSite && (
         <button
           onClick={() => openWebsite(website)}
-          className={`${btn} rounded-full bg-[#e7f3ff] hover:bg-[#0066cc] hover:text-white text-[#0066cc] flex items-center justify-center`}
+          className={`${btn} rounded-full bg-primary-50 hover:bg-primary-600 hover:text-white text-primary-600 flex items-center justify-center`}
           title="Open website"
         >
           <Globe size={icon} />

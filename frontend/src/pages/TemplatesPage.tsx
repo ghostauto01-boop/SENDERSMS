@@ -133,7 +133,7 @@ export default function TemplatesPage() {
                   <button onClick={() => handleDuplicate(tpl.id)} className="btn-ghost btn-sm" title="Duplicate">
                     <Copy size={14} />
                   </button>
-                  <button onClick={() => handleDelete(tpl.id)} className="btn-ghost btn-sm text-red-600" title="Delete">
+                  <button onClick={() => handleDelete(tpl.id)} className="btn-ghost btn-sm text-danger-600" title="Delete">
                     <Trash2 size={14} />
                   </button>
                 </div>

@@ -11,10 +11,21 @@ from pydantic_settings import BaseSettings
 
 logger = logging.getLogger(__name__)
 
+#: Repository root — ``backend/app/config.py`` -> up three levels. Used so the
+#: project's ``.env`` is found no matter which directory the server is started
+#: from (uvicorn from ``backend/`` is the common local case).
+_PROJECT_ROOT = os.path.abspath(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
+)
+
 # Placeholder values that must never survive into a production deployment.
 INSECURE_SECRET_KEY = "change-me-to-a-random-secret-key-at-least-32-chars"
 INSECURE_ENCRYPTION_KEY = "change-me-to-a-32-byte-base64-encoded-key"
-INSECURE_ADMIN_PASSWORD = "admin"
+#: The operator password. The app ships with password sign-in enabled and this
+#: default; the setup guide's first step is changing it.
+INSECURE_ADMIN_PASSWORD = "12345678"
+#: Kept as an alias: older code and tests refer to the placeholder by this name.
+DEFAULT_ADMIN_PASSWORD = INSECURE_ADMIN_PASSWORD
 
 
 class Settings(BaseSettings):
@@ -51,8 +62,9 @@ class Settings(BaseSettings):
     # --- Bootstrap Admin ---
     ADMIN_USERNAME: str = "admin"
     ADMIN_PASSWORD: str = INSECURE_ADMIN_PASSWORD
-    # Password-only login (the only thing typed on the login screen).
-    LOGIN_PASSWORD: str = "12345678"
+    # Password-only login (username optional). Defaults to the same password so
+    # the one field on the login screen works out of the box.
+    LOGIN_PASSWORD: str = INSECURE_ADMIN_PASSWORD
 
     # --- SMS Gateway (SMS-Gate.app) ---
     # Credentials MUST come from the environment — never hardcode them here.
@@ -116,7 +128,10 @@ class Settings(BaseSettings):
     # True = the connector's authorization page requires the operator password.
     # False = it offers the same one-tap sign-in the app's own login wall does.
     # Turn it on for a deployment that is reachable by people other than you.
-    MCP_OAUTH_REQUIRE_LOGIN: bool = False
+    # This app now has a password wall, so the connector's authorization page
+    # asks for the same password by default. Set it to False only on a
+    # deployment you are happy to have anyone sign into.
+    MCP_OAUTH_REQUIRE_LOGIN: bool = True
     MCP_OAUTH_ACCESS_TOKEN_TTL_MINUTES: int = 60
     MCP_OAUTH_REFRESH_TOKEN_TTL_DAYS: int = 30
 
@@ -137,11 +152,25 @@ class Settings(BaseSettings):
     GMAIL_SEND_REPLIES: bool = True
 
     # --- Rate Limiting ---
-    RATE_LIMIT_LOGIN: str = "5/minute"
-    RATE_LIMIT_API: str = "60/minute"
+    #: Brute-force protection on the password endpoints. The wall is back on,
+    #: so this is the limit that matters — a human types the password once.
+    RATE_LIMIT_LOGIN: str = "10/minute"
+    #: Global ceiling for API traffic, per client IP. This has to clear one
+    #: person using the app normally: a single page load is 5-10 requests, the
+    #: bell polls every 30 s, and several people may share one office/NAT
+    #: address. At the previous 60/minute a real user could hit a 429 while
+    #: simply navigating, which reads as "the app is broken".
+    RATE_LIMIT_API: str = "600/minute"
 
+    # ``.env`` is looked up next to this file's project root AND in the current
+    # working directory. Running uvicorn from ``backend/`` used to silently skip
+    # a repo-root ``.env``, which is exactly how a local run ends up pointed at
+    # a Postgres server that is not there.
     model_config = {
-        "env_file": ".env",
+        "env_file": (
+            os.path.join(_PROJECT_ROOT, ".env"),
+            os.path.join(os.getcwd(), ".env"),
+        ),
         "env_file_encoding": "utf-8",
         "case_sensitive": True,
     }
@@ -163,6 +192,16 @@ class Settings(BaseSettings):
         return bool(
             self.CALLGATE_BASE_URL and self.CALLGATE_USERNAME and self.CALLGATE_PASSWORD
         )
+
+    def uses_default_admin_password(self) -> bool:
+        """Is the operator password still the shipped default?
+
+        Deliberately NOT part of :meth:`insecure_defaults`: refusing to boot a
+        deployment over a weak password would take a working app offline. The
+        Setup Guide raises it as a to-do instead, which is where an operator
+        actually sees it.
+        """
+        return (self.ADMIN_PASSWORD or "").strip() == INSECURE_ADMIN_PASSWORD
 
     def insecure_defaults(self) -> list[str]:
         """Names of settings still holding an unsafe placeholder value."""
