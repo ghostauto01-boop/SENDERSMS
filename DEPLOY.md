@@ -737,6 +737,47 @@ calls answer `503 {"error_kind": "database", "db": {"kind": ..., "message": ...,
 
 ---
 
+### Deployed app does not have the latest code
+
+**Symptom.** A pull request is merged into `main`, Render reports a successful
+deploy a second or two later, and the app still behaves the old way — a new
+screen is missing, a fixed bug is still there.
+
+**Cause.** The service is building a different branch. Render deploys the branch
+the service (or its blueprint) was created from, and that choice survives later
+merges. When a push arrives for some *other* branch, the service re-checks its
+own branch, finds no new commit, and reports success without building anything.
+A deploy that finishes in about a second is this, not a fast build.
+
+**How to check from the repository, without the dashboard.** GitHub records every
+Render deploy, including the branch and commit it used:
+
+```bash
+gh api repos/<owner>/<repo>/deployments?per_page=5 \
+  --jq '.[] | "\(.created_at)  \(.environment)  \(.sha[0:7])"'
+# 2026-10-06T07:34:53Z  arena/019fedaf-sendersms - sendsms-api  a6e59b7
+```
+
+The environment is `<branch> - <service>`. If that branch is not `main`, the
+service is not building your merges. The status line also carries the live URL
+and a link straight to the deploy log:
+
+```bash
+gh api repos/<owner>/<repo>/deployments/<id>/statuses \
+  --jq '.[0] | "\(.state)  \(.environment_url)  \(.log_url)"'
+```
+
+**Fix.** Render dashboard → the service → **Settings** → **Branch** → `main` →
+Save, then **Manual Deploy → Deploy latest commit**. Do it for both
+`sendsms-api` and `sendsms-worker`, or they drift apart. `render.yaml` now states
+`branch: main` and `autoDeploy: true` for both services, so applying or syncing
+the blueprint from `main` sets it the same way.
+
+**Then check the result in the app itself.** Open `/setup` (Setup Guide) on the
+deployed instance: it reads the live database and environment, so a missing
+`PUBLIC_BASE_URL`, an unregistered webhook or a disconnected mailbox shows up as
+a named step instead of as a symptom later.
+
 ## Project Structure
 
 ```
