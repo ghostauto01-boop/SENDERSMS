@@ -1,6 +1,41 @@
 # SENDERSMS
 
 
+## Set up everything — the in-app guide
+
+Open **Setup Guide** in the sidebar (`/setup`). It is a tutorial for this
+deployment, not a copy of the docs: every step is checked against the database
+and the environment on each load, so it tells you what *your* install is missing
+and in what order to fix it.
+
+Six sections, in the order that matters:
+
+| # | Section | What it checks |
+|---|---------|----------------|
+| 1 | Foundation | placeholder secrets, `PUBLIC_BASE_URL`, which database is connected, whether background work runs (Celery worker or the inline poller) |
+| 2 | SMS (Nigeria) | the SMS-Gate credentials, whether the inbound webhook is registered **and still points at this address**, the SIM slot |
+| 3 | Email sending | Brevo senders, which one is default/active, and the inbound-parse webhook URL with its token |
+| 4 | Email replies | connected mailboxes, last sync, imported/rescued counts, and the reply-routing report — the freemail `Reply-To` that makes Gmail file a prospect's answer in Spam is named here |
+| 5 | AI connectors | one card per client (ChatGPT, Claude, Arena) with the exact MCP URL to paste, whether OAuth is reachable, and how many assistants are connected |
+| 6 | Optional | push/email notifications, CallGate, sending rules and compliance, and whether anything has been sent yet |
+
+Each step shows *why it matters* (the symptom you get without it), what the server
+currently sees, the values to paste into the other system with a copy button, the
+button that opens the screen where it is fixed, and how to verify it afterwards.
+The number on the sidebar badge is the count of steps still blocking you; it
+drops as each one is fixed.
+
+The same data is available to scripts:
+
+```bash
+curl -s -b cookies.txt https://your-app/api/v1/guide           # full checklist
+curl -s -b cookies.txt https://your-app/api/v1/guide/summary   # progress only
+```
+
+`ready_to_send` in the response is true once nothing required for sending is
+missing — the mailbox and the AI connectors are deliberately not part of that,
+because they are things you add after your first campaign, not before it.
+
 ## Email (Brevo) — what is wired
 
 The app runs SMS and email side by side. Email reuses the same tables as SMS (a

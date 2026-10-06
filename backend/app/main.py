@@ -992,7 +992,7 @@ async def health_db():
     code = 200 if result.get("ok") else 503
     return JSONResponse(result, status_code=code, headers={"Cache-Control": "no-store"})
 
-from app.api.v1 import ads, auth, calendar, calls, contacts, lists, campaigns, sequences, followups, inbox, overview, templates, analytics, settings as settings_api, webhooks, dashboard, send, autoreply, automations, ai, variables, campaign_followups, notifications, email as email_api, mailbox as mailbox_api, mcp as mcp_api
+from app.api.v1 import ads, auth, calendar, calls, contacts, lists, campaigns, sequences, followups, inbox, overview, templates, analytics, settings as settings_api, webhooks, dashboard, send, autoreply, automations, ai, variables, campaign_followups, notifications, email as email_api, mailbox as mailbox_api, guide as guide_api, mcp as mcp_api
 app.include_router(auth.router, prefix="/api/v1/auth")
 app.include_router(dashboard.router, prefix="/api/v1/dashboard")
 app.include_router(contacts.router, prefix="/api/v1/contacts")
@@ -1027,6 +1027,11 @@ app.include_router(email_api.router, prefix="/api/v1/email")
 # replies land in the app, and sends one-to-one replies back out through that same
 # mailbox so they stay DMARC-aligned instead of tainting the thread.
 app.include_router(mailbox_api.router, prefix="/api/v1/mailbox")
+# The in-app setup tutorial: a checklist whose status is read live from the
+# database and environment, so a missing PUBLIC_BASE_URL or an unregistered
+# webhook is something the operator is told about instead of something they have
+# to diagnose from a symptom.
+app.include_router(guide_api.router, prefix="/api/v1/guide")
 app.include_router(mcp_api.router, prefix="/api/v1/mcp")
 # The canonical address an AI assistant is pointed at: https://your-app/mcp
 app.include_router(mcp_api.protocol_router, prefix="/mcp")

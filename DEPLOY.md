@@ -571,6 +571,25 @@ If webhooks aren't available, the system falls back to polling automatically.
 
 ## 5. Production Checklist
 
+### Start here: the in-app setup guide
+
+After the service is live, log in and open **Setup Guide** (`/setup`) before
+working through the checklist below. It runs the same checks against your actual
+database and environment and reports each one as *done*, *to do*, *needs
+attention* or *optional*, with the value to paste, a button to the screen that
+fixes it, and how to verify it. It is the fastest way to find the one missing
+setting that shows up as a symptom somewhere else — no inbound SMS, replies
+landing in Spam, or an AI assistant that will not connect.
+
+```bash
+# the same data, for a script or a monitoring probe
+curl -s -b cookies.txt "$PUBLIC_BASE_URL/api/v1/guide/summary"
+# {"done":9,"blocking":2,"optional":4,"total":15,"percent":73,
+#  "ready_to_send":false,"next_step":"Register the inbound SMS webhook",...}
+```
+
+The badge on the sidebar entry is the number of steps still blocking you.
+
 Before going live, verify each item:
 
 ### Security
