@@ -16,6 +16,11 @@ services:
     runtime: python
     region: frankfurt
     plan: free
+    # Deploy main, and deploy it automatically when main moves. Without these a
+    # blueprint that was applied from a feature branch keeps building that
+    # branch, so a merged PR never reaches the running service.
+    branch: main
+    autoDeploy: true
     buildCommand: |
       pip install --upgrade pip && pip install -r requirements.txt
       npm ci && npm run build
@@ -106,6 +111,8 @@ services:
     runtime: python
     region: frankfurt
     plan: free
+    branch: main
+    autoDeploy: true
     buildCommand: pip install --upgrade pip && pip install -r requirements.txt
     startCommand: cd backend && python app/worker_web.py
     envVars:
