@@ -553,6 +553,17 @@ async def _send_template_message(
             html_body = await render_for_contact(db, html_body, contact)
         if not subject:
             subject = "(no subject)"
+        # An HTML-only campaign still needs a plain-text alternative: it is what
+        # every mail client falls back to, and HTML with no text part is one of
+        # the oldest spam signals there is.
+        if not (body or "").strip() and (html_body or "").strip():
+            body = email_service.html_to_text(html_body)
+        # Campaign mail is bulk mail, so it carries the one-click unsubscribe the
+        # Gmail/Yahoo bulk-sender rules ask for: the List-Unsubscribe headers for
+        # the machines (added in build_headers) and one button for the reader.
+        body, html_body = email_service.apply_unsubscribe(
+            body or "", html_body, (account.reply_to or account.from_email or "").strip()
+        )
 
     # Create message
     import uuid

@@ -165,6 +165,9 @@ async def _poll() -> int:
         # audience refresh. Uses the same no-worker fallback pattern as the
         # legacy campaign sweep above.
         work += await _process_ads_manager()
+        # Connected mailboxes: pull replies (and the ones Gmail filed in Spam)
+        # into the email inbox. No-worker fallback for the Celery beat task.
+        work += await _process_mailbox_sync_inline()
     except _DatabaseDown:
         raise
     except Exception as e:
@@ -310,6 +313,35 @@ async def _process_ads_manager() -> int:
         return int(result.get("sent") or 0) + int(result.get("followups") or 0)
     except Exception as exc:
         logger.warning("Ads manager sweep: %s", exc)
+        return 0
+
+
+async def _process_mailbox_sync_inline() -> int:
+    """Import email replies without a Celery worker.
+
+    The same job runs on beat (``app.tasks.mailbox_tasks.sync_mailboxes``). It is
+    repeated here for the deployments that have no worker at all — the Render free
+    tier, or a Docker compose without the Celery service — because a reply that
+    only arrives when a worker happens to be awake is the exact complaint this
+    feature exists to fix.
+
+    Safe to run alongside beat: each mailbox carries its own ``last_sync_at`` and
+    poll interval, and message storage is idempotent on the provider message id,
+    so two overlapping passes store one copy.
+    """
+    try:
+        from app.services import mailbox_service
+
+        async with async_session_factory() as db:
+            results = await mailbox_service.sync_due_mailboxes(db)
+            await db.commit()
+        imported = sum(int(r.get("stored") or 0) for r in results if isinstance(r, dict))
+        rescued = sum(int(r.get("rescued") or 0) for r in results if isinstance(r, dict))
+        if imported or rescued:
+            logger.info("MAILBOX: imported %s reply(ies), rescued %s from Spam", imported, rescued)
+        return imported + rescued
+    except Exception as exc:  # noqa: BLE001 — one unreachable mailbox must not stop the poll
+        logger.warning("Mailbox sweep: %s", exc)
         return 0
 
 
@@ -855,7 +887,29 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title=settings.APP_NAME, version="1.0.0", lifespan=lifespan)
 # GZip large JSON (inbox threads, analytics, contact pages) — cuts payloads ~70%.
 app.add_middleware(GZipMiddleware, minimum_size=1000)
-app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins_list, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+# The MCP headers are listed explicitly rather than relying on "*": a browser
+# client (claude.ai, or the connector self-test page) sends a credentialed
+# request, and the Fetch spec says a wildcard Access-Control-Allow-Headers is
+# then treated as the literal header name "*" — the preflight fails and the
+# connector shows "could not connect" with no server-side error at all.
+# expose_headers matters for the same clients: without it, JavaScript cannot
+# read Mcp-Session-Id off the response, so every request after the first looks
+# unauthenticated.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins_list,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=[
+        "Authorization", "Content-Type", "Accept", "Accept-Encoding", "Origin",
+        "X-Requested-With", "X-CSRF-Token", "Last-Event-ID",
+        "Mcp-Session-Id", "Mcp-Protocol-Version", "X-Mcp-Selftest",
+    ],
+    expose_headers=[
+        "Mcp-Session-Id", "Mcp-Protocol-Version", "WWW-Authenticate",
+        "Content-Type", "Content-Length", "Location",
+    ],
+)
 
 
 @app.middleware("http")
@@ -938,7 +992,7 @@ async def health_db():
     code = 200 if result.get("ok") else 503
     return JSONResponse(result, status_code=code, headers={"Cache-Control": "no-store"})
 
-from app.api.v1 import ads, auth, calendar, calls, contacts, lists, campaigns, sequences, followups, inbox, overview, templates, analytics, settings as settings_api, webhooks, dashboard, send, autoreply, automations, ai, variables, campaign_followups, notifications, email as email_api, mcp as mcp_api
+from app.api.v1 import ads, auth, calendar, calls, contacts, lists, campaigns, sequences, followups, inbox, overview, templates, analytics, settings as settings_api, webhooks, dashboard, send, autoreply, automations, ai, variables, campaign_followups, notifications, email as email_api, mailbox as mailbox_api, guide as guide_api, mcp as mcp_api
 app.include_router(auth.router, prefix="/api/v1/auth")
 app.include_router(dashboard.router, prefix="/api/v1/dashboard")
 app.include_router(contacts.router, prefix="/api/v1/contacts")
@@ -969,9 +1023,25 @@ app.include_router(notifications.router, prefix="/api/v1/notifications")
 # Email channel (Brevo): senders, one-off sends, the email inbox and its stats.
 # The SMS routes above are untouched -- this is a parallel, additive surface.
 app.include_router(email_api.router, prefix="/api/v1/email")
+# Connected mailboxes (Gmail / IMAP): reads the operator's own inbox so prospect
+# replies land in the app, and sends one-to-one replies back out through that same
+# mailbox so they stay DMARC-aligned instead of tainting the thread.
+app.include_router(mailbox_api.router, prefix="/api/v1/mailbox")
+# The in-app setup tutorial: a checklist whose status is read live from the
+# database and environment, so a missing PUBLIC_BASE_URL or an unregistered
+# webhook is something the operator is told about instead of something they have
+# to diagnose from a symptom.
+app.include_router(guide_api.router, prefix="/api/v1/guide")
 app.include_router(mcp_api.router, prefix="/api/v1/mcp")
-# The one address an AI assistant is pointed at: https://your-app/mcp
+# The canonical address an AI assistant is pointed at: https://your-app/mcp
 app.include_router(mcp_api.protocol_router, prefix="/mcp")
+# Per-client connector endpoints (/connectors/chatgpt/mcp, ...), the OAuth 2.1
+# authorization server they need (/connectors/<key>/oauth/*) and the discovery
+# documents both ChatGPT and Claude read before they will show a sign-in window
+# (/.well-known/oauth-protected-resource, /.well-known/oauth-authorization-server).
+# Mounted at the root because those paths are fixed by the specs, and mounted
+# before the SPA catch-all so the catch-all cannot swallow them.
+app.include_router(mcp_api.public_router)
 
 PUBLIC_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "public")
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist")

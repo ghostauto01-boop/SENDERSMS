@@ -1,19 +1,23 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import {
   LayoutDashboard, Users, List, Megaphone, GitBranch, Sparkles,
   Inbox, Send, Clock, FileText, BarChart3, Settings, MessageSquareReply,
   Zap, Moon, Sun, Menu, X, LogOut, Search, Braces, Repeat, Calendar, Target,
-  Activity, Phone, Mail, MailOpen,
+  Activity, Phone, Mail, MailOpen, GraduationCap,
 } from "lucide-react";
 import BrandMark from "../components/BrandMark";
 import ChannelSwitch from "../components/ChannelSwitch";
 import NotificationBell from "../components/NotificationBell";
+import guideApi from "../api/guide";
 
 const navItems = [
   { to: "/overview", label: "Overview", icon: Activity },
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  // The setup tutorial. Its badge is the number of steps that still block you,
+  // read live from the server, so it disappears as each one is fixed.
+  { to: "/setup", label: "Setup Guide", icon: GraduationCap },
   // The Send page follows the channel switch (Send SMS / Send Email).
   { to: "/send", label: "Send", icon: Send },
   { to: "/email-inbox", label: "Email Inbox", icon: MailOpen },
@@ -39,6 +43,21 @@ const navItems = [
 
 export default function MainLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  /** Steps in the setup guide that are not done yet; null until the first answer. */
+  const [setupBlocking, setSetupBlocking] = useState<number | null>(null);
+
+  useEffect(() => {
+    const load = () =>
+      guideApi
+        .summary()
+        .then((s) => setSetupBlocking(s.blocking))
+        .catch(() => setSetupBlocking(null));
+    load();
+    // The guide page announces its own re-checks, so the badge updates the moment
+    // a step is fixed instead of on the next full reload.
+    window.addEventListener("setup-guide-updated", load);
+    return () => window.removeEventListener("setup-guide-updated", load);
+  }, []);
   const [dark, setDark] = useState(() => {
     if (typeof window !== "undefined") {
       return (
@@ -122,7 +141,10 @@ export default function MainLayout() {
                 `}
               >
                 <item.icon size={18} />
-                {item.label}
+                <span className="flex-1">{item.label}</span>
+                {item.to === "/setup" && setupBlocking ? (
+                  <span className="badge-red">{setupBlocking}</span>
+                ) : null}
               </Link>
             );
           })}

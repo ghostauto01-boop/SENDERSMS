@@ -43,11 +43,45 @@ services:
         sync: false
       - key: DEFAULT_TIMEZONE
         value: Africa/Lagos
-      # Public URL used to register the SMS-Gate inbound webhook.
-      # Render injects RENDER_EXTERNAL_URL automatically; set this explicitly
-      # if you serve the app behind a custom domain.
+      # The public HTTPS address of THIS service. Everything that has to be
+      # reached from outside depends on it:
+      #   - the SMS-Gate inbound webhook (no replies to your SMS without it)
+      #   - the Brevo inbound webhook and the email unsubscribe link
+      #   - every URL in the MCP OAuth metadata (ChatGPT/Claude reject a
+      #     relative or mismatched `resource`, so the connectors cannot connect)
+      #   - the Gmail OAuth redirect URI
+      # Render injects RENDER_EXTERNAL_URL automatically and the app falls back
+      # to it; set this explicitly if you serve the app behind a custom domain.
+      # The in-app Setup Guide (/setup) flags it if it is still missing.
       - key: PUBLIC_BASE_URL
         sync: false
+      # --- Email replies (Gmail) -------------------------------------------
+      # Poll interval, in seconds, for every connected mailbox. The inline
+      # poller and the worker both honour it, and it is idempotent, so running
+      # both is safe.
+      - key: GMAIL_POLL_INTERVAL
+        value: "60"
+      # Move replies Gmail filed as spam back into the inbox and import them.
+      - key: GMAIL_RESCUE_FROM_SPAM
+        value: "true"
+      # Send one-to-one replies from the connected mailbox instead of Brevo, so
+      # the thread stays in Gmail and does not look spoofed to the prospect.
+      - key: GMAIL_SEND_REPLIES
+        value: "true"
+      # Optional. Leave empty to connect Gmail with an app password over IMAP
+      # (no Google Cloud project needed). Fill both to also offer the
+      # "Sign in with Google" button, which unlocks the spam-rescue API and the
+      # "never send it to Spam" filter. Register the redirect URI
+      # <PUBLIC_BASE_URL>/api/v1/mailbox/google/callback in the OAuth client.
+      - key: GOOGLE_CLIENT_ID
+        value: ""
+      - key: GOOGLE_CLIENT_SECRET
+        value: ""
+      # --- AI connectors (MCP) ---------------------------------------------
+      # ChatGPT / Claude / Arena connect over OAuth 2.1 at
+      # <PUBLIC_BASE_URL>/connectors/<client>/mcp.
+      - key: MCP_OAUTH_ENABLED
+        value: "true"
       # Signing key from the SMS-Gate device (Settings -> Webhooks -> Signing Key).
       # Without it, inbound webhooks are rejected with 401.
       - key: SMSGATE_WEBHOOK_SECRET
@@ -103,4 +137,18 @@ services:
         sync: false
       - key: SMSGATE_PASSWORD
         sync: false
+      # This service runs `celery worker -B`, so it is the one that executes the
+      # sync-connected-mailboxes beat task: keep these identical to the API
+      # service. Importing a reply twice is prevented by an idempotency key, so
+      # running this and the inline poller together is safe.
+      - key: GMAIL_POLL_INTERVAL
+        value: "60"
+      - key: GMAIL_RESCUE_FROM_SPAM
+        value: "true"
+      - key: GMAIL_SEND_REPLIES
+        value: "true"
+      - key: GOOGLE_CLIENT_ID
+        value: ""
+      - key: GOOGLE_CLIENT_SECRET
+        value: ""
     healthCheckPath: /health

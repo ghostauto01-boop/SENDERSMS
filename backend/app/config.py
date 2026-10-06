@@ -108,6 +108,34 @@ class Settings(BaseSettings):
     VAPID_PRIVATE_KEY: Optional[str] = None
     VAPID_CLAIM_EMAIL: str = "admin@example.com"
 
+    # --- MCP connectors (ChatGPT / Claude / Arena / any MCP client) ---
+    # OAuth 2.1 is what ChatGPT and Claude custom connectors require; turning
+    # this off leaves only the static bearer tokens (Claude Code, curl, the
+    # Arena bridge) working.
+    MCP_OAUTH_ENABLED: bool = True
+    # True = the connector's authorization page requires the operator password.
+    # False = it offers the same one-tap sign-in the app's own login wall does.
+    # Turn it on for a deployment that is reachable by people other than you.
+    MCP_OAUTH_REQUIRE_LOGIN: bool = False
+    MCP_OAUTH_ACCESS_TOKEN_TTL_MINUTES: int = 60
+    MCP_OAUTH_REFRESH_TOKEN_TTL_DAYS: int = 30
+
+    # --- Inbound email: pulling replies out of Gmail ---
+    # OAuth (a Google Cloud project) is used when configured; otherwise the
+    # app signs in to IMAP with an app password. Both need a public HTTPS
+    # redirect only for OAuth.
+    GOOGLE_CLIENT_ID: Optional[str] = None
+    GOOGLE_CLIENT_SECRET: Optional[str] = None
+    # How often the poller checks a connected mailbox for replies, in seconds.
+    GMAIL_POLL_INTERVAL: int = 60
+    # Move a reply that Gmail put in Spam back into the Inbox when it matches a
+    # contact or a thread this app sent. This is the fix for "the prospect
+    # replied and it landed in my spam".
+    GMAIL_RESCUE_FROM_SPAM: bool = True
+    # Send a reply through Gmail itself (aligned DMARC, appears in Gmail's Sent)
+    # instead of Brevo, when the mailbox is connected and the addresses match.
+    GMAIL_SEND_REPLIES: bool = True
+
     # --- Rate Limiting ---
     RATE_LIMIT_LOGIN: str = "5/minute"
     RATE_LIMIT_API: str = "60/minute"

@@ -47,6 +47,7 @@ import adsApi, { AdsCampaign } from "../api/ads";
 import CampaignBuilder from "./ads/CampaignBuilder";
 import CampaignDetail from "./ads/CampaignDetail";
 import EmailSendPanel from "../components/EmailSendPanel";
+import MailboxRepliesTab from "../components/MailboxRepliesTab";
 import RichEmailEditor from "../components/RichEmailEditor";
 import {
   Badge,
@@ -87,6 +88,7 @@ const SECTIONS = [
   { key: "Senders", icon: KeyRound },
   { key: "Quick Send", icon: Send },
   { key: "Templates", icon: FileText },
+  { key: "Replies", icon: Inbox },
   { key: "Deliverability", icon: ShieldCheck },
   { key: "Suppression", icon: ShieldOff },
   { key: "Activity", icon: Activity },
@@ -107,8 +109,29 @@ const emptyAccount = {
   track_clicks: true,
 };
 
+/**
+ * Which tab to open, and what to say about it, when the page is reached with a
+ * query string. The Gmail OAuth callback lands here with `?section=Replies`
+ * after Google sends the browser back, so the operator arrives on the panel that
+ * just changed instead of on the Overview wondering whether it worked.
+ */
+function sectionFromQuery(): Section {
+  const wanted = new URLSearchParams(window.location.search).get("section");
+  return SECTIONS.some((s) => s.key === wanted) ? (wanted as Section) : "Overview";
+}
+
+function replyBannerFromQuery(): string | null {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("mailbox") === "error") {
+    return "That mailbox connection did not complete. Nothing was saved — try again, or connect with an app password instead.";
+  }
+  const address = params.get("address");
+  return address ? `${address} is connected. Replies to it now arrive in the Email Inbox.` : null;
+}
+
 export default function EmailManagerPage() {
-  const [section, setSection] = useState<Section>("Overview");
+  const [section, setSection] = useState<Section>(sectionFromQuery);
+  const [replyBanner] = useState<string | null>(replyBannerFromQuery);
   const navigate = useNavigate();
 
   const [campaigns, setCampaigns] = useState<AdsCampaign[]>([]);
@@ -177,7 +200,7 @@ export default function EmailManagerPage() {
           <h1 className="text-2xl sm:text-3xl font-bold">Email Manager</h1>
           <p className="text-gray-500 mt-1">
             Email campaigns, email sets, creatives, A/B testing, Andromeda, follow-ups and
-            analytics — plus senders, templates and deliverability.
+            analytics — plus senders, templates, replies and deliverability.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -274,6 +297,7 @@ export default function EmailManagerPage() {
       )}
       {section === "Quick Send" && <SendTab reference={emailReference} accounts={accounts} />}
       {section === "Templates" && <TemplatesTab reference={emailReference} />}
+      {section === "Replies" && <MailboxRepliesTab banner={replyBanner} />}
       {section === "Deliverability" && <DeliverabilityTab accounts={accounts} />}
       {section === "Suppression" && <SuppressionTab />}
       {section === "Activity" && <ActivityTab accounts={accounts} />}

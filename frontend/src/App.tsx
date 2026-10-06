@@ -31,6 +31,7 @@ const CalendarPage = lazy(() => import("./pages/CalendarPage"));
 const AudiencesPage = lazy(() => import("./pages/AudiencesPage"));
 const PhonePage = lazy(() => import("./pages/PhonePage"));
 const NotificationsPage = lazy(() => import("./pages/NotificationsPage"));
+const SetupPage = lazy(() => import("./pages/SetupPage"));
 
 function PageSpinner() {
   return (
@@ -96,6 +97,7 @@ function AppRoutes() {
         <Route path="/templates" element={<TemplatesPage />} />
         <Route path="/analytics" element={<AnalyticsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/setup" element={<SetupPage />} />
         <Route path="/send" element={<SendPage />} />
         <Route path="/auto-reply" element={<AutoReplyPage />} />
         <Route path="/automations" element={<AutomationsPage />} />
