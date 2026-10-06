@@ -84,7 +84,7 @@ function ScheduleModal({
         />
 
         {campaign.scheduled_start_at && (
-          <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
+          <p className="text-xs text-primary-600 dark:text-primary-400 mt-2">
             Currently scheduled for {formatWhen(campaign.scheduled_start_at)}.
           </p>
         )}
@@ -256,7 +256,7 @@ export default function CampaignsPage() {
                     <p className="text-sm text-gray-500 mt-1">{camp.description}</p>
                   )}
                   {camp.scheduled_start_at && camp.status === "scheduled" && (
-                    <p className="text-sm text-blue-600 dark:text-blue-400 mt-1 flex items-center gap-1">
+                    <p className="text-sm text-primary-600 dark:text-primary-400 mt-1 flex items-center gap-1">
                       <CalendarClock size={14} />
                       Sends automatically on {formatWhen(camp.scheduled_start_at)}
                     </p>
@@ -274,7 +274,7 @@ export default function CampaignsPage() {
                         <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-sm text-gray-500">
                           <span>Sent: {sent}</span>
                           <span>Delivered: {delivered}</span>
-                          <span className={failed > 0 ? "text-red-600" : ""}>Failed: {failed}</span>
+                          <span className={failed > 0 ? "text-danger-600" : ""}>Failed: {failed}</span>
                           <span>Replies: {replies}</span>
                           <span>Interested: {interested}</span>
                           {l?.reply_rate > 0 && <span>Reply rate: {l.reply_rate}%</span>}
@@ -303,7 +303,7 @@ export default function CampaignsPage() {
                           {(l?.unread ?? 0) > 0 && (
                             <Link
                               to={`/inbox?campaign_id=${camp.id}`}
-                              className="btn-ghost btn-sm text-amber-600"
+                              className="btn-ghost btn-sm text-warning-600"
                               title="Unread replies from this campaign"
                             >
                               {l.unread} unread
@@ -318,7 +318,7 @@ export default function CampaignsPage() {
                   {camp.status === "draft" && (
                     <>
                       <button onClick={() => handleAction(camp.id, "validate")} className="btn-primary btn-sm">Validate</button>
-                      <button onClick={() => handleDelete(camp.id)} className="btn-ghost btn-sm text-red-600"><Trash2 size={14} /></button>
+                      <button onClick={() => handleDelete(camp.id)} className="btn-ghost btn-sm text-danger-600"><Trash2 size={14} /></button>
                     </>
                   )}
                   {camp.status === "scheduled" && (
@@ -540,7 +540,7 @@ function CampaignModal({
           {editing ? "Edit Campaign" : "Create Campaign"}
         </h2>
         {editing && campaign!.status === "scheduled" && (
-          <p className="text-xs text-amber-600 dark:text-amber-500 -mt-2 mb-3">
+          <p className="text-xs text-warning-600 dark:text-warning-500 -mt-2 mb-3">
             Saving changes returns this campaign to draft, so it must be validated again.
           </p>
         )}

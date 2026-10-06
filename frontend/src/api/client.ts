@@ -28,18 +28,53 @@ const normaliseDetail = (data: any) => {
   if (msg) data.detail = msg;
 };
 
+/**
+ * How long to wait before replaying a request that was refused with 429.
+ *
+ * The API's global ceiling is deliberately generous (600 requests/minute), but
+ * a burst — a dashboard firing several calls at once, then a navigation before
+ * they settle — can still trip it. Retrying once, after the server's own
+ * `Retry-After`, turns what used to be a visible "could not load" into a
+ * half-second pause. It never retries a non-idempotent call that might have
+ * been applied, and never loops.
+ */
+const RATE_LIMIT_MAX_RETRIES = 1;
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const retryAfterMs = (error: any): number => {
+  const raw = error?.response?.headers?.["retry-after"];
+  const seconds = Number(raw);
+  if (Number.isFinite(seconds) && seconds > 0) return Math.min(seconds, 5) * 1000;
+  return 800;
+};
+
 api.interceptors.response.use(
-  (response) => {
+  async (response) => {
     // Any real answer from the API means the database is back.
     if (!String(response.config?.url || "").startsWith("/health")) {
       reportDbOk();
     }
     return response;
   },
-  (error) => {
+  async (error) => {
     if (error.response?.data) {
       normaliseDetail(error.response.data);
     }
+
+    // 429: wait for the window the server named and replay once. Only GETs are
+    // replayed — repeating a send because of a throttle is not something the
+    // user asked for.
+    const config = error.config || {};
+    if (
+      error.response?.status === 429 &&
+      (config.method || "get").toLowerCase() === "get" &&
+      (config.__rateLimitRetries || 0) < RATE_LIMIT_MAX_RETRIES
+    ) {
+      config.__rateLimitRetries = (config.__rateLimitRetries || 0) + 1;
+      await sleep(retryAfterMs(error));
+      return api.request(config);
+    }
+
     // 503 + error_kind "database": Postgres itself is down (e.g. the Neon
     // free plan suspended the project). Tell the banner; pages still get
     // the rejection so their own loading states settle.

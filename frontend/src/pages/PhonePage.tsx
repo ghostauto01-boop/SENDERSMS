@@ -12,7 +12,7 @@ import ContactActions from "../components/ContactActions";
 import { displayName, startCall, openWhatsappForCall } from "../utils/call";
 
 const avatarColor = (name: string) => {
-  const colors = ["bg-[#00a884]", "bg-[#128C7E]", "bg-[#075E54]", "bg-[#34B7F1]", "bg-[#FF8A65]", "bg-[#BA68C8]", "bg-[#4DB6AC]", "bg-[#FFB74D]"];
+  const colors = ["bg-primary-600", "bg-primary-700", "bg-primary-800", "bg-[#34B7F1]", "bg-warning-400", "bg-accent-500", "bg-primary-400", "bg-warning-400"];
   let h = 0; for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % colors.length;
   return colors[h];
 };
@@ -23,12 +23,12 @@ const initials = (c: Contact) => {
 };
 
 const statusMeta: Record<string, { label: string; cls: string; Icon: any }> = {
-  ended: { label: "Connected", cls: "text-[#00a884]", Icon: CheckCircle2 },
-  started: { label: "On call", cls: "text-[#0066cc]", Icon: PhoneCall },
-  ringing: { label: "Ringing", cls: "text-[#ff9f0a]", Icon: PhoneCall },
-  initiated: { label: "Dialling", cls: "text-[#ff9f0a]", Icon: PhoneOutgoing },
-  direct_dial: { label: "Direct dial", cls: "text-[#667781]", Icon: PhoneOutgoing },
-  failed: { label: "Failed", cls: "text-[#c5221f]", Icon: XCircle },
+  ended: { label: "Connected", cls: "text-primary-600", Icon: CheckCircle2 },
+  started: { label: "On call", cls: "text-primary-600", Icon: PhoneCall },
+  ringing: { label: "Ringing", cls: "text-warning-500", Icon: PhoneCall },
+  initiated: { label: "Dialling", cls: "text-warning-500", Icon: PhoneOutgoing },
+  direct_dial: { label: "Direct dial", cls: "text-gray-500", Icon: PhoneOutgoing },
+  failed: { label: "Failed", cls: "text-danger-700", Icon: XCircle },
 };
 
 function fmtDur(s?: number | null) {
@@ -156,36 +156,36 @@ export default function PhonePage() {
     <div className="space-y-4 max-w-3xl mx-auto">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
-          <Phone size={22} className="text-[#00a884]" /> Phone
+          <Phone size={22} className="text-primary-600" /> Phone
         </h1>
         {gw && (
-          <span className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${gw.configured ? "bg-[#d9fdd3] text-[#075e54]" : "bg-[#fff8c4] text-[#9a6f00]"}`}>
+          <span className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${gw.configured ? "bg-primary-100 text-primary-800" : "bg-warning-100 text-warning-700"}`}>
             {gw.configured ? <><Wifi size={12} /> CallGate connected</> : <><WifiOff size={12} /> Direct dial mode</>}
           </span>
         )}
       </div>
 
       {gw && !gw.configured && (
-        <div className="card p-3 text-sm bg-[#fff8c4]/50 border border-[#ffecb3]">
+        <div className="card p-3 text-sm bg-warning-100/50 border border-warning-200">
           <p className="font-medium">CallGate isn't set up yet.</p>
           <p className="text-gray-600 text-[13px] mt-0.5">
             Calls will dial directly from this device. To place calls on your shop phone from anywhere,
-            install CallGate on it and connect it in <a href="/settings" className="text-[#00a884] font-semibold">Settings → Calls</a>.
+            install CallGate on it and connect it in <a href="/settings" className="text-primary-600 font-semibold">Settings → Calls</a>.
           </p>
         </div>
       )}
 
       {active && (
-        <div className="card p-3 flex items-center gap-3 bg-[#d9fdd3]/60 border border-[#00a884]/30">
+        <div className="card p-3 flex items-center gap-3 bg-primary-100/60 border border-primary-600/30">
           <span className="relative flex h-3 w-3">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#00a884] opacity-60" />
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-[#00a884]" />
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary-600 opacity-60" />
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-primary-600" />
           </span>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold truncate">{active.contact_name} • {active.phone_number}</p>
             <p className="text-xs text-gray-600">{statusMeta[active.status]?.label || active.status}</p>
           </div>
-          <button onClick={doEnd} disabled={ending} className="bg-[#c5221f] text-white rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-50">
+          <button onClick={doEnd} disabled={ending} className="bg-danger-700 text-white rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-50">
             {ending ? "Ending…" : "End call"}
           </button>
         </div>
@@ -213,7 +213,7 @@ export default function PhonePage() {
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`flex-1 py-2 rounded-full text-sm font-semibold ${tab === t ? "bg-[#00a884] text-white" : "bg-white dark:bg-[#202c33] text-gray-600 dark:text-gray-300 border"}`}
+            className={`flex-1 py-2 rounded-full text-sm font-semibold ${tab === t ? "bg-primary-600 text-white" : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border"}`}
           >
             {t === "contacts" ? `Contacts (${total})` : `Recent (${logsTotal})`}
           </button>
@@ -223,9 +223,9 @@ export default function PhonePage() {
       {tab === "contacts" ? (
         <>
           <div className="relative">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#667781]" />
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
             <input
-              className="w-full pl-9 pr-3 py-2.5 bg-white dark:bg-[#202c33] rounded-full text-[15px] border shadow-sm focus:outline-none focus:ring-2 focus:ring-[#00a884]/20"
+              className="w-full pl-9 pr-3 py-2.5 bg-white dark:bg-gray-800 rounded-full text-[15px] border shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-600/20"
               placeholder="Search name, business or phone…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -254,14 +254,14 @@ export default function PhonePage() {
                   <button
                     onClick={() => doCallContact(c)}
                     disabled={callingId === c.id}
-                    className="w-11 h-11 rounded-full bg-[#00a884] hover:bg-[#06cf9c] text-white flex items-center justify-center flex-shrink-0 disabled:opacity-60"
+                    className="w-11 h-11 rounded-full bg-primary-600 hover:bg-primary-500 text-white flex items-center justify-center flex-shrink-0 disabled:opacity-60"
                     title={`Call ${name} via your phone (SIM)`}
                   >
                     {callingId === c.id ? <Loader2 size={18} className="animate-spin" /> : <Phone size={18} />}
                   </button>
                   <button
                     onClick={() => openWhatsappForCall(c.phone_number, name)}
-                    className="w-11 h-11 rounded-full bg-[#25D366] hover:bg-[#1fb857] text-white flex items-center justify-center flex-shrink-0"
+                    className="w-11 h-11 rounded-full bg-primary-600 hover:bg-primary-700 text-white flex items-center justify-center flex-shrink-0"
                     title={`Call ${name} on WhatsApp`}
                   >
                     <PhoneCall size={18} />
@@ -298,7 +298,7 @@ export default function PhonePage() {
             const meta = statusMeta[l.status] || { label: l.status, cls: "text-gray-500", Icon: Phone };
             return (
               <div key={l.id} className="card p-3 flex items-center gap-3">
-                {l.direction === "incoming" ? <PhoneIncoming size={18} className="text-[#0066cc] flex-shrink-0" /> : <PhoneOutgoing size={18} className="text-[#00a884] flex-shrink-0" />}
+                {l.direction === "incoming" ? <PhoneIncoming size={18} className="text-primary-600 flex-shrink-0" /> : <PhoneOutgoing size={18} className="text-primary-600 flex-shrink-0" />}
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-[15px] truncate">{l.contact_name}</p>
                   <p className="text-[12px] text-gray-500 flex items-center gap-1.5">
@@ -307,16 +307,16 @@ export default function PhonePage() {
                     {l.duration_seconds != null && l.status === "ended" && <span>• {fmtDur(l.duration_seconds)}</span>}
                     <span>• {fmtTime(l.created_at)}</span>
                   </p>
-                  {l.last_error && <p className="text-[11px] text-red-500 truncate">{l.last_error}</p>}
+                  {l.last_error && <p className="text-[11px] text-danger-500 truncate">{l.last_error}</p>}
                 </div>
                 <button
                   onClick={() => startCall(l.contact_id ? { contact_id: l.contact_id } : { phone_number: l.phone_number }).then(() => loadActive())}
-                  className="w-10 h-10 rounded-full bg-[#00a884]/10 hover:bg-[#00a884] hover:text-white text-[#00a884] flex items-center justify-center flex-shrink-0"
+                  className="w-10 h-10 rounded-full bg-primary-600/10 hover:bg-primary-600 hover:text-white text-primary-600 flex items-center justify-center flex-shrink-0"
                   title={`Call back ${l.phone_number}`}
                 >
                   <Phone size={16} />
                 </button>
-                {l.status === "failed" && <PhoneMissed size={16} className="text-red-400 flex-shrink-0" />}
+                {l.status === "failed" && <PhoneMissed size={16} className="text-danger-400 flex-shrink-0" />}
               </div>
             );
           })}

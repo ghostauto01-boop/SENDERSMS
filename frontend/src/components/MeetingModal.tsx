@@ -342,19 +342,19 @@ export default function MeetingModal({ meetingId = null, initial, onClose, onSav
 
   const statusPill = (s: string) => {
     const map: Record<string, string> = {
-      scheduled: "bg-[#e7f3ff] text-[#0066cc]",
-      confirmed: "bg-[#d9fdd3] text-[#008069]",
-      completed: "bg-[#f0f2f5] text-[#54656f]",
-      cancelled: "bg-[#fce8e6] text-[#c5221f]",
-      no_show: "bg-[#ffecb3] text-[#8d5100]",
+      scheduled: "bg-primary-50 text-primary-600",
+      confirmed: "bg-primary-100 text-primary-700",
+      completed: "bg-gray-100 text-gray-600",
+      cancelled: "bg-danger-100 text-danger-700",
+      no_show: "bg-warning-200 text-warning-700",
     };
-    return map[s] || "bg-[#f0f2f5] text-[#54656f]";
+    return map[s] || "bg-gray-100 text-gray-600";
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4">
-      <div className="bg-white dark:bg-[#202c33] w-full sm:max-w-2xl max-h-[94vh] overflow-y-auto rounded-t-[20px] sm:rounded-2xl">
-        <div className="sticky top-0 bg-[#008069] dark:bg-[#202c33] px-4 py-3 flex items-center justify-between z-10">
+      <div className="bg-white dark:bg-gray-800 w-full sm:max-w-2xl max-h-[94vh] overflow-y-auto rounded-t-[20px] sm:rounded-2xl">
+        <div className="sticky top-0 bg-primary-700 dark:bg-gray-800 px-4 py-3 flex items-center justify-between z-10">
           <h2 className="text-white font-semibold flex items-center gap-2">
             <CalendarPlus size={18} /> {editing ? "Edit meeting" : "Book a meeting"}
             {editing && (
@@ -370,19 +370,19 @@ export default function MeetingModal({ meetingId = null, initial, onClose, onSav
 
         {loading ? (
           <div className="p-10 text-center">
-            <div className="w-8 h-8 border-2 border-[#00a884] border-t-transparent rounded-full animate-spin mx-auto" />
+            <div className="w-8 h-8 border-2 border-primary-600 border-t-transparent rounded-full animate-spin mx-auto" />
           </div>
         ) : (
           <form onSubmit={submit} className="p-4 sm:p-6 space-y-4">
             {/* Title + type */}
             <div>
-              <label className="text-xs font-medium text-[#54656f]">Title *</label>
+              <label className="text-xs font-medium text-gray-600">Title *</label>
               <input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Site visit, Demo call, …"
                 autoFocus={!editing}
-                className="mt-1 w-full px-3 py-2.5 bg-[#f0f2f5] dark:bg-[#111b21] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#00a884]/20 text-[#111b21] dark:text-white"
+                className="mt-1 w-full px-3 py-2.5 bg-gray-100 dark:bg-gray-900 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/20 text-gray-900 dark:text-white"
               />
               <div className="flex gap-1.5 mt-2 flex-wrap">
                 {EVENT_TYPES.map((t) => (
@@ -392,8 +392,8 @@ export default function MeetingModal({ meetingId = null, initial, onClose, onSav
                     onClick={() => setEventType(t.v)}
                     className={`px-3 py-1.5 rounded-full text-xs font-medium ${
                       eventType === t.v
-                        ? "bg-[#00a884] text-white"
-                        : "bg-[#f0f2f5] dark:bg-[#111b21] text-[#54656f] dark:text-[#8696a0]"
+                        ? "bg-primary-600 text-white"
+                        : "bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-400"
                     }`}
                   >
                     {t.l}
@@ -405,31 +405,31 @@ export default function MeetingModal({ meetingId = null, initial, onClose, onSav
             {/* Date / time / duration */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
               <div className="col-span-2 sm:col-span-1">
-                <label className="text-xs font-medium text-[#54656f]">Date *</label>
+                <label className="text-xs font-medium text-gray-600">Date *</label>
                 <input
                   type="date"
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
-                  className="mt-1 w-full px-3 py-2.5 bg-[#f0f2f5] dark:bg-[#111b21] rounded-xl text-sm text-[#111b21] dark:text-white"
+                  className="mt-1 w-full px-3 py-2.5 bg-gray-100 dark:bg-gray-900 rounded-xl text-sm text-gray-900 dark:text-white"
                 />
               </div>
               <div>
-                <label className="text-xs font-medium text-[#54656f]">Starts</label>
+                <label className="text-xs font-medium text-gray-600">Starts</label>
                 <input
                   type="time"
                   value={time}
                   disabled={allDay}
                   onChange={(e) => setTime(e.target.value)}
-                  className="mt-1 w-full px-3 py-2.5 bg-[#f0f2f5] dark:bg-[#111b21] rounded-xl text-sm text-[#111b21] dark:text-white disabled:opacity-50"
+                  className="mt-1 w-full px-3 py-2.5 bg-gray-100 dark:bg-gray-900 rounded-xl text-sm text-gray-900 dark:text-white disabled:opacity-50"
                 />
               </div>
               <div>
-                <label className="text-xs font-medium text-[#54656f]">Length</label>
+                <label className="text-xs font-medium text-gray-600">Length</label>
                 <select
                   value={duration}
                   disabled={allDay}
                   onChange={(e) => setDuration(parseInt(e.target.value, 10))}
-                  className="mt-1 w-full px-3 py-2.5 bg-[#f0f2f5] dark:bg-[#111b21] rounded-xl text-sm text-[#111b21] dark:text-white disabled:opacity-50"
+                  className="mt-1 w-full px-3 py-2.5 bg-gray-100 dark:bg-gray-900 rounded-xl text-sm text-gray-900 dark:text-white disabled:opacity-50"
                 >
                   {DURATIONS.map((d) => (
                     <option key={d} value={d}>
@@ -440,8 +440,8 @@ export default function MeetingModal({ meetingId = null, initial, onClose, onSav
                 </select>
               </div>
               <div className="flex items-end pb-1">
-                <label className="flex items-center gap-2 text-xs text-[#54656f] cursor-pointer select-none">
-                  <input type="checkbox" checked={allDay} onChange={(e) => setAllDay(e.target.checked)} className="rounded accent-[#00a884] w-4 h-4" />
+                <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer select-none">
+                  <input type="checkbox" checked={allDay} onChange={(e) => setAllDay(e.target.checked)} className="rounded accent-primary-600 w-4 h-4" />
                   All day
                 </label>
               </div>
@@ -449,7 +449,7 @@ export default function MeetingModal({ meetingId = null, initial, onClose, onSav
 
             {/* Contacts */}
             <div>
-              <label className="text-xs font-medium text-[#54656f] flex items-center gap-1">
+              <label className="text-xs font-medium text-gray-600 flex items-center gap-1">
                 <Users size={12} /> Contacts * <span className="font-normal">(first is the primary)</span>
               </label>
               <div className="mt-1">
@@ -460,69 +460,69 @@ export default function MeetingModal({ meetingId = null, initial, onClose, onSav
             {/* Location / link / notes */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               <div>
-                <label className="text-xs font-medium text-[#54656f] flex items-center gap-1">
+                <label className="text-xs font-medium text-gray-600 flex items-center gap-1">
                   <MapPin size={12} /> Location
                 </label>
                 <input
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
                   placeholder="12 Allen Avenue, Ikeja"
-                  className="mt-1 w-full px-3 py-2.5 bg-[#f0f2f5] dark:bg-[#111b21] rounded-xl text-sm text-[#111b21] dark:text-white"
+                  className="mt-1 w-full px-3 py-2.5 bg-gray-100 dark:bg-gray-900 rounded-xl text-sm text-gray-900 dark:text-white"
                 />
               </div>
               <div>
-                <label className="text-xs font-medium text-[#54656f] flex items-center gap-1">
+                <label className="text-xs font-medium text-gray-600 flex items-center gap-1">
                   <Link2 size={12} /> Meeting link
                 </label>
                 <input
                   value={link}
                   onChange={(e) => setLink(e.target.value)}
                   placeholder="https://meet…"
-                  className="mt-1 w-full px-3 py-2.5 bg-[#f0f2f5] dark:bg-[#111b21] rounded-xl text-sm text-[#111b21] dark:text-white"
+                  className="mt-1 w-full px-3 py-2.5 bg-gray-100 dark:bg-gray-900 rounded-xl text-sm text-gray-900 dark:text-white"
                 />
               </div>
             </div>
             <div>
-              <label className="text-xs font-medium text-[#54656f]">Notes</label>
+              <label className="text-xs font-medium text-gray-600">Notes</label>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={2}
                 placeholder="Agenda, things to bring, …"
-                className="mt-1 w-full px-3 py-2.5 bg-[#f0f2f5] dark:bg-[#111b21] rounded-xl text-sm text-[#111b21] dark:text-white"
+                className="mt-1 w-full px-3 py-2.5 bg-gray-100 dark:bg-gray-900 rounded-xl text-sm text-gray-900 dark:text-white"
               />
             </div>
             <div>
-              <label className="text-xs font-medium text-[#54656f]">Tags</label>
+              <label className="text-xs font-medium text-gray-600">Tags</label>
               <div className="mt-1">
                 <TagPicker value={tags} onChange={setTags} suggestionsUrl="/calendar/tags" placeholder="vip, lagos, …" />
               </div>
             </div>
 
             {/* SMS invite + reminders */}
-            <div className="border-t border-gray-100 dark:border-[#2a3942] pt-3 space-y-3">
+            <div className="border-t border-gray-100 dark:border-gray-700 pt-3 space-y-3">
               <button
                 type="button"
                 onClick={() => setShowAdvanced(!showAdvanced)}
-                className="w-full flex items-center justify-between text-sm font-medium text-[#111b21] dark:text-white"
+                className="w-full flex items-center justify-between text-sm font-medium text-gray-900 dark:text-white"
               >
                 <span className="flex items-center gap-2">
-                  <Send size={15} className="text-[#00a884]" /> SMS invite & reminders
+                  <Send size={15} className="text-primary-600" /> SMS invite & reminders
                 </span>
-                <span className="text-xs text-[#667781]">{showAdvanced ? "Hide ▲" : "Show ▼"}</span>
+                <span className="text-xs text-gray-500">{showAdvanced ? "Hide ▲" : "Show ▼"}</span>
               </button>
 
               {showAdvanced && (
                 <>
                   <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
-                    <input type="checkbox" checked={sendInvite} onChange={(e) => setSendInvite(e.target.checked)} className="rounded accent-[#00a884] w-4 h-4" />
-                    <span className="text-[#111b21] dark:text-white font-medium">Text the invite on booking</span>
+                    <input type="checkbox" checked={sendInvite} onChange={(e) => setSendInvite(e.target.checked)} className="rounded accent-primary-600 w-4 h-4" />
+                    <span className="text-gray-900 dark:text-white font-medium">Text the invite on booking</span>
                   </label>
                   {sendInvite && (
                     <div className="space-y-2 pl-1">
                       <TemplatePicker value={inviteTemplateId} onChange={setInviteTemplateId} placeholder="Invite template (optional)…" showPreview={false} />
                       <div className="flex items-center gap-2">
-                        <span className="text-xs text-[#667781]">or custom message</span>
+                        <span className="text-xs text-gray-500">or custom message</span>
                         <ShortcodePicker targetRef={inviteRef} value={inviteBody} onChange={setInviteBody} label="Shortcode" />
                       </div>
                       <textarea
@@ -531,23 +531,23 @@ export default function MeetingModal({ meetingId = null, initial, onClose, onSav
                         onChange={(e) => setInviteBody(e.target.value)}
                         rows={2}
                         placeholder="Hi {{first_name}}, you're booked: {{meeting_title}} on {{meeting_date}} at {{meeting_time}} {{meeting_location}}"
-                        className="w-full px-3 py-2.5 bg-[#f0f2f5] dark:bg-[#111b21] rounded-xl text-sm font-mono text-[#111b21] dark:text-white"
+                        className="w-full px-3 py-2.5 bg-gray-100 dark:bg-gray-900 rounded-xl text-sm font-mono text-gray-900 dark:text-white"
                       />
                       {invitePreview && (
-                        <p className="text-xs bg-[#d9fdd3]/60 dark:bg-[#0a332c] rounded-xl px-3 py-2 text-[#0a332c] dark:text-[#e9edef]">
+                        <p className="text-xs bg-primary-100/60 dark:bg-primary-950 rounded-xl px-3 py-2 text-primary-950 dark:text-gray-200">
                           <b>Preview{previewContact ? ` for ${previewContact.first_name || "contact"}` : ""}:</b> {invitePreview}
                         </p>
                       )}
                       {!inviteSource && (
-                        <p className="text-[11px] text-[#667781]">Empty = the default invite text (personalized automatically).</p>
+                        <p className="text-[11px] text-gray-500">Empty = the default invite text (personalized automatically).</p>
                       )}
                     </div>
                   )}
 
                   <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
-                    <input type="checkbox" checked={sendReminder} onChange={(e) => setSendReminder(e.target.checked)} className="rounded accent-[#00a884] w-4 h-4" />
-                    <span className="text-[#111b21] dark:text-white font-medium flex items-center gap-1.5">
-                      <Bell size={14} className="text-[#ffad1f]" /> Send SMS reminders
+                    <input type="checkbox" checked={sendReminder} onChange={(e) => setSendReminder(e.target.checked)} className="rounded accent-primary-600 w-4 h-4" />
+                    <span className="text-gray-900 dark:text-white font-medium flex items-center gap-1.5">
+                      <Bell size={14} className="text-warning-500" /> Send SMS reminders
                     </span>
                   </label>
                   {sendReminder && (
@@ -560,8 +560,8 @@ export default function MeetingModal({ meetingId = null, initial, onClose, onSav
                             onClick={() => toggleReminderMinute(p.v)}
                             className={`px-2.5 py-1.5 rounded-full text-xs font-medium flex items-center gap-1 ${
                               reminderMinutes.includes(p.v)
-                                ? "bg-[#ffad1f] text-white"
-                                : "bg-[#f0f2f5] dark:bg-[#111b21] text-[#54656f] dark:text-[#8696a0]"
+                                ? "bg-warning-500 text-white"
+                                : "bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-400"
                             }`}
                           >
                             {reminderMinutes.includes(p.v) && <Check size={11} />}
@@ -575,9 +575,9 @@ export default function MeetingModal({ meetingId = null, initial, onClose, onSav
                           onChange={(e) => setCustomMinutes(e.target.value)}
                           placeholder="Custom minutes before…"
                           inputMode="numeric"
-                          className="flex-1 px-3 py-2 bg-[#f0f2f5] dark:bg-[#111b21] rounded-xl text-xs text-[#111b21] dark:text-white"
+                          className="flex-1 px-3 py-2 bg-gray-100 dark:bg-gray-900 rounded-xl text-xs text-gray-900 dark:text-white"
                         />
-                        <button type="button" onClick={addCustomMinutes} className="px-3 py-2 rounded-xl bg-[#f0f2f5] dark:bg-[#111b21] text-xs font-medium text-[#54656f]">
+                        <button type="button" onClick={addCustomMinutes} className="px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-900 text-xs font-medium text-gray-600">
                           Add
                         </button>
                       </div>
@@ -590,7 +590,7 @@ export default function MeetingModal({ meetingId = null, initial, onClose, onSav
                                 key={m}
                                 type="button"
                                 onClick={() => toggleReminderMinute(m)}
-                                className="px-2.5 py-1 rounded-full text-xs bg-[#ffad1f] text-white"
+                                className="px-2.5 py-1 rounded-full text-xs bg-warning-500 text-white"
                                 title="Tap to remove"
                               >
                                 {m} min ✕
@@ -600,7 +600,7 @@ export default function MeetingModal({ meetingId = null, initial, onClose, onSav
                       )}
                       <TemplatePicker value={reminderTemplateId} onChange={setReminderTemplateId} placeholder="Reminder template (optional)…" showPreview={false} />
                       <div className="flex items-center gap-2">
-                        <span className="text-xs text-[#667781]">or custom message</span>
+                        <span className="text-xs text-gray-500">or custom message</span>
                         <ShortcodePicker targetRef={reminderRef} value={reminderBody} onChange={setReminderBody} label="Shortcode" />
                       </div>
                       <textarea
@@ -609,10 +609,10 @@ export default function MeetingModal({ meetingId = null, initial, onClose, onSav
                         onChange={(e) => setReminderBody(e.target.value)}
                         rows={2}
                         placeholder="Hi {{first_name}}, reminder: {{meeting_title}} {{meeting_when}} ({{meeting_date}} at {{meeting_time}})"
-                        className="w-full px-3 py-2.5 bg-[#f0f2f5] dark:bg-[#111b21] rounded-xl text-sm font-mono text-[#111b21] dark:text-white"
+                        className="w-full px-3 py-2.5 bg-gray-100 dark:bg-gray-900 rounded-xl text-sm font-mono text-gray-900 dark:text-white"
                       />
                       {reminderPreview && (
-                        <p className="text-xs bg-[#fff8c4] dark:bg-[#2a3942] rounded-xl px-3 py-2 text-[#5c4b00] dark:text-[#e9edef]">
+                        <p className="text-xs bg-warning-100 dark:bg-gray-700 rounded-xl px-3 py-2 text-warning-800 dark:text-gray-200">
                           <b>Preview{previewContact ? ` for ${previewContact.first_name || "contact"}` : ""}:</b> {reminderPreview}
                         </p>
                       )}
@@ -624,38 +624,38 @@ export default function MeetingModal({ meetingId = null, initial, onClose, onSav
 
             {/* Edit-mode actions */}
             {editing && (
-              <div className="border-t border-gray-100 dark:border-[#2a3942] pt-3">
-                <p className="text-xs font-medium text-[#54656f] mb-2">Update this meeting</p>
+              <div className="border-t border-gray-100 dark:border-gray-700 pt-3">
+                <p className="text-xs font-medium text-gray-600 mb-2">Update this meeting</p>
                 <div className="flex gap-1.5 flex-wrap">
                   {status !== "confirmed" && status !== "completed" && (
-                    <button type="button" disabled={!!actionBusy} onClick={() => runAction("confirm", "Confirmed")} className="px-3 py-2 rounded-full bg-[#d9fdd3] text-[#008069] text-xs font-semibold disabled:opacity-50">
+                    <button type="button" disabled={!!actionBusy} onClick={() => runAction("confirm", "Confirmed")} className="px-3 py-2 rounded-full bg-primary-100 text-primary-700 text-xs font-semibold disabled:opacity-50">
                       {actionBusy === "confirm" ? "…" : "✓ Confirm"}
                     </button>
                   )}
                   {status !== "completed" && (
-                    <button type="button" disabled={!!actionBusy} onClick={() => runAction("complete", "Marked complete")} className="px-3 py-2 rounded-full bg-[#00a884] text-white text-xs font-semibold disabled:opacity-50">
+                    <button type="button" disabled={!!actionBusy} onClick={() => runAction("complete", "Marked complete")} className="px-3 py-2 rounded-full bg-primary-600 text-white text-xs font-semibold disabled:opacity-50">
                       {actionBusy === "complete" ? "…" : "✓ Complete"}
                     </button>
                   )}
                   {status !== "cancelled" && status !== "completed" && (
                     <>
-                      <button type="button" disabled={!!actionBusy} onClick={() => runAction("no-show", "Marked no-show")} className="px-3 py-2 rounded-full bg-[#ffecb3] text-[#8d5100] text-xs font-semibold disabled:opacity-50">
+                      <button type="button" disabled={!!actionBusy} onClick={() => runAction("no-show", "Marked no-show")} className="px-3 py-2 rounded-full bg-warning-200 text-warning-700 text-xs font-semibold disabled:opacity-50">
                         {actionBusy === "no-show" ? "…" : "No-show"}
                       </button>
-                      <button type="button" disabled={!!actionBusy} onClick={() => runAction("cancel", "Cancelled")} className="px-3 py-2 rounded-full bg-[#fce8e6] text-[#c5221f] text-xs font-semibold disabled:opacity-50">
+                      <button type="button" disabled={!!actionBusy} onClick={() => runAction("cancel", "Cancelled")} className="px-3 py-2 rounded-full bg-danger-100 text-danger-700 text-xs font-semibold disabled:opacity-50">
                         {actionBusy === "cancel" ? "…" : "Cancel"}
                       </button>
                     </>
                   )}
                 </div>
                 <div className="flex gap-1.5 flex-wrap mt-2">
-                  <button type="button" disabled={!!actionBusy} onClick={() => runAction("send-invite", "Invite sent")} className="px-3 py-2 rounded-full bg-[#e7f3ff] text-[#0066cc] text-xs font-semibold disabled:opacity-50">
+                  <button type="button" disabled={!!actionBusy} onClick={() => runAction("send-invite", "Invite sent")} className="px-3 py-2 rounded-full bg-primary-50 text-primary-600 text-xs font-semibold disabled:opacity-50">
                     {actionBusy === "send-invite" ? "Sending…" : "↻ Resend invite"}
                   </button>
-                  <button type="button" disabled={!!actionBusy} onClick={() => runAction("send-reminder", "Reminder sent")} className="px-3 py-2 rounded-full bg-[#e7f3ff] text-[#0066cc] text-xs font-semibold disabled:opacity-50">
+                  <button type="button" disabled={!!actionBusy} onClick={() => runAction("send-reminder", "Reminder sent")} className="px-3 py-2 rounded-full bg-primary-50 text-primary-600 text-xs font-semibold disabled:opacity-50">
                     {actionBusy === "send-reminder" ? "Sending…" : "🔔 Remind now"}
                   </button>
-                  <button type="button" disabled={!!actionBusy} onClick={remove} className="px-3 py-2 rounded-full bg-transparent border border-red-200 text-[#c5221f] text-xs font-semibold disabled:opacity-50 flex items-center gap-1">
+                  <button type="button" disabled={!!actionBusy} onClick={remove} className="px-3 py-2 rounded-full bg-transparent border border-danger-200 text-danger-700 text-xs font-semibold disabled:opacity-50 flex items-center gap-1">
                     <Trash2 size={12} /> Delete
                   </button>
                 </div>
@@ -663,10 +663,10 @@ export default function MeetingModal({ meetingId = null, initial, onClose, onSav
             )}
 
             <div className="flex gap-2 pt-1">
-              <button type="button" onClick={onClose} className="flex-1 py-3 rounded-full bg-[#f0f2f5] dark:bg-[#111b21] text-[#54656f] dark:text-white font-medium">
+              <button type="button" onClick={onClose} className="flex-1 py-3 rounded-full bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-white font-medium">
                 Cancel
               </button>
-              <button type="submit" disabled={saving} className="flex-1 py-3 rounded-full bg-[#00a884] text-white font-semibold disabled:opacity-50">
+              <button type="submit" disabled={saving} className="flex-1 py-3 rounded-full bg-primary-600 text-white font-semibold disabled:opacity-50">
                 {saving ? "Saving…" : editing ? "Save changes" : "Book meeting"}
               </button>
             </div>

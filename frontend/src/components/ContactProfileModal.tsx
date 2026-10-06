@@ -91,7 +91,7 @@ export default function ContactProfileModal({
             </div>
           )}
 
-          {error && <p className="text-center text-red-600 py-6">{error}</p>}
+          {error && <p className="text-center text-danger-600 py-6">{error}</p>}
 
           {profile && (
             <>

@@ -11,12 +11,12 @@ import {
   BarChart, Area, AreaChart,
 } from "recharts";
 
-const GREEN = "#00a884";
-const BLUE = "#0066cc";
-const RED = "#e5484d";
-const AMBER = "#f5a623";
-const PURPLE = "#8e4ec6";
-const TEAL = "#12a594";
+const GREEN = "#2563eb";
+const BLUE = "#2563eb";
+const RED = "#ef4444";
+const AMBER = "#f59e0b";
+const PURPLE = "#4f46e5";
+const TEAL = "#4163f6";
 
 const fmtDate = (iso: string) => {
   try {
@@ -71,15 +71,15 @@ export default function AnalyticsPage() {
   }
 
   const metrics = analytics ? [
-    { label: "Messages Sent", value: analytics.sent, icon: MessageSquare, color: "text-blue-600", bg: "bg-blue-50 dark:bg-blue-900/20" },
-    { label: "Delivered", value: analytics.delivered, icon: CheckCircle2, color: "text-green-600", bg: "bg-green-50 dark:bg-green-900/20" },
-    { label: "Failed", value: analytics.failed, icon: XCircle, color: "text-red-600", bg: "bg-red-50 dark:bg-red-900/20" },
-    { label: "Delivery Rate", value: `${analytics.delivery_rate}%`, icon: TrendingUp, color: "text-emerald-600", bg: "bg-emerald-50 dark:bg-emerald-900/20" },
-    { label: "Replies", value: analytics.replies, icon: MessageSquare, color: "text-purple-600", bg: "bg-purple-50 dark:bg-purple-900/20" },
-    { label: "Reply Rate", value: `${analytics.reply_rate}%`, icon: TrendingUp, color: "text-indigo-600", bg: "bg-indigo-50 dark:bg-indigo-900/20" },
-    { label: "Opt-outs", value: analytics.opt_outs, icon: AlertTriangle, color: "text-orange-600", bg: "bg-orange-50 dark:bg-orange-900/20" },
-    { label: "Interested Leads", value: analytics.interested_leads, icon: Users, color: "text-pink-600", bg: "bg-pink-50 dark:bg-pink-900/20" },
-    { label: "Follow-ups", value: analytics.followups, icon: Clock, color: "text-yellow-600", bg: "bg-yellow-50 dark:bg-yellow-900/20" },
+    { label: "Messages Sent", value: analytics.sent, icon: MessageSquare, color: "text-primary-600", bg: "bg-primary-50 dark:bg-primary-900/20" },
+    { label: "Delivered", value: analytics.delivered, icon: CheckCircle2, color: "text-success-600", bg: "bg-success-50 dark:bg-success-900/20" },
+    { label: "Failed", value: analytics.failed, icon: XCircle, color: "text-danger-600", bg: "bg-danger-50 dark:bg-danger-900/20" },
+    { label: "Delivery Rate", value: `${analytics.delivery_rate}%`, icon: TrendingUp, color: "text-success-600", bg: "bg-success-50 dark:bg-success-900/20" },
+    { label: "Replies", value: analytics.replies, icon: MessageSquare, color: "text-primary-600", bg: "bg-primary-50 dark:bg-primary-900/20" },
+    { label: "Reply Rate", value: `${analytics.reply_rate}%`, icon: TrendingUp, color: "text-primary-600", bg: "bg-primary-50 dark:bg-primary-900/20" },
+    { label: "Opt-outs", value: analytics.opt_outs, icon: AlertTriangle, color: "text-warning-600", bg: "bg-warning-50 dark:bg-warning-900/20" },
+    { label: "Interested Leads", value: analytics.interested_leads, icon: Users, color: "text-primary-600", bg: "bg-primary-50 dark:bg-primary-900/20" },
+    { label: "Follow-ups", value: analytics.followups, icon: Clock, color: "text-warning-600", bg: "bg-warning-50 dark:bg-warning-900/20" },
   ] : [];
 
   const donut = analytics ? [
@@ -87,7 +87,7 @@ export default function AnalyticsPage() {
     { name: "Failed", value: analytics.failed },
     { name: "In flight / other", value: Math.max(0, analytics.sent - analytics.delivered - analytics.failed) },
   ].filter((d) => d.value > 0) : [];
-  const donutColors = [GREEN, RED, "#cbd5e1"];
+  const donutColors = [GREEN, RED, "#cdd7e5"];
 
   return (
     <div className="space-y-6">
@@ -223,10 +223,10 @@ export default function AnalyticsPage() {
           {/* Failure + quarantine reasons */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div className="card p-4">
-              <h3 className="font-semibold mb-1 flex items-center gap-2"><XCircle size={16} className="text-red-500" /> Why sends failed</h3>
+              <h3 className="font-semibold mb-1 flex items-center gap-2"><XCircle size={16} className="text-danger-500" /> Why sends failed</h3>
               <p className="text-xs text-gray-500 mb-3">Top gateway/carrier failure reasons.</p>
               {(funnel?.failure_reasons || []).length === 0 ? (
-                <p className="text-sm text-green-600 flex items-center gap-1.5 py-4"><CheckCircle2 size={15} /> No failures in this period. 🎉</p>
+                <p className="text-sm text-success-600 flex items-center gap-1.5 py-4"><CheckCircle2 size={15} /> No failures in this period. 🎉</p>
               ) : (
                 <div className="space-y-2">
                   {(funnel.failure_reasons || []).map((r: any, i: number) => {
@@ -234,7 +234,7 @@ export default function AnalyticsPage() {
                     return (
                       <div key={i}>
                         <div className="flex justify-between text-xs mb-0.5"><span className="truncate font-medium">{r.reason}</span><span className="text-gray-500 ml-2">{r.count}</span></div>
-                        <div className="h-2 rounded-full bg-gray-100 dark:bg-gray-700"><div className="h-2 rounded-full bg-red-400" style={{ width: `${Math.round((r.count / max) * 100)}%` }} /></div>
+                        <div className="h-2 rounded-full bg-gray-100 dark:bg-gray-700"><div className="h-2 rounded-full bg-danger-400" style={{ width: `${Math.round((r.count / max) * 100)}%` }} /></div>
                       </div>
                     );
                   })}
@@ -242,7 +242,7 @@ export default function AnalyticsPage() {
               )}
             </div>
             <div className="card p-4">
-              <h3 className="font-semibold mb-1 flex items-center gap-2"><Filter size={16} className="text-amber-500" /> Numbers the filter is blocking</h3>
+              <h3 className="font-semibold mb-1 flex items-center gap-2"><Filter size={16} className="text-warning-500" /> Numbers the filter is blocking</h3>
               <p className="text-xs text-gray-500 mb-3">Bad numbers quarantined so they never bill your SIM. Clean them from Lists.</p>
               {(funnel?.quarantine_reasons || []).length === 0 ? (
                 <p className="text-sm text-gray-400 py-4">No quarantined numbers — your lists are clean. ✨</p>
@@ -252,8 +252,8 @@ export default function AnalyticsPage() {
                     const max = Math.max(...(funnel.quarantine_reasons || []).map((x: any) => x.count), 1);
                     return (
                       <div key={i}>
-                        <div className="flex justify-between text-xs mb-0.5"><span className="truncate font-medium flex items-center gap-1"><ShieldAlert size={12} className="text-amber-500" />{r.reason}</span><span className="text-gray-500 ml-2">{r.count}</span></div>
-                        <div className="h-2 rounded-full bg-gray-100 dark:bg-gray-700"><div className="h-2 rounded-full bg-amber-400" style={{ width: `${Math.round((r.count / max) * 100)}%` }} /></div>
+                        <div className="flex justify-between text-xs mb-0.5"><span className="truncate font-medium flex items-center gap-1"><ShieldAlert size={12} className="text-warning-500" />{r.reason}</span><span className="text-gray-500 ml-2">{r.count}</span></div>
+                        <div className="h-2 rounded-full bg-gray-100 dark:bg-gray-700"><div className="h-2 rounded-full bg-warning-400" style={{ width: `${Math.round((r.count / max) * 100)}%` }} /></div>
                       </div>
                     );
                   })}
@@ -264,7 +264,7 @@ export default function AnalyticsPage() {
 
           {/* Calls */}
           <div className="card p-4">
-            <h3 className="font-semibold mb-1 flex items-center gap-2"><PhoneCall size={16} className="text-[#00a884]" /> Calls</h3>
+            <h3 className="font-semibold mb-1 flex items-center gap-2"><PhoneCall size={16} className="text-primary-600" /> Calls</h3>
             <p className="text-xs text-gray-500 mb-3">
               {calls ? `${calls.total} calls placed • ${calls.connected} connected (${calls.connect_rate}%)` : "Phone call activity via CallGate."}
             </p>

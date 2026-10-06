@@ -163,7 +163,7 @@ export default function RichEmailEditor({
     );
   };
 
-  const addDivider = () => insertHtmlBlock('<hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0">', "----------");
+  const addDivider = () => insertHtmlBlock('<hr style="border:none;border-top:1px solid #e3e9f2;margin:20px 0">', "----------");
 
   const addTable = () => {
     const rows = [
@@ -177,8 +177,8 @@ export default function RichEmailEditor({
           `<tr>${row
             .map((cell) =>
               index === 0
-                ? `<th style="border:1px solid #e5e7eb;padding:8px;text-align:left">${cell}</th>`
-                : `<td style="border:1px solid #e5e7eb;padding:8px">${cell}</td>`
+                ? `<th style="border:1px solid #e3e9f2;padding:8px;text-align:left">${cell}</th>`
+                : `<td style="border:1px solid #e3e9f2;padding:8px">${cell}</td>`
             )
             .join("")}</tr>`
       )
@@ -366,7 +366,7 @@ export default function RichEmailEditor({
               </span>
               <button
                 type="button"
-                className="text-gray-400 hover:text-red-500"
+                className="text-gray-400 hover:text-danger-500"
                 onClick={() => onAttachments?.(files.filter((_, i) => i !== index))}
               >
                 <X size={12} />

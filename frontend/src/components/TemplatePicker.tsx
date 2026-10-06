@@ -124,13 +124,13 @@ export default function TemplatePicker({
           onClick={() => setOpen(!open)}
           aria-haspopup="listbox"
           aria-expanded={open}
-          className="w-full flex items-center gap-2 px-3 py-2.5 bg-[#f0f2f5] dark:bg-[#111b21] rounded-xl text-sm text-left focus:outline-none focus:ring-2 focus:ring-[#00a884]/20 disabled:opacity-60"
+          className="w-full flex items-center gap-2 px-3 py-2.5 bg-gray-100 dark:bg-gray-900 rounded-xl text-sm text-left focus:outline-none focus:ring-2 focus:ring-primary-600/20 disabled:opacity-60"
         >
-          <FileText size={15} className="text-[#00a884] flex-shrink-0" />
-          <span className={`flex-1 truncate ${selected ? "text-[#111b21] dark:text-white font-medium" : "text-[#667781]"}`}>
+          <FileText size={15} className="text-primary-600 flex-shrink-0" />
+          <span className={`flex-1 truncate ${selected ? "text-gray-900 dark:text-white font-medium" : "text-gray-500"}`}>
             {selected ? `${selected.name}${selected.category ? ` · ${selected.category}` : ""}` : placeholder}
           </span>
-          <ChevronDown size={15} className={`text-[#667781] flex-shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
+          <ChevronDown size={15} className={`text-gray-500 flex-shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
         </button>
 
         {open && (
@@ -163,10 +163,10 @@ export default function TemplatePicker({
                     setOpen(false);
                     setQuery("");
                   }}
-                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-[#667781] flex items-center justify-between"
+                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 flex items-center justify-between"
                 >
                   {noneLabel}
-                  {value === "" && <Check size={14} className="text-[#00a884]" />}
+                  {value === "" && <Check size={14} className="text-primary-600" />}
                 </button>
               )}
               {!loading &&
@@ -187,12 +187,12 @@ export default function TemplatePicker({
                       <span className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">
                         {t.name}
                         {t.category && (
-                          <span className="ml-1.5 text-[11px] font-normal text-[#667781]">{t.category}</span>
+                          <span className="ml-1.5 text-[11px] font-normal text-gray-500">{t.category}</span>
                         )}
                       </span>
-                      {String(t.id) === value && <Check size={14} className="text-[#00a884] flex-shrink-0" />}
+                      {String(t.id) === value && <Check size={14} className="text-primary-600 flex-shrink-0" />}
                     </span>
-                    <span className="block text-xs text-[#667781] dark:text-[#8696a0] truncate mt-0.5">
+                    <span className="block text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">
                       {t.body}
                     </span>
                   </button>
@@ -205,7 +205,7 @@ export default function TemplatePicker({
             <div className="border-t border-gray-100 dark:border-gray-700 px-3 py-2 bg-gray-50 dark:bg-gray-900/40">
               <Link
                 to="/templates"
-                className="text-xs text-[#00a884] hover:underline"
+                className="text-xs text-primary-600 hover:underline"
                 onClick={() => setOpen(false)}
               >
                 ＋ Manage templates (new, edit, shortcodes)
@@ -216,7 +216,7 @@ export default function TemplatePicker({
       </div>
 
       {showPreview && selected && (
-        <p className="mt-1.5 text-xs text-[#667781] dark:text-[#8696a0] whitespace-pre-wrap break-words bg-[#f0f2f5] dark:bg-[#111b21] rounded-lg px-2.5 py-2">
+        <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400 whitespace-pre-wrap break-words bg-gray-100 dark:bg-gray-900 rounded-lg px-2.5 py-2">
           {selected.body}
         </p>
       )}

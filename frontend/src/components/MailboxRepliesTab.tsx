@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
 import {
   AlertTriangle,
@@ -80,7 +81,7 @@ function ConnectModal({ close, connected }: { close: () => void; connected: () =
   return (
     <Modal title="Connect a mailbox with an app password" close={close}>
       <div className="space-y-3">
-        <div className="card bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-900 p-3 text-sm">
+        <div className="card bg-primary-50 dark:bg-primary-950/30 border-primary-200 dark:border-primary-900 p-3 text-sm">
           <p className="font-medium flex items-center gap-2">
             <KeyRound size={15} /> Your Gmail password will not work here
           </p>
@@ -155,12 +156,12 @@ function ConnectModal({ close, connected }: { close: () => void; connected: () =
         </Field>
 
         {result && (
-          <div className="card bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-900 p-3 text-sm">
+          <div className="card bg-success-50 dark:bg-success-950/30 border-success-200 dark:border-success-900 p-3 text-sm">
             <p className="font-medium">
               Connected — saw {result.seen}, imported {result.stored}, rescued {result.rescued}
             </p>
             {(result.errors || []).length > 0 && (
-              <ul className="text-xs text-amber-700 mt-1 list-disc pl-4">
+              <ul className="text-xs text-warning-700 mt-1 list-disc pl-4">
                 {result.errors.map((e, i) => (
                   <li key={i}>{e}</li>
                 ))}
@@ -269,7 +270,7 @@ function MailboxRow({
             Check
           </button>
           <button
-            className="btn-secondary text-xs text-red-600"
+            className="btn-secondary text-xs text-danger-600"
             disabled={busy === "Removing"}
             aria-label={`Disconnect ${mailbox.email_address}`}
             title="Disconnect this mailbox"
@@ -281,7 +282,7 @@ function MailboxRow({
       </div>
 
       {mailbox.last_sync_status === "error" && mailbox.last_error && (
-        <p className="text-xs text-red-600 flex items-start gap-1.5">
+        <p className="text-xs text-danger-600 flex items-start gap-1.5">
           <XCircle size={14} className="mt-0.5 shrink-0" />
           Last sync failed: {mailbox.last_error}
         </p>
@@ -301,7 +302,7 @@ function MailboxRow({
             rescued
           </p>
           {summary.errors.map((e, i) => (
-            <p key={i} className="text-amber-700">
+            <p key={i} className="text-warning-700">
               {e}
             </p>
           ))}
@@ -439,9 +440,9 @@ export default function MailboxRepliesTab({ banner }: { banner?: string | null }
   return (
     <div className="space-y-4">
       {banner && (
-        <div className="card border-l-4 border-green-500 bg-green-50 dark:bg-green-950/30">
+        <div className="card border-l-4 border-success-500 bg-success-50 dark:bg-success-950/30">
           <p className="text-sm font-medium flex items-center gap-2">
-            <CheckCircle2 size={16} className="text-green-600" /> {banner}
+            <CheckCircle2 size={16} className="text-success-600" /> {banner}
           </p>
         </div>
       )}
@@ -470,8 +471,57 @@ export default function MailboxRepliesTab({ banner }: { banner?: string | null }
         </div>
       </div>
 
+      {/* Does Brevo read a Gmail inbox? No — and this is the question that
+          explains most "my replies never arrive" tickets, so it is answered
+          here, once, above everything else. */}
+      <div className="card p-4 space-y-3">
+        <h3 className="font-semibold flex items-center gap-2">
+          <Mail size={17} className="text-primary-600" /> “Does Brevo read my Gmail inbox?” — no, and
+          here is what does
+        </h3>
+        <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
+          Brevo only sees messages delivered to a domain whose MX records point at Brevo. A prospect
+          replying to <code>you@gmail.com</code> never passes through Brevo at all — and Gmail may
+          even have filed it under Spam, where neither Brevo nor this app would ever look. Connecting
+          your mailbox here closes both gaps: this app reads the inbox <em>and</em> Spam, threads each
+          reply onto the campaign that caused it, and can answer from the same mailbox so Google
+          signs the message and the conversation continues in Gmail exactly as the prospect expects.
+        </p>
+        <div className="grid sm:grid-cols-2 gap-3">
+          <div className="rounded-xl border border-primary-200 dark:border-primary-900 bg-primary-50 dark:bg-primary-950/30 p-3 space-y-1.5">
+            <p className="text-sm font-semibold text-primary-800 dark:text-primary-200">
+              1. Connect with Google (recommended)
+            </p>
+            <ul className="text-xs text-gray-600 dark:text-gray-300 space-y-1 list-disc pl-4">
+              <li>One click, no app password, revocable from your Google account.</li>
+              <li>Reads Inbox and Spam, and can install Gmail’s “never send it to Spam” filters.</li>
+              <li>Sends replies through the Gmail API so DMARC stays aligned.</li>
+              <li>Needs <code>GOOGLE_CLIENT_ID</code> and <code>GOOGLE_CLIENT_SECRET</code> on the server.</li>
+            </ul>
+          </div>
+          <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40 p-3 space-y-1.5">
+            <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">
+              2. Connect with an app password
+            </p>
+            <ul className="text-xs text-gray-600 dark:text-gray-300 space-y-1 list-disc pl-4">
+              <li>No Google Cloud project, no OAuth screen — works in two minutes.</li>
+              <li>Reads Inbox and Spam over IMAP and rescues replies from Spam.</li>
+              <li>Cannot create Gmail filters, and sends over SMTP instead of the API.</li>
+              <li>Needs 2-Step Verification and a 16-character app password.</li>
+            </ul>
+          </div>
+        </div>
+        <p className="text-xs text-gray-500">
+          Either way the result is the same for you: replies appear in the{" "}
+          <Link to="/email-inbox" className="text-primary-600 hover:underline">
+            Email Inbox
+          </Link>{" "}
+          with the sender’s name and a preview — and a notification arrives on your phone.
+        </p>
+      </div>
+
       {!oauthReady && (
-        <div className="card border-l-4 border-amber-400 p-3 text-sm">
+        <div className="card border-l-4 border-warning-400 p-3 text-sm">
           <p className="font-medium">“Connect with Google” needs two environment variables</p>
           <p className="text-gray-600 dark:text-gray-300 text-xs mt-1 leading-relaxed">
             Set <code>GOOGLE_CLIENT_ID</code> and <code>GOOGLE_CLIENT_SECRET</code> from an OAuth
@@ -524,9 +574,9 @@ export default function MailboxRepliesTab({ banner }: { banner?: string | null }
                   size={17}
                   className={`mt-0.5 shrink-0 ${
                     f.severity === "high"
-                      ? "text-red-500"
+                      ? "text-danger-500"
                       : f.severity === "medium"
-                        ? "text-amber-500"
+                        ? "text-warning-500"
                         : "text-gray-400"
                   }`}
                 />
@@ -548,8 +598,8 @@ export default function MailboxRepliesTab({ banner }: { banner?: string | null }
       )}
 
       {report && report.healthy && findings.length === 0 && (
-        <div className="card border-l-4 border-green-500 p-3 text-sm flex items-center gap-2">
-          <CheckCircle2 size={16} className="text-green-600" /> Nothing looks wrong with reply
+        <div className="card border-l-4 border-success-500 p-3 text-sm flex items-center gap-2">
+          <CheckCircle2 size={16} className="text-success-600" /> Nothing looks wrong with reply
           routing right now.
         </div>
       )}
@@ -562,7 +612,7 @@ export default function MailboxRepliesTab({ banner }: { banner?: string | null }
             return (
               <div key={p.id} className="flex items-start gap-3 text-sm">
                 {ready ? (
-                  <CheckCircle2 size={16} className="text-green-500 mt-0.5 shrink-0" />
+                  <CheckCircle2 size={16} className="text-success-500 mt-0.5 shrink-0" />
                 ) : (
                   <XCircle size={16} className="text-gray-300 mt-0.5 shrink-0" />
                 )}

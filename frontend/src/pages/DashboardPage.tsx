@@ -53,7 +53,7 @@ export default function DashboardPage() {
 
   if (error && !stats) return (
     <div className="text-center py-12">
-      <AlertTriangle size={48} className="mx-auto text-red-500 mb-4" />
+      <AlertTriangle size={48} className="mx-auto text-danger-500 mb-4" />
       <h2 className="text-xl font-semibold mb-2">Error Loading Dashboard</h2>
       <p className="text-gray-500 mb-4">{error}</p>
       <button onClick={loadData} className="btn-primary">Retry</button>
@@ -65,14 +65,14 @@ export default function DashboardPage() {
   const sent = s.messages_sent || 0;
 
   const statCards = [
-    { label: "Total Contacts", value: s.total_contacts || 0, icon: Users, color: "text-blue-600 bg-blue-100 dark:bg-blue-900/50" },
-    { label: "Messages Sent", value: sent, icon: MessageSquare, color: "text-green-600 bg-green-100 dark:bg-green-900/50" },
-    { label: "Delivered", value: deliveries, icon: CheckCircle2, color: "text-emerald-600 bg-emerald-100 dark:bg-emerald-900/50" },
-    { label: "Failed", value: s.messages_failed || 0, icon: XCircle, color: "text-red-600 bg-red-100 dark:bg-red-900/50" },
-    { label: "Replies", value: s.replies || 0, icon: TrendingUp, color: "text-purple-600 bg-purple-100 dark:bg-purple-900/50" },
-    { label: "Delivery Rate", value: sent > 0 ? `${Math.round(deliveries / sent * 100)}%` : "0%", icon: BarChart3, color: "text-indigo-600 bg-indigo-100 dark:bg-indigo-900/50" },
-    { label: "Active Campaigns", value: s.active_campaigns || 0, icon: Activity, color: "text-orange-600 bg-orange-100 dark:bg-orange-900/50" },
-    { label: "Follow-ups Due", value: s.followups_due_today || 0, icon: Clock, color: "text-yellow-600 bg-yellow-100 dark:bg-yellow-900/50" },
+    { label: "Total Contacts", value: s.total_contacts || 0, icon: Users, color: "text-primary-600 bg-primary-100 dark:bg-primary-900/50" },
+    { label: "Messages Sent", value: sent, icon: MessageSquare, color: "text-success-600 bg-success-100 dark:bg-success-900/50" },
+    { label: "Delivered", value: deliveries, icon: CheckCircle2, color: "text-success-600 bg-success-100 dark:bg-success-900/50" },
+    { label: "Failed", value: s.messages_failed || 0, icon: XCircle, color: "text-danger-600 bg-danger-100 dark:bg-danger-900/50" },
+    { label: "Replies", value: s.replies || 0, icon: TrendingUp, color: "text-primary-600 bg-primary-100 dark:bg-primary-900/50" },
+    { label: "Delivery Rate", value: sent > 0 ? `${Math.round(deliveries / sent * 100)}%` : "0%", icon: BarChart3, color: "text-primary-600 bg-primary-100 dark:bg-primary-900/50" },
+    { label: "Active Campaigns", value: s.active_campaigns || 0, icon: Activity, color: "text-warning-600 bg-warning-100 dark:bg-warning-900/50" },
+    { label: "Follow-ups Due", value: s.followups_due_today || 0, icon: Clock, color: "text-warning-600 bg-warning-100 dark:bg-warning-900/50" },
   ];
 
   return (
@@ -113,7 +113,7 @@ export default function DashboardPage() {
                 <XAxis dataKey="day" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} />
                 <Tooltip />
-                <Line type="monotone" dataKey="count" stroke="#3b82f6" strokeWidth={2} />
+                <Line type="monotone" dataKey="count" stroke="#4163f6" strokeWidth={2} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -125,7 +125,7 @@ export default function DashboardPage() {
                 <XAxis dataKey="day" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} />
                 <Tooltip />
-                <Line type="monotone" dataKey="count" stroke="#8b5cf6" strokeWidth={2} />
+                <Line type="monotone" dataKey="count" stroke="#4f46e5" strokeWidth={2} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -141,7 +141,7 @@ export default function DashboardPage() {
               <XAxis dataKey="name" tick={{ fontSize: 11 }} />
               <YAxis tick={{ fontSize: 12 }} />
               <Tooltip />
-              <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="count" fill="#4163f6" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>

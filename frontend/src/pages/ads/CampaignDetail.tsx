@@ -226,8 +226,8 @@ export default function CampaignDetail({
                 key={i}
                 className={`p-3 rounded-lg text-sm ${
                   a.level === "warning"
-                    ? "bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-200"
-                    : "bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-200"
+                    ? "bg-warning-50 dark:bg-warning-900/20 text-warning-800 dark:text-warning-200"
+                    : "bg-primary-50 dark:bg-primary-900/20 text-primary-800 dark:text-primary-200"
                 }`}
               >
                 {a.level === "warning" ? "⚠ " : "ℹ "}
@@ -479,7 +479,7 @@ function SetsTab({
                         <button
                           type="button"
                           title={`Remove ${listName(lid)} from this set`}
-                          className="hover:text-red-600"
+                          className="hover:text-danger-600"
                           onClick={() => removeList(s, lid)}
                         >
                           <X size={12} />
@@ -487,7 +487,7 @@ function SetsTab({
                       </span>
                     ))}
                     {audName && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-200">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-200">
                         ⦿ {audName}
                       </span>
                     )}
@@ -505,7 +505,7 @@ function SetsTab({
                       </span>
                     ))}
                     {lists.length === 0 && !audName && explicit.length === 0 && filters.length === 0 && (
-                      <span className="px-2 py-0.5 rounded-full text-xs bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-200">
+                      <span className="px-2 py-0.5 rounded-full text-xs bg-warning-100 dark:bg-warning-900/40 text-warning-700 dark:text-warning-200">
                         No audience yet — edit targeting to add lists or contacts
                       </span>
                     )}
@@ -539,7 +539,7 @@ function SetsTab({
                     <Copy size={14} />
                   </button>
                   <button
-                    className="btn-ghost btn-sm text-red-600"
+                    className="btn-ghost btn-sm text-danger-600"
                     onClick={async () => {
                       if (!confirm(`Remove set “${s.name}”?`)) return;
                       await adsApi.deleteSet(s.id);
@@ -747,7 +747,7 @@ function SetEditor({
             <b>{estimate.eligible}</b> eligible contacts
             <span className="text-gray-500"> ({estimate.matched} matched before screening)</span>
             {estimate.matched === 0 && (
-              <span className="block text-xs mt-1 text-amber-700 dark:text-amber-300">
+              <span className="block text-xs mt-1 text-warning-700 dark:text-warning-300">
                 Nothing selected yet — add at least one list, contact, audience or filter.
               </span>
             )}
@@ -995,7 +995,7 @@ function TemplateSyncChip({
       className={
         synced
           ? "badge-green inline-flex items-center gap-1"
-          : "badge-yellow inline-flex items-center gap-1 hover:ring-1 hover:ring-amber-400"
+          : "badge-yellow inline-flex items-center gap-1 hover:ring-1 hover:ring-warning-400"
       }
     >
       <FileText size={11} />
@@ -1086,7 +1086,7 @@ function CreativesTab({
                 const p = perf[c.id] || {};
                 return (
                   <div
-                    className={`card p-4 ${p.is_winner ? "ring-2 ring-green-500" : ""}`}
+                    className={`card p-4 ${p.is_winner ? "ring-2 ring-success-500" : ""}`}
                     key={c.id}
                   >
                     <div className="flex flex-wrap gap-3 items-start justify-between">
@@ -1134,7 +1134,7 @@ function CreativesTab({
                         {isEmail && (
                           <p className="text-sm font-medium mt-2 truncate">
                             {c.subject || detail.subject || (
-                              <span className="text-amber-600">No subject — set one or add a campaign subject</span>
+                              <span className="text-warning-600">No subject — set one or add a campaign subject</span>
                             )}
                           </p>
                         )}
@@ -1191,7 +1191,7 @@ function CreativesTab({
                           <Copy size={14} />
                         </button>
                         <button
-                          className="btn-ghost btn-sm text-red-600"
+                          className="btn-ghost btn-sm text-danger-600"
                           onClick={async () => {
                             if (!confirm("Delete this creative? History is preserved.")) return;
                             await adsApi.deleteCreative(c.id);
@@ -1559,21 +1559,21 @@ function CreativeEditor({
           )}
 
           {templateMeta && templateMeta.deleted && (
-            <p className="mt-2 text-xs rounded-lg px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 flex items-start gap-2">
+            <p className="mt-2 text-xs rounded-lg px-3 py-2 bg-danger-50 dark:bg-danger-900/20 text-danger-700 dark:text-danger-300 flex items-start gap-2">
               <Trash2 size={13} className="mt-0.5 flex-shrink-0" />
               The template this creative started from was deleted. Saving keeps your current text and
               removes the binding.
             </p>
           )}
           {templateMeta && !templateMeta.deleted && templateChanged && !editedSinceSave && (
-            <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg px-3 py-2 bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-200 text-xs">
+            <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg px-3 py-2 bg-warning-50 dark:bg-warning-900/20 text-warning-800 dark:text-warning-200 text-xs">
               <span className="flex-1 min-w-[180px]">
                 Template “{templateMeta.name}” was updated after this creative was saved.
               </span>
               <button
                 type="button"
                 onClick={syncFromTemplate}
-                className="px-2.5 py-1 rounded-full bg-amber-500 text-white font-semibold hover:bg-amber-600 flex items-center gap-1"
+                className="px-2.5 py-1 rounded-full bg-warning-500 text-white font-semibold hover:bg-warning-600 flex items-center gap-1"
               >
                 <RefreshCw size={12} /> Sync to template
               </button>
@@ -1581,7 +1581,7 @@ function CreativeEditor({
           )}
           {templateMeta && !templateMeta.deleted && !templateChanged && !editedSinceSave && originalBody !== null && (
             <p className="mt-1.5 text-xs text-gray-500 flex items-center gap-1.5">
-              <CheckCircle2 size={13} className="text-green-600" />
+              <CheckCircle2 size={13} className="text-success-600" />
               Synced to template “{templateMeta.name}” — the card on the Creatives tab shows the same.
             </p>
           )}
@@ -1922,9 +1922,9 @@ function AudienceTab({
 
       {/* Bulk-remove bar: ticked contacts, or every unsent contact (all pages) */}
       {(selected.length > 0 || allRemovable) && (
-        <div className="flex flex-wrap items-center gap-2 justify-between rounded-lg border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 px-3 py-2">
-          <span className="text-sm font-semibold text-red-700 dark:text-red-300 flex items-center gap-2 flex-wrap">
-            <button onClick={clearSelection} className="w-6 h-6 rounded-full bg-red-100 dark:bg-red-900/40 flex items-center justify-center">
+        <div className="flex flex-wrap items-center gap-2 justify-between rounded-lg border border-danger-200 dark:border-danger-900/50 bg-danger-50 dark:bg-danger-950/30 px-3 py-2">
+          <span className="text-sm font-semibold text-danger-700 dark:text-danger-300 flex items-center gap-2 flex-wrap">
+            <button onClick={clearSelection} className="w-6 h-6 rounded-full bg-danger-100 dark:bg-danger-900/40 flex items-center justify-center">
               <X size={13} />
             </button>
             {allRemovable
@@ -2025,7 +2025,7 @@ function AudienceTab({
                   <td className="p-3">
                     {REMOVABLE.has(r.send_status) ? (
                       <button
-                        className="btn-ghost btn-sm text-red-600"
+                        className="btn-ghost btn-sm text-danger-600"
                         title="Remove from audience (not sent yet)"
                         onClick={() => removeOne(r)}
                       >
@@ -2319,7 +2319,7 @@ function AutomationTab({ detail, reload, isEmail }: { detail: Detail; reload: ()
                   Edit
                 </button>
                 <button
-                  className="btn-ghost btn-sm text-red-600"
+                  className="btn-ghost btn-sm text-danger-600"
                   onClick={async () => {
                     if (!confirm("Remove this follow-up step?")) return;
                     await adsApi.deleteStep(s.id);
@@ -2866,7 +2866,7 @@ function AnalyticsTab({
               <tr
                 key={c2.id}
                 className={`border-b border-gray-50 dark:border-gray-700/50 ${
-                  c2.is_winner ? "bg-green-50/60 dark:bg-green-900/10" : ""
+                  c2.is_winner ? "bg-success-50/60 dark:bg-success-900/10" : ""
                 }`}
               >
                 <td className="p-3">
@@ -2967,7 +2967,7 @@ function SettingsTab({
         </div>
       </div>
       <div className="card p-5 space-y-3">
-        <h3 className="font-semibold text-red-600">Danger zone</h3>
+        <h3 className="font-semibold text-danger-600">Danger zone</h3>
         <p className="text-sm text-gray-500">
           Deleting removes the campaign, its sets, creatives and assignments. Contacts, lists and message
           history are untouched.
@@ -3013,14 +3013,14 @@ function LaunchModal({
     <Modal title="Pre-launch check" close={close} wide>
       <div className="space-y-4">
         {errors.length > 0 && (
-          <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-sm text-red-800 dark:text-red-200 space-y-1">
+          <div className="p-3 rounded-lg bg-danger-50 dark:bg-danger-900/20 text-sm text-danger-800 dark:text-danger-200 space-y-1">
             {errors.map((e: string, i: number) => (
               <p key={i}>✕ {e}</p>
             ))}
           </div>
         )}
         {warnings.length > 0 && (
-          <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-sm text-amber-800 dark:text-amber-200 space-y-1">
+          <div className="p-3 rounded-lg bg-warning-50 dark:bg-warning-900/20 text-sm text-warning-800 dark:text-warning-200 space-y-1">
             {warnings.map((w: string, i: number) => (
               <p key={i}>⚠ {w}</p>
             ))}

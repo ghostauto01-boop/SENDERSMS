@@ -190,7 +190,7 @@ export default function CampaignBuilder({
           <section className="space-y-3">
             <h3 className="font-semibold text-sm text-gray-500 uppercase tracking-wide">Email sender</h3>
             {emailAccounts.length === 0 ? (
-              <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-sm text-amber-800 dark:text-amber-200">
+              <div className="p-3 rounded-lg bg-warning-50 dark:bg-warning-900/20 text-sm text-warning-800 dark:text-warning-200">
                 No Brevo sender yet — add one under Email Manager → Senders first, or this campaign
                 can never send.
               </div>
@@ -529,7 +529,7 @@ export default function CampaignBuilder({
               creative. OFF by default; nothing automatic runs unless you turn this on.
             </span>
           </label>
-          <label className="flex items-center gap-2 text-sm p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20">
+          <label className="flex items-center gap-2 text-sm p-3 rounded-lg bg-warning-50 dark:bg-warning-900/20">
             <input type="checkbox" checked={!!form.test_mode} onChange={(e) => set("test_mode", e.target.checked)} />
             <span>
               <b>Test mode</b> — simulate everything (assignment, split, queue, limits, follow-ups) without

@@ -178,12 +178,17 @@ You should see:
 
 #### 7. Open the Application
 
-Visit **http://localhost:5173** and tap **Log in as admin**.
+Visit **http://localhost:5173** and sign in with the admin password.
 
-There is no password on the login screen: one tap opens the operator account
-(`ADMIN_USERNAME`, `admin` by default), creating it on first use.
-`ADMIN_PASSWORD` is still accepted if an older client sends it, but nothing
-asks for it — so keep the deployment URL private.
+The login screen asks for one thing: the password in `ADMIN_PASSWORD`
+(`12345678` on a fresh clone — change it before the app is reachable by anyone
+else). The operator account (`ADMIN_USERNAME`, `admin` by default) is created on
+first use, and its stored password follows `ADMIN_PASSWORD`, so changing the
+variable changes the sign-in password immediately — there is no re-seeding step
+and no way to lock yourself out with a stale hash.
+
+A wrong password returns 401; no password at all is never accepted. Keep the URL
+private as well — defence in depth costs nothing.
 
 ---
 
@@ -852,7 +857,7 @@ Beyond the usual `DATABASE_URL` / `REDIS_URL` / `SECRET_KEY`, this release adds:
 | `GMAIL_RESCUE_FROM_SPAM` | Default `true`: move a recognised reply that Gmail filed in Spam back to the Inbox, then import it. |
 | `GMAIL_SEND_REPLIES` | Default `true`: send one-to-one replies from the connected mailbox instead of Brevo. Campaigns always use Brevo. |
 | `MCP_OAUTH_ENABLED` | Default `true`. Set `false` to serve only static bearer tokens on the MCP endpoints. |
-| `MCP_OAUTH_REQUIRE_LOGIN` | Default `false` (one-tap consent, matching the app's own login wall). Set `true` to require the operator password before the consent screen — do this on any deployment other people can reach. |
+| `MCP_OAUTH_REQUIRE_LOGIN` | Default `true` (the connector's authorization page asks for the app password, matching the login wall). Set `false` only on a deployment nobody else can reach, for a one-tap "continue as the operator" button. |
 
 ### Connecting an AI assistant (MCP)
 

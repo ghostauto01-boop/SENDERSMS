@@ -478,3 +478,88 @@ async def test_composer_test_send_does_not_create_a_thread(db, monkeypatch):
     # Nothing was written: a test is not outreach.
     assert (await db.execute(select(Message))).scalars().all() == []
     assert (await db.execute(select(Conversation))).scalars().all() == []
+
+
+# ---------------------------------------------------------------------------
+# "Why did nothing send?" and "why did my lead get unsubscribed?"
+# ---------------------------------------------------------------------------
+
+
+def test_opt_out_detection_matches_whole_words_only():
+    """An ordinary reply containing "stop" must not unsubscribe anybody.
+
+    The detector used to be a substring test, so "please stop by on Thursday"
+    opted the contact out of email *and* added them to the suppression list —
+    silently, with no notification. The SMS platform matches whole words; email
+    now does the same.
+    """
+    from app.services.email_service import looks_like_unsubscribe
+
+    # Real opt-outs, in the forms people actually write them.
+    assert looks_like_unsubscribe("STOP") is True
+    assert looks_like_unsubscribe("unsubscribe") is True
+    assert looks_like_unsubscribe("Unsubscribe me please") is True
+    assert looks_like_unsubscribe("Please opt out of these emails") is True
+    assert looks_like_unsubscribe("remove me from your list") is True
+    assert looks_like_unsubscribe("Opt-Out") is True
+
+    # A long, ordinary message that happens to use "stop".
+    assert looks_like_unsubscribe("Can I stop by the office on Thursday?") is False
+    assert looks_like_unsubscribe("Shall we stop for coffee before the meeting?") is False
+    assert looks_like_unsubscribe("Our bus stop is the one two doors down from you") is False
+    # Substrings of the keyword itself.
+    assert looks_like_unsubscribe("The nonstop flight lands at 6am") is False
+    assert looks_like_unsubscribe("Thanks, this is unstoppable") is False
+
+    # …but a real instruction is still honoured, however it is worded.
+    assert looks_like_unsubscribe("Please stop emailing me, I am no longer interested") is True
+    assert looks_like_unsubscribe("Can I stop by tomorrow, and also unsubscribe me from this?") is True
+
+    assert looks_like_unsubscribe("") is False
+    assert looks_like_unsubscribe(None) is False
+
+
+@pytest.mark.asyncio
+async def test_unreadable_api_key_says_so_instead_of_blaming_the_key(db, monkeypatch):
+    """A key that will not decrypt names the real cause.
+
+    Rotating CREDENTIAL_ENCRYPTION_KEY (or letting the web app and the worker
+    disagree about it) leaves every stored credential unreadable. Reported as
+    the old catch-all — "No usable email sender (check the Brevo API key...)"
+    — the operator goes looking for an API key that is right there in the
+    database. The message has to point at the encryption key instead.
+    """
+    sent: list = []
+    _fake_brevo(monkeypatch, sent)
+
+    account = EmailAccount(
+        name="Main",
+        from_name="Acme",
+        from_email="hello@acme-leads.io",
+        # A well-formed Fernet token produced with a *different* key.
+        api_key_encrypted=(
+            "gAAAAABm0VqAAAAAq7Zr8Yq0k1sJm9pQ2vXw3nT5rL7cB4dE6fG8hJ0kL2mN"
+            "4oP6qR8sT0uV2wX4yZ6aB8cD0eF2gH4iJ6kL8mN0oP2qR4sT6uV8wX"
+        ),
+        is_default=True,
+        is_active=True,
+    )
+    db.add(account)
+    await db.commit()
+
+    usable, why = await email_service.account_is_usable(account)
+    assert usable is False and why == "api_key_unreadable"
+
+    contact = Contact(phone_number="+2348012345678", first_name="Ada",
+                      email="ada@acme-leads.io")
+    db.add(contact)
+    await db.commit()
+
+    message, result = await email_service.send_now(
+        db, contact, subject="Hello", text_body="Hi Ada", account=account,
+    )
+    assert result["success"] is False
+    # Names the encryption key, and never claims the API key is missing.
+    assert "CREDENTIAL_ENCRYPTION_KEY" in result["error"]
+    assert "No usable email sender" not in result["error"]
+    assert sent == []

@@ -54,6 +54,20 @@ _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[A-Za-z]{2,}$")
 
 UNSUBSCRIBE_KEYWORDS = ("unsubscribe", "stop", "opt out", "opt-out", "remove me", "no more emails")
 
+#: Whole words, deliberately: a plain substring test made "stop" match inside
+#: "nonstop" and "unstoppable".
+_UNSUBSCRIBE_RE = re.compile(
+    r"\b(" + "|".join(re.escape(k) for k in UNSUBSCRIBE_KEYWORDS) + r")\b",
+    re.IGNORECASE,
+)
+
+#: Ordinary English that contains "stop" as a word but is not an opt-out:
+#: "stop by the office", "stop over for coffee", "the bus stop".
+_STOP_LOOKALIKES = re.compile(
+    r"\b(?:bus|short|one)\s+stop\b|\bstop\s+(?:by|in|over|off|at|round|around|and|to|for)\b",
+    re.IGNORECASE,
+)
+
 
 # ==========================================================================
 # Small helpers
@@ -86,13 +100,27 @@ def email_problem(address: str | None) -> str | None:
 
 
 def looks_like_unsubscribe(body: str | None) -> bool:
-    text = (body or "").strip().lower()
+    """Does this reply ask to be taken off the list?
+
+    Whole words only, so an ordinary sentence that happens to contain "stop"
+    ("stop by", "bus stop", "nonstop") is not read as an opt-out. A quoted
+    signature or a long reply cannot plausibly be an opt-out either, so only the
+    opening lines are considered.
+    """
+    text = (body or "").strip()
     if not text:
         return False
     if len(text) > 400:
-        # Only the first lines of a long reply can plausibly be an opt-out.
         text = text[:400]
-    return any(k in text for k in UNSUBSCRIBE_KEYWORDS)
+    if not _UNSUBSCRIBE_RE.search(text):
+        return False
+    # A short reply that contains the word is an instruction ("STOP",
+    # "unsubscribe me", "please stop emailing me").
+    if len(text.split()) <= 6:
+        return True
+    # In a longer reply only the unambiguous phrases count, and a phrasal use of
+    # "stop" ("can I stop by on Thursday?") never does.
+    return bool(_UNSUBSCRIBE_RE.search(_STOP_LOOKALIKES.sub(" ", text)))
 
 
 def html_to_text(html: str | None) -> str:
@@ -273,6 +301,13 @@ async def account_is_usable(account: EmailAccount) -> tuple[bool, str | None]:
         return False, "account_disabled"
     if not account.api_key_encrypted:
         return False, "no_api_key"
+    if not decrypt_value(account.api_key_encrypted):
+        # Something *is* stored but will not decrypt. That is almost always
+        # CREDENTIAL_ENCRYPTION_KEY having changed (or differing between the web
+        # process and the worker), and it is worth saying out loud: reported as
+        # a generic "no usable sender" the operator goes hunting for a missing
+        # API key that is actually sitting right there in the database.
+        return False, "api_key_unreadable"
     if not account.from_email:
         return False, "no_from_address"
     await reset_daily_counter(account)
@@ -1147,20 +1182,46 @@ async def deliver(db: AsyncSession, message: Message) -> dict:
                 if fallback is not None:
                     candidates.append(fallback)
 
+    unusable: list[str] = []
     for candidate in candidates:
         usable, why = await account_is_usable(candidate)
         if not usable:
             logger.info("EMAIL: account %s unusable (%s)", candidate.id, why)
+            unusable.append(why or "unknown")
             continue
 
         result = await _send_via_account(db, candidate, message)
         if result.get("success") or not result.get("_try_next"):
             return result
 
-    return {
-        "success": False,
-        "error": "No usable email sender (check the Brevo API key, daily limit and From address)",
-    }
+    return {"success": False, "error": _no_sender_error(unusable)}
+
+
+#: What to tell the operator for each reason no sender could be used. Written as
+#: the next action, not as a diagnosis they have to translate.
+_SENDER_FIX = {
+    "account_disabled": "the sending account is switched off in Email Manager",
+    "no_api_key": "no Brevo API key is saved — add it in Email Manager",
+    "api_key_unreadable": (
+        "the saved API key cannot be decrypted on this server — usually "
+        "CREDENTIAL_ENCRYPTION_KEY changed or differs between the web app and "
+        "the worker; re-save the key in Email Manager"
+    ),
+    "no_from_address": "the sending account has no From address",
+    "daily_limit_reached": "the account's daily limit for today is used up",
+}
+
+
+def _no_sender_error(reasons: list[str]) -> str:
+    """Explain *why* nothing could send, instead of one catch-all sentence."""
+    if not reasons:
+        return (
+            "No sending account is configured — add a Brevo account and API key "
+            "in Email Manager."
+        )
+    unique = list(dict.fromkeys(reasons))
+    detail = "; ".join(_SENDER_FIX.get(r, r.replace("_", " ")) for r in unique)
+    return f"No email could be sent: {detail}."
 
 
 async def _send_via_account(db: AsyncSession, account: EmailAccount, message: Message) -> dict:
@@ -1826,6 +1887,12 @@ async def process_inbound_email(db: AsyncSession, payload: dict) -> dict:
                     cc.status = "replied"
                     cc.next_action_at = None
 
+        # Tell the operator, with enough context to decide whether to answer
+        # now: who wrote, what the subject is, and the first line of what they
+        # said. This is the email twin of notify_inbound_sms — same bell, same
+        # browser push, same deep link straight into the thread.
+        await _notify_inbound_email(db, contact, conversation, message, subject, body)
+
         keyword = None
         if looks_like_unsubscribe(body):
             keyword = "unsubscribe"
@@ -1874,6 +1941,96 @@ async def process_inbound_email(db: AsyncSession, payload: dict) -> dict:
 
     await db.flush()
     return {"stored": stored, "received": len(items)}
+
+
+def email_notification_text(
+    contact: Contact, subject: str | None, body: str | None
+) -> tuple[str, str]:
+    """Build the ``(sender, preview)`` pair for an inbound-email alert.
+
+    Split out (and pure) so the bell, the notifications list and the push
+    payload cannot drift apart, and so the formatting is testable without a
+    database. The shape is deliberately the same as an SMS reply alert —
+    "who", then "what" — because that is what makes a notification actionable
+    at a glance on a phone lock screen:
+
+        Ada Obi — Re: Your restaurant menu
+        Can you send the pricing sheet for 200 covers?
+    """
+    name = (
+        (contact.display_name if hasattr(contact, "display_name") else None)
+        or " ".join(
+            part for part in [getattr(contact, "first_name", None), getattr(contact, "last_name", None)] if part
+        ).strip()
+        or getattr(contact, "email", None)
+        or "Unknown sender"
+    )
+    snippet = _notification_snippet(body)
+    headline = (subject or "").strip()
+    if headline.lower().startswith("re:"):
+        headline = headline[3:].strip()
+    body_text = f"{headline} — {snippet}" if headline and snippet else (headline or snippet)
+    return name, body_text[:400]
+
+
+def _notification_snippet(raw: str | None) -> str:
+    """A one-line preview of an email body.
+
+    Strips the parts of a real message that are noise in a notification: quoted
+    reply chains, the "On <date> … wrote:" attribution, signatures separated by
+    "-- ", and HTML tags when the body arrived as markup.
+    """
+    text = str(raw or "")
+    if "<" in text and ">" in text:
+        text = re.sub(r"<(script|style)[^>]*>.*?</\1>", " ", text, flags=re.S | re.I)
+        text = re.sub(r"<br\s*/?>|</p>|</div>", "\n", text, flags=re.I)
+        text = re.sub(r"<[^>]+>", " ", text)
+        text = (
+            text.replace("&nbsp;", " ").replace("&amp;", "&").replace("&lt;", "<")
+            .replace("&gt;", ">").replace("&quot;", '"').replace("&#39;", "'")
+        )
+    cutters = (
+        r"\n\s*On .{0,120}wrote:",
+        r"\n\s*-{2,}\s*Original Message\s*-{2,}",
+        r"\n\s*From:\s.+\n",
+        r"\n\s*_{5,}",
+        r"\n\s*--\s*\n",
+        r"\n\s*Sent from my ",
+    )
+    for pattern in cutters:
+        text = re.split(pattern, text, maxsplit=1, flags=re.I)[0]
+    text = re.sub(r"\s+", " ", text).strip()
+    if len(text) > 180:
+        text = text[:179].rstrip() + "…"
+    return text
+
+
+async def _notify_inbound_email(
+    db: AsyncSession,
+    contact: Contact,
+    conversation: Conversation,
+    message: Message,
+    subject: str | None,
+    body: str | None,
+) -> None:
+    """Raise the in-app + browser notification for one inbound email.
+
+    Failures here must never lose the message itself, so everything is caught:
+    a notification is a courtesy, the stored reply is the product.
+    """
+    try:
+        from app.services.push_service import notify_inbound_email
+
+        name, preview = email_notification_text(contact, subject, body)
+        await notify_inbound_email(
+            db,
+            contact_name=name,
+            subject=subject,
+            preview=preview,
+            conversation_id=conversation.id,
+        )
+    except Exception as exc:  # noqa: BLE001 — never break inbound mail
+        logger.warning("EMAIL-IN notify failed: %s", exc)
 
 
 async def _maybe_auto_reply(

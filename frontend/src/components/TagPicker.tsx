@@ -75,15 +75,15 @@ export default function TagPicker({
 
   return (
     <div ref={rootRef} className={`relative ${className}`}>
-      <div className="flex flex-wrap items-center gap-1.5 px-2.5 py-2 bg-[#f0f2f5] dark:bg-[#111b21] rounded-xl min-h-[44px] focus-within:ring-2 focus-within:ring-[#00a884]/20">
-        <TagIcon size={14} className="text-[#667781] flex-shrink-0" />
+      <div className="flex flex-wrap items-center gap-1.5 px-2.5 py-2 bg-gray-100 dark:bg-gray-900 rounded-xl min-h-[44px] focus-within:ring-2 focus-within:ring-primary-600/20">
+        <TagIcon size={14} className="text-gray-500 flex-shrink-0" />
         {value.map((t) => (
           <span
             key={t}
-            className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-[#e7f3ff] text-[#0066cc] dark:bg-[#182533] dark:text-[#53bdeb] font-medium"
+            className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-primary-50 text-primary-600 dark:bg-gray-800 dark:text-primary-400 font-medium"
           >
             {t}
-            <button type="button" onClick={() => remove(t)} aria-label={`Remove tag ${t}`} className="hover:text-red-500">
+            <button type="button" onClick={() => remove(t)} aria-label={`Remove tag ${t}`} className="hover:text-danger-500">
               <X size={11} />
             </button>
           </span>
@@ -107,7 +107,7 @@ export default function TagPicker({
           }}
           placeholder={value.length === 0 ? placeholder : ""}
           aria-label="Add a tag"
-          className="flex-1 min-w-[90px] bg-transparent text-sm outline-none text-gray-800 dark:text-gray-100 placeholder:text-[#667781]"
+          className="flex-1 min-w-[90px] bg-transparent text-sm outline-none text-gray-800 dark:text-gray-100 placeholder:text-gray-500"
         />
       </div>
 
@@ -121,14 +121,14 @@ export default function TagPicker({
               className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-between gap-2"
             >
               <span className="text-gray-800 dark:text-gray-100 truncate">{t.name}</span>
-              <span className="text-[11px] text-[#667781] flex-shrink-0">{t.count}</span>
+              <span className="text-[11px] text-gray-500 flex-shrink-0">{t.count}</span>
             </button>
           ))}
           {input.trim() && !suggestions.some((t) => t.name.toLowerCase() === input.trim().toLowerCase()) && (
             <button
               type="button"
               onClick={() => add(input)}
-              className="w-full text-left px-3 py-1.5 text-sm text-[#00a884] hover:bg-[#00a884]/10 font-medium"
+              className="w-full text-left px-3 py-1.5 text-sm text-primary-600 hover:bg-primary-600/10 font-medium"
             >
               ＋ Create “{input.trim()}”
             </button>

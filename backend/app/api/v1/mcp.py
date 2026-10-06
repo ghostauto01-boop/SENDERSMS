@@ -28,6 +28,7 @@ transaction for the database (see ``app/mcp/server.py``).
 import hashlib
 import json
 import logging
+import os
 import secrets
 import time
 from collections import defaultdict, deque
@@ -35,7 +36,13 @@ from datetime import datetime, timezone
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
+from fastapi.responses import (
+    HTMLResponse,
+    JSONResponse,
+    PlainTextResponse,
+    RedirectResponse,
+    Response,
+)
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -48,9 +55,16 @@ from app.models.mcp import McpCall, McpToken
 from app.models.mcp_oauth import McpOAuthClient, McpOAuthToken
 from app.models.user import User
 from app.security.auth import apply_session_cookie, create_access_token, get_current_user
-from app.utils.urls import public_base_url
+from app.utils.urls import public_base_url, public_base_url_source
 
 logger = logging.getLogger(__name__)
+
+#: The stdio bridge shipped in the repo (tools/arena-connector). Served by
+#: /api/v1/mcp/bridge so the operator can fetch it without cloning anything.
+BRIDGE_PATH = os.path.abspath(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "..",
+                 "tools", "arena-connector", "arena_mcp_bridge.py")
+)
 
 #: Token management + connector administration, for the app's own settings screen.
 router = APIRouter()
@@ -972,24 +986,94 @@ async def activity(limit: int = 50, db: AsyncSession = Depends(get_db),
 @router.get("/connectors")
 async def list_connectors(db: AsyncSession = Depends(get_db),
                           cu: User = Depends(get_current_user)):
-    """One card per AI client: its endpoint, its auth, and whether it works."""
+    """One card per AI client: its endpoint, its auth, and whether it works.
+
+    ``ready`` means "an absolute base URL is known", which — since the request's
+    own host is used when PUBLIC_BASE_URL is unset — is true for any request
+    that arrived on a real host. ``base_url_source`` says where it came from, so
+    the screen can distinguish "configured" from "detected from this browser
+    session" and tell the operator which one to keep.
+    """
     items = []
     for profile in C.CONNECTORS:
         connection = await oauth_flow.get_connection(db, profile.key)
         items.append(oauth_flow.connection_out(connection, profile))
     await db.commit()
     base = public_base_url()
+    source = public_base_url_source()
     return {
         "items": items,
         "public_base_url": base,
+        "base_url_source": source,
         "ready": bool(base),
         "problem": None if base else (
-            "PUBLIC_BASE_URL is not set, so every URL in the OAuth metadata is relative and no "
-            "client can complete a connection. Set it to this deployment's public address."
+            "This deployment's public address could not be determined, so every URL in the OAuth "
+            "metadata would be relative and no client could complete a connection. Set "
+            "PUBLIC_BASE_URL to this deployment's public https address."
+        ),
+        "note": (
+            "Detected from this browser session. Set PUBLIC_BASE_URL to the deployment's permanent "
+            "https address so the connector also works for clients that reach it on another host."
+            if source == "request" else None
         ),
         "require_login": bool(settings.MCP_OAUTH_REQUIRE_LOGIN),
         "protocol_versions": list(C.PROTOCOL_VERSIONS),
+        "bridge": _bridge_info(base),
     }
+
+
+def _bridge_info(base: str | None) -> dict:
+    """The paste-in fallback for hosts with no connector form (Arena, Cursor…).
+
+    A stdio bridge and a bearer token work everywhere, including a sandbox with
+    only bash — which is the one path that never depends on OAuth discovery,
+    redirect URIs or a public URL being configured correctly.
+    """
+    sample_endpoint = f"{base}/connectors/arena/mcp" if base else "/connectors/arena/mcp"
+    return {
+        "available": os.path.isfile(BRIDGE_PATH),
+        "download_url": "/api/v1/mcp/bridge",
+        "script": "arena_mcp_bridge.py",
+        "endpoint": sample_endpoint,
+        "run": (
+            f'SENDERSMS_MCP_URL="{sample_endpoint}" '
+            'SENDERSMS_MCP_TOKEN="<token from Access tokens>" '
+            "python3 arena_mcp_bridge.py"
+        ),
+        "config": {
+            "mcpServers": {
+                "sendersms": {
+                    "command": "python3",
+                    "args": ["arena_mcp_bridge.py"],
+                    "env": {
+                        "SENDERSMS_MCP_URL": sample_endpoint,
+                        "SENDERSMS_MCP_TOKEN": "<token from Access tokens>",
+                    },
+                }
+            }
+        },
+    }
+
+
+@router.get("/bridge", response_class=PlainTextResponse)
+async def download_bridge(cu: User = Depends(get_current_user)) -> PlainTextResponse:
+    """Serve the stdio bridge so it can be fetched straight from the app.
+
+    Dashboard-only (unlike the MCP endpoints themselves): the script contains no
+    secret, but it is not something to publish to the open internet either.
+    """
+    if not os.path.isfile(BRIDGE_PATH):
+        raise HTTPException(404, "The stdio bridge is not bundled with this build.")
+    with open(BRIDGE_PATH, "r", encoding="utf-8") as handle:
+        body = handle.read()
+    return PlainTextResponse(
+        body,
+        headers={
+            "Content-Disposition": 'attachment; filename="arena_mcp_bridge.py"',
+            "Cache-Control": "no-store",
+        },
+    )
+
 
 
 @router.post("/connectors/{key}")

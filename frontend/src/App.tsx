@@ -104,6 +104,10 @@ function AppRoutes() {
         <Route path="/variables" element={<VariablesPage />} />
         <Route path="/campaign-follow-ups" element={<CampaignFollowUpsPage />} />
         <Route path="/calendar" element={<CalendarPage />} />
+        {/* Reached from the bell's "View all notifications" and from any
+            notification deep link. Without this route it fell through to the
+            catch-all and every one of those links opened the Dashboard. */}
+        <Route path="/notifications" element={<NotificationsPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>

@@ -10,6 +10,7 @@ from app.config import settings
 from app.database import init_db, async_session_factory
 from app import db_health
 from app.poll_scheduler import PollActivity, next_poll_delay
+from app.utils.urls import bind_request_base, clear_request_base
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -910,6 +911,28 @@ app.add_middleware(
         "Content-Type", "Content-Length", "Location",
     ],
 )
+
+
+@app.middleware("http")
+async def _bind_public_base_url(request, call_next):
+    """Learn this deployment's public address from the request itself.
+
+    The MCP connector flow needs absolute URLs (ChatGPT and Claude both reject
+    a relative ``resource``), and a deployment that never set PUBLIC_BASE_URL
+    used to answer every connector attempt with "PUBLIC_BASE_URL is not set" —
+    which is why the AI connector looked broken while the endpoint was fine.
+
+    Binding the request's own scheme + host here means the OAuth metadata, the
+    ``WWW-Authenticate`` challenge and the connector self-test all produce
+    working absolute URLs with nothing configured. ``PUBLIC_BASE_URL`` still
+    wins when it is set (see app.utils.urls), so a custom domain or a tunnel
+    keeps working exactly as before.
+    """
+    bind_request_base(request)
+    try:
+        return await call_next(request)
+    finally:
+        clear_request_base()
 
 
 @app.middleware("http")

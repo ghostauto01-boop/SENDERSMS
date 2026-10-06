@@ -96,8 +96,8 @@ export default function ImportContactsModal({ onClose, onDone, defaultListId = "
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4">
-      <div className="bg-white dark:bg-[#202c33] w-full sm:max-w-xl max-h-[92vh] overflow-y-auto rounded-t-[20px] sm:rounded-2xl">
-        <div className="sticky top-0 bg-[#008069] dark:bg-[#202c33] px-4 py-3 flex items-center justify-between z-10">
+      <div className="bg-white dark:bg-gray-800 w-full sm:max-w-xl max-h-[92vh] overflow-y-auto rounded-t-[20px] sm:rounded-2xl">
+        <div className="sticky top-0 bg-primary-700 dark:bg-gray-800 px-4 py-3 flex items-center justify-between z-10">
           <h2 className="text-white font-semibold">Import contacts</h2>
           <button
             onClick={onClose}
@@ -110,15 +110,15 @@ export default function ImportContactsModal({ onClose, onDone, defaultListId = "
         <div className="p-4 sm:p-6">
           {step === "upload" && (
             <div className="space-y-3">
-              <div className="border-2 border-dashed border-[#00a884]/30 bg-[#f0f9f6] dark:bg-[#0a332c]/30 rounded-2xl p-6 text-center">
-                <Upload size={32} className="mx-auto text-[#00a884] mb-2" />
-                <p className="font-medium text-[#111b21] dark:text-white">Drop your CSV here</p>
-                <p className="text-xs text-[#667781] mt-1">
+              <div className="border-2 border-dashed border-primary-600/30 bg-primary-50 dark:bg-primary-950/30 rounded-2xl p-6 text-center">
+                <Upload size={32} className="mx-auto text-primary-600 mb-2" />
+                <p className="font-medium text-gray-900 dark:text-white">Drop your CSV here</p>
+                <p className="text-xs text-gray-500 mt-1">
                   Every column is imported — including your own custom fields, which become shortcodes
                 </p>
                 <input type="file" accept=".csv" onChange={handleFileChange} className="mt-3 block w-full text-sm" />
               </div>
-              <p className="text-xs text-[#667781] text-center">
+              <p className="text-xs text-gray-500 text-center">
                 Columns are auto-detected. Unknown columns become template-ready custom fields.
               </p>
             </div>
@@ -126,20 +126,20 @@ export default function ImportContactsModal({ onClose, onDone, defaultListId = "
 
           {step === "map" && preview && (
             <div className="space-y-3">
-              <p className="text-sm font-semibold text-[#111b21] dark:text-white">
-                Map columns <span className="font-normal text-[#667781]">(auto-detected)</span>
+              <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                Map columns <span className="font-normal text-gray-500">(auto-detected)</span>
               </p>
               {!phoneMapped && (
-                <p className="text-xs bg-[#fce8e6] text-[#c5221f] rounded-xl px-3 py-2">
+                <p className="text-xs bg-danger-100 text-danger-700 rounded-xl px-3 py-2">
                   ⚠ No column is mapped to Phone — every row would be rejected. Map one below.
                 </p>
               )}
-              <div className="max-h-40 overflow-auto text-xs border border-gray-200 dark:border-[#2a3942] rounded-xl">
+              <div className="max-h-40 overflow-auto text-xs border border-gray-200 dark:border-gray-700 rounded-xl">
                 <table className="w-full">
                   <thead>
-                    <tr className="bg-[#f0f2f5] dark:bg-[#111b21]">
+                    <tr className="bg-gray-100 dark:bg-gray-900">
                       {preview.headers.map((h: string) => (
-                        <th key={h} className="px-2 py-2 text-left text-[#54656f]">
+                        <th key={h} className="px-2 py-2 text-left text-gray-600">
                           {h}
                         </th>
                       ))}
@@ -147,7 +147,7 @@ export default function ImportContactsModal({ onClose, onDone, defaultListId = "
                   </thead>
                   <tbody>
                     {preview.rows.map((r: string[], i: number) => (
-                      <tr key={i} className="border-t border-gray-100 dark:border-[#2a3942]">
+                      <tr key={i} className="border-t border-gray-100 dark:border-gray-700">
                         {r.map((c: string, j: number) => (
                           <td key={j} className="px-2 py-1.5 truncate max-w-[100px]">
                             {c}
@@ -162,9 +162,9 @@ export default function ImportContactsModal({ onClose, onDone, defaultListId = "
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto">
                 {preview.headers.map((h: string) => (
                   <div key={h}>
-                    <label className="text-xs font-medium text-[#54656f]">{h}</label>
+                    <label className="text-xs font-medium text-gray-600">{h}</label>
                     <select
-                      className="w-full mt-1 px-2 py-2 bg-[#f0f2f5] dark:bg-[#111b21] rounded-xl text-xs text-[#111b21] dark:text-white"
+                      className="w-full mt-1 px-2 py-2 bg-gray-100 dark:bg-gray-900 rounded-xl text-xs text-gray-900 dark:text-white"
                       value={mapping[h] || ""}
                       onChange={(e) => setMapping({ ...mapping, [h]: e.target.value })}
                       aria-label={`Map column ${h}`}
@@ -192,7 +192,7 @@ export default function ImportContactsModal({ onClose, onDone, defaultListId = "
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-medium text-[#54656f]">Import into list</label>
+                  <label className="text-xs font-medium text-gray-600">Import into list</label>
                   <div className="mt-1">
                     <ListPicker
                       value={selectedListId}
@@ -202,21 +202,21 @@ export default function ImportContactsModal({ onClose, onDone, defaultListId = "
                   </div>
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-[#54656f]">Tag every imported contact</label>
+                  <label className="text-xs font-medium text-gray-600">Tag every imported contact</label>
                   <div className="mt-1">
                     <TagPicker value={tags} onChange={setTags} placeholder="e.g. restaurants" />
                   </div>
                 </div>
               </div>
-              <p className="text-xs text-[#667781]">
+              <p className="text-xs text-gray-500">
                 Can&apos;t find the right list? Open the list box and tap{" "}
-                <b className="text-[#00a884]">＋ Create new list</b> — it is created and selected
+                <b className="text-primary-600">＋ Create new list</b> — it is created and selected
                 in one step, no trip to the Lists page.
               </p>
               <button
                 onClick={doImport}
                 disabled={!phoneMapped}
-                className="w-full py-3 rounded-full bg-[#00a884] text-white font-semibold disabled:opacity-50"
+                className="w-full py-3 rounded-full bg-primary-600 text-white font-semibold disabled:opacity-50"
               >
                 Import Contacts
               </button>
@@ -225,45 +225,45 @@ export default function ImportContactsModal({ onClose, onDone, defaultListId = "
 
           {step === "importing" && (
             <div className="text-center py-8">
-              <div className="w-10 h-10 border-4 border-[#00a884] border-t-transparent rounded-full animate-spin mx-auto" />
-              <p className="text-sm mt-4 text-[#667781]">Importing…</p>
+              <div className="w-10 h-10 border-4 border-primary-600 border-t-transparent rounded-full animate-spin mx-auto" />
+              <p className="text-sm mt-4 text-gray-500">Importing…</p>
             </div>
           )}
 
           {step === "done" && result && (
             <div className="space-y-3 text-center">
               <p className="text-4xl">✅</p>
-              <p className="font-semibold text-[#111b21] dark:text-white">Import complete</p>
+              <p className="font-semibold text-gray-900 dark:text-white">Import complete</p>
               {result.list && (
-                <p className="text-xs text-[#667781]">
-                  into list <b className="text-[#00a884]">{result.list.name}</b>
+                <p className="text-xs text-gray-500">
+                  into list <b className="text-primary-600">{result.list.name}</b>
                 </p>
               )}
               <div className="grid grid-cols-3 gap-2 text-sm">
-                <div className="bg-[#d9fdd3] rounded-xl p-3">
-                  <p className="text-2xl font-bold text-[#008069]">{result.imported}</p>
-                  <p className="text-xs text-[#54656f]">Imported</p>
+                <div className="bg-primary-100 rounded-xl p-3">
+                  <p className="text-2xl font-bold text-primary-700">{result.imported}</p>
+                  <p className="text-xs text-gray-600">Imported</p>
                 </div>
-                <div className="bg-[#ffecb3] rounded-xl p-3">
-                  <p className="text-2xl font-bold text-[#8d5100]">{result.duplicates}</p>
+                <div className="bg-warning-200 rounded-xl p-3">
+                  <p className="text-2xl font-bold text-warning-700">{result.duplicates}</p>
                   <p className="text-xs">Duplicates</p>
                 </div>
-                <div className="bg-[#fce8e6] rounded-xl p-3">
-                  <p className="text-2xl font-bold text-[#c5221f]">{result.invalid}</p>
+                <div className="bg-danger-100 rounded-xl p-3">
+                  <p className="text-2xl font-bold text-danger-700">{result.invalid}</p>
                   <p className="text-xs">Invalid</p>
                 </div>
               </div>
               {result.errors.length > 0 && (
                 <details className="text-xs text-left">
-                  <summary className="cursor-pointer text-[#667781]">{result.errors.length} errors</summary>
-                  <pre className="mt-1 max-h-32 overflow-auto bg-[#f0f2f5] p-2 rounded">
+                  <summary className="cursor-pointer text-gray-500">{result.errors.length} errors</summary>
+                  <pre className="mt-1 max-h-32 overflow-auto bg-gray-100 p-2 rounded">
                     {JSON.stringify(result.errors.slice(0, 20), null, 2)}
                   </pre>
                 </details>
               )}
               <button
                 onClick={() => onDone(result)}
-                className="w-full py-3 rounded-full bg-[#00a884] text-white font-semibold"
+                className="w-full py-3 rounded-full bg-primary-600 text-white font-semibold"
               >
                 Done
               </button>

@@ -176,7 +176,7 @@ function AutomationModal({
                 {(c.field === "has_tag" || c.field === "keyword") && (
                   <input className="input text-sm" placeholder={c.field === "has_tag" ? "restaurants" : "refund, broken"} value={c.value} onChange={(e) => updateCondition(i, { value: e.target.value })} />
                 )}
-                <button onClick={() => setConditions((cs) => cs.filter((_, idx) => idx !== i))} className="btn-ghost btn-sm text-red-600"><Trash2 size={14} /></button>
+                <button onClick={() => setConditions((cs) => cs.filter((_, idx) => idx !== i))} className="btn-ghost btn-sm text-danger-600"><Trash2 size={14} /></button>
               </div>
             ))}
             <button onClick={() => setConditions((cs) => [...cs, EMPTY_CONDITION()])} className="btn-secondary btn-sm"><Plus size={14} className="mr-1" />Add condition</button>
@@ -190,7 +190,7 @@ function AutomationModal({
                   <select className="input text-sm flex-1" value={a.type} onChange={(e) => updateAction(i, { type: e.target.value })}>
                     {ACTION_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
                   </select>
-                  <button onClick={() => setActions((as) => as.filter((_, idx) => idx !== i))} className="btn-ghost btn-sm text-red-600"><Trash2 size={14} /></button>
+                  <button onClick={() => setActions((as) => as.filter((_, idx) => idx !== i))} className="btn-ghost btn-sm text-danger-600"><Trash2 size={14} /></button>
                 </div>
                 {(a.type === "send_sms" || a.type === "send_email") && (
                   <div className="space-y-1.5">
@@ -223,7 +223,7 @@ function AutomationModal({
             <button onClick={() => setActions((as) => [...as, EMPTY_ACTION()])} className="btn-secondary btn-sm"><Plus size={14} className="mr-1" />Add action</button>
           </div>
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="text-sm text-danger-600">{error}</p>}
         </div>
 
         <div className="flex gap-2 mt-5">
@@ -271,9 +271,9 @@ function AiTester() {
             <span className="text-xs text-gray-500">confidence {Math.round((result.classification?.confidence || 0) * 100)}%</span>
           </div>
           {result.matched?.length ? (
-            <div className="rounded-lg bg-green-50 dark:bg-green-900/20 p-3">
-              <p className="font-medium text-green-800 dark:text-green-300">Would trigger:</p>
-              {result.matched.map((m: any) => <p key={m.id} className="text-green-700 dark:text-green-200">• {m.name}</p>)}
+            <div className="rounded-lg bg-success-50 dark:bg-success-900/20 p-3">
+              <p className="font-medium text-success-800 dark:text-success-300">Would trigger:</p>
+              {result.matched.map((m: any) => <p key={m.id} className="text-success-700 dark:text-success-200">• {m.name}</p>)}
             </div>
           ) : (
             <p className="text-xs text-gray-500">No automation matches this reply.</p>
@@ -356,7 +356,7 @@ export default function AutomationsPage() {
                 <div className="flex gap-1 shrink-0">
                   <button onClick={() => toggle(a)} className="btn-ghost btn-sm" title={a.is_enabled ? "Pause" : "Activate"}>{a.is_enabled ? "Pause" : "Activate"}</button>
                   <button onClick={() => { setEditing(a); setShowModal(true); }} className="btn-ghost btn-sm" title="Edit"><Pencil size={14} /></button>
-                  <button onClick={() => remove(a)} className="btn-ghost btn-sm text-red-600" title="Delete"><Trash2 size={14} /></button>
+                  <button onClick={() => remove(a)} className="btn-ghost btn-sm text-danger-600" title="Delete"><Trash2 size={14} /></button>
                 </div>
               </div>
 

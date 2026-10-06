@@ -727,40 +727,64 @@ def connection_out(row: McpConnection | None, profile: C.ConnectorProfile) -> di
 # ---------------------------------------------------------------------------
 
 _PAGE_CSS = """
-:root{color-scheme:light dark}
+/* The connector's sign-in and consent pages, on the app's palette: the same
+   blue/indigo brand, the same cooled neutrals, light and dark. They are served
+   by the API rather than the SPA, so the tokens are repeated here — but only
+   these tokens, so nothing can drift into a second design language. */
+:root{color-scheme:light dark;
+--brand:#2563eb;--brand-dark:#1d4ed8;--brand-soft:#eef4ff;--brand-ink:#1e3a8a;
+--accent:#4f46e5;--canvas:#f7f9fc;--surface:#fff;--ink:#141b28;--muted:#66748c;
+--line:#e3e9f2;--ok-bg:#ecfdf5;--ok-line:#a7f3d0;--ok-ink:#047857;
+--bad-bg:#fef2f2;--bad-line:#fecaca;--bad-ink:#b91c1c}
 *{box-sizing:border-box}
-body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,
-sans-serif;background:#f3f4f6;color:#111827;padding:24px;display:flex;justify-content:center}
-.card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:26px;width:100%;
-max-width:460px;box-shadow:0 8px 30px rgba(0,0,0,.07)}
-h1{font-size:19px;margin:0 0 6px}
-p{font-size:14px;line-height:1.55;color:#4b5563;margin:8px 0}
+body{margin:0;min-height:100vh;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,
+Helvetica,Arial,sans-serif;background:var(--canvas);color:var(--ink);padding:24px;
+display:flex;align-items:center;justify-content:center;
+background-image:radial-gradient(60rem 30rem at 15% -10%,rgba(37,99,235,.14),transparent),
+radial-gradient(50rem 26rem at 110% 110%,rgba(79,70,229,.14),transparent)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:28px;
+width:100%;max-width:460px;box-shadow:0 12px 32px rgba(16,24,40,.10),0 2px 8px rgba(16,24,40,.06);
+animation:rise .24s cubic-bezier(.22,1,.36,1) both}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.mark{width:44px;height:44px;border-radius:13px;background:linear-gradient(135deg,var(--brand),var(--accent));
+display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:17px;
+margin-bottom:14px;box-shadow:0 4px 12px rgba(37,99,235,.28)}
+h1{font-size:20px;margin:0 0 6px;letter-spacing:-.01em}
+p{font-size:14px;line-height:1.55;color:var(--muted);margin:8px 0}
 .badge{display:inline-block;font-size:11px;font-weight:600;letter-spacing:.02em;padding:3px 9px;
-border-radius:999px;background:#eef2ff;color:#4338ca;margin-bottom:12px}
-label{display:block;font-size:13px;font-weight:600;margin:14px 0 5px;color:#374151}
-input[type=password],input[type=text]{width:100%;padding:10px 12px;border:1px solid #d1d5db;
-border-radius:8px;font-size:14px;background:#fff;color:#111827}
-button{width:100%;margin-top:16px;padding:11px 14px;border-radius:9px;border:0;font-size:14px;
-font-weight:600;cursor:pointer}
-.primary{background:#2563eb;color:#fff}
-.primary:hover{background:#1d4ed8}
-.ghost{background:#fff;color:#374151;border:1px solid #d1d5db;margin-top:8px}
-.ghost:hover{background:#f9fafb}
-.scopes{border:1px solid #e5e7eb;border-radius:10px;padding:12px 14px;margin-top:16px;
-background:#fafafa}
-.scope{display:flex;gap:10px;align-items:flex-start;padding:6px 0;font-size:13px;color:#374151}
+border-radius:999px;background:var(--brand-soft);color:var(--brand-ink);margin-bottom:12px}
+label{display:block;font-size:13px;font-weight:600;margin:14px 0 5px;color:var(--ink)}
+input[type=password],input[type=text]{width:100%;padding:11px 12px;border:1px solid var(--line);
+border-radius:12px;font-size:15px;background:var(--surface);color:var(--ink);
+transition:box-shadow .15s ease,border-color .15s ease}
+input[type=password]:focus,input[type=text]:focus{outline:none;border-color:var(--brand);
+box-shadow:0 0 0 4px rgba(37,99,235,.14)}
+button{width:100%;margin-top:16px;padding:12px 14px;border-radius:12px;border:0;font-size:14px;
+font-weight:600;cursor:pointer;transition:transform .14s cubic-bezier(.22,1,.36,1),
+background .14s ease,box-shadow .14s ease}
+button:active{transform:scale(.985)}
+.primary{background:var(--brand);color:#fff;box-shadow:0 2px 8px rgba(37,99,235,.24)}
+.primary:hover{background:var(--brand-dark)}
+.ghost{background:var(--surface);color:var(--ink);border:1px solid var(--line);margin-top:8px}
+.ghost:hover{background:var(--canvas)}
+.scopes{border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-top:16px;
+background:var(--canvas)}
+.scope{display:flex;gap:10px;align-items:flex-start;padding:6px 0;font-size:13px;color:var(--ink)}
 .scope input{margin-top:2px}
-.error{background:#fef2f2;border:1px solid #fecaca;color:#991b1b;border-radius:10px;
+.error{background:var(--bad-bg);border:1px solid var(--bad-line);color:var(--bad-ink);
+border-radius:12px;padding:12px 14px;font-size:13px;margin-top:14px}
+.ok{background:var(--ok-bg);border:1px solid var(--ok-line);color:var(--ok-ink);border-radius:12px;
 padding:12px 14px;font-size:13px;margin-top:14px}
-.ok{background:#f0fdf4;border:1px solid #bbf7d0;color:#166534;border-radius:10px;padding:12px 14px;
-font-size:13px;margin-top:14px}
-code{background:#f3f4f6;border-radius:4px;padding:1px 5px;font-size:12px}
-small{color:#6b7280;font-size:12px;line-height:1.5;display:block;margin-top:14px}
+code{background:var(--canvas);border:1px solid var(--line);border-radius:6px;padding:1px 5px;
+font-size:12px}
+small{color:var(--muted);font-size:12px;line-height:1.5;display:block;margin-top:14px}
 @media (prefers-color-scheme:dark){
-body{background:#0b1220;color:#e5e7eb}.card{background:#111827;border-color:#1f2937}
-p,small{color:#9ca3af}label{color:#d1d5db}input{background:#0b1220;border-color:#374151;
-color:#e5e7eb}.scopes{background:#0b1220;border-color:#1f2937}.scope{color:#d1d5db}
-code{background:#1f2937}.ghost{background:#111827;border-color:#374151;color:#e5e7eb}}
+:root{--canvas:#0b1018;--surface:#151d2c;--ink:#e8edf6;--muted:#98a6bd;--line:#26313f;
+--brand-soft:#16265c;--brand-ink:#bcd0ff;--ok-bg:#022c22;--ok-line:#065f46;--ok-ink:#6ee7b7;
+--bad-bg:#450a0a;--bad-line:#7f1d1d;--bad-ink:#fca5a5}
+.card{box-shadow:0 12px 32px rgba(0,0,0,.45)}
+.primary:hover{background:#4163f6}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 """
 
 
@@ -769,7 +793,7 @@ def _page(title: str, body: str) -> str:
         "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">"
         "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
         f"<title>{html.escape(title)}</title><style>{_PAGE_CSS}</style></head>"
-        f"<body><main class=\"card\">{body}</main></body></html>"
+        f"<body><main class=\"card\"><div class=\"mark\">SS</div>{body}</main></body></html>"
     )
 
 
@@ -791,10 +815,10 @@ def login_page(action: str, *, connector: str, client_name: str, error: str = ""
                allow_one_tap: bool = True) -> str:
     """Sign in to authorize a connector.
 
-    The app's own login wall is one tap (``POST /api/v1/auth/admin``), so the
-    same choice is offered here — but it can be switched off with
-    ``MCP_OAUTH_REQUIRE_LOGIN=true``, which hides the one-tap button and makes a
-    password mandatory on a deployment that is exposed to the internet.
+    The browser's sign-in is the app password (``ADMIN_PASSWORD``), so this page
+    asks for the same password. ``MCP_OAUTH_REQUIRE_LOGIN=false`` restores the
+    old one-tap behaviour for a deployment that has deliberately removed every
+    password — never use it on an address other people can reach.
     """
     query = html.escape(action, quote=True)
     body = (
@@ -804,7 +828,7 @@ def login_page(action: str, *, connector: str, client_name: str, error: str = ""
         "to continue.</p>"
         + (f"<div class=\"error\">{html.escape(error)}</div>" if error else "")
         + f"<form method=\"post\" action=\"{query}\">"
-        "<label for=\"password\">Password (optional if this deployment is yours alone)</label>"
+        "<label for=\"password\">App password</label>"
         "<input id=\"password\" name=\"password\" type=\"password\" autocomplete=\"current-password\">"
         "<button class=\"primary\" type=\"submit\">Continue</button>"
         + (

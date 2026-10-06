@@ -14,14 +14,14 @@ import type { CampaignRef } from "../types";
  */
 
 const PALETTE = [
-  { bg: "bg-blue-100 dark:bg-blue-900/50", text: "text-blue-700 dark:text-blue-300", dot: "bg-blue-500" },
-  { bg: "bg-purple-100 dark:bg-purple-900/50", text: "text-purple-700 dark:text-purple-300", dot: "bg-purple-500" },
-  { bg: "bg-emerald-100 dark:bg-emerald-900/50", text: "text-emerald-700 dark:text-emerald-300", dot: "bg-emerald-500" },
-  { bg: "bg-amber-100 dark:bg-amber-900/50", text: "text-amber-700 dark:text-amber-300", dot: "bg-amber-500" },
-  { bg: "bg-pink-100 dark:bg-pink-900/50", text: "text-pink-700 dark:text-pink-300", dot: "bg-pink-500" },
-  { bg: "bg-cyan-100 dark:bg-cyan-900/50", text: "text-cyan-700 dark:text-cyan-300", dot: "bg-cyan-500" },
-  { bg: "bg-orange-100 dark:bg-orange-900/50", text: "text-orange-700 dark:text-orange-300", dot: "bg-orange-500" },
-  { bg: "bg-indigo-100 dark:bg-indigo-900/50", text: "text-indigo-700 dark:text-indigo-300", dot: "bg-indigo-500" },
+  { bg: "bg-primary-100 dark:bg-primary-900/50", text: "text-primary-700 dark:text-primary-300", dot: "bg-primary-500" },
+  { bg: "bg-primary-100 dark:bg-primary-900/50", text: "text-primary-700 dark:text-primary-300", dot: "bg-primary-500" },
+  { bg: "bg-success-100 dark:bg-success-900/50", text: "text-success-700 dark:text-success-300", dot: "bg-success-500" },
+  { bg: "bg-warning-100 dark:bg-warning-900/50", text: "text-warning-700 dark:text-warning-300", dot: "bg-warning-500" },
+  { bg: "bg-primary-100 dark:bg-primary-900/50", text: "text-primary-700 dark:text-primary-300", dot: "bg-primary-500" },
+  { bg: "bg-primary-100 dark:bg-primary-900/50", text: "text-primary-700 dark:text-primary-300", dot: "bg-primary-500" },
+  { bg: "bg-warning-100 dark:bg-warning-900/50", text: "text-warning-700 dark:text-warning-300", dot: "bg-warning-500" },
+  { bg: "bg-primary-100 dark:bg-primary-900/50", text: "text-primary-700 dark:text-primary-300", dot: "bg-primary-500" },
 ];
 
 /** Stable colour for a campaign: same name + kind always yields the same slot. */

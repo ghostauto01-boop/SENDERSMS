@@ -23,8 +23,8 @@ import CampaignChip from "../components/CampaignChip";
 
 const avatarColor = (name: string) => {
   const colors = [
-    "bg-[#25D366]", "bg-[#128C7E]", "bg-[#075E54]", "bg-[#34B7F1]",
-    "bg-[#FF8A65]", "bg-[#BA68C8]", "bg-[#4DB6AC]", "bg-[#FFB74D]",
+    "bg-primary-600", "bg-primary-700", "bg-primary-800", "bg-[#34B7F1]",
+    "bg-warning-400", "bg-accent-500", "bg-primary-400", "bg-warning-400",
   ];
   let h = 0; for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % colors.length;
   return colors[h];
@@ -448,59 +448,59 @@ export default function InboxPage() {
 
   /* ================================================================ */
   return (
-    <div className="app-shell w-full bg-[#111b21] flex flex-col">
+    <div className="app-shell w-full bg-gray-900 flex flex-col">
       {/* WhatsApp Web container */}
-      <div className="flex flex-1 overflow-hidden bg-white dark:bg-[#111b21]">
+      <div className="flex flex-1 overflow-hidden bg-white dark:bg-gray-900">
 
         {/* ============ LEFT — Conversation list ============ */}
-        <div className={`${selected ? "hidden md:flex" : "flex"} w-full md:w-[420px] lg:w-[420px] flex-shrink-0 flex-col border-r border-[#e9edef] dark:border-[#222d34] bg-white dark:bg-[#111b21]`}>
+        <div className={`${selected ? "hidden md:flex" : "flex"} w-full md:w-[420px] lg:w-[420px] flex-shrink-0 flex-col border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900`}>
           {/* List header (59px, like WhatsApp) */}
-          <div className="h-[59px] bg-[#f0f2f5] dark:bg-[#202c33] flex items-center justify-between px-3 md:px-4 flex-shrink-0 relative">
+          <div className="h-[59px] bg-gray-100 dark:bg-gray-800 flex items-center justify-between px-3 md:px-4 flex-shrink-0 relative">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-10 h-10 rounded-full bg-[#00a884] flex items-center justify-center text-white font-semibold text-[15px] flex-shrink-0">
+              <div className="w-10 h-10 rounded-full bg-primary-600 flex items-center justify-center text-white font-semibold text-[15px] flex-shrink-0">
                 {initials(displayName, "")}
               </div>
-              <span className="font-semibold text-[15px] text-[#111b21] dark:text-[#e9edef] truncate hidden sm:block">
+              <span className="font-semibold text-[15px] text-gray-900 dark:text-gray-200 truncate hidden sm:block">
                 {displayName}
               </span>
             </div>
             <div className="flex items-center gap-0.5">
               {/* The email inbox is its own screen; this jumps straight to it. */}
               <Link to="/email-inbox" title="Open the Email inbox"
-                className="h-10 px-2.5 flex items-center gap-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-[#54656f] dark:text-[#aebac1] text-[13px]">
+                className="h-10 px-2.5 flex items-center gap-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-gray-600 dark:text-gray-400 text-[13px]">
                 <Mail size={18} />
                 {emailUnread > 0 && (
-                  <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-[#00a884] text-white text-[11px] flex items-center justify-center">
+                  <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-primary-600 text-white text-[11px] flex items-center justify-center">
                     {emailUnread}
                   </span>
                 )}
               </Link>
               <button onClick={doPoll} disabled={polling} title="Sync from phone"
-                className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-[#54656f] dark:text-[#aebac1]">
+                className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-gray-600 dark:text-gray-400">
                 <span className={`text-[20px] leading-none ${polling ? "animate-spin inline-block" : ""}`}>↻</span>
               </button>
               <button onClick={doPollDebug} disabled={debugLoading} title="Receive-path diagnostic"
-                className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-[#54656f] dark:text-[#aebac1]">
+                className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-gray-600 dark:text-gray-400">
                 <Bug size={19} />
               </button>
               <div className="relative">
                 <button onClick={() => setShowMenu(!showMenu)} title="Menu"
-                  className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-[#54656f] dark:text-[#aebac1]">
+                  className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-gray-600 dark:text-gray-400">
                   <MoreVertical size={19} />
                 </button>
                 {showMenu && (
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
-                    <div className="absolute right-0 top-11 bg-white dark:bg-[#233138] rounded-lg shadow-xl border border-gray-200 dark:border-[#222d34] py-1.5 w-52 z-50">
+                    <div className="absolute right-0 top-11 bg-white dark:bg-gray-700 rounded-lg shadow-xl border border-gray-200 dark:border-gray-800 py-1.5 w-52 z-50">
                       {menuItems.map(it => (
                         <Link key={it.to} to={it.to} onClick={() => setShowMenu(false)}
-                          className="w-full flex items-center gap-3 px-3 py-2.5 text-[14px] text-[#111b21] dark:text-[#e9edef] hover:bg-[#f0f2f5] dark:hover:bg-[#182533]">
-                          <it.icon size={16} className="text-[#54656f] dark:text-[#aebac1]" /> {it.label}
+                          className="w-full flex items-center gap-3 px-3 py-2.5 text-[14px] text-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800">
+                          <it.icon size={16} className="text-gray-600 dark:text-gray-400" /> {it.label}
                         </Link>
                       ))}
-                      <div className="border-t border-gray-100 dark:border-[#222d34] my-1" />
+                      <div className="border-t border-gray-100 dark:border-gray-800 my-1" />
                       <button onClick={handleLogout}
-                        className="w-full flex items-center gap-3 px-3 py-2.5 text-[14px] text-red-600 dark:text-red-400 hover:bg-[#f0f2f5] dark:hover:bg-[#182533]">
+                        className="w-full flex items-center gap-3 px-3 py-2.5 text-[14px] text-danger-600 dark:text-danger-400 hover:bg-gray-100 dark:hover:bg-gray-800">
                         <LogOut size={16} /> Log out
                       </button>
                     </div>
@@ -511,11 +511,11 @@ export default function InboxPage() {
           </div>
 
           {/* Search (WhatsApp: grey pill, 8px inset) */}
-          <div className="px-2 md:px-3 py-2 bg-white dark:bg-[#111b21] border-b border-[#e9edef] dark:border-[#222d34] flex-shrink-0">
+          <div className="px-2 md:px-3 py-2 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex-shrink-0">
             <div className="relative">
-              <SearchIcon size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#54656f] dark:text-[#8696a0]" />
+              <SearchIcon size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600 dark:text-gray-400" />
               <input
-                className="w-full pl-9 pr-3 py-[7px] bg-[#f0f2f5] dark:bg-[#202c33] rounded-lg text-[14px] placeholder:text-[#667781] dark:placeholder:text-[#8696a0] focus:outline-none text-[#111b21] dark:text-[#e9edef]"
+                className="w-full pl-9 pr-3 py-[7px] bg-gray-100 dark:bg-gray-800 rounded-lg text-[14px] placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:outline-none text-gray-900 dark:text-gray-200"
                 placeholder="Search or start new chat"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
@@ -524,7 +524,7 @@ export default function InboxPage() {
           </div>
 
           {/* Filter chips (WhatsApp-style pills) */}
-          <div className="px-2 md:px-3 py-2 bg-white dark:bg-[#111b21] flex gap-2 overflow-x-auto scrollbar-none flex-shrink-0">
+          <div className="px-2 md:px-3 py-2 bg-white dark:bg-gray-900 flex gap-2 overflow-x-auto scrollbar-none flex-shrink-0">
             {filters.map(f => {
               const active = filter === f.v;
               return (
@@ -532,7 +532,7 @@ export default function InboxPage() {
                   key={f.v}
                   onClick={() => { setFilter(f.v); setSelected(null); }}
                   className={`whitespace-nowrap px-3 py-1.5 rounded-full text-[13px] font-medium transition-colors flex-shrink-0
-                    ${active ? "bg-[#00a884] text-white shadow-sm" : "bg-[#f0f2f5] dark:bg-[#182533] text-[#54656f] dark:text-[#8696a0] hover:bg-[#e9edef] dark:hover:bg-[#202c33]"}`}
+                    ${active ? "bg-primary-600 text-white shadow-sm" : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800"}`}
                 >
                   {f.l} {f.v === "unread" && unreadCount > 0 ? ` · ${unreadCount}` : ""}
                 </button>
@@ -541,24 +541,24 @@ export default function InboxPage() {
           </div>
 
           {/* Campaign filter — "which campaign are these leads from?" */}
-          <div className="px-2 md:px-3 pb-2 bg-white dark:bg-[#111b21] flex-shrink-0 relative">
+          <div className="px-2 md:px-3 pb-2 bg-white dark:bg-gray-900 flex-shrink-0 relative">
             {activeCampaign ? (
-              <div className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-[#e7f8f3] dark:bg-[#182533] border border-[#00a884]/30">
+              <div className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-primary-50 dark:bg-gray-800 border border-primary-600/30">
                 <CampaignChip campaign={activeCampaign} />
-                <span className="text-[11px] text-[#54656f] dark:text-[#8696a0] truncate">
+                <span className="text-[11px] text-gray-600 dark:text-gray-400 truncate">
                   {repliedOnly ? "replies only" : "all leads"} · {convs.length}
                 </span>
                 <div className="ml-auto flex items-center gap-1">
                   <button
                     onClick={() => applyCampaignFilter(activeCampaign, !repliedOnly)}
-                    className="text-[11px] font-medium text-[#00a884] hover:underline px-1.5"
+                    className="text-[11px] font-medium text-primary-600 hover:underline px-1.5"
                     title={repliedOnly ? "Show every lead from this campaign" : "Show only leads who replied"}
                   >
                     {repliedOnly ? "All leads" : "Replies"}
                   </button>
                   <button
                     onClick={() => applyCampaignFilter(null)}
-                    className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-[#54656f] dark:text-[#8696a0]"
+                    className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-gray-600 dark:text-gray-400"
                     title="Clear campaign filter"
                   >
                     <XIcon size={13} />
@@ -568,12 +568,12 @@ export default function InboxPage() {
             ) : (
               <button
                 onClick={() => setShowCampaignPicker((v) => !v)}
-                className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg bg-[#f0f2f5] dark:bg-[#202c33] text-[13px] text-[#54656f] dark:text-[#8696a0] hover:bg-[#e9edef] dark:hover:bg-[#2a3942]"
+                className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-[13px] text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
               >
-                <Filter size={14} className="text-[#00a884]" />
+                <Filter size={14} className="text-primary-600" />
                 Filter by campaign
                 {campaignOptions.length > 0 && (
-                  <span className="ml-auto text-[11px] text-[#667781]">{campaignOptions.length}</span>
+                  <span className="ml-auto text-[11px] text-gray-500">{campaignOptions.length}</span>
                 )}
               </button>
             )}
@@ -581,9 +581,9 @@ export default function InboxPage() {
             {showCampaignPicker && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setShowCampaignPicker(false)} />
-                <div className="absolute left-2 right-2 md:left-3 md:right-3 top-full mt-1 z-50 bg-white dark:bg-[#233138] rounded-lg shadow-xl border border-gray-200 dark:border-[#222d34] py-1.5 max-h-[320px] overflow-y-auto wa-scrollbar">
+                <div className="absolute left-2 right-2 md:left-3 md:right-3 top-full mt-1 z-50 bg-white dark:bg-gray-700 rounded-lg shadow-xl border border-gray-200 dark:border-gray-800 py-1.5 max-h-[320px] overflow-y-auto wa-scrollbar">
                   {campaignOptions.length === 0 ? (
-                    <p className="px-3 py-3 text-[12px] text-[#667781] dark:text-[#8696a0]">
+                    <p className="px-3 py-3 text-[12px] text-gray-500 dark:text-gray-400">
                       No campaign has produced leads yet.
                     </p>
                   ) : (
@@ -591,20 +591,20 @@ export default function InboxPage() {
                       <button
                         key={`${c.kind}-${c.id}`}
                         onClick={() => applyCampaignFilter(c)}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-[#f0f2f5] dark:hover:bg-[#182533]"
+                        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-800"
                       >
                         <CampaignChip campaign={c} />
-                        <span className="ml-auto text-[11px] text-[#667781] dark:text-[#8696a0] flex-shrink-0">
+                        <span className="ml-auto text-[11px] text-gray-500 dark:text-gray-400 flex-shrink-0">
                           {c.leads} lead{c.leads === 1 ? "" : "s"} · {c.replies} replied
                         </span>
                       </button>
                     ))
                   )}
-                  <div className="border-t border-gray-100 dark:border-[#222d34] my-1" />
+                  <div className="border-t border-gray-100 dark:border-gray-800 my-1" />
                   <Link
                     to="/overview"
                     onClick={() => setShowCampaignPicker(false)}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-[#00a884] hover:bg-[#f0f2f5] dark:hover:bg-[#182533]"
+                    className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-primary-600 hover:bg-gray-100 dark:hover:bg-gray-800"
                   >
                     <BarChart3 size={14} /> Open campaign overview
                   </Link>
@@ -614,15 +614,15 @@ export default function InboxPage() {
           </div>
 
           {/* Archive-style row */}
-          <div className="px-3 md:px-4 py-2.5 bg-white dark:bg-[#111b21] flex items-center justify-between border-b border-[#f0f2f5] dark:border-[#222d34] flex-shrink-0">
-            <button onClick={doPoll} className="text-[13px] text-[#00a884] font-medium hover:underline flex items-center gap-1.5">
+          <div className="px-3 md:px-4 py-2.5 bg-white dark:bg-gray-900 flex items-center justify-between border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
+            <button onClick={doPoll} className="text-[13px] text-primary-600 font-medium hover:underline flex items-center gap-1.5">
               <span className="text-[14px]">📥</span> Sync from phone
             </button>
-            <span className="text-[11px] text-[#667781] dark:text-[#8696a0]">{convs.length} chats</span>
+            <span className="text-[11px] text-gray-500 dark:text-gray-400">{convs.length} chats</span>
           </div>
 
           {/* Conversation list */}
-          <div className="flex-1 overflow-y-auto wa-scrollbar bg-white dark:bg-[#111b21]">
+          <div className="flex-1 overflow-y-auto wa-scrollbar bg-white dark:bg-gray-900">
             {loading ? (
               [...Array(8)].map((_, i) => (
                 <div key={i} className="flex gap-3 px-3 py-3 animate-pulse">
@@ -635,10 +635,10 @@ export default function InboxPage() {
               ))
             ) : convs.length === 0 ? (
               <div className="text-center py-16 px-6">
-                <MessageCircle size={48} className="mx-auto mb-3 text-[#00a884] opacity-40" />
-                <p className="text-[14px] font-medium text-[#111b21] dark:text-[#e9edef]">No conversations yet</p>
-                <p className="text-[13px] text-[#667781] dark:text-[#8696a0] mt-1">
-                  Tap <b className="text-[#00a884]">↻ Sync</b> to pull messages from your phone.
+                <MessageCircle size={48} className="mx-auto mb-3 text-primary-600 opacity-40" />
+                <p className="text-[14px] font-medium text-gray-900 dark:text-gray-200">No conversations yet</p>
+                <p className="text-[13px] text-gray-500 dark:text-gray-400 mt-1">
+                  Tap <b className="text-primary-600">↻ Sync</b> to pull messages from your phone.
                 </p>
               </div>
             ) : convs.map(c => {
@@ -650,34 +650,34 @@ export default function InboxPage() {
                 <button
                   key={c.id}
                   onClick={() => openChat(c)}
-                  className={`w-full flex gap-3 px-3 py-3 text-left hover:bg-[#f5f6f6] dark:hover:bg-[#202c33] transition-colors relative
-                    ${isActive ? "bg-[#f0f2f5] dark:bg-[#2a3942]" : "bg-white dark:bg-[#111b21]"}`}
+                  className={`w-full flex gap-3 px-3 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors relative
+                    ${isActive ? "bg-gray-100 dark:bg-gray-700" : "bg-white dark:bg-gray-900"}`}
                 >
                   <div className={`w-[49px] h-[49px] rounded-full flex items-center justify-center text-white font-medium text-[15px] flex-shrink-0 ${avatarColor(name)}`}>
                     {initials(name, c.contact_phone)}
                   </div>
-                  <div className="flex-1 min-w-0 flex flex-col justify-center border-b border-[#f0f2f5] dark:border-[#222d34] -mb-3 pb-3">
+                  <div className="flex-1 min-w-0 flex flex-col justify-center border-b border-gray-100 dark:border-gray-800 -mb-3 pb-3">
                     <div className="flex items-baseline justify-between gap-2">
-                      <span className={`truncate text-[16px] leading-5 ${isUnread ? "font-semibold text-[#111b21] dark:text-[#e9edef]" : "font-normal text-[#111b21] dark:text-[#e9edef]"}`}>
+                      <span className={`truncate text-[16px] leading-5 ${isUnread ? "font-semibold text-gray-900 dark:text-gray-200" : "font-normal text-gray-900 dark:text-gray-200"}`}>
                         {name}
                       </span>
-                      <span className={`text-[11px] flex-shrink-0 ml-2 ${isUnread ? "text-[#00a884] font-medium" : "text-[#667781] dark:text-[#8696a0]"}`}>
+                      <span className={`text-[11px] flex-shrink-0 ml-2 ${isUnread ? "text-primary-600 font-medium" : "text-gray-500 dark:text-gray-400"}`}>
                         {formatListTime(c.last_message_at)}
                       </span>
                     </div>
                     <div className="flex items-center justify-between gap-2 mt-0.5">
-                      <p className={`truncate text-[13px] leading-4 flex items-center gap-1 min-w-0 flex-1 ${isUnread ? "text-[#111b21] dark:text-[#e9edef] font-medium" : "text-[#667781] dark:text-[#8696a0]"}`}>
-                        {c.status === "interested" && <Star size={12} className="text-[#f7c948] flex-shrink-0" />}
-                        {!isUnread && c.status !== "interested" && <span className="text-[#54656f] dark:text-[#8696a0] flex-shrink-0">✓✓</span>}
+                      <p className={`truncate text-[13px] leading-4 flex items-center gap-1 min-w-0 flex-1 ${isUnread ? "text-gray-900 dark:text-gray-200 font-medium" : "text-gray-500 dark:text-gray-400"}`}>
+                        {c.status === "interested" && <Star size={12} className="text-warning-400 flex-shrink-0" />}
+                        {!isUnread && c.status !== "interested" && <span className="text-gray-600 dark:text-gray-400 flex-shrink-0">✓✓</span>}
                         <span className="truncate">{preview}</span>
                       </p>
                       <div className="flex items-center gap-1.5 flex-shrink-0">
                         {isUnread ? (
-                          <span className="bg-[#00a884] text-white text-[11px] font-medium min-w-[20px] h-[20px] px-1.5 flex items-center justify-center rounded-full">
+                          <span className="bg-primary-600 text-white text-[11px] font-medium min-w-[20px] h-[20px] px-1.5 flex items-center justify-center rounded-full">
                             {c.unread_count || 1}
                           </span>
                         ) : c.status === "closed" ? (
-                          <Archive size={13} className="text-[#667781] dark:text-[#8696a0]" />
+                          <Archive size={13} className="text-gray-500 dark:text-gray-400" />
                         ) : null}
                       </div>
                     </div>
@@ -693,7 +693,7 @@ export default function InboxPage() {
                           title={`Lead from "${c.campaign.name}" — tap to see every lead from it`}
                         />
                         {c.last_campaign && c.last_campaign.id !== c.campaign.id && (
-                          <span className="text-[9px] text-[#667781] dark:text-[#8696a0]" title={`Last messaged by "${c.last_campaign.name}"`}>
+                          <span className="text-[9px] text-gray-500 dark:text-gray-400" title={`Last messaged by "${c.last_campaign.name}"`}>
                             → {c.last_campaign.name}
                           </span>
                         )}
@@ -707,39 +707,39 @@ export default function InboxPage() {
         </div>
 
         {/* ============ RIGHT — Chat pane ============ */}
-        <div className="flex-1 flex flex-col bg-[#efeae2] dark:bg-[#0b141a] relative overflow-hidden">
+        <div className="flex-1 flex flex-col bg-gray-100 dark:bg-gray-950 relative overflow-hidden">
 
           {/* DEBUG VIEW */}
           {debugData ? (
-            <div className="flex-1 p-4 overflow-y-auto wa-scrollbar bg-white dark:bg-[#111b21]">
+            <div className="flex-1 p-4 overflow-y-auto wa-scrollbar bg-white dark:bg-gray-900">
               <div className="flex items-center justify-between mb-3">
-                <h2 className="font-bold text-[16px] text-[#111b21] dark:text-[#e9edef]">🔍 Receive path diagnostic</h2>
-                <button onClick={() => setDebugData(null)} className="w-8 h-8 rounded-full bg-[#f0f2f5] dark:bg-[#202c33] flex items-center justify-center text-[#54656f]">✕</button>
+                <h2 className="font-bold text-[16px] text-gray-900 dark:text-gray-200">🔍 Receive path diagnostic</h2>
+                <button onClick={() => setDebugData(null)} className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-600">✕</button>
               </div>
               {debugData.error ? (
-                <p className="text-red-600 text-sm">Error: {debugData.error}</p>
+                <p className="text-danger-600 text-sm">Error: {debugData.error}</p>
               ) : (
                 <div className="space-y-3 text-[13px]">
                   {debugData.issues?.length > 0 ? (
-                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
-                      <p className="font-medium mb-1 text-red-700 dark:text-red-400">Problems blocking incoming SMS</p>
-                      <ul className="list-disc ml-4 space-y-1 text-red-700 dark:text-red-300">
+                    <div className="bg-danger-50 dark:bg-danger-900/20 border border-danger-200 dark:border-danger-800 rounded-lg p-3">
+                      <p className="font-medium mb-1 text-danger-700 dark:text-danger-400">Problems blocking incoming SMS</p>
+                      <ul className="list-disc ml-4 space-y-1 text-danger-700 dark:text-danger-300">
                         {debugData.issues.map((i: string, n: number) => (<li key={n}>{i}</li>))}
                       </ul>
                     </div>
                   ) : (
-                    <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3">
-                      <p className="font-medium text-green-700 dark:text-green-400">{debugData.note}</p>
+                    <div className="bg-success-50 dark:bg-success-900/20 border border-success-200 dark:border-success-800 rounded-lg p-3">
+                      <p className="font-medium text-success-700 dark:text-success-400">{debugData.note}</p>
                     </div>
                   )}
-                  <div className="bg-[#f0f2f5] dark:bg-[#202c33] rounded-lg p-3 space-y-1 text-[#111b21] dark:text-[#e9edef]">
+                  <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-3 space-y-1 text-gray-900 dark:text-gray-200">
                     <p className="font-semibold mb-1">Configuration</p>
                     <p>Public URL set: <strong>{String(debugData.config?.public_base_url_set)}</strong></p>
                     <p>Gateway credentials: <strong>{String(debugData.config?.credentials_set)}</strong></p>
                     <p>Signing secret: <strong>{String(debugData.config?.signing_secret_set)}</strong>{debugData.config?.allow_unsigned && " (unsigned allowed)"}</p>
-                    {debugData.webhook_url && <p className="text-[#667781] dark:text-[#8696a0] break-all text-[11px]">Delivering to: <code className="bg-white dark:bg-[#111b21] px-1 rounded">{debugData.webhook_url}</code></p>}
+                    {debugData.webhook_url && <p className="text-gray-500 dark:text-gray-400 break-all text-[11px]">Delivering to: <code className="bg-white dark:bg-gray-900 px-1 rounded">{debugData.webhook_url}</code></p>}
                   </div>
-                  <div className="bg-[#f0f2f5] dark:bg-[#202c33] rounded-lg p-3 space-y-1 text-[#111b21] dark:text-[#e9edef]">
+                  <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-3 space-y-1 text-gray-900 dark:text-gray-200">
                     <p className="font-semibold mb-1">Device & webhooks</p>
                     <p>Devices online: <strong>{debugData.devices?.count ?? 0}</strong></p>
                     <p>Events registered: <strong>{debugData.matching_events?.length ?? 0}</strong> {debugData.matching_events?.join(", ")}</p>
@@ -749,63 +749,63 @@ export default function InboxPage() {
                     <div>
                       <p className="font-semibold mb-1">Last webhooks received</p>
                       {debugData.recent_webhook_events.map((e: any, i: number) => (
-                        <div key={i} className={`mb-1 p-2 rounded text-[12px] ${e.status === "error" ? "bg-red-50 dark:bg-red-900/20" : "bg-green-50 dark:bg-green-900/20"}`}>
+                        <div key={i} className={`mb-1 p-2 rounded text-[12px] ${e.status === "error" ? "bg-danger-50 dark:bg-danger-900/20" : "bg-success-50 dark:bg-success-900/20"}`}>
                           <p><code>{e.event_type}</code> — {e.status} @ {e.at?.slice(11, 19)}</p>
-                          {e.error && <p className="text-red-600">{e.error}</p>}
+                          {e.error && <p className="text-danger-600">{e.error}</p>}
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <p className="text-orange-600">No webhook has ever reached this server.</p>
+                    <p className="text-warning-600">No webhook has ever reached this server.</p>
                   )}
                 </div>
               )}
             </div>
           ) : pollDebug && !selected ? (
-            <div className="flex-1 p-4 overflow-y-auto wa-scrollbar bg-white dark:bg-[#111b21]">
-              <div className="bg-[#f0f2f5] dark:bg-[#202c33] rounded-lg p-3 text-[13px]">
+            <div className="flex-1 p-4 overflow-y-auto wa-scrollbar bg-white dark:bg-gray-900">
+              <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-3 text-[13px]">
                 <p className="font-semibold mb-2">📊 Sync result</p>
                 <div className="space-y-1">
-                  <p>Device online: <strong className={pollDebug.device_online ? "text-[#00a884]" : "text-red-600"}>{String(!!pollDebug.device_online)}</strong></p>
-                  <p>Events registered: <strong className={pollDebug.registered_events?.length ? "text-[#00a884]" : "text-red-600"}>{pollDebug.registered_events?.length || 0}</strong> {pollDebug.registered_events?.join(", ")}</p>
+                  <p>Device online: <strong className={pollDebug.device_online ? "text-primary-600" : "text-danger-600"}>{String(!!pollDebug.device_online)}</strong></p>
+                  <p>Events registered: <strong className={pollDebug.registered_events?.length ? "text-primary-600" : "text-danger-600"}>{pollDebug.registered_events?.length || 0}</strong> {pollDebug.registered_events?.join(", ")}</p>
                   <p>History replay triggered: <strong>{String(!!pollDebug.export_triggered)}</strong></p>
                   <p>Delivery statuses updated: <strong>{pollDebug.outgoing_updated || 0}</strong></p>
                   <p>Outgoing checked: {pollDebug.total_api_messages || 0}</p>
-                  {pollDebug.webhook_url && <p className="mt-1 text-[#667781] break-all text-[11px]">Webhook: <code className="bg-white dark:bg-[#111b21] px-1 rounded">{pollDebug.webhook_url}</code></p>}
-                  {pollDebug.error && <p className="text-red-600 mt-1">Error: {pollDebug.error}</p>}
+                  {pollDebug.webhook_url && <p className="mt-1 text-gray-500 break-all text-[11px]">Webhook: <code className="bg-white dark:bg-gray-900 px-1 rounded">{pollDebug.webhook_url}</code></p>}
+                  {pollDebug.error && <p className="text-danger-600 mt-1">Error: {pollDebug.error}</p>}
                   {pollDebug.problems?.length > 0 && (
-                    <div className="mt-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded p-2">
-                      <p className="font-medium text-red-700 dark:text-red-400 mb-1">Needs attention</p>
+                    <div className="mt-2 bg-danger-50 dark:bg-danger-900/20 border border-danger-200 dark:border-danger-800 rounded p-2">
+                      <p className="font-medium text-danger-700 dark:text-danger-400 mb-1">Needs attention</p>
                       <ul className="list-disc ml-4 space-y-1">{pollDebug.problems.map((p: string, i: number) => (<li key={i}>{p}</li>))}</ul>
                     </div>
                   )}
-                  {pollDebug.note && <p className="text-[#00a884] mt-1">{pollDebug.note}</p>}
+                  {pollDebug.note && <p className="text-primary-600 mt-1">{pollDebug.note}</p>}
                 </div>
               </div>
               <div className="mt-4 text-center">
-                <button onClick={doPollDebug} className="text-[13px] text-[#00a884] hover:underline">🔍 Full diagnostic</button>
-                <p className="text-[13px] text-[#667781] mt-2">Select a chat on the left</p>
+                <button onClick={doPollDebug} className="text-[13px] text-primary-600 hover:underline">🔍 Full diagnostic</button>
+                <p className="text-[13px] text-gray-500 mt-2">Select a chat on the left</p>
               </div>
             </div>
           ) : selected ? (
             <>
               {/* Chat header (59px) */}
-              <div className="h-[59px] bg-[#f0f2f5] dark:bg-[#202c33] flex items-center justify-between px-2 md:px-4 border-l border-[#e9edef] dark:border-[#222d34] flex-shrink-0 relative z-20">
+              <div className="h-[59px] bg-gray-100 dark:bg-gray-800 flex items-center justify-between px-2 md:px-4 border-l border-gray-200 dark:border-gray-800 flex-shrink-0 relative z-20">
                 <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <button className="md:hidden w-9 h-9 -ml-1 flex items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-[#54656f] dark:text-[#aebac1]" onClick={() => { setSelected(null); setShowActions(false); }}>
+                  <button className="md:hidden w-9 h-9 -ml-1 flex items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-gray-600 dark:text-gray-400" onClick={() => { setSelected(null); setShowActions(false); }}>
                     <ChevronLeft size={22} />
                   </button>
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-medium text-[15px] flex-shrink-0 ${avatarColor(selected.contact_name || selected.contact_phone)}`}>
                     {initials(selected.contact_name || "", selected.contact_phone || "")}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <h2 className="font-semibold text-[16px] leading-5 text-[#111b21] dark:text-[#e9edef] truncate">
+                    <h2 className="font-semibold text-[16px] leading-5 text-gray-900 dark:text-gray-200 truncate">
                       {selected.contact_name || selected.contact_phone}
                     </h2>
-                    <p className="text-[12px] text-[#667781] dark:text-[#8696a0] truncate flex items-center gap-1.5">
+                    <p className="text-[12px] text-gray-500 dark:text-gray-400 truncate flex items-center gap-1.5">
                       {selected.contact_phone}
-                      {selected.unread_count > 0 && <span className="bg-[#00a884] text-white text-[10px] px-1.5 py-px rounded-full ml-1">{selected.unread_count} new</span>}
-                      {selected.status === "interested" && <span className="text-[#f7c948]">★ interested</span>}
+                      {selected.unread_count > 0 && <span className="bg-primary-600 text-white text-[10px] px-1.5 py-px rounded-full ml-1">{selected.unread_count} new</span>}
+                      {selected.status === "interested" && <span className="text-warning-400">★ interested</span>}
                       {/* Where this lead came from, right in the chat header. */}
                       {selected.campaign && (
                         <CampaignChip
@@ -826,49 +826,49 @@ export default function InboxPage() {
                       startCall(cid ? { contact_id: cid } : { phone_number: selected.contact_phone });
                     }}
                     title={`Call ${selected.contact_phone} (via your phone)`}
-                    className="flex w-10 h-10 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-[#00a884]"
+                    className="flex w-10 h-10 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-primary-600"
                   ><Phone size={19} /></button>
                   {/* WhatsApp video/voice call entry */}
                   <button
                     onClick={() => openWhatsappForCall(selected.contact_phone, selected.contact_name)}
                     title="WhatsApp call (opens WhatsApp)"
-                    className="flex w-10 h-10 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-[#54656f] dark:text-[#aebac1]"
+                    className="flex w-10 h-10 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-gray-600 dark:text-gray-400"
                   ><Video size={19} /></button>
                   {/* WhatsApp chat */}
                   <button
                     onClick={() => openWhatsappChat(selected.contact_phone)}
                     title="Open WhatsApp chat"
-                    className="flex w-10 h-10 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-[#25D366]"
+                    className="flex w-10 h-10 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-primary-600"
                   ><MessageCircle size={19} /></button>
                   {/* Website, when the contact has one */}
                   {websiteUrl(selected.contact?.website) && (
                     <button
                       onClick={() => openWebsite(selected.contact.website)}
                       title="Open website"
-                      className="hidden sm:flex w-10 h-10 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-[#0066cc]"
+                      className="hidden sm:flex w-10 h-10 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-primary-600"
                     ><Globe size={19} /></button>
                   )}
                   <button
                     onClick={() => setShowBooking(true)}
                     title="Book a meeting"
-                    className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-[#00a884]"
+                    className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-primary-600"
                   >
                     <CalendarPlus size={19} />
                   </button>
                   <div className="relative">
-                    <button onClick={() => setShowActions(!showActions)} className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-[#54656f] dark:text-[#aebac1]">
+                    <button onClick={() => setShowActions(!showActions)} className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-gray-600 dark:text-gray-400">
                       <MoreVertical size={19} />
                     </button>
                     {showActions && (
                       <>
                         <div className="fixed inset-0 z-40" onClick={() => setShowActions(false)} />
-                        <div className="absolute right-0 top-11 bg-white dark:bg-[#233138] rounded-lg shadow-xl border border-gray-200 dark:border-[#222d34] py-1.5 w-52 z-50">
-                          <button onClick={() => { setShowBooking(true); setShowActions(false); }} className="w-full text-left px-3 py-2.5 text-[14px] text-[#111b21] dark:text-[#e9edef] hover:bg-[#f0f2f5] dark:hover:bg-[#182533] flex items-center gap-2.5"><CalendarPlus size={16} className="text-[#00a884]" /> Book a meeting</button>
-                          <button onClick={() => { markAs("interested"); setShowActions(false); }} className="w-full text-left px-3 py-2.5 text-[14px] text-[#111b21] dark:text-[#e9edef] hover:bg-[#f0f2f5] dark:hover:bg-[#182533] flex items-center gap-2.5"><Star size={16} className="text-[#f7c948]" /> Mark interested</button>
-                          <button onClick={() => { markAs("not-interested"); setShowActions(false); }} className="w-full text-left px-3 py-2.5 text-[14px] text-[#111b21] dark:text-[#e9edef] hover:bg-[#f0f2f5] dark:hover:bg-[#182533] flex items-center gap-2.5"><ThumbsDown size={16} className="text-[#667781]" /> Not interested</button>
-                          <button onClick={() => { markAs("close"); setShowActions(false); }} className="w-full text-left px-3 py-2.5 text-[14px] text-[#111b21] dark:text-[#e9edef] hover:bg-[#f0f2f5] dark:hover:bg-[#182533] flex items-center gap-2.5"><Archive size={16} className="text-[#667781]" /> Close chat</button>
-                          <div className="border-t border-gray-100 dark:border-[#222d34] my-1" />
-                          <button onClick={() => { setShowInfo(!showInfo); setShowActions(false); }} className="w-full text-left px-3 py-2.5 text-[14px] text-[#111b21] dark:text-[#e9edef] hover:bg-[#f0f2f5] dark:hover:bg-[#182533]">Contact info</button>
+                        <div className="absolute right-0 top-11 bg-white dark:bg-gray-700 rounded-lg shadow-xl border border-gray-200 dark:border-gray-800 py-1.5 w-52 z-50">
+                          <button onClick={() => { setShowBooking(true); setShowActions(false); }} className="w-full text-left px-3 py-2.5 text-[14px] text-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-2.5"><CalendarPlus size={16} className="text-primary-600" /> Book a meeting</button>
+                          <button onClick={() => { markAs("interested"); setShowActions(false); }} className="w-full text-left px-3 py-2.5 text-[14px] text-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-2.5"><Star size={16} className="text-warning-400" /> Mark interested</button>
+                          <button onClick={() => { markAs("not-interested"); setShowActions(false); }} className="w-full text-left px-3 py-2.5 text-[14px] text-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-2.5"><ThumbsDown size={16} className="text-gray-500" /> Not interested</button>
+                          <button onClick={() => { markAs("close"); setShowActions(false); }} className="w-full text-left px-3 py-2.5 text-[14px] text-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-2.5"><Archive size={16} className="text-gray-500" /> Close chat</button>
+                          <div className="border-t border-gray-100 dark:border-gray-800 my-1" />
+                          <button onClick={() => { setShowInfo(!showInfo); setShowActions(false); }} className="w-full text-left px-3 py-2.5 text-[14px] text-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800">Contact info</button>
                         </div>
                       </>
                     )}
@@ -877,7 +877,7 @@ export default function InboxPage() {
               </div>
 
               {showInfo && selected?.contact && (
-                <div className="px-4 py-3 bg-[#fff8e1] dark:bg-[#182533] border-b border-[#ffe082] dark:border-[#2a3942] text-[13px] space-y-1 z-10">
+                <div className="px-4 py-3 bg-warning-100 dark:bg-gray-800 border-b border-warning-200 dark:border-gray-700 text-[13px] space-y-1 z-10">
                   {selected.contact.business_name && <p><strong>Business:</strong> {selected.contact.business_name}</p>}
                   {selected.contact.city && <p><strong>Location:</strong> {selected.contact.city}{selected.contact.state ? `, ${selected.contact.state}` : ""}</p>}
                   <p><strong>Phone:</strong> {selected.contact.phone_number}</p>
@@ -894,48 +894,48 @@ export default function InboxPage() {
                         const cid = selected.contact?.id || selected.contact_id;
                         startCall(cid ? { contact_id: cid } : { phone_number: selected.contact_phone });
                       }}
-                      className="flex items-center gap-1.5 bg-[#00a884] text-white text-[12px] font-semibold px-3 py-1.5 rounded-full"
+                      className="flex items-center gap-1.5 bg-primary-600 text-white text-[12px] font-semibold px-3 py-1.5 rounded-full"
                     ><Phone size={13} /> Call</button>
                     <button
                       onClick={() => openWhatsappChat(selected.contact_phone)}
-                      className="flex items-center gap-1.5 bg-[#25D366] text-white text-[12px] font-semibold px-3 py-1.5 rounded-full"
+                      className="flex items-center gap-1.5 bg-primary-600 text-white text-[12px] font-semibold px-3 py-1.5 rounded-full"
                     ><MessageCircle size={13} /> WhatsApp</button>
                     <button
                       onClick={() => openWhatsappForCall(selected.contact_phone, selected.contact_name)}
-                      className="flex items-center gap-1.5 bg-[#128C7E] text-white text-[12px] font-semibold px-3 py-1.5 rounded-full"
+                      className="flex items-center gap-1.5 bg-primary-700 text-white text-[12px] font-semibold px-3 py-1.5 rounded-full"
                     ><Video size={13} /> WhatsApp call</button>
                     {websiteUrl(selected.contact.website) && (
                       <button
                         onClick={() => openWebsite(selected.contact.website)}
-                        className="flex items-center gap-1.5 bg-[#0066cc] text-white text-[12px] font-semibold px-3 py-1.5 rounded-full"
+                        className="flex items-center gap-1.5 bg-primary-600 text-white text-[12px] font-semibold px-3 py-1.5 rounded-full"
                       ><Globe size={13} /> Website</button>
                     )}
                   </div>
                 </div>
               )}
               {showInfo && (
-                <div className="px-4 py-3 bg-white dark:bg-[#111b21] border-b border-[#e9edef] dark:border-[#222d34] z-10">
+                <div className="px-4 py-3 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 z-10">
                   <div className="flex items-center justify-between mb-1.5">
-                    <p className="text-[13px] font-semibold text-[#111b21] dark:text-[#e9edef]">Upcoming meetings</p>
+                    <p className="text-[13px] font-semibold text-gray-900 dark:text-gray-200">Upcoming meetings</p>
                     <button
                       onClick={() => setShowBooking(true)}
-                      className="text-[12px] font-medium text-[#00a884] hover:underline flex items-center gap-1"
+                      className="text-[12px] font-medium text-primary-600 hover:underline flex items-center gap-1"
                     >
                       <CalendarPlus size={13} /> Book
                     </button>
                   </div>
                   {contactMeetings.length === 0 ? (
-                    <p className="text-[12px] text-[#667781] dark:text-[#8696a0]">None booked yet.</p>
+                    <p className="text-[12px] text-gray-500 dark:text-gray-400">None booked yet.</p>
                   ) : (
                     <div className="space-y-1">
                       {contactMeetings.map(m => (
                         <button
                           key={m.id}
                           onClick={() => setEditingMeetingId(m.id)}
-                          className="w-full text-left text-[12px] px-2.5 py-1.5 rounded-lg bg-[#f0f2f5] dark:bg-[#202c33] hover:bg-[#e9edef] dark:hover:bg-[#2a3942] flex items-center justify-between gap-2"
+                          className="w-full text-left text-[12px] px-2.5 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 flex items-center justify-between gap-2"
                         >
-                          <span className="font-medium text-[#111b21] dark:text-[#e9edef] truncate">{m.title}</span>
-                          <span className="text-[#667781] dark:text-[#8696a0] flex-shrink-0">
+                          <span className="font-medium text-gray-900 dark:text-gray-200 truncate">{m.title}</span>
+                          <span className="text-gray-500 dark:text-gray-400 flex-shrink-0">
                             {new Date(m.starts_at).toLocaleDateString([], { day: "numeric", month: "short" })}{" "}
                             {new Date(m.starts_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                           </span>
@@ -950,13 +950,13 @@ export default function InboxPage() {
               <div
                 className="flex-1 overflow-y-auto wa-scrollbar px-2 md:px-[6%] lg:px-[9%] py-3 relative"
                 onScroll={onChatScroll}
-                style={{ backgroundColor: "#efeae2", backgroundImage: CHAT_BG }}
+                style={{ backgroundColor: "#eff3f9", backgroundImage: CHAT_BG }}
               >
-                <div className="absolute inset-0 bg-[#0b141a] opacity-0 dark:opacity-100 pointer-events-none" />
+                <div className="absolute inset-0 bg-gray-950 opacity-0 dark:opacity-100 pointer-events-none" />
                 <div className="relative z-10 flex flex-col">
                   {messages.length === 0 ? (
                     <div className="flex justify-center my-10">
-                      <div className="bg-white dark:bg-[#182533] text-[#54656f] dark:text-[#8696a0] text-[12.5px] px-3 py-2 rounded-lg shadow-sm max-w-[85%] text-center">
+                      <div className="bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-[12.5px] px-3 py-2 rounded-lg shadow-sm max-w-[85%] text-center">
                         🔒 Messages are secured. This chat is with <strong>{selected.contact_name || selected.contact_phone}</strong>. Be respectful and avoid spam.
                       </div>
                     </div>
@@ -969,13 +969,13 @@ export default function InboxPage() {
                     const showDate = i === 0 || !isSameDay(messages[i - 1]?.created_at, m.created_at);
                     const bubble =
                       isOut
-                        ? "bg-[#d9fdd3] dark:bg-[#005c4b] rounded-tr-none text-[#111b21] dark:text-[#e9edef]"
-                        : "bg-white dark:bg-[#202c33] rounded-tl-none text-[#111b21] dark:text-[#e9edef]";
+                        ? "bg-primary-100 dark:bg-primary-800 rounded-tr-none text-gray-900 dark:text-gray-200"
+                        : "bg-white dark:bg-gray-800 rounded-tl-none text-gray-900 dark:text-gray-200";
                     return (
                       <div key={m.id}>
                         {showDate && (
                           <div className="flex justify-center my-2.5">
-                            <span className="bg-white dark:bg-[#182533] text-[#54656f] dark:text-[#8696a0] text-[12.5px] px-3 py-1 rounded-lg shadow-sm">
+                            <span className="bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-[12.5px] px-3 py-1 rounded-lg shadow-sm">
                               {dayLabel(m.created_at)}
                             </span>
                           </div>
@@ -984,18 +984,18 @@ export default function InboxPage() {
                           <div className={`relative max-w-[82%] sm:max-w-[65%] px-2 pt-1.5 pb-1 rounded-lg shadow-sm text-[14.2px] leading-[19px] break-words ${bubble}`}>
                             {g.isLast && (
                               <span
-                                className={`absolute top-0 w-3 h-3 ${isOut ? "right-[-6px] bg-[#d9fdd3] dark:bg-[#005c4b]" : "left-[-6px] bg-white dark:bg-[#202c33]"}`}
+                                className={`absolute top-0 w-3 h-3 ${isOut ? "right-[-6px] bg-primary-100 dark:bg-primary-800" : "left-[-6px] bg-white dark:bg-gray-800"}`}
                                 style={{ clipPath: isOut ? "polygon(0 0, 100% 0, 0 100%)" : "polygon(100% 0, 0 0, 100% 100%)" }}
                               />
                             )}
                             <p className="whitespace-pre-wrap break-words pr-6">{m.body}</p>
                             {isFailed && m.last_error && (
-                              <p className="text-[11px] mt-1 text-red-600 dark:text-red-300 bg-red-50 dark:bg-red-900/20 px-1.5 py-0.5 rounded">⚠ {m.last_error}</p>
+                              <p className="text-[11px] mt-1 text-danger-600 dark:text-danger-300 bg-danger-50 dark:bg-danger-900/20 px-1.5 py-0.5 rounded">⚠ {m.last_error}</p>
                             )}
                             {!isOut && (
-                              <div className="text-[10px] mt-1 flex flex-wrap items-center gap-1 text-[#54656f] dark:text-[#8696a0]">
+                              <div className="text-[10px] mt-1 flex flex-wrap items-center gap-1 text-gray-600 dark:text-gray-400">
                                 {m.ai_sentiment && (
-                                  <span className={`px-1.5 py-0.5 rounded-full ${m.ai_sentiment === "positive" ? "bg-[#d9fdd3] text-[#008069]" : m.ai_sentiment === "negative" ? "bg-[#fce8e6] text-[#c5221f]" : "bg-[#f0f2f5] text-[#54656f]"}`}>
+                                  <span className={`px-1.5 py-0.5 rounded-full ${m.ai_sentiment === "positive" ? "bg-primary-100 text-primary-700" : m.ai_sentiment === "negative" ? "bg-danger-100 text-danger-700" : "bg-gray-100 text-gray-600"}`}>
                                     AI: {m.ai_sentiment}{m.ai_intent && m.ai_intent !== "general" ? ` · ${m.ai_intent.replace(/_/g, " ")}` : ""}
                                   </span>
                                 )}
@@ -1004,7 +1004,7 @@ export default function InboxPage() {
                                   onClick={() => rateReply(m.id, "good")}
                                   aria-label="Mark as good reply"
                                   title="Good reply"
-                                  className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full border ${m.ai_sentiment === "positive" ? "bg-[#008069] text-white border-[#008069]" : "border-[#d1d7db] hover:bg-[#d9fdd3]"}`}
+                                  className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full border ${m.ai_sentiment === "positive" ? "bg-primary-700 text-white border-primary-700" : "border-gray-300 hover:bg-primary-100"}`}
                                 >
                                   <ThumbsUp size={11} /> Good
                                 </button>
@@ -1013,20 +1013,20 @@ export default function InboxPage() {
                                   onClick={() => rateReply(m.id, "bad")}
                                   aria-label="Mark as bad reply and opt out"
                                   title="Bad reply — opt out lead"
-                                  className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full border ${m.ai_sentiment === "negative" ? "bg-[#c5221f] text-white border-[#c5221f]" : "border-[#d1d7db] hover:bg-[#fce8e6]"}`}
+                                  className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full border ${m.ai_sentiment === "negative" ? "bg-danger-700 text-white border-danger-700" : "border-gray-300 hover:bg-danger-100"}`}
                                 >
                                   <ThumbsDown size={11} /> Bad
                                 </button>
                               </div>
                             )}
                             {g.isLast && (
-                              <div className={`flex items-center gap-1 justify-end mt-0.5 text-[11px] select-none ${isOut ? "text-[#667781] dark:text-[#8696a0]" : "text-[#667781] dark:text-[#8696a0]"}`}>
+                              <div className={`flex items-center gap-1 justify-end mt-0.5 text-[11px] select-none ${isOut ? "text-gray-500 dark:text-gray-400" : "text-gray-500 dark:text-gray-400"}`}>
                                 <span>{formatTime(m.created_at)}</span>
                                 {isOut && (
                                   <span className="flex items-center">
-                                    {isFailed ? <span className="text-red-500">⚠ failed</span>
-                                      : isDelivered ? <CheckCheck size={14} className="text-[#53bdeb]" />
-                                      : isSent ? <CheckCheck size={14} className="text-[#8696a0]" />
+                                    {isFailed ? <span className="text-danger-500">⚠ failed</span>
+                                      : isDelivered ? <CheckCheck size={14} className="text-primary-400" />
+                                      : isSent ? <CheckCheck size={14} className="text-gray-400" />
                                       : <span className="text-[11px]">✓</span>}
                                   </span>
                                 )}
@@ -1043,8 +1043,8 @@ export default function InboxPage() {
 
               {/* Template picker: selecting one inserts a contact-personalized,
                   editable preview into the composer. */}
-              <div className="bg-[#f0f2f5] dark:bg-[#202c33] px-2 md:px-4 pt-2 flex items-center gap-2 flex-shrink-0 border-t border-[#d8dcdf] dark:border-[#2a3942]">
-                <FileText size={16} className="text-[#00a884] flex-shrink-0" />
+              <div className="bg-gray-100 dark:bg-gray-800 px-2 md:px-4 pt-2 flex items-center gap-2 flex-shrink-0 border-t border-gray-300 dark:border-gray-700">
+                <FileText size={16} className="text-primary-600 flex-shrink-0" />
                 <label htmlFor="reply-template" className="sr-only">Reply with a template</label>
                 <select
                   id="reply-template"
@@ -1052,7 +1052,7 @@ export default function InboxPage() {
                   value={selectedTemplateId}
                   disabled={templateLoading}
                   onChange={e => chooseTemplate(e.target.value)}
-                  className="min-w-0 flex-1 sm:max-w-sm bg-white dark:bg-[#2a3942] text-[#111b21] dark:text-[#e9edef] rounded-lg px-3 py-2 text-[13px] outline-none border border-transparent focus:border-[#00a884] disabled:opacity-60"
+                  className="min-w-0 flex-1 sm:max-w-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200 rounded-lg px-3 py-2 text-[13px] outline-none border border-transparent focus:border-primary-600 disabled:opacity-60"
                 >
                   <option value="">{templateLoading ? "Personalizing template…" : "Choose a reply template…"}</option>
                   {templates.map(template => (
@@ -1073,7 +1073,7 @@ export default function InboxPage() {
                   <button
                     type="button"
                     onClick={() => setSelectedTemplateId("")}
-                    className="text-[12px] text-[#667781] hover:text-[#111b21] dark:hover:text-white px-2"
+                    className="text-[12px] text-gray-500 hover:text-gray-900 dark:hover:text-white px-2"
                     title="Keep the text but unlink the template"
                   >
                     Unlink
@@ -1082,13 +1082,13 @@ export default function InboxPage() {
               </div>
 
               {/* Composer — pinned above the mobile keyboard via 100dvh shell */}
-              <div className="bg-[#f0f2f5] dark:bg-[#202c33] px-2 md:px-4 py-2 flex items-end gap-1.5 flex-shrink-0 safe-bottom">
-                <button className="hidden sm:flex w-10 h-10 items-center justify-center rounded-full text-[#54656f] dark:text-[#8696a0] hover:bg-black/5 dark:hover:bg-white/10 flex-shrink-0"><Smile size={22} /></button>
-                <button className="hidden sm:flex w-10 h-10 items-center justify-center rounded-full text-[#54656f] dark:text-[#8696a0] hover:bg-black/5 dark:hover:bg-white/10 flex-shrink-0"><Paperclip size={20} /></button>
-                <div className="flex-1 bg-white dark:bg-[#2a3942] rounded-[8px] flex items-end gap-2 px-2.5 py-1 shadow-sm min-h-[42px]">
+              <div className="bg-gray-100 dark:bg-gray-800 px-2 md:px-4 py-2 flex items-end gap-1.5 flex-shrink-0 safe-bottom">
+                <button className="hidden sm:flex w-10 h-10 items-center justify-center rounded-full text-gray-600 dark:text-gray-400 hover:bg-black/5 dark:hover:bg-white/10 flex-shrink-0"><Smile size={22} /></button>
+                <button className="hidden sm:flex w-10 h-10 items-center justify-center rounded-full text-gray-600 dark:text-gray-400 hover:bg-black/5 dark:hover:bg-white/10 flex-shrink-0"><Paperclip size={20} /></button>
+                <div className="flex-1 bg-white dark:bg-gray-700 rounded-[8px] flex items-end gap-2 px-2.5 py-1 shadow-sm min-h-[42px]">
                   <textarea
                     ref={taRef}
-                    className="flex-1 bg-transparent border-none outline-none resize-none py-[9px] text-[15px] leading-5 placeholder:text-[#667781] dark:placeholder:text-[#8696a0] text-[#111b21] dark:text-[#e9edef] max-h-[120px]"
+                    className="flex-1 bg-transparent border-none outline-none resize-none py-[9px] text-[15px] leading-5 placeholder:text-gray-500 dark:placeholder:text-gray-400 text-gray-900 dark:text-gray-200 max-h-[120px]"
                     placeholder="Type a message"
                     rows={1}
                     value={replyText}
@@ -1105,7 +1105,7 @@ export default function InboxPage() {
                 <button
                   onClick={sendReply}
                   disabled={sending || !replyText.trim()}
-                  className={`w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 shadow-sm transition-colors ${replyText.trim() ? "bg-[#00a884] hover:bg-[#06cf9c] text-white" : "bg-[#00a884] text-white opacity-70"}`}
+                  className={`w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 shadow-sm transition-colors ${replyText.trim() ? "bg-primary-600 hover:bg-primary-500 text-white" : "bg-primary-600 text-white opacity-70"}`}
                 >
                   {sending
                     ? <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -1115,21 +1115,21 @@ export default function InboxPage() {
             </>
           ) : (
             /* Empty state — WhatsApp Web's iconic landing screen */
-            <div className="flex-1 flex flex-col items-center justify-center bg-[#f0f2f5] dark:bg-[#222e35] p-6">
-              <div className="w-[200px] h-[200px] lg:w-[303px] lg:h-[303px] mx-auto mb-6 rounded-full bg-[#f0f2f5] dark:bg-[#182533] flex items-center justify-center border border-[#e9edef] dark:border-[#222d34] shadow-sm">
-                <MessageCircle size={110} className="text-[#41525d] dark:text-[#8696a0] opacity-20" />
+            <div className="flex-1 flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-800 p-6">
+              <div className="w-[200px] h-[200px] lg:w-[303px] lg:h-[303px] mx-auto mb-6 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center border border-gray-200 dark:border-gray-800 shadow-sm">
+                <MessageCircle size={110} className="text-gray-600 dark:text-gray-400 opacity-20" />
               </div>
-              <h3 className="text-[28px] font-light text-[#41525d] dark:text-[#e9edef] tracking-tight">SMS SENDER</h3>
-              <p className="text-[13px] text-[#667781] dark:text-[#8696a0] mt-2 leading-5 text-center max-w-sm">
+              <h3 className="text-[28px] font-light text-gray-600 dark:text-gray-200 tracking-tight">SMS SENDER</h3>
+              <p className="text-[13px] text-gray-500 dark:text-gray-400 mt-2 leading-5 text-center max-w-sm">
                 Select a chat to start messaging. Your messages are synced from your phone via SMS-Gate.
               </p>
               <div className="mt-6 flex items-center gap-2">
                 <button onClick={doPoll} disabled={polling}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#00a884] text-white text-[14px] font-medium hover:bg-[#06cf9c] transition-colors disabled:opacity-70">
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-primary-600 text-white text-[14px] font-medium hover:bg-primary-500 transition-colors disabled:opacity-70">
                   <span className={`text-[16px] ${polling ? "animate-spin inline-block" : ""}`}>↻</span> Sync from phone
                 </button>
               </div>
-              <p className="text-[12px] text-[#667781] dark:text-[#8696a0] mt-6 flex items-center justify-center gap-1">
+              <p className="text-[12px] text-gray-500 dark:text-gray-400 mt-6 flex items-center justify-center gap-1">
                 🔒 End-to-end synced with your device
               </p>
             </div>

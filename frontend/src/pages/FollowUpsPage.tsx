@@ -301,7 +301,7 @@ export default function FollowUpsPage() {
                           Sequence #{followup.sequence_id} · step {(followup.sequence_step_order ?? 0) + 1}
                         </p>
                       )}
-                      {followup.last_error && <p className="text-xs text-red-600 mt-1">{followup.last_error}</p>}
+                      {followup.last_error && <p className="text-xs text-danger-600 mt-1">{followup.last_error}</p>}
                     </td>
                     <td className="px-4 py-3 text-sm whitespace-nowrap">
                       {followup.scheduled_at ? new Date(followup.scheduled_at).toLocaleString() : "—"}
@@ -345,8 +345,8 @@ export default function FollowUpsPage() {
 
       {showCreate && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4">
-          <div className="bg-white dark:bg-[#202c33] w-full sm:max-w-lg max-h-[92vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl">
-            <div className="sticky top-0 bg-[#008069] dark:bg-[#202c33] px-4 py-3 flex items-center justify-between">
+          <div className="bg-white dark:bg-gray-800 w-full sm:max-w-lg max-h-[92vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl">
+            <div className="sticky top-0 bg-primary-700 dark:bg-gray-800 px-4 py-3 flex items-center justify-between">
               <div>
                 <h2 className="text-white font-semibold">Create Follow-up</h2>
                 <p className="text-white/70 text-xs">The SMS sends automatically at the selected time.</p>
@@ -356,18 +356,18 @@ export default function FollowUpsPage() {
 
             <form onSubmit={handleCreate} className="p-4 sm:p-6 space-y-4">
               <div>
-                <label className="text-xs font-medium text-[#54656f]">Contact</label>
+                <label className="text-xs font-medium text-gray-600">Contact</label>
                 <div className="relative mt-1">
-                  <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#667781]" />
+                  <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
                   <input
-                    className="w-full pl-9 pr-3 py-2.5 bg-[#f0f2f5] dark:bg-[#111b21] rounded-xl text-sm"
+                    className="w-full pl-9 pr-3 py-2.5 bg-gray-100 dark:bg-gray-900 rounded-xl text-sm"
                     placeholder="Filter by name, business or phone"
                     value={contactSearch}
                     onChange={(event) => setContactSearch(event.target.value)}
                   />
                 </div>
                 <select
-                  className="w-full mt-2 px-3 py-2.5 bg-[#f0f2f5] dark:bg-[#111b21] rounded-xl text-sm"
+                  className="w-full mt-2 px-3 py-2.5 bg-gray-100 dark:bg-gray-900 rounded-xl text-sm"
                   value={form.contact_id}
                   onChange={(event) => setForm({ ...form, contact_id: event.target.value })}
                   disabled={contactsLoading}
@@ -381,7 +381,7 @@ export default function FollowUpsPage() {
                   ))}
                 </select>
                 {!contactsLoading && contacts.length === 0 && (
-                  <p className="text-xs text-amber-600 mt-1">Create a contact first, then return here.</p>
+                  <p className="text-xs text-warning-600 mt-1">Create a contact first, then return here.</p>
                 )}
                 {!contactsLoading && contactSearch && filteredContacts.length === 0 && contacts.length > 0 && (
                   <p className="text-xs text-gray-500 mt-1">No contacts match this filter.</p>
@@ -390,9 +390,9 @@ export default function FollowUpsPage() {
 
               {channel === "email" && (
                 <div>
-                  <label className="text-xs font-medium text-[#54656f]">Subject</label>
+                  <label className="text-xs font-medium text-gray-600">Subject</label>
                   <input
-                    className="w-full mt-1 px-3 py-2.5 bg-[#f0f2f5] dark:bg-[#111b21] rounded-xl text-sm"
+                    className="w-full mt-1 px-3 py-2.5 bg-gray-100 dark:bg-gray-900 rounded-xl text-sm"
                     value={form.subject}
                     onChange={(event) => setForm({ ...form, subject: event.target.value })}
                     placeholder="Following up on {{business_name}}"
@@ -401,39 +401,39 @@ export default function FollowUpsPage() {
               )}
 
               <div>
-                <label className="text-xs font-medium text-[#54656f]">Send date and time</label>
+                <label className="text-xs font-medium text-gray-600">Send date and time</label>
                 <input
                   type="datetime-local"
                   min={defaultFollowupTime()}
-                  className="w-full mt-1 px-3 py-2.5 bg-[#f0f2f5] dark:bg-[#111b21] rounded-xl text-sm"
+                  className="w-full mt-1 px-3 py-2.5 bg-gray-100 dark:bg-gray-900 rounded-xl text-sm"
                   value={form.scheduled_at}
                   onChange={(event) => setForm({ ...form, scheduled_at: event.target.value })}
                   required
                 />
-                <p className="text-[11px] text-[#667781] mt-1">Uses your device's local time.</p>
+                <p className="text-[11px] text-gray-500 mt-1">Uses your device's local time.</p>
               </div>
 
               <div>
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-medium text-[#54656f]">
+                  <label className="text-xs font-medium text-gray-600">
                     {channel === "email" ? "Email body" : "Message"}
                   </label>
-                  <span className="text-[11px] text-[#667781]">{form.message_text.length} characters</span>
+                  <span className="text-[11px] text-gray-500">{form.message_text.length} characters</span>
                 </div>
                 <textarea
-                  className="w-full mt-1 px-3 py-2.5 bg-[#f0f2f5] dark:bg-[#111b21] rounded-xl text-sm min-h-28 resize-y"
+                  className="w-full mt-1 px-3 py-2.5 bg-gray-100 dark:bg-gray-900 rounded-xl text-sm min-h-28 resize-y"
                   placeholder="Hi {{first_name}}, just following up…"
                   value={form.message_text}
                   onChange={(event) => setForm({ ...form, message_text: event.target.value })}
                   maxLength={5000}
                   required
                 />
-                <p className="text-[11px] text-[#667781] mt-1">Contact placeholders such as {"{{first_name}}"} are filled when sent.</p>
+                <p className="text-[11px] text-gray-500 mt-1">Contact placeholders such as {"{{first_name}}"} are filled when sent.</p>
               </div>
 
               <div className="flex gap-2 pt-1">
-                <button type="button" onClick={closeCreate} className="flex-1 py-3 rounded-full bg-[#f0f2f5] dark:bg-[#111b21] text-[#54656f] dark:text-white font-medium">Cancel</button>
-                <button type="submit" disabled={submitting || contactsLoading || contacts.length === 0} className="flex-1 py-3 rounded-full bg-[#00a884] text-white font-semibold disabled:opacity-50">
+                <button type="button" onClick={closeCreate} className="flex-1 py-3 rounded-full bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-white font-medium">Cancel</button>
+                <button type="submit" disabled={submitting || contactsLoading || contacts.length === 0} className="flex-1 py-3 rounded-full bg-primary-600 text-white font-semibold disabled:opacity-50">
                   {submitting ? "Creating…" : "Create Follow-up"}
                 </button>
               </div>

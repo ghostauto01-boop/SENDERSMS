@@ -77,10 +77,20 @@ const CONNECTORS = {
     },
   ],
   public_base_url: "https://app.example.test",
+  base_url_source: "env",
   ready: true,
   problem: null,
+  note: null,
   require_login: true,
   protocol_versions: ["2026-07-28", "2025-06-18"],
+  bridge: {
+    available: true,
+    download_url: "/api/v1/mcp/bridge",
+    script: "arena_mcp_bridge.py",
+    endpoint: "https://app.example.test/connectors/arena/mcp",
+    run: "SENDERSMS_MCP_URL=\"https://app.example.test/connectors/arena/mcp\" python3 arena_mcp_bridge.py",
+    config: { mcpServers: { sendsms: { command: "python3" } } },
+  },
 };
 
 beforeEach(() => {
@@ -89,7 +99,12 @@ beforeEach(() => {
   apiPost.mockReset();
   apiDelete.mockReset();
 
-  apiGet.mockImplementation((url: string) => {
+  apiGet.mockImplementation(defaultGet);
+});
+
+/** The default GET router: one entry per endpoint the page reads. */
+function defaultGet(url: string): Promise<{ data: any }> {
+  {
     if (url === "/settings/notifications") {
       return Promise.resolve({
         data: {
@@ -164,23 +179,25 @@ beforeEach(() => {
       });
     }
     return Promise.reject(new Error("unmocked GET " + url));
-  });
+  }
+}
 
+beforeEach(() => {
   apiPut.mockResolvedValue({ data: { success: true } });
 });
 
 describe("SettingsPage — site access", () => {
-  it("says the login wall is off", async () => {
+  it("explains that the login screen asks for the admin password", async () => {
     render(<SettingsPage />);
     await waitFor(() => expect(screen.getByText("Site access")).toBeInTheDocument());
     fireEvent.click(screen.getByText("Site access"));
     await waitFor(() => {
-      expect(screen.getByText(/There is no password wall/)).toBeInTheDocument();
+      expect(screen.getByText(/The login screen asks for the admin password/)).toBeInTheDocument();
     });
-    // The old username/password instruction must be gone.
-    expect(
-      screen.queryByText(/Everyone signs in with the admin username and password/)
-    ).not.toBeInTheDocument();
+    // It names the environment variable that changes it, and the shipped
+    // default, so the operator knows both what to type and what to replace.
+    expect(screen.getByText("ADMIN_PASSWORD")).toBeInTheDocument();
+    expect(screen.getByText("12345678")).toBeInTheDocument();
   });
 });
 
@@ -258,12 +275,40 @@ describe("SettingsPage — AI (MCP) access", () => {
     expect(screen.getAllByText(/tools\/arena-connector\/AGENTS\.md/).length).toBeGreaterThan(0);
   });
 
-  it("warns when a connector cannot work without PUBLIC_BASE_URL", async () => {
+  it("explains an unreachable address instead of claiming the connector is broken", async () => {
     await openTab();
-    // Only the Arena fixture has endpoint_ready:false, so exactly one warning.
+    // Only the Arena fixture has endpoint_ready:false: its address is not
+    // reachable from the internet, and the card says so with the fix.
     expect(
-      screen.getAllByText(/cannot work until PUBLIC_BASE_URL is set/),
+      screen.getAllByText(/not reachable from the internet/),
     ).toHaveLength(1);
+    expect(screen.getByText(/PUBLIC_BASE_URL=https:\/\/your-app\.example\.com/)).toBeInTheDocument();
+  });
+
+  it("says the connector works when the address was detected from this session", async () => {
+    apiGet.mockImplementation((url: string) => {
+      if (url === "/mcp/connectors") {
+        return Promise.resolve({
+          data: {
+            ...CONNECTORS,
+            base_url_source: "request",
+            note: "Detected from this browser session.",
+          },
+        });
+      }
+      return defaultGet(url);
+    });
+    await openTab();
+    expect(screen.getByText(/detected from this session/)).toBeInTheDocument();
+    // No red "cannot work" banner: the handshake genuinely works with a
+    // detected address, and pretending otherwise sends the operator hunting.
+    expect(screen.queryByText(/No public address could be determined/)).toBeNull();
+  });
+
+  it("offers the stdio bridge to agents that have no connector screen", async () => {
+    await openTab();
+    expect(screen.getByText(/Download arena_mcp_bridge\.py/)).toBeInTheDocument();
+    expect(screen.getByText(/SENDERSMS_MCP_URL/)).toBeInTheDocument();
   });
 
   it("runs the handshake test and shows the fix for a failing step", async () => {

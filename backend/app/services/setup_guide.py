@@ -94,6 +94,26 @@ def _foundation_steps(db_ok: Optional[bool], db_kind: Optional[str]) -> list[dic
     steps: list[dict] = []
 
     insecure = settings.insecure_defaults()
+    weak_password = settings.uses_default_admin_password()
+
+    if weak_password:
+        steps.append(_step(
+            "admin-password", "foundation", "Change the admin password",
+            status=ATTENTION if settings.is_production else TODO,
+            why=(
+                "Sign-in uses the app password, which is still the one that ships with the "
+                "project (12345678). Anyone who knows it can read your contacts and send as you."
+            ),
+            detail="ADMIN_PASSWORD is still the shipped default.",
+            steps=[
+                "Create a strong password (12+ characters, not reused anywhere).",
+                "Set ADMIN_PASSWORD to it in the environment (Render → Environment, docker "
+                "compose, or .env) and restart.",
+                "Sign in with the new password — the app refreshes the stored hash on first use.",
+            ],
+            verify="Sign in with the new password; the old one is refused.",
+        ))
+
     if insecure:
         steps.append(_step(
             "secrets", "foundation", "Replace the default secrets",

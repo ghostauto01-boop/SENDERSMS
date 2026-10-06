@@ -128,13 +128,15 @@ openssl rand -base64 32
 
 Also decide now:
 - `ADMIN_USERNAME` — the operator account name, e.g. `admin`
-- `ADMIN_PASSWORD` — optional now. The login screen has no password field: it is
-  a single **Log in as admin** button. This value is only a fallback for older
-  clients that still post credentials.
+- `ADMIN_PASSWORD` — **the password the login screen asks for.** The app ships
+  with `12345678` so you can get in on the first run; change it here before the
+  address is shared with anyone. The stored admin account follows this value, so
+  rotating it takes effect at the next sign-in and never locks you out.
 
-> Because there is no password wall, **anyone who knows your app's address can
-> open it**. Keep the URL private (or put the site behind a VPN / basic auth at
-> the host level) if the data matters.
+> **The login screen is password-protected.** A wrong password is refused and an
+> empty one is never accepted, so only someone with `ADMIN_PASSWORD` gets in. If
+> `ADMIN_PASSWORD` is left empty, add `APP_PASSWORD` instead — that is the site
+> password, and the app will use whichever one is set.
 
 ---
 

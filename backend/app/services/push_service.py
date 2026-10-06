@@ -147,6 +147,52 @@ async def notify_inbound_sms(db: AsyncSession, contact_name: str, text: str,
     )
 
 
+async def notify_inbound_email(
+    db: AsyncSession,
+    *,
+    contact_name: str,
+    subject: Optional[str] = None,
+    preview: str = "",
+    conversation_id: Optional[int] = None,
+) -> NotificationEvent:
+    """An inbound email, previewed exactly like an inbound SMS.
+
+    The notification centre, the bell badge, the browser push payload and the
+    phone lock screen all read these three strings, so the sender's name and the
+    first line of the message are visible without opening the app — the same
+    thing ``notify_inbound_sms`` does for texts.
+    """
+    sender = (contact_name or "").strip() or "an unknown sender"
+    headline = (subject or "").strip()
+    snippet = (preview or "").strip()
+
+    # Callers may pass the subject separately, or already merged into the
+    # preview (which is what email_service does). Dedupe, so the notification
+    # never reads "Menu design — Menu design — Good afternoon".
+    def _bare(value: str) -> str:
+        text = value.strip().lower()
+        if text.startswith("re:"):
+            text = text[3:]
+        # Collapse whitespace: "re: x" and "x" have to compare equal, and the
+        # prefix strip leaves a leading space behind.
+        return " ".join(text.split())
+
+    if headline and snippet and _bare(snippet).startswith(_bare(headline)[:40]):
+        headline = ""
+
+    parts = [part for part in (headline, snippet) if part]
+    body = " — ".join(parts) if parts else "Open the Email Inbox to read it."
+    return await notify(
+        db, "email_reply", f"📧 New email from {sender}", body,
+        url=(
+            f"/email-inbox?conversation_id={conversation_id}"
+            if conversation_id else "/email-inbox"
+        ),
+        reference_id=conversation_id, reference_type="conversation",
+        tag=f"email-{conversation_id}" if conversation_id else "email",
+    )
+
+
 async def notify_campaign_done(db: AsyncSession, campaign_name: str,
                                sent: int = 0, delivered: int = 0,
                                campaign_id: Optional[int] = None) -> NotificationEvent:

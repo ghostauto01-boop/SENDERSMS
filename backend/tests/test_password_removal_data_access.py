@@ -1,11 +1,11 @@
 """Regression test: existing data must never be hidden or lost by access changes.
 
-The scenario this guards (updated for the restored login screen):
-1. The operator signs in and creates contacts, campaigns, messages
+The scenario this guards (updated for the restored password wall):
+1. The operator signs in with the app password and creates contacts, campaigns
 2. Later deployments change access settings (extra site password on/off,
    rotated ADMIN_PASSWORD, fresh browser, new session cookie)
-3. After signing in again — with the env admin credentials or the saved
-   site password — ALL the data must still be there.
+3. After signing in again — with the app password or the saved site password —
+   ALL the data must still be there, owned by the same operator account.
 
 Data lives in the database; the login screen only guards the door.
 """
@@ -14,7 +14,12 @@ import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from app.config import settings
 from app.database import Base, get_db
+
+#: The password this deployment is configured with — never hardcoded, so the
+#: test keeps describing "the configured password works".
+APP_PASSWORD = settings.ADMIN_PASSWORD
 
 
 @pytest_asyncio.fixture
@@ -80,7 +85,7 @@ async def test_data_accessible_from_any_browser_after_login(test_db):
     # Phase 1: Sign in with the env admin credentials and create data
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         login = await client.post(
-            "/api/v1/auth/login", json={"username": "admin", "password": "admin"}
+            "/api/v1/auth/login", json={"username": "admin", "password": APP_PASSWORD}
         )
         assert login.status_code == 200
 
@@ -118,7 +123,7 @@ async def test_data_accessible_from_any_browser_after_login(test_db):
     # Phase 3: …but after signing in again it sees ALL the data.
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as fresh:
         login = await fresh.post(
-            "/api/v1/auth/login", json={"username": "admin", "password": "admin"}
+            "/api/v1/auth/login", json={"username": "admin", "password": APP_PASSWORD}
         )
         assert login.status_code == 200
 
@@ -161,7 +166,7 @@ async def test_toggling_site_password_keeps_data_intact(test_db):
     # Create data while signed in with the env admin credentials
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         login = await client.post(
-            "/api/v1/auth/login", json={"username": "admin", "password": "admin"}
+            "/api/v1/auth/login", json={"username": "admin", "password": APP_PASSWORD}
         )
         assert login.status_code == 200
         for name, phone in [("Dave", "08044444444"), ("Eve", "08055555555")]:
@@ -174,7 +179,7 @@ async def test_toggling_site_password_keeps_data_intact(test_db):
     # Enable the extra site password
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         login = await client.post(
-            "/api/v1/auth/login", json={"username": "admin", "password": "admin"}
+            "/api/v1/auth/login", json={"username": "admin", "password": APP_PASSWORD}
         )
         cookie = {"sendsms_session": login.cookies["sendsms_session"]}
         response = await client.put(

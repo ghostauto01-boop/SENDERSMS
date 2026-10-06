@@ -12,7 +12,7 @@ import sys
 
 import httpx
 
-BASE = "http://127.0.0.1:8000/api/v1"
+BASE = os.environ.get("SMS_API_BASE", "http://127.0.0.1:8000").rstrip("/") + "/api/v1"
 RUN = str(int(__import__("time").time()))
 FAKE = "http://127.0.0.1:8799"
 ok = True
@@ -31,7 +31,10 @@ httpx.delete(f"{FAKE}/_log")
 
 with httpx.Client(base_url=BASE, timeout=30, follow_redirects=True) as api:
     # ---------------------------------------------------------------- login
-    api.post("/auth/admin", json={})
+    # The login screen asks for the admin password; the shipped default is used
+    # when the environment does not override it.
+    password = os.environ.get("ADMIN_PASSWORD") or os.environ.get("APP_PASSWORD") or "12345678"
+    api.post("/auth/admin", json={"password": password})
     me = api.get("/auth/me")
     step("login", me.status_code == 200, str(me.status_code))
 

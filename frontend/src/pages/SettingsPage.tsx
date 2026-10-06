@@ -3,7 +3,27 @@ import api from "../api/client";
 import { useAuth } from "../hooks/useAuth";
 import { NotificationProviderSettings } from "../types";
 import toast from "react-hot-toast";
-import { Wifi, Bell, Shield, Clock, TestTube, Eye, EyeOff, Activity, CheckCircle, XCircle, Webhook, RefreshCw, Trash2, Phone, Lock, Mail, Plus, Sparkles } from "lucide-react";
+import {
+  Activity,
+  Bell,
+  CheckCircle,
+  Clock,
+  Eye,
+  EyeOff,
+  Lock,
+  Mail,
+  Phone,
+  Plus,
+  RefreshCw,
+  Shield,
+  ShieldCheck,
+  Sparkles,
+  TestTube,
+  Trash2,
+  Webhook,
+  Wifi,
+  XCircle,
+} from "lucide-react";
 import { Link } from "react-router-dom";
 import emailApi, { EmailAccount } from "../api/email";
 import McpConnectors from "../components/McpConnectors";
@@ -80,9 +100,11 @@ function AccessTab() {
       setPasswordSet(!!data.password_set);
       setPassword("");
       noteAccess(true);
-      toast.success(hadPassword
-        ? "Login password updated. You can sign in with it too."
-        : "Login password saved. You can sign in with it too.");
+      toast.success(
+        hadPassword
+          ? "Extra login password updated — it signs you in as well."
+          : "Extra login password saved — it signs you in as well."
+      );
     } catch (e: any) {
       toast.error(e?.response?.data?.detail || "Could not save");
     } finally {
@@ -97,13 +119,19 @@ function AccessTab() {
   return (
     <div className="card p-6 space-y-4 max-w-lg">
       <h2 className="text-lg font-semibold">Site access</h2>
-      <div className="p-3 rounded-lg text-sm bg-emerald-50 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-200">
-        Open. There is no password wall — the login screen is a single
-        “Log in as admin” button and nothing is typed. The optional password
-        below stays as a second way in, but it blocks nothing.
+      <div className="p-3 rounded-xl text-sm bg-primary-50 text-primary-800 dark:bg-primary-950/40 dark:text-primary-200 space-y-1">
+        <p className="font-medium flex items-center gap-2">
+          <ShieldCheck size={15} /> The login screen asks for the admin password
+        </p>
+        <p className="text-xs">
+          That password is <code>ADMIN_PASSWORD</code> in the server environment (the shipped
+          default is <code>12345678</code>). Change it there — the stored hash follows the
+          environment on the next sign-in. The password below is an <em>additional</em> way in and
+          is optional.
+        </p>
       </div>
       <div>
-        <label className="label">Extra login password {passwordSet && <span className="text-green-600 font-normal">(saved — leave blank to keep)</span>}</label>
+        <label className="label">Extra login password {passwordSet && <span className="text-success-600 font-normal">(saved — leave blank to keep)</span>}</label>
         <div className="relative">
           <input
             type={show ? "text" : "password"}
@@ -117,7 +145,9 @@ function AccessTab() {
             {show ? <EyeOff size={16} /> : <Eye size={16} />}
           </button>
         </div>
-        <p className="text-xs text-gray-400 mt-1">Optional. A second way in for an older client — nothing is locked without it.</p>
+        <p className="text-xs text-gray-400 mt-1">
+          Optional. Both this and the admin password open the same operator account.
+        </p>
       </div>
       <button onClick={save} disabled={saving} className="btn-primary w-full">{saving ? "Saving..." : "Save"}</button>
     </div>
@@ -158,7 +188,7 @@ function GatewayTab() {
       <h2 className="text-lg font-semibold">SMS Gateway</h2>
       <p className="text-xs text-gray-500">Connected to <code className="text-xs bg-gray-100 dark:bg-gray-700 px-1 rounded">{gw?.base_url || "api.sms-gate.app/3rdparty/v1"}</code>{gw?.username ? <> Username: <strong>{gw.username}</strong>.</> : null}</p>
       {gw && !gw.configured && (
-        <div className="p-3 rounded-lg text-sm bg-red-50 dark:bg-red-900/30 text-red-700">
+        <div className="p-3 rounded-lg text-sm bg-danger-50 dark:bg-danger-900/30 text-danger-700">
           Gateway credentials are not configured. Set SMSGATE_USERNAME and SMSGATE_PASSWORD.
         </div>
       )}
@@ -177,7 +207,7 @@ function GatewayTab() {
       </div>
 
       {result && (
-        <div className={`p-3 rounded-lg text-sm flex items-center gap-2 ${result.success ? "bg-green-50 dark:bg-green-900/30 text-green-700" : "bg-red-50 dark:bg-red-900/30 text-red-700"}`}>
+        <div className={`p-3 rounded-lg text-sm flex items-center gap-2 ${result.success ? "bg-success-50 dark:bg-success-900/30 text-success-700" : "bg-danger-50 dark:bg-danger-900/30 text-danger-700"}`}>
           {result.success ? <CheckCircle size={16} /> : <XCircle size={16} />}
           <span>{result.message || (result.success ? "Connected" : "Failed")}</span>
         </div>
@@ -250,18 +280,18 @@ function WebhooksCard() {
 
       {loading ? <div className="skeleton h-20 w-full"/> : !data ? null : (<>
         {!data.configured && (
-          <div className="p-3 rounded-lg text-sm bg-red-50 dark:bg-red-900/30 text-red-700">
+          <div className="p-3 rounded-lg text-sm bg-danger-50 dark:bg-danger-900/30 text-danger-700">
             Gateway credentials are missing, so webhooks cannot be registered.
           </div>
         )}
         {data.configured && !data.public_base_url_set && (
-          <div className="p-3 rounded-lg text-sm bg-amber-50 dark:bg-amber-900/30 text-amber-700">
+          <div className="p-3 rounded-lg text-sm bg-warning-50 dark:bg-warning-900/30 text-warning-700">
             PUBLIC_BASE_URL is not set, so we do not know this server&apos;s public address.
             Set it, or enter a URL manually below.
           </div>
         )}
         {data.configured && data.public_base_url_set && !data.signing_secret_set && (
-          <div className="p-3 rounded-lg text-sm bg-amber-50 dark:bg-amber-900/30 text-amber-700">
+          <div className="p-3 rounded-lg text-sm bg-warning-50 dark:bg-warning-900/30 text-warning-700">
             No signing secret set. Copy the key from the phone app (Settings &rarr; Webhooks &rarr;
             Signing Key) into SMSGATE_WEBHOOK_SECRET so deliveries can be verified.
           </div>
@@ -274,7 +304,7 @@ function WebhooksCard() {
           </div>
         )}
 
-        <div className={`p-3 rounded-lg text-sm flex items-start gap-2 ${data.healthy ? "bg-green-50 dark:bg-green-900/30 text-green-700" : "bg-amber-50 dark:bg-amber-900/30 text-amber-700"}`}>
+        <div className={`p-3 rounded-lg text-sm flex items-start gap-2 ${data.healthy ? "bg-success-50 dark:bg-success-900/30 text-success-700" : "bg-warning-50 dark:bg-warning-900/30 text-warning-700"}`}>
           {data.healthy ? <CheckCircle size={16} className="mt-0.5 shrink-0"/> : <XCircle size={16} className="mt-0.5 shrink-0"/>}
           <span>
             {data.healthy
@@ -290,7 +320,7 @@ function WebhooksCard() {
               return (
                 <div key={ev} className="flex items-center justify-between text-xs py-1 border-b border-gray-100 dark:border-gray-700 last:border-0">
                   <code>{ev}</code>
-                  <span className={on ? "text-green-600 font-medium" : "text-gray-400"}>
+                  <span className={on ? "text-success-600 font-medium" : "text-gray-400"}>
                     {on ? "registered" : "missing"}
                   </span>
                 </div>
@@ -329,12 +359,12 @@ function WebhooksCard() {
                 <div key={w.id} className="flex items-center justify-between gap-2 py-1 border-b border-gray-100 dark:border-gray-700 last:border-0">
                   <div className="min-w-0">
                     <code className="block truncate">{w.event}</code>
-                    <span className={`block truncate text-[10px] ${w.is_ours ? "text-green-600" : "text-gray-400"}`}>
+                    <span className={`block truncate text-[10px] ${w.is_ours ? "text-success-600" : "text-gray-400"}`}>
                       {w.is_ours ? "this server" : w.url}
                     </span>
                   </div>
                   <button onClick={()=>remove(w.id)} disabled={busy}
-                          className="text-red-600 hover:text-red-700 shrink-0" title="Remove">
+                          className="text-danger-600 hover:text-danger-700 shrink-0" title="Remove">
                     <Trash2 size={14}/>
                   </button>
                 </div>
@@ -343,7 +373,7 @@ function WebhooksCard() {
           </details>
         )}
 
-        {data.error && <p className="text-xs text-red-600 break-all">{data.error}</p>}
+        {data.error && <p className="text-xs text-danger-600 break-all">{data.error}</p>}
       </>)}
     </div>
   );
@@ -410,7 +440,7 @@ function RulesTab({ s, onUpdate }: { s: Record<string, string>; onUpdate: () => 
       <div className="flex items-center justify-between"><span className="font-medium">Live throttle</span><span className={`badge ${status.allowed_now?"badge-green":"badge-yellow"}`}>{status.allowed_now?"Sending allowed":"Holding"}</span></div>
       <p className="text-xs text-gray-500">Sent — this minute: <strong>{status.counters?.minute ?? 0}</strong> · this hour: <strong>{status.counters?.hour ?? 0}</strong> · today: <strong>{status.counters?.day ?? 0}</strong></p>
       {status.interval_seconds>0 && <p className="text-xs text-gray-500">Pacing: one SMS every <strong>{status.interval_seconds}s</strong>.</p>}
-      {status.reason && <p className="text-xs text-amber-600">{status.reason}{status.wait_seconds ? ` — next send in ~${status.wait_seconds}s` : ""}</p>}
+      {status.reason && <p className="text-xs text-warning-600">{status.reason}{status.wait_seconds ? ` — next send in ~${status.wait_seconds}s` : ""}</p>}
       {status.last_sent_at && <p className="text-xs text-gray-400">Last send: {new Date(status.last_sent_at).toLocaleString()}</p>}
     </div>)}
     </div>);}
@@ -472,8 +502,8 @@ function CallsTab() {
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold flex items-center gap-2"><Phone size={18} />Phone Calls (CallGate)</h2>
           {cfg?.configured
-            ? <span className="flex items-center gap-1 text-xs font-medium text-green-700 bg-green-50 px-2 py-1 rounded-full"><CheckCircle size={12} />Connected</span>
-            : <span className="flex items-center gap-1 text-xs font-medium text-amber-700 bg-amber-50 px-2 py-1 rounded-full"><XCircle size={12} />Not set up</span>}
+            ? <span className="flex items-center gap-1 text-xs font-medium text-success-700 bg-success-50 px-2 py-1 rounded-full"><CheckCircle size={12} />Connected</span>
+            : <span className="flex items-center gap-1 text-xs font-medium text-warning-700 bg-warning-50 px-2 py-1 rounded-full"><XCircle size={12} />Not set up</span>}
         </div>
         <p className="text-xs text-gray-500">
           CallGate is the companion app to SMS-Gate — install it on the <strong>same phone</strong> as SMS-Gate and this app can
@@ -503,7 +533,7 @@ function CallsTab() {
             <input className="input w-full" placeholder="From CallGate → Settings → Server" value={f.username} onChange={(e) => setF({ ...f, username: e.target.value })} />
           </div>
           <div>
-            <label className="label">Password {cfg?.password_set && <span className="text-green-600 font-normal">(saved {cfg.password_hint})</span>}</label>
+            <label className="label">Password {cfg?.password_set && <span className="text-success-600 font-normal">(saved {cfg.password_hint})</span>}</label>
             <div className="relative">
               <input type={showPw ? "text" : "password"} className="input w-full pr-10" placeholder={cfg?.password_set ? "•••••• (leave blank to keep)" : "CallGate password"} value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} />
               <button onClick={() => setShowPw(!showPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">{showPw ? <EyeOff size={16} /> : <Eye size={16} />}</button>
@@ -524,7 +554,7 @@ function CallsTab() {
         </div>
 
         {result && (
-          <div className={`p-3 rounded-lg text-sm flex items-center gap-2 ${result.success ? "bg-green-50 dark:bg-green-900/30 text-green-700" : "bg-red-50 dark:bg-red-900/30 text-red-700"}`}>
+          <div className={`p-3 rounded-lg text-sm flex items-center gap-2 ${result.success ? "bg-success-50 dark:bg-success-900/30 text-success-700" : "bg-danger-50 dark:bg-danger-900/30 text-danger-700"}`}>
             {result.success ? <CheckCircle size={16} /> : <XCircle size={16} />}
             <span>{result.message || (result.success ? "Connected" : "Failed")}</span>
           </div>
@@ -598,7 +628,7 @@ function CallWebhooksCard() {
       </div>
       <p className="text-xs text-gray-500">CallGate tells this server when calls ring, connect and end — that's what fills your call history.</p>
       {loading ? <div className="skeleton h-20 w-full" /> : data?.error ? (
-        <div className="p-3 rounded-lg text-sm bg-amber-50 dark:bg-amber-900/30 text-amber-700">{data.error}</div>
+        <div className="p-3 rounded-lg text-sm bg-warning-50 dark:bg-warning-900/30 text-warning-700">{data.error}</div>
       ) : (
         <>
           <div className="space-y-1">
@@ -607,7 +637,7 @@ function CallWebhooksCard() {
               return (
                 <div key={ev} className="flex items-center justify-between text-xs py-1 border-b border-gray-100 dark:border-gray-700 last:border-0">
                   <code>{ev}</code>
-                  <span className={on ? "text-green-600 font-medium" : "text-gray-400"}>{on ? "registered" : "missing"}</span>
+                  <span className={on ? "text-success-600 font-medium" : "text-gray-400"}>{on ? "registered" : "missing"}</span>
                 </div>
               );
             })}
@@ -630,7 +660,7 @@ function CallWebhooksCard() {
                 {data.webhooks.map((w: any) => (
                   <div key={w.id} className="flex items-center justify-between gap-2 py-1 border-b border-gray-100 dark:border-gray-700 last:border-0">
                     <div className="min-w-0"><code className="block truncate">{w.event}</code><span className="block truncate text-[10px] text-gray-400">{w.url}</span></div>
-                    <button onClick={() => remove(w.id)} disabled={busy} className="text-red-600 hover:text-red-700 shrink-0" title="Remove"><Trash2 size={14} /></button>
+                    <button onClick={() => remove(w.id)} disabled={busy} className="text-danger-600 hover:text-danger-700 shrink-0" title="Remove"><Trash2 size={14} /></button>
                   </div>
                 ))}
               </div>

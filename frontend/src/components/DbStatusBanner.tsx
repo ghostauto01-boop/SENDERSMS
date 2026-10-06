@@ -56,7 +56,7 @@ export default function DbStatusBanner() {
     <div
       role="alert"
       data-testid="db-status-banner"
-      className="sticky top-0 z-[60] border-b border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100"
+      className="sticky top-0 z-[60] border-b border-warning-300 bg-warning-50 text-warning-900 dark:border-warning-700 dark:bg-warning-950 dark:text-warning-100"
     >
       <div className="mx-auto flex max-w-6xl items-start gap-3 px-4 py-3 text-sm">
         <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0" />
@@ -80,7 +80,7 @@ export default function DbStatusBanner() {
           type="button"
           onClick={recheck}
           disabled={checking}
-          className="inline-flex flex-shrink-0 items-center gap-1 rounded-md border border-amber-400 bg-white px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-60 dark:bg-amber-900 dark:text-amber-50 dark:hover:bg-amber-800"
+          className="inline-flex flex-shrink-0 items-center gap-1 rounded-md border border-warning-400 bg-white px-3 py-1.5 text-xs font-medium text-warning-900 hover:bg-warning-100 disabled:opacity-60 dark:bg-warning-900 dark:text-warning-50 dark:hover:bg-warning-800"
         >
           <RefreshCw className={`h-3.5 w-3.5 ${checking ? "animate-spin" : ""}`} />
           {checking ? "Checking…" : "Check again"}

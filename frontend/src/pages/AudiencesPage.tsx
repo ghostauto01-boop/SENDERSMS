@@ -223,7 +223,7 @@ function AudienceCard({
               </span>
             ))}
             {listNames.length === 0 && !a.explicit_contacts && chips.length === 0 && (
-              <span className="px-2 py-0.5 rounded-full text-xs bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-200">
+              <span className="px-2 py-0.5 rounded-full text-xs bg-warning-100 dark:bg-warning-900/40 text-warning-700 dark:text-warning-200">
                 Empty — edit to add lists or contacts
               </span>
             )}
@@ -247,7 +247,7 @@ function AudienceCard({
         <button className="btn-secondary btn-sm" onClick={onDuplicate}>
           <Copy size={14} />
         </button>
-        <button className="btn-ghost btn-sm text-red-600" onClick={onDelete}>
+        <button className="btn-ghost btn-sm text-danger-600" onClick={onDelete}>
           <Trash2 size={14} />
         </button>
         <span className="ml-auto text-xs text-gray-400 self-center">Updated {fmtDay(a.updated_at)}</span>
@@ -370,7 +370,7 @@ function AudienceEditor({
             <b>{estimate.eligible}</b> eligible contacts
             <span className="text-gray-500"> ({estimate.matched} matched before screening)</span>
             {estimate.matched === 0 && (
-              <span className="block text-xs mt-1 text-amber-700 dark:text-amber-300">
+              <span className="block text-xs mt-1 text-warning-700 dark:text-warning-300">
                 Nothing selected yet — add at least one list, contact or filter.
               </span>
             )}
@@ -536,14 +536,14 @@ function AudiencePreviewModal({ audience, close }: { audience: AdsAudience; clos
                           <div className="flex items-center justify-end gap-1.5">
                             <button
                               onClick={() => openWhatsappForCall(c.phone_number, c.name || undefined)}
-                              className="w-7 h-7 rounded-full bg-[#25D366] text-white flex items-center justify-center hover:bg-[#1fb857]"
+                              className="w-7 h-7 rounded-full bg-primary-600 text-white flex items-center justify-center hover:bg-primary-700"
                               title={`Call ${c.name || c.phone_number} on WhatsApp`}
                             >
                               <PhoneCall size={12} />
                             </button>
                             <button
                               onClick={() => openWhatsappChat(c.phone_number)}
-                              className="w-7 h-7 rounded-full bg-[#25D366]/15 text-[#128C7E] flex items-center justify-center hover:bg-[#25D366] hover:text-white"
+                              className="w-7 h-7 rounded-full bg-primary-600/15 text-primary-700 flex items-center justify-center hover:bg-primary-600 hover:text-white"
                               title="Open WhatsApp chat"
                             >
                               <MessageCircle size={12} />
