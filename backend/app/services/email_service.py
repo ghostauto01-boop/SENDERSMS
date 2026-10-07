@@ -31,6 +31,7 @@ from datetime import date, datetime, time, timedelta, timezone
 from typing import Iterable, Optional
 
 from sqlalchemy import func, or_, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -39,6 +40,7 @@ from app.models.campaign import Campaign, CampaignContact
 from app.models.contact import Contact
 from app.models.conversation import Conversation, Message
 from app.models.email import EmailAccount, EmailEvent, EmailSuppression
+from app.models.email_inbox import EmailContactAddress
 from app.security.encryption import decrypt_value, encrypt_value
 from app.utils.naming import contact_display_name
 
@@ -84,6 +86,62 @@ def normalize_email(raw: str | None) -> str | None:
     if not _EMAIL_RE.match(value):
         return None
     return value
+
+
+async def find_contact_by_email(db: AsyncSession, address: str | None) -> Contact | None:
+    """Find a CRM contact by its primary or a verified reply address."""
+    value = normalize_email(address)
+    if not value:
+        return None
+    contact = (
+        await db.execute(select(Contact).where(func.lower(Contact.email) == value).limit(1))
+    ).scalars().first()
+    if contact is not None:
+        return contact
+    return (
+        await db.execute(
+            select(Contact)
+            .join(EmailContactAddress, EmailContactAddress.contact_id == Contact.id)
+            .where(EmailContactAddress.email_address == value)
+            .limit(1)
+        )
+    ).scalars().first()
+
+
+async def remember_contact_email(
+    db: AsyncSession, contact: Contact, address: str | None
+) -> bool:
+    """Store a changed/personal sender without replacing the primary email."""
+    value = normalize_email(address)
+    if not value or value == normalize_email(contact.email) or contact.id is None:
+        return False
+    existing = (
+        await db.execute(
+            select(EmailContactAddress).where(EmailContactAddress.email_address == value)
+        )
+    ).scalar_one_or_none()
+    if existing is not None:
+        return existing.contact_id == contact.id
+
+    try:
+        # Avoid aborting the caller's transaction if two mailbox syncs encounter
+        # the same new address at once; the unique address index decides owner.
+        async with db.begin_nested():
+            db.add(EmailContactAddress(contact_id=contact.id, email_address=value))
+            await db.flush()
+        return True
+    except IntegrityError:
+        return False
+
+
+async def contact_email_aliases(db: AsyncSession, contact_id: int) -> list[str]:
+    return list(
+        (await db.execute(
+            select(EmailContactAddress.email_address)
+            .where(EmailContactAddress.contact_id == contact_id)
+            .order_by(EmailContactAddress.created_at, EmailContactAddress.id)
+        )).scalars().all()
+    )
 
 
 def email_problem(address: str | None) -> str | None:
@@ -471,9 +529,12 @@ async def unsuppress_email(db: AsyncSession, entry: EmailSuppression) -> None:
     await db.flush()
 
 
-async def contact_email_problem(db: AsyncSession, contact: Contact) -> str | None:
-    """Every reason this contact must not be emailed, or ``None``."""
-    problem = email_problem(contact.email)
+async def contact_email_problem(
+    db: AsyncSession, contact: Contact, address: str | None = None
+) -> str | None:
+    """Every reason this contact/recipient must not be emailed, or ``None``."""
+    recipient = normalize_email(address) if address is not None else normalize_email(contact.email)
+    problem = email_problem(recipient)
     if problem:
         return problem
     if contact.is_email_opted_out:
@@ -482,7 +543,7 @@ async def contact_email_problem(db: AsyncSession, contact: Contact) -> str | Non
         return "email_opted_out"
     if contact.is_email_undeliverable or contact.email_status == "bounced":
         return "email_bounced"
-    if await get_suppression(db, contact.email):
+    if await get_suppression(db, recipient):
         return "suppressed"
     return None
 
@@ -961,6 +1022,7 @@ async def queue_email(
     bulk: bool = False,
     cc: list[str] | str | None = None,
     bcc: list[str] | str | None = None,
+    recipient_address: str | None = None,
 ) -> Message | None:
     """Create the outbound email ``Message`` row (delivery happens elsewhere).
 
@@ -969,7 +1031,8 @@ async def queue_email(
     Returns ``None`` when the contact cannot be emailed — callers treat that as
     "skipped", exactly like an opted-out SMS contact.
     """
-    problem = await contact_email_problem(db, contact)
+    address = normalize_email(recipient_address) if recipient_address else normalize_email(contact.email)
+    problem = await contact_email_problem(db, contact, address)
     if problem:
         logger.info("EMAIL: skipping contact %s (%s)", contact.id, problem)
         return None
@@ -979,7 +1042,6 @@ async def queue_email(
         logger.warning("EMAIL: no sender account configured; cannot queue for %s", contact.id)
         return None
 
-    address = normalize_email(contact.email)
     # An HTML-only body must still produce a text part: it is the fallback every
     # mail client shows and what spam filters expect. Doing it here (rather than
     # only in the API routes) covers campaigns, scheduled sends and automations.
@@ -1058,6 +1120,7 @@ async def send_now(
     bulk: bool = False,
     cc: list[str] | str | None = None,
     bcc: list[str] | str | None = None,
+    recipient_address: str | None = None,
 ) -> tuple[Message | None, dict]:
     """Queue + deliver in one call. Used by the API's "send now" paths."""
     message = await queue_email(
@@ -1065,7 +1128,7 @@ async def send_now(
         subject=subject, text_body=text_body, html_body=html_body,
         account=account, campaign_id=campaign_id, ads_campaign_id=ads_campaign_id,
         is_auto_reply=is_auto_reply, attachments=attachments, bulk=bulk,
-        cc=cc, bcc=bcc,
+        cc=cc, bcc=bcc, recipient_address=recipient_address,
     )
     if message is None:
         return None, {"success": False, "error": "contact_not_emailable"}
@@ -1571,6 +1634,92 @@ async def unsubscribe_contact(
     await db.flush()
 
 
+_REPLY_SUBJECT_PREFIX = re.compile(
+    r"^\s*(?:(?:re|aw|sv|tr|rv)\s*(?:\[\d+\])?\s*:\s*)+",
+    flags=re.IGNORECASE,
+)
+
+
+def email_reply_subject_base(subject: str | None) -> str:
+    """Remove common localized reply prefixes; forwarded mail is not a reply."""
+    return _REPLY_SUBJECT_PREFIX.sub("", str(subject or "").strip()).strip().casefold()
+
+
+def _reply_thread_ids(*blobs: str | None) -> list[str]:
+    values: list[str] = []
+    for blob in blobs:
+        for token in re.findall(r"<[^>\s]+>", str(blob or "")):
+            if token not in values:
+                values.append(token)
+    return values[:20]
+
+
+async def find_outgoing_email_by_message_ids(
+    db: AsyncSession, in_reply_to: str | None, references: str | None
+) -> Message | None:
+    """Find only an app-sent email named by an RFC threading header."""
+    ids = _reply_thread_ids(in_reply_to, references)
+    if not ids:
+        return None
+    return (
+        await db.execute(
+            select(Message)
+            .where(
+                Message.channel == "email",
+                Message.direction == "outgoing",
+                Message.rfc_message_id.in_(ids),
+            )
+            .order_by(Message.id.desc())
+            .limit(1)
+        )
+    ).scalars().first()
+
+
+async def find_outgoing_email_by_reply_subject(
+    db: AsyncSession, subject: str | None, *, contact_id: int | None = None
+) -> Message | None:
+    """Conservative fallback for mail clients that drop In-Reply-To headers.
+
+    A known contact can match only their own outbound mail. An unknown changed
+    address is associated by subject only when that subject identifies one CRM
+    contact unambiguously; common campaign subjects are intentionally rejected.
+    """
+    raw = str(subject or "").strip()
+    base = email_reply_subject_base(raw)
+    if not base or not _REPLY_SUBJECT_PREFIX.match(raw):
+        return None
+    query = select(Message).where(
+        Message.channel == "email", Message.direction == "outgoing"
+    )
+    if contact_id is not None:
+        query = query.where(Message.contact_id == contact_id)
+    candidates = (
+        await db.execute(query.order_by(Message.id.desc()).limit(500))
+    ).scalars().all()
+    matches = [message for message in candidates if email_reply_subject_base(message.subject) == base]
+    if not matches:
+        return None
+    if contact_id is not None:
+        return matches[0]
+    if len({message.contact_id for message in matches}) != 1:
+        return None
+    return matches[0]
+
+
+async def find_outgoing_email_for_inbound(
+    db: AsyncSession,
+    *,
+    in_reply_to: str | None,
+    references: str | None,
+    subject: str | None,
+) -> Message | None:
+    """Match explicit RFC headers first, then a unique reply-subject fallback."""
+    parent = await find_outgoing_email_by_message_ids(db, in_reply_to, references)
+    if parent is not None:
+        return parent
+    return await find_outgoing_email_by_reply_subject(db, subject)
+
+
 async def find_conversation_for_inbound(
     db: AsyncSession,
     *,
@@ -1578,6 +1727,7 @@ async def find_conversation_for_inbound(
     in_reply_to: str | None,
     references: str | None,
     subject: str | None,
+    parent_message: Message | None = None,
 ) -> tuple[Conversation | None, str | None]:
     """Which existing email thread did this inbound message answer?
 
@@ -1590,30 +1740,22 @@ async def find_conversation_for_inbound(
 
     Only when none of those apply is a brand-new thread started.
     """
-    ids: list[str] = []
-    for blob in (in_reply_to, references):
-        for token in re.findall(r"<[^>\s]+>", blob or ""):
-            if token not in ids:
-                ids.append(token)
-    if ids:
-        parent = (
+    parent_message = parent_message or await find_outgoing_email_for_inbound(
+        db, in_reply_to=in_reply_to, references=references, subject=subject
+    )
+    if parent_message is not None:
+        conversation = (
             await db.execute(
-                select(Message.conversation_id)
-                .where(Message.channel == "email", Message.rfc_message_id.in_(ids))
-                .order_by(Message.id.desc())
-                .limit(1)
+                select(Conversation).where(
+                    Conversation.id == parent_message.conversation_id,
+                    Conversation.contact_id == contact.id,
+                )
             )
         ).scalar_one_or_none()
-        if parent:
-            conversation = (
-                await db.execute(select(Conversation).where(Conversation.id == parent))
-            ).scalar_one_or_none()
-            if conversation is not None:
-                return conversation, "reply-chain"
+        if conversation is not None:
+            return conversation, "reply-chain"
 
-    base = re.sub(
-        r"^\s*((re|fwd|fw|aw|sv)\s*:\s*)+", "", (subject or "").strip(), flags=re.IGNORECASE
-    ).strip().lower()
+    base = email_reply_subject_base(subject)
     if base:
         candidate = (
             await db.execute(
@@ -1634,7 +1776,14 @@ async def find_conversation_for_inbound(
     # same address is overwhelmingly about the mail it is replying to, and
     # dropping it into the existing chat beats scattering single-message
     # threads for the same person.
-    fallback = await find_conversations(db, contact.id, "email")
+    fallback = (
+        await db.execute(
+            select(Conversation)
+            .where(Conversation.contact_id == contact.id, Conversation.channel == "email")
+            .order_by(Conversation.id.desc())
+            .limit(1)
+        )
+    ).scalars().first()
     if fallback is not None:
         return fallback, "latest-thread"
 
@@ -1763,12 +1912,25 @@ async def process_inbound_email(db: AsyncSession, payload: dict) -> dict:
         ).scalar_one_or_none():
             continue
 
-        contact = (
-            await db.execute(select(Contact).where(func.lower(Contact.email) == from_address))
-        ).scalars().first()
+        parent_message = await find_outgoing_email_for_inbound(
+            db, in_reply_to=in_reply_to, references=references, subject=subject
+        )
+        contact = await find_contact_by_email(db, from_address)
+        if parent_message is not None:
+            parent_contact = (
+                await db.execute(select(Contact).where(Contact.id == parent_message.contact_id))
+            ).scalar_one_or_none()
+            # An explicit reply to our sent message is strong evidence that an
+            # unknown sender is the same person. Preserve any already-known,
+            # different contact rather than merging CRM records by accident.
+            if parent_contact is not None and (contact is None or contact.id == parent_contact.id):
+                contact = parent_contact
+                await remember_contact_email(db, contact, from_address)
+
         if contact is None:
-            # The address may arrive via a reply from a different mailbox; fall
-            # back to a new contact so nothing is ever silently dropped.
+            # A genuinely unrelated inbound webhook message still gets a safe
+            # standalone CRM contact; connected mailboxes filter these before
+            # this shared ingestion path is called.
             name_hint = item.get("From")
             display = ""
             if isinstance(name_hint, dict):
@@ -1788,7 +1950,12 @@ async def process_inbound_email(db: AsyncSession, payload: dict) -> dict:
             contact.lead_status = "replied"
 
         conversation, matched_by = await find_conversation_for_inbound(
-            db, contact=contact, in_reply_to=in_reply_to, references=references, subject=subject
+            db,
+            contact=contact,
+            in_reply_to=in_reply_to,
+            references=references,
+            subject=subject,
+            parent_message=parent_message,
         )
         if conversation is None:
             conversation = await get_or_create_conversation(db, contact, channel="email")

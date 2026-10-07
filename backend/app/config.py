@@ -51,9 +51,19 @@ class Settings(BaseSettings):
     # --- CORS ---
     CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000"
 
+    # Browser origins used by hosted MCP clients. Kept separate from the app-wide
+    # CORS allowlist so providers can preflight only MCP routes, not every CRM API.
+    MCP_CORS_ORIGINS: str = (
+        "https://chatgpt.com,https://chat.openai.com,https://claude.ai"
+    )
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
+
+    @property
+    def mcp_cors_origins_list(self) -> list[str]:
+        return [o.strip().rstrip("/") for o in self.MCP_CORS_ORIGINS.split(",") if o.strip()]
 
     # --- Public URL (used to register the gateway webhook) ---
     # Must point at THIS deployment, e.g. https://your-app.onrender.com

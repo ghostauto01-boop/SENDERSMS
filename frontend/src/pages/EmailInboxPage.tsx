@@ -4,26 +4,37 @@ import toast from "react-hot-toast";
 import {
   ArrowLeft,
   ArrowUpRight,
+  Building2,
+  CalendarPlus,
   CheckCheck,
   ChevronDown,
   ChevronUp,
   Clock,
+  Globe,
   Inbox,
   Mail,
   MailOpen,
+  MapPin,
+  MessageCircle,
   MousePointerClick,
   Paperclip,
+  Phone,
   RefreshCw,
   Reply,
   Search,
   Send,
   Sparkles,
   Star,
+  Video,
   X,
   XCircle,
 } from "lucide-react";
-import emailApi, { EmailConversation, EmailMessage } from "../api/email";
+import api from "../api/client";
+import emailApi, { EmailContactDetails, EmailConversation, EmailMessage } from "../api/email";
+import MeetingModal from "../components/MeetingModal";
 import RichEmailEditor, { AttachmentPayload } from "../components/RichEmailEditor";
+import { openWebsite, openWhatsappChat, openWhatsappForCall, startCall, websiteUrl } from "../utils/call";
+import type { Meeting } from "../types";
 
 /**
  * EMAIL INBOX — the Gmail-shaped one.
@@ -84,6 +95,20 @@ function toneFor(key: string): string {
   let hash = 0;
   for (let i = 0; i < key.length; i += 1) hash = (hash * 31 + key.charCodeAt(i)) % 997;
   return AVATAR_TONES[hash % AVATAR_TONES.length];
+}
+
+function hasSmsPhone(phone?: string | null): boolean {
+  const value = (phone || "").trim();
+  return Boolean(value && !value.toLowerCase().startsWith("email:") && /\d/.test(value));
+}
+
+function meetingTime(value?: string | null): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString([], {
+    weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
+  });
 }
 
 function when(value?: string | null): string {
@@ -329,6 +354,10 @@ export default function EmailInboxPage() {
   const [showCc, setShowCc] = useState(false);
   const [sending, setSending] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [showContactInfo, setShowContactInfo] = useState(false);
+  const [showBooking, setShowBooking] = useState(false);
+  const [editingMeetingId, setEditingMeetingId] = useState<number | null>(null);
+  const [contactMeetings, setContactMeetings] = useState<Meeting[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -366,6 +395,7 @@ export default function EmailInboxPage() {
   const open = useCallback(
     async (id: number) => {
       setOpenId(id);
+      setShowContactInfo(false);
       setLoadingDetail(true);
       setReply("");
       setReplyHtml("");
@@ -451,13 +481,39 @@ export default function EmailInboxPage() {
     }
   };
 
+  const loadContactMeetings = useCallback(async (contactId: number) => {
+    try {
+      const { data } = await api.get("/calendar/upcoming", {
+        params: { contact_id: contactId, limit: 5 },
+      });
+      setContactMeetings(data.items || []);
+    } catch {
+      setContactMeetings([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    const contactId = Number(detail?.contact?.id || 0);
+    if (!contactId) {
+      setContactMeetings([]);
+      return;
+    }
+    let cancelled = false;
+    api.get("/calendar/upcoming", { params: { contact_id: contactId, limit: 5 } })
+      .then(({ data }) => { if (!cancelled) setContactMeetings(data.items || []); })
+      .catch(() => { if (!cancelled) setContactMeetings([]); });
+    return () => { cancelled = true; };
+  }, [detail?.conversation?.id, detail?.contact?.id]);
+
   const unreadTotal = useMemo(
     () => conversations.reduce((sum, c) => sum + (c.unread_count || 0), 0),
     [conversations]
   );
 
   const contactName = detail?.contact?.name || detail?.contact?.email || "";
+  const contact: EmailContactDetails | null = detail?.contact || null;
   const threadMessages: EmailMessage[] = detail?.messages || [];
+  const contactHasPhone = hasSmsPhone(contact?.phone_number);
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -753,76 +809,204 @@ export default function EmailInboxPage() {
                     are opted back in on the Contacts page.
                   </p>
                 )}
-              </div>
-
-              {/* Messages */}
-              <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 bg-gray-50/60 dark:bg-gray-900/30 wa-scrollbar">
-                {threadMessages.map((m, index) => (
-                  <MessageCard
-                    key={m.id}
-                    message={m}
-                    contactName={contactName}
-                    // Only the newest message is open by default, like Gmail.
-                    defaultOpen={index === threadMessages.length - 1}
-                    onOpenActivity={() => emailApi.messageEvents(m.id)}
-                  />
-                ))}
-                <div ref={bottomRef} />
-              </div>
-
-              {/* Composer */}
-              <div className="border-t border-gray-100 dark:border-gray-700/70 p-3 sm:p-4 space-y-2 safe-bottom">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
-                    <Reply size={13} /> Reply
-                  </p>
-                  <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                  <div role="tablist" aria-label="Email conversation views" className="flex gap-1 rounded-xl bg-gray-100 dark:bg-gray-900 p-1">
                     <button
-                      className="text-xs text-gray-500 hover:text-primary-600"
-                      onClick={() => setShowCc((v) => !v)}
-                    >
-                      Cc
-                    </button>
-                    <span className="text-[11px] text-gray-400 hidden sm:inline">
-                      sent from {detail.conversation.email_account_name || "the default sender"}
-                    </span>
+                      type="button"
+                      role="tab"
+                      aria-selected={!showContactInfo}
+                      onClick={() => setShowContactInfo(false)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                        !showContactInfo ? "bg-white dark:bg-gray-700 text-primary-700 dark:text-primary-300 shadow-sm" : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
+                      }`}
+                    >Conversation</button>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={showContactInfo}
+                      onClick={() => setShowContactInfo(true)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                        showContactInfo ? "bg-white dark:bg-gray-700 text-primary-700 dark:text-primary-300 shadow-sm" : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
+                      }`}
+                    >Contact information</button>
                   </div>
-                </div>
-                {showCc && (
-                  <input
-                    className="input animate-fade-in"
-                    placeholder="Cc — separate several addresses with a comma"
-                    value={cc}
-                    onChange={(e) => setCc(e.target.value)}
-                  />
-                )}
-                <RichEmailEditor
-                  body={reply}
-                  onBody={setReply}
-                  html={replyHtml}
-                  onHtml={setReplyHtml}
-                  attachments={replyAttachments}
-                  onAttachments={setReplyAttachments}
-                />
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-[11px] text-gray-400 hidden sm:flex items-center gap-1">
-                    <Sparkles size={12} /> Ctrl/⌘ + Enter sends
-                  </p>
                   <button
-                    className="btn-primary w-full sm:w-auto"
-                    onClick={sendReply}
-                    disabled={sending || !reply.trim()}
+                    type="button"
+                    onClick={() => setShowBooking(true)}
+                    className="btn-primary py-2 px-3 text-xs"
+                    title="Book a meeting"
                   >
-                    {sending ? (
-                      <>Sending…</>
-                    ) : (
-                      <>
-                        <Send size={15} /> Send reply
-                      </>
-                    )}
+                    <CalendarPlus size={14} /> Book meeting
                   </button>
                 </div>
               </div>
+
+              {showContactInfo ? (
+                <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-5 bg-gray-50/60 dark:bg-gray-900/30 wa-scrollbar" role="tabpanel" aria-label="Contact information">
+                  {contact ? (
+                    <>
+                      <section className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+                        <div className="flex items-start gap-3">
+                          <span className={`w-12 h-12 rounded-2xl flex items-center justify-center text-sm font-bold shrink-0 ${toneFor(contact.email || String(contact.id))}`}>
+                            {initialsOf(contact.name, contact.email)}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <h3 className="font-semibold text-gray-900 dark:text-white">{contact.name}</h3>
+                            {contact.business_name && <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1.5"><Building2 size={13} /> {contact.business_name}</p>}
+                            <div className="flex flex-wrap gap-1.5 mt-2">
+                              {contact.lead_status && <span className="badge-blue capitalize">{contact.lead_status.replace(/_/g, " ")}</span>}
+                              {contact.email_status && <span className="badge-gray capitalize">Email {contact.email_status}</span>}
+                              {contact.is_email_undeliverable && <span className="badge-red">Undeliverable</span>}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-2 mt-4">
+                          {hasSmsPhone(contact.phone_number) && (
+                            <>
+                              <button type="button" onClick={() => startCall({ contact_id: contact.id })} className="chip text-primary-700 dark:text-primary-300"><Phone size={13} /> Call</button>
+                              <button type="button" onClick={() => openWhatsappChat(contact.phone_number!)} className="chip text-primary-700 dark:text-primary-300"><MessageCircle size={13} /> WhatsApp</button>
+                              <button type="button" onClick={() => openWhatsappForCall(contact.phone_number!, contact.name)} className="chip"><Video size={13} /> WhatsApp call</button>
+                            </>
+                          )}
+                          {websiteUrl(contact.website) && (
+                            <button type="button" onClick={() => openWebsite(contact.website)} className="chip text-primary-700 dark:text-primary-300"><Globe size={13} /> Website</button>
+                          )}
+                        </div>
+                      </section>
+
+                      <section className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+                        <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Contact details</h3>
+                        <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                          {contact.phone_number && hasSmsPhone(contact.phone_number) && (
+                            <div><dt className="text-xs text-gray-400">Phone</dt><dd className="mt-0.5 text-gray-800 dark:text-gray-200">{contact.phone_number}</dd></div>
+                          )}
+                          {contact.email && (
+                            <div><dt className="text-xs text-gray-400">Primary email</dt><dd className="mt-0.5 break-all"><a className="text-primary-600 dark:text-primary-400 hover:underline" href={`mailto:${contact.email}`}>{contact.email}</a></dd></div>
+                          )}
+                          {(contact.email_aliases || []).length > 0 && (
+                            <div className="sm:col-span-2"><dt className="text-xs text-gray-400">Alternate email addresses</dt><dd className="mt-1 flex flex-wrap gap-1.5">
+                              {(contact.email_aliases || []).map((address) => <a key={address} href={`mailto:${address}`} className="chip text-primary-600 dark:text-primary-300 break-all">{address}<span className="text-[10px] text-gray-400">used in replies</span></a>)}
+                            </dd></div>
+                          )}
+                          {contact.website && <div><dt className="text-xs text-gray-400">Website</dt><dd className="mt-0.5 break-all"><a className="text-primary-600 dark:text-primary-400 hover:underline" href={websiteUrl(contact.website) || undefined} target="_blank" rel="noreferrer">{contact.website}</a></dd></div>}
+                          {contact.industry && <div><dt className="text-xs text-gray-400">Industry</dt><dd className="mt-0.5 text-gray-800 dark:text-gray-200">{contact.industry}</dd></div>}
+                          {(contact.city || contact.state || contact.country) && <div><dt className="text-xs text-gray-400 flex items-center gap-1"><MapPin size={11} /> Location</dt><dd className="mt-0.5 text-gray-800 dark:text-gray-200">{[contact.city, contact.state, contact.country].filter(Boolean).join(", ")}</dd></div>}
+                          {contact.source && <div><dt className="text-xs text-gray-400">Source</dt><dd className="mt-0.5 text-gray-800 dark:text-gray-200">{contact.source}</dd></div>}
+                        </dl>
+                        {contact.notes && <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-700"><p className="text-xs text-gray-400">Notes</p><p className="mt-1 text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{contact.notes}</p></div>}
+                        {Object.keys(contact.custom_fields || {}).length > 0 && (
+                          <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-700">
+                            <p className="text-xs text-gray-400 mb-2">Other saved details</p>
+                            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
+                              {Object.entries(contact.custom_fields || {}).map(([key, value]) => (
+                                <div key={key}><dt className="text-xs text-gray-400 capitalize">{key.replace(/_/g, " ")}</dt><dd className="mt-0.5 break-words text-gray-800 dark:text-gray-200">{typeof value === "string" ? value : JSON.stringify(value)}</dd></div>
+                              ))}
+                            </dl>
+                          </div>
+                        )}
+                        {(contact.tags || []).length > 0 && (
+                          <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-700">
+                            <p className="text-xs text-gray-400 mb-2">Tags</p>
+                            <div className="flex flex-wrap gap-1.5">{(contact.tags || []).map((tag) => <span key={tag} className="badge-gray">{tag}</span>)}</div>
+                          </div>
+                        )}
+                      </section>
+
+                      <section className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+                        <div className="flex items-center justify-between gap-2 mb-3">
+                          <div><h3 className="text-sm font-semibold text-gray-900 dark:text-white">Upcoming meetings</h3><p className="text-xs text-gray-400 mt-0.5">Bookings linked to this contact</p></div>
+                          <button type="button" onClick={() => setShowBooking(true)} className="btn-primary py-2 px-3 text-xs"><CalendarPlus size={14} /> Book</button>
+                        </div>
+                        {contactMeetings.length === 0 ? (
+                          <p className="text-sm text-gray-500 dark:text-gray-400 py-2">No upcoming meetings booked.</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {contactMeetings.map((meeting) => (
+                              <button key={meeting.id} type="button" onClick={() => setEditingMeetingId(meeting.id)} className="w-full rounded-xl border border-gray-100 dark:border-gray-700 px-3 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 flex items-center justify-between gap-3">
+                                <span className="min-w-0"><span className="block text-sm font-medium text-gray-900 dark:text-white truncate">{meeting.title}</span><span className="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">{meetingTime(meeting.starts_at)}{meeting.location ? ` · ${meeting.location}` : ""}</span></span>
+                                <span className="badge-gray capitalize shrink-0">{meeting.status.replace(/_/g, " ")}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </section>
+                    </>
+                  ) : (
+                    <p className="text-sm text-gray-500">No contact record is linked to this conversation.</p>
+                  )}
+                </div>
+              ) : (
+                <>
+                  {/* Messages */}
+                  <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 bg-gray-50/60 dark:bg-gray-900/30 wa-scrollbar">
+                    {threadMessages.map((m, index) => (
+                      <MessageCard
+                        key={m.id}
+                        message={m}
+                        contactName={contactName}
+                        // Only the newest message is open by default, like Gmail.
+                        defaultOpen={index === threadMessages.length - 1}
+                        onOpenActivity={() => emailApi.messageEvents(m.id)}
+                      />
+                    ))}
+                    <div ref={bottomRef} />
+                  </div>
+
+                  {/* Composer */}
+                  <div className="border-t border-gray-100 dark:border-gray-700/70 p-3 sm:p-4 space-y-2 safe-bottom">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                        <Reply size={13} /> Reply
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <button
+                          className="text-xs text-gray-500 hover:text-primary-600"
+                          onClick={() => setShowCc((v) => !v)}
+                        >
+                          Cc
+                        </button>
+                        <span className="text-[11px] text-gray-400 hidden sm:inline">
+                          sent from {detail.conversation.email_account_name || "the default sender"}
+                        </span>
+                      </div>
+                    </div>
+                    {showCc && (
+                      <input
+                        className="input animate-fade-in"
+                        placeholder="Cc — separate several addresses with a comma"
+                        value={cc}
+                        onChange={(e) => setCc(e.target.value)}
+                      />
+                    )}
+                    <RichEmailEditor
+                      body={reply}
+                      onBody={setReply}
+                      html={replyHtml}
+                      onHtml={setReplyHtml}
+                      attachments={replyAttachments}
+                      onAttachments={setReplyAttachments}
+                    />
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-[11px] text-gray-400 hidden sm:flex items-center gap-1">
+                        <Sparkles size={12} /> Ctrl/⌘ + Enter sends
+                      </p>
+                      <button
+                        className="btn-primary w-full sm:w-auto"
+                        onClick={sendReply}
+                        disabled={sending || !reply.trim()}
+                      >
+                        {sending ? (
+                          <>Sending…</>
+                        ) : (
+                          <>
+                            <Send size={15} /> Send reply
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
             </>
           ) : (
             <div className="flex-1 flex items-center justify-center p-10 text-gray-500">
@@ -842,6 +1026,32 @@ export default function EmailInboxPage() {
         connected under Email Manager → Replies, replies are sent from that mailbox so they thread
         correctly in the prospect's Gmail.
       </p>
+
+      {showBooking && contact && (
+        <MeetingModal
+          initial={{
+            contactIds: [contact.id],
+            conversationId: openId || undefined,
+            sendInvite: contactHasPhone,
+            sendReminder: contactHasPhone,
+          }}
+          onClose={() => setShowBooking(false)}
+          onSaved={() => {
+            setShowBooking(false);
+            void loadContactMeetings(contact.id);
+          }}
+        />
+      )}
+      {editingMeetingId !== null && (
+        <MeetingModal
+          meetingId={editingMeetingId}
+          onClose={() => setEditingMeetingId(null)}
+          onSaved={() => {
+            setEditingMeetingId(null);
+            if (contact) void loadContactMeetings(contact.id);
+          }}
+        />
+      )}
     </div>
   );
 }

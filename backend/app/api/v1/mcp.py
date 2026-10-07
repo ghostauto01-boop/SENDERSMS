@@ -848,7 +848,16 @@ async def _token_from_refresh(request: Request, profile: C.ConnectorProfile, db:
     if client.client_id != row.client_id:
         raise oauth_flow.OAuthError("invalid_grant", "client_id does not match the refresh token")
 
-    scope = oauth_flow.normalize_scope(params.get("scope"), maximum=row.scope) or row.scope
+    requested_scope = str(params.get("scope") or "").strip()
+    # RFC 6749 refresh requests normally omit scope to retain the grant. Passing
+    # None through normalize_scope would silently turn every refreshed write
+    # token into read-only, which makes a connector appear to lose permissions
+    # after its first access-token expiry.
+    scope = (
+        oauth_flow.normalize_scope(requested_scope, maximum=row.scope)
+        if requested_scope
+        else (row.scope or "read")
+    )
     row.revoked_at = datetime.now(timezone.utc)
     granted = await oauth_flow.grant_tokens(
         db,

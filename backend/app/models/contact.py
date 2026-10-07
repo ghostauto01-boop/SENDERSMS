@@ -95,6 +95,10 @@ class Contact(Base):
     list_memberships: Mapped[list["ContactListMember"]] = relationship(
         "ContactListMember", back_populates="contact", cascade="all, delete-orphan"
     )
+    email_aliases: Mapped[list["EmailContactAddress"]] = relationship(
+        "EmailContactAddress", back_populates="contact", cascade="all, delete-orphan",
+        lazy="selectin",
+    )
 
     def __repr__(self):
         return f"<Contact(id={self.id}, phone={self.phone_number})>"
