@@ -12,7 +12,10 @@ class ContactCreate(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     business_name: Optional[str] = None
-    phone_number: str = Field(..., max_length=20)
+    #: Optional: a contact is identified by a phone OR an email. Both may be
+    #: given. A request with neither is rejected in the route, not here, so the
+    #: error message can explain which one is missing.
+    phone_number: Optional[str] = Field(default=None, max_length=20)
     email: Optional[str] = None
     city: Optional[str] = None
     state: Optional[str] = None
@@ -29,6 +32,9 @@ class ContactUpdate(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     business_name: Optional[str] = None
+    #: Settable, so a phone-only contact imported from an email file can be
+    #: given its number later without a re-import.
+    phone_number: Optional[str] = None
     email: Optional[str] = None
     city: Optional[str] = None
     state: Optional[str] = None
@@ -50,7 +56,8 @@ class ContactOut(BaseModel):
     first_name: Optional[str]
     last_name: Optional[str]
     business_name: Optional[str]
-    phone_number: str
+    #: Null for an email-only contact — the UI shows the address instead.
+    phone_number: Optional[str] = None
     email: Optional[str]
     city: Optional[str]
     state: Optional[str]
@@ -74,6 +81,15 @@ class ContactOut(BaseModel):
     emails_sent: int = 0
     emails_received: int = 0
     last_emailed_at: Optional[datetime] = None
+    # Email enrichment provenance. The UI needs all four to answer "can I
+    # safely email this?" and "why does this address look odd?" — and to show
+    # an unverified guess as an unverified guess.
+    email_source: Optional[str] = None
+    email_verified: bool = False
+    email_verified_at: Optional[datetime] = None
+    email_confidence: Optional[int] = None
+    email_enriched_at: Optional[datetime] = None
+    email_enrichment_note: Optional[str] = None
     # Opt-out audit trail. These were recorded in the DB but never returned by
     # the API, so the UI could not show WHY or WHEN a contact opted out.
     opt_out_reason: Optional[str] = None

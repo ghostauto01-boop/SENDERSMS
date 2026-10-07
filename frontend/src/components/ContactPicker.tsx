@@ -17,10 +17,17 @@ interface Props {
   className?: string;
 }
 
-export const contactName = (c: Partial<Contact> & { phone_number?: string }) =>
+// `phone_number` is `string | null` on Contact (email-only contacts exist), so
+// these helpers accept a nullable field and never assume a number is present.
+type PickableContact = Partial<Omit<Contact, "phone_number">> & {
+  phone_number?: string | null;
+};
+
+export const contactName = (c: PickableContact) =>
   `${c.first_name || ""} ${c.last_name || ""}`.trim() ||
   c.business_name ||
   c.phone_number ||
+  c.email ||
   "Unnamed";
 
 export const avatarColor = (name: string) => {
@@ -33,11 +40,14 @@ export const avatarColor = (name: string) => {
   return colors[h];
 };
 
-export const contactInitials = (c: Partial<Contact> & { phone_number?: string }) => {
+export const contactInitials = (c: PickableContact) => {
   if (c.first_name || c.last_name)
     return `${(c.first_name?.[0] || "").toUpperCase()}${(c.last_name?.[0] || "").toUpperCase()}`;
   if (c.business_name) return c.business_name.slice(0, 2).toUpperCase();
-  return (c.phone_number || "??").slice(-2);
+  // Fall back to whatever identifies them — an email-only contact has no digits
+  // to slice here.
+  const channel = c.phone_number || c.email || "";
+  return channel ? channel.replace(/[^A-Za-z0-9]/g, "").slice(-2).toUpperCase() || "??" : "??";
 };
 
 export default function ContactPicker({

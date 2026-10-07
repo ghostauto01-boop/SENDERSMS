@@ -25,6 +25,9 @@ redis==5.2.1
 
 # HTTP
 httpx==0.28.1
+# MX lookups for the free email-enrichment stage. Optional: the enrichment
+# service degrades to syntax-only diagnosis when this is absent.
+dnspython==2.7.0
 
 # Inbuilt browser notifications (VAPID Web Push — free, no third party)
 pywebpush==2.5.0

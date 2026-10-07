@@ -24,7 +24,10 @@ export function whatsappChatUrl(phone: string, text?: string): string {
  * drops the user straight into the contact's chat where the call button sits
  * in the header bar, so the whole flow is open → tap call.
  */
-export function openWhatsappForCall(phone: string, name?: string) {
+export function openWhatsappForCall(phone?: string | null, name?: string) {
+  // Email-only contacts reach this from a shared action bar; do nothing rather
+  // than opening a chat with a blank number.
+  if (!phone) return;
   window.open(whatsappChatUrl(phone), "_blank", "noopener");
   toast.success(
     name
@@ -34,7 +37,8 @@ export function openWhatsappForCall(phone: string, name?: string) {
   );
 }
 
-export function openWhatsappChat(phone: string, text?: string) {
+export function openWhatsappChat(phone?: string | null, text?: string) {
+  if (!phone) return;
   window.open(whatsappChatUrl(phone, text), "_blank", "noopener");
 }
 
@@ -112,7 +116,15 @@ export async function startCall(opts: { contact_id?: number; phone_number?: stri
   }
 }
 
-export function displayName(c: { first_name?: string | null; last_name?: string | null; business_name?: string | null; phone_number: string }): string {
+export function displayName(c: {
+  first_name?: string | null;
+  last_name?: string | null;
+  business_name?: string | null;
+  // Nullable: a contact can be email-only, in which case the address is the
+  // only thing there is to name them by.
+  phone_number?: string | null;
+  email?: string | null;
+}): string {
   const n = `${c.first_name || ""} ${c.last_name || ""}`.trim();
-  return n || c.business_name || c.phone_number;
+  return n || c.business_name || c.phone_number || c.email || "Unnamed";
 }

@@ -87,6 +87,31 @@ services:
         value: ""
       - key: GOOGLE_CLIENT_SECRET
         value: ""
+      # --- Email enrichment (free tiers, all optional) ----------------------
+      # Contacts may now be phone-only, email-only or both, and enrichment
+      # fills in missing addresses and verifies the ones on file. Cleaning and
+      # MX/typo diagnosis are free and always on; these keys add provider
+      # lookups on their free monthly allowances.
+      # A pattern-guessed address is stored UNVERIFIED and excluded from sends.
+      - key: EMAIL_ENRICHMENT_ENABLED
+        value: "true"
+      - key: EMAIL_ENRICHMENT_USE_PROVIDERS
+        value: "true"
+      # Off by default: guesses are unverified by definition.
+      - key: EMAIL_ENRICHMENT_ALLOW_INFERRED
+        value: "false"
+      # Guessed addresses stay visible on the contact but are held back from
+      # sends unless this is flipped on deliberately.
+      - key: EMAIL_SEND_INFERRED
+        value: "false"
+      # hunter.io (finder + verifier), zerobounce.net / neverbounce.com
+      # (verification). Leave blank to run the free stages only.
+      - key: HUNTER_API_KEY
+        value: ""
+      - key: ZEROBOUNCE_API_KEY
+        value: ""
+      - key: NEVERBOUNCE_API_KEY
+        value: ""
       # --- AI connectors (MCP) ---------------------------------------------
       # ChatGPT / Claude / Arena connect over OAuth 2.1 at
       # <PUBLIC_BASE_URL>/connectors/<client>/mcp.

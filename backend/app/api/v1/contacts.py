@@ -20,7 +20,7 @@ from app.models.contact_list import ContactList, ContactListMember
 from app.models.user import User
 from app.schemas.contact import ContactCreate, ContactUpdate, ContactOut, ContactListOut, BulkAction
 from app.security.auth import get_current_user
-from app.utils.phone import normalize_nigerian_number
+from app.utils.contact_identity import clean_phone, normalize_email
 
 router = APIRouter()
 
@@ -89,14 +89,22 @@ def _apply_channel_filters(query, email_state: Optional[str]):
     * ``emailable``   — has an address and has not opted out or bounced
     * ``no_email``    — has no usable address (nothing to send to)
     * ``unsubscribed``/``bounced`` — the two states that block email
+    * ``verified``    — confirmed to exist by a real verification call
+    * ``unverified``  — has an address nobody confirmed (includes guesses)
+    * ``inferred``    — the address was pattern-guessed, never proven
+
+    ``unverified`` and ``inferred`` exist so the UI can answer "how many
+    addresses can I actually trust?" and so a send can exclude guesses, which
+    is the whole reason a guess is stored with a flag instead of being passed
+    off as a normal address.
     """
     if not email_state:
         return query
     state = email_state.lower()
+    has_address = (Contact.email.isnot(None), Contact.email != "")
     if state in ("emailable", "has_email"):
         query = query.where(
-            Contact.email.isnot(None),
-            Contact.email != "",
+            *has_address,
             Contact.is_email_opted_out.is_(False),
             Contact.is_email_undeliverable.is_(False),
         )
@@ -106,6 +114,12 @@ def _apply_channel_filters(query, email_state: Optional[str]):
         query = query.where(Contact.is_email_opted_out.is_(True))
     elif state == "bounced":
         query = query.where(Contact.is_email_undeliverable.is_(True))
+    elif state == "verified":
+        query = query.where(*has_address, Contact.email_verified.is_(True))
+    elif state == "unverified":
+        query = query.where(*has_address, Contact.email_verified.is_(False))
+    elif state == "inferred":
+        query = query.where(*has_address, Contact.email_source == "inferred")
     return query
 
 
@@ -243,23 +257,43 @@ async def create_contact(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Create a new contact."""
-    # Normalize phone number
-    normalized = normalize_nigerian_number(data.phone_number)
-    if not normalized:
-        raise HTTPException(status_code=400, detail="Invalid Nigerian phone number")
+    """Create a new contact.
 
-    # Check for duplicates
-    existing = await db.execute(select(Contact).where(Contact.phone_number == normalized))
-    if existing.scalar_one_or_none():
-        raise HTTPException(status_code=409, detail="Contact with this phone number already exists")
+    A contact needs a phone number or an email address — not both. A phone-only
+    lead and an email-only lead are equally valid records; a request with
+    neither is refused, because there would be no way to reach that person.
+    """
+    normalized = clean_phone(data.phone_number)
+    email = normalize_email(data.email)
+
+    if data.phone_number and not normalized:
+        raise HTTPException(status_code=400, detail="Invalid Nigerian phone number")
+    if not normalized and not email:
+        raise HTTPException(
+            status_code=400,
+            detail="A contact needs a phone number or an email address",
+        )
+
+    # Check for duplicates on whichever identifiers are present.
+    if normalized:
+        existing = await db.execute(select(Contact).where(Contact.phone_number == normalized))
+        if existing.scalar_one_or_none():
+            raise HTTPException(status_code=409, detail="Contact with this phone number already exists")
+    if email:
+        existing = await db.execute(
+            select(Contact).where(func.lower(Contact.email) == email).limit(1)
+        )
+        if existing.scalars().first():
+            raise HTTPException(status_code=409, detail="Contact with this email already exists")
 
     contact = Contact(
         first_name=data.first_name,
         last_name=data.last_name,
         business_name=data.business_name,
         phone_number=normalized,
-        email=data.email,
+        email=email,
+        email_lower=email,
+        email_source="manual" if email else None,
         city=data.city,
         state=data.state,
         country=data.country or "Nigeria",
@@ -290,6 +324,62 @@ async def update_contact(
         raise HTTPException(status_code=404, detail="Contact not found")
 
     update_data = data.model_dump(exclude_unset=True)
+
+    # Normalise the two identity fields rather than storing whatever was typed,
+    # and refuse an edit that would leave the contact with no way to be reached.
+    if "phone_number" in update_data:
+        raw_phone = update_data["phone_number"]
+        if raw_phone in (None, ""):
+            # Clearing the phone is allowed only when an address remains.
+            update_data["phone_number"] = None
+        else:
+            normalized = clean_phone(raw_phone)
+            if not normalized:
+                raise HTTPException(status_code=400, detail="Invalid Nigerian phone number")
+            clash = await db.execute(
+                select(Contact).where(
+                    Contact.phone_number == normalized, Contact.id != contact_id
+                )
+            )
+            if clash.scalar_one_or_none():
+                raise HTTPException(
+                    status_code=409, detail="Another contact already has this phone number"
+                )
+            update_data["phone_number"] = normalized
+
+    if "email" in update_data:
+        raw_email = update_data["email"]
+        email = normalize_email(raw_email)
+        if raw_email in (None, "") or not email:
+            update_data["email"] = None
+            update_data["email_lower"] = None
+        else:
+            clash = await db.execute(
+                select(Contact).where(
+                    func.lower(Contact.email) == email, Contact.id != contact_id
+                ).limit(1)
+            )
+            if clash.scalars().first():
+                raise HTTPException(
+                    status_code=409, detail="Another contact already has this email"
+                )
+            update_data["email"] = email
+            update_data["email_lower"] = email
+            # A human just typed this: it supersedes any machine verdict.
+            if email != (contact.email or "").lower():
+                update_data["email_source"] = "manual"
+                update_data["email_verified"] = False
+                update_data["email_verified_at"] = None
+                update_data["email_confidence"] = None
+
+    resulting_phone = update_data.get("phone_number", contact.phone_number)
+    resulting_email = update_data.get("email", contact.email)
+    if not resulting_phone and not resulting_email:
+        raise HTTPException(
+            status_code=400,
+            detail="A contact needs a phone number or an email address",
+        )
+
     for key, value in update_data.items():
         setattr(contact, key, value)
     contact.updated_at = datetime.now(timezone.utc)
@@ -685,13 +775,8 @@ async def import_csv(
 
     return {
         "new_variables": new_variables,
-        "imported": result.imported,
-        "skipped": result.skipped,
-        "invalid": result.invalid,
-        "duplicates": result.duplicates,
-        "total_rows": result.total_rows,
+        **result.as_dict(),
         "errors": result.errors[:50],  # Limit error report
-        "imported_ids": result.imported_contact_ids,
         "list": (
             {
                 "id": target_list.id,
@@ -702,6 +787,136 @@ async def import_csv(
             else None
         ),
     }
+
+
+@router.get("/enrich/status")
+async def enrichment_status(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Which enrichment stages are available, and how much work is outstanding.
+
+    ``providers`` lists the ones with an API key configured, so the UI can tell
+    "nothing to do here, there is no key" apart from "the key is exhausted".
+    """
+    from app.config import settings as _settings
+    from app.services import email_enrichment as enrichment
+
+    total = (await db.execute(select(func.count(Contact.id)))).scalar() or 0
+    with_email = (
+        await db.execute(
+            select(func.count(Contact.id)).where(
+                Contact.email.isnot(None), Contact.email != ""
+            )
+        )
+    ).scalar() or 0
+    verified = (
+        await db.execute(
+            select(func.count(Contact.id)).where(Contact.email_verified.is_(True))
+        )
+    ).scalar() or 0
+    unverified = (
+        await db.execute(
+            select(func.count(Contact.id)).where(
+                Contact.email.isnot(None),
+                Contact.email != "",
+                Contact.email_verified.is_(False),
+            )
+        )
+    ).scalar() or 0
+    inferred = (
+        await db.execute(
+            select(func.count(Contact.id)).where(Contact.email_source == "inferred")
+        )
+    ).scalar() or 0
+
+    return {
+        "enabled": _settings.EMAIL_ENRICHMENT_ENABLED,
+        "providers": sorted(enrichment.configured_providers().keys()),
+        "providers_active": _settings.email_enrichment_active,
+        "allow_inferred": _settings.EMAIL_ENRICHMENT_ALLOW_INFERRED,
+        # Whether a guessed address may actually be emailed. It is always
+        # *stored*; this is the send-time rule, reported so the UI can explain
+        # why a guessed address never appears in a campaign's recipients.
+        "send_inferred": _settings.EMAIL_SEND_INFERRED,
+        "dns_available": enrichment._dns_available(),
+        "free_stages": ["clean", "diagnose"],
+        "paid_stages": ["find", "verify"],
+        "contacts": {
+            "total": total,
+            "with_email": with_email,
+            "without_email": max(total - with_email, 0),
+            "verified": verified,
+            "unverified": unverified,
+            "inferred": inferred,
+        },
+    }
+
+
+@router.post("/enrich")
+async def enrich_emails(
+    contact_ids: Optional[list[int]] = Query(default=None),
+    scope: str = Query("ids", description="ids | all | no_email | unverified"),
+    search: Optional[str] = None,
+    lead_status: Optional[str] = None,
+    tag: Optional[str] = None,
+    allow_inferred: Optional[bool] = None,
+    limit: int = Query(default=500, ge=1, le=5000),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Clean, find and verify email addresses for contacts that need it.
+
+    ``scope`` decides who is processed:
+
+    * ``ids``        — the listed ``contact_ids`` (the UI's selection)
+    * ``all``        — every contact matching the current filters
+    * ``no_email``   — only contacts with no address (the finders' queue)
+    * ``unverified`` — only contacts with an address nobody has confirmed yet
+
+    ``limit`` caps a single run by default so one click cannot burn an entire
+    monthly provider quota (Hunter's free plan is ~25 searches a month). The
+    caller can raise it deliberately.
+    """
+    from app.services import email_enrichment as enrichment
+
+    if scope == "ids":
+        ids = sorted({int(cid) for cid in (contact_ids or []) if cid is not None})
+        if not ids:
+            raise HTTPException(status_code=400, detail="No contacts selected")
+        query = select(Contact).where(Contact.id.in_(ids))
+    else:
+        query = _apply_contact_filters(select(Contact), search, lead_status, tag)
+        if scope == "no_email":
+            query = query.where(or_(Contact.email.is_(None), Contact.email == ""))
+        elif scope == "unverified":
+            query = query.where(
+                Contact.email.isnot(None),
+                Contact.email != "",
+                Contact.email_verified.is_(False),
+            )
+        elif scope != "all":
+            raise HTTPException(
+                status_code=400,
+                detail="scope must be one of: ids, all, no_email, unverified",
+            )
+        query = query.order_by(Contact.id.asc())
+
+    contacts = list((await db.execute(query.limit(limit))).scalars().all())
+    if not contacts:
+        return {
+            "success": True, "processed": 0, "matched": 0,
+            "message": "Nothing to enrich for that selection",
+            "items": [],
+        }
+
+    report = await enrichment.enrich_contacts(
+        db, contacts, allow_inferred=allow_inferred
+    )
+    report["matched"] = len(contacts)
+    report["capped"] = len(contacts) >= limit
+    await db.commit()
+    return report
 
 
 @router.get("/export/csv")

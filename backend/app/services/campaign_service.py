@@ -316,10 +316,21 @@ class CampaignService:
             ).scalar_one_or_none()
             if not contact:
                 continue
-            from app.services.list_hygiene import contact_is_blocked_from_send
 
-            if contact_is_blocked_from_send(contact):
-                continue
+            # The eligibility gate has to match the channel. Screening an EMAIL
+            # campaign with the SMS rules dropped every email-only contact —
+            # exactly the contacts an email campaign exists to reach — because
+            # they have no phone number to classify.
+            if (campaign.channel or "sms") == "email":
+                from app.services import email_service
+
+                if await email_service.contact_email_problem(self.db, contact):
+                    continue
+            else:
+                from app.services.list_hygiene import contact_is_blocked_from_send
+
+                if contact_is_blocked_from_send(contact):
+                    continue
 
             cc = CampaignContact(
                 campaign_id=campaign.id,

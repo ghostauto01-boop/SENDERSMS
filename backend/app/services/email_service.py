@@ -42,6 +42,9 @@ from app.models.conversation import Conversation, Message
 from app.models.email import EmailAccount, EmailEvent, EmailSuppression
 from app.models.email_inbox import EmailContactAddress
 from app.security.encryption import decrypt_value, encrypt_value
+# One definition of "a usable email address" for the whole app: import,
+# enrichment and sending all call this.
+from app.utils.contact_identity import normalize_email as _shared_normalize_email
 from app.utils.naming import contact_display_name
 
 logger = logging.getLogger(__name__)
@@ -52,7 +55,8 @@ CHANNELS = ("sms", "email")
 #: CSV export spells "no email".
 _PLACEHOLDER_DOMAINS = {"example.com", "example.org", "test.com", "localhost", "invalid"}
 
-_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[A-Za-z]{2,}$")
+# The address syntax rule now lives with the rest of the contact-identity
+# rules (app.utils.contact_identity); normalize_email below delegates to it.
 
 UNSUBSCRIBE_KEYWORDS = ("unsubscribe", "stop", "opt out", "opt-out", "remove me", "no more emails")
 
@@ -77,15 +81,15 @@ _STOP_LOOKALIKES = re.compile(
 
 
 def normalize_email(raw: str | None) -> str | None:
-    """Lower-case/trim an address, or ``None`` when it is unusable."""
-    if not raw:
-        return None
-    value = str(raw).strip().strip("<>").strip().strip(",").lower()
-    if not value or " " in value:
-        return None
-    if not _EMAIL_RE.match(value):
-        return None
-    return value
+    """Lower-case/trim an address, or ``None`` when it is unusable.
+
+    Delegates to the shared rule in :mod:`app.utils.contact_identity` so the
+    importer, enrichment and the sender can never disagree about what counts as
+    a valid address. (It used to be a second, slightly different implementation
+    here, which is how ``"<a@b.com>,"`` was accepted by one path and rejected by
+    another.)
+    """
+    return _shared_normalize_email(raw)
 
 
 async def find_contact_by_email(db: AsyncSession, address: str | None) -> Contact | None:
@@ -543,6 +547,18 @@ async def contact_email_problem(
         return "email_opted_out"
     if contact.is_email_undeliverable or contact.email_status == "bounced":
         return "email_bounced"
+    # A pattern-guessed address is unverified by construction. It is stored on
+    # the contact (so it is visible and reviewable) but held back from every
+    # send path unless the operator opts in — see EMAIL_SEND_INFERRED. The gate
+    # is skipped when the caller passes some other address (a reply alias, a
+    # thread address): if the person wrote to us from it, it is not a guess.
+    primary = normalize_email(contact.email)
+    if (
+        recipient == primary
+        and (contact.email_source or "") == "inferred"
+        and not settings.EMAIL_SEND_INFERRED
+    ):
+        return "inferred_unverified"
     if await get_suppression(db, recipient):
         return "suppressed"
     return None

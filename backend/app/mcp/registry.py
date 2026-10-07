@@ -127,11 +127,15 @@ LIST_ID = Param("list_id", type="integer", description="Contact list id.", where
 def _contact_fields(for_create: bool = False) -> list[Param]:
     """The columns an operator actually imports, in one place.
 
-    ``phone_number`` only appears when creating: the app's contact records are
-    phone-first (it began life as an SMS tool), so a new contact must have one,
-    but the update endpoint deliberately does not accept a new number — changing
-    a phone number would silently inherit the old contact's history. ``for_create``
-    keeps the tool schema honest in both directions.
+    ``phone_number`` only appears when creating: the update endpoint
+    deliberately does not accept a new number, because changing a phone number
+    would silently inherit the old contact's history. ``for_create`` keeps the
+    tool schema honest in both directions.
+
+    Neither channel is individually required any more. A contact needs a phone
+    number *or* an email address, so the only thing the schema can honestly say
+    is "at least one of these two" — the API is where that is enforced, and it
+    answers 400 with the reason when both are missing.
     """
     fields = [
         Param("email", description="Email address. Required to receive email from this app.", where="body"),
@@ -148,13 +152,16 @@ def _contact_fields(for_create: bool = False) -> list[Param]:
         Param("tags", type="array", items="string", description="Tag names.", where="body"),
     ]
     if for_create:
-        # Mirrors ContactCreate: the API rejects a contact without a number.
+        # Mirrors ContactCreate: the API rejects a contact with neither channel,
+        # so neither is marked required here — flagging phone_number as required
+        # would make every AI client refuse to create an email-only contact,
+        # which is exactly the case this app now supports.
         fields.insert(0, Param(
-            "phone_number", required=True, where="body",
+            "phone_number", where="body",
             description=(
                 "The contact's phone number in international form, e.g. +2348012345678. "
-                "Required: records are phone-first, so every contact needs one even if you "
-                "only ever email them."
+                "Optional, but a contact needs a phone number or an email address — "
+                "provide at least one."
             ),
         ))
     return fields
@@ -198,8 +205,8 @@ TOOLS: list[Tool] = [
     Tool(
         name="create_contact",
         description=(
-            "Create one contact. A phone number is required (records are phone-first); add an "
-            "email too if they should receive email. Refuses a duplicate phone or email."
+            "Create one contact. Provide a phone number, an email address, or both — a "
+            "contact with neither is refused. Refuses a duplicate phone or email."
         ),
         method="POST", path="/api/v1/contacts/", scope="write", group="contacts",
         params=_contact_fields(for_create=True),

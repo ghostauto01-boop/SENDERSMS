@@ -5,7 +5,9 @@ import { startCall, openWhatsappChat, openWhatsappForCall, openWebsite, websiteU
 
 interface Props {
   contactId?: number;
-  phone: string;
+  /** Null for an email-only contact — the phone actions are then hidden
+   *  rather than rendered as buttons that can only fail. */
+  phone?: string | null;
   name?: string;
   website?: string | null;
   /** show SMS button (needs an onSms handler from the parent) */
@@ -21,13 +23,16 @@ interface Props {
 function ContactActions({ contactId, phone, name, website, onSms, size = "sm", layout = "row" }: Props) {
   const [calling, setCalling] = useState(false);
   const hasSite = !!websiteUrl(website);
+  const hasPhone = !!phone;
   const btn = size === "sm" ? "w-8 h-8" : "w-10 h-10";
   const icon = size === "sm" ? 14 : 17;
 
   const doCall = async () => {
     setCalling(true);
     try {
-      await startCall(contactId ? { contact_id: contactId } : { phone_number: phone });
+      await startCall(
+        contactId ? { contact_id: contactId } : { phone_number: phone as string },
+      );
     } finally {
       setCalling(false);
     }
@@ -36,6 +41,7 @@ function ContactActions({ contactId, phone, name, website, onSms, size = "sm", l
   if (layout === "bar") {
     return (
       <div className="flex gap-2">
+        {hasPhone && (
         <button
           onClick={doCall}
           disabled={calling}
@@ -44,7 +50,8 @@ function ContactActions({ contactId, phone, name, website, onSms, size = "sm", l
         >
           {calling ? <Loader2 size={14} className="animate-spin" /> : <Phone size={14} />} Call
         </button>
-        {onSms && (
+        )}
+        {onSms && hasPhone && (
           <button
             onClick={onSms}
             className="flex-1 bg-primary-700 hover:bg-primary-600 text-white rounded-full py-2.5 text-[13px] font-semibold flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform"
@@ -52,20 +59,24 @@ function ContactActions({ contactId, phone, name, website, onSms, size = "sm", l
             <MessageSquare size={14} /> SMS
           </button>
         )}
+        {hasPhone && (
+        <>
         <button
-          onClick={() => openWhatsappForCall(phone, name)}
+          onClick={() => openWhatsappForCall(phone as string, name)}
           title="Call on WhatsApp (opens the chat — tap the call icon)"
           className="w-[52px] bg-primary-600 hover:bg-primary-700 text-white rounded-full py-2.5 flex items-center justify-center active:scale-[0.98] transition-transform"
         >
           <PhoneCall size={16} />
         </button>
         <button
-          onClick={() => openWhatsappChat(phone)}
+          onClick={() => openWhatsappChat(phone as string)}
           title="Open WhatsApp chat"
           className="w-[52px] bg-primary-600/15 hover:bg-primary-600 hover:text-white text-primary-700 rounded-full py-2.5 flex items-center justify-center active:scale-[0.98] transition-transform"
         >
           <MessageCircle size={16} />
         </button>
+        </>
+        )}
         {hasSite && (
           <button
             onClick={() => openWebsite(website)}
@@ -81,6 +92,7 @@ function ContactActions({ contactId, phone, name, website, onSms, size = "sm", l
 
   return (
     <div className="flex gap-1">
+      {hasPhone && (
       <button
         onClick={doCall}
         disabled={calling}
@@ -89,7 +101,8 @@ function ContactActions({ contactId, phone, name, website, onSms, size = "sm", l
       >
         {calling ? <Loader2 size={icon} className="animate-spin" /> : <Phone size={icon} />}
       </button>
-      {onSms && (
+      )}
+      {onSms && hasPhone && (
         <button
           onClick={onSms}
           className={`${btn} rounded-full bg-primary-700/10 hover:bg-primary-700 hover:text-white text-primary-700 flex items-center justify-center`}
@@ -98,20 +111,24 @@ function ContactActions({ contactId, phone, name, website, onSms, size = "sm", l
           <MessageSquare size={icon} />
         </button>
       )}
+      {hasPhone && (
+      <>
       <button
-        onClick={() => openWhatsappForCall(phone, name)}
+        onClick={() => openWhatsappForCall(phone as string, name)}
         className={`${btn} rounded-full bg-primary-600 text-white flex items-center justify-center hover:bg-primary-700`}
         title="Call on WhatsApp (opens the chat — tap the call icon)"
       >
         <PhoneCall size={icon} />
       </button>
       <button
-        onClick={() => openWhatsappChat(phone)}
+        onClick={() => openWhatsappChat(phone as string)}
         className={`${btn} rounded-full bg-primary-600/10 hover:bg-primary-600 hover:text-white text-primary-700 flex items-center justify-center`}
         title="Open WhatsApp chat"
       >
         <MessageCircle size={icon} />
       </button>
+      </>
+      )}
       {hasSite && (
         <button
           onClick={() => openWebsite(website)}
