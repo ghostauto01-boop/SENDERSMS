@@ -223,6 +223,102 @@ def _sqlite_rebuild_table(
         return False
 
 
+def _sqlite_relax_column(sync_conn, metadata, table_name: str, column_name: str) -> bool:
+    """Rebuild a SQLite table with one NOT NULL dropped, shape otherwise kept.
+
+    ``_sqlite_rebuild_table`` reshapes the table to the model, which
+    reintroduces NOT NULL on every other model column. That is fatal here: this
+    module deliberately adds NOT NULL columns to populated legacy tables as
+    *nullable* (see ``_add_column_sql`` — a strict constraint with nothing to
+    backfill the existing rows would fail the deploy), so a legacy ``contacts``
+    table routinely holds NULL in ``created_at``. The model-shaped copy then
+    dies on ``NOT NULL constraint failed: contacts__repair.created_at``, the
+    relaxation never happens, and email-only inserts keep failing on exactly the
+    databases this pass exists to fix.
+
+    So: keep the table's own columns and nullability, change the one column, and
+    append any model columns the table is still missing (nullable). The copy
+    therefore never has to invent a value.
+    """
+    from sqlalchemy import Column, MetaData, Table
+
+    tmp_name = f"{table_name}__repair"
+    try:
+        reflected = Table(table_name, MetaData(), autoload_with=sync_conn)
+        if column_name not in reflected.columns:
+            return False
+
+        columns: list = []
+        for col in reflected.columns:
+            # Every column keeps the nullability and the DEFAULT it already has;
+            # only the one being relaxed changes. (Getting nullability backwards
+            # reimposes NOT NULL on the whole table; dropping the default makes
+            # later inserts that omit the column fail.)
+            columns.append(
+                Column(
+                    col.name,
+                    col.type,
+                    primary_key=col.primary_key,
+                    nullable=True if col.name == column_name else col.nullable,
+                    server_default=(
+                        col.server_default.arg if col.server_default is not None else None
+                    ),
+                )
+            )
+
+        model = metadata.tables.get(table_name)
+        if model is not None:
+            for col in model.columns:
+                if col.name not in reflected.columns:
+                    # Added as nullable for the same reason _add_column_sql
+                    # does it: existing rows have no value to copy.
+                    columns.append(Column(col.name, col.type, nullable=True))
+
+        tmp = Table(tmp_name, MetaData(), *columns)
+        old_cols = [c.name for c in reflected.columns]
+
+        fk_state = 0
+        try:
+            fk_state = sync_conn.execute(text("PRAGMA foreign_keys")).scalar() or 0
+            sync_conn.execute(text("PRAGMA foreign_keys=OFF"))
+        except Exception:  # noqa: BLE001 - pragma support varies; best effort
+            pass
+
+        try:
+            sync_conn.execute(text(f'DROP TABLE IF EXISTS "{tmp_name}"'))
+            tmp.create(sync_conn)
+            cols = ", ".join(f'"{c}"' for c in old_cols)
+            sync_conn.execute(
+                text(f'INSERT INTO "{tmp_name}" ({cols}) SELECT {cols} FROM "{table_name}"')
+            )
+            sync_conn.execute(text(f'DROP TABLE "{table_name}"'))
+            sync_conn.execute(text(f'ALTER TABLE "{tmp_name}" RENAME TO "{table_name}"'))
+        finally:
+            if fk_state:
+                try:
+                    sync_conn.execute(text("PRAGMA foreign_keys=ON"))
+                except Exception:  # noqa: BLE001
+                    pass
+
+        logger.warning(
+            "schema_repair: rebuilt table %s so %s.%s is nullable (%d row(s) copied).",
+            table_name,
+            table_name,
+            column_name,
+            sync_conn.execute(text(f'SELECT COUNT(*) FROM "{table_name}"')).scalar() or 0,
+        )
+        return True
+    except Exception as exc:  # noqa: BLE001 - never fatal
+        logger.error(
+            "schema_repair: could not rebuild %s to make %s nullable (%s). "
+            "Email-only contacts cannot be inserted until scripts/migrate_existing_db.sql "
+            "is applied by hand.",
+            table_name,
+            column_name,
+            exc,
+        )
+        return False
+
 #: Unique keys that a release deliberately WIDENED.
 #:
 #: ``create_all`` never touches a table it already knows, so a unique
@@ -390,7 +486,8 @@ def _repair_relaxed_not_null(sync_conn, metadata) -> list[str]:
 
     Only ever removes a constraint; no row is read, written or dropped. On
     PostgreSQL this is a single metadata-only ALTER. SQLite cannot alter a
-    constraint in place, so the existing table-rebuild path is used.
+    constraint in place, so the table is rebuilt keeping its own shape — see
+    ``_sqlite_relax_column`` for why a model-shaped rebuild is not usable here.
     """
     from sqlalchemy import inspect
 
@@ -414,12 +511,10 @@ def _repair_relaxed_not_null(sync_conn, metadata) -> list[str]:
             continue  # already nullable — a clean restart reports nothing
 
         if dialect == "sqlite":
-            # No ALTER COLUMN; rebuilding copies the column across as nullable
-            # because the rebuild takes its shape from the model.
-            if _sqlite_rebuild_table(
-                sync_conn, metadata, table_name,
-                reason=f"{table_name}.{column_name} being optional",
-            ):
+            # SQLite has no ALTER COLUMN. A model-shaped rebuild is not usable
+            # here (it would reimpose NOT NULL on columns the legacy table holds
+            # NULL in), so the shape is kept and only this column changes.
+            if _sqlite_relax_column(sync_conn, metadata, table_name, column_name):
                 applied.append(f"relaxed {table_name}.{column_name}")
             continue
 

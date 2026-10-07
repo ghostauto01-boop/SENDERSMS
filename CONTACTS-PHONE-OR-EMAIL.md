@@ -135,10 +135,12 @@ An existing database has `contacts.phone_number NOT NULL`, which would reject
 every email-only insert. Two mechanisms handle it, and either is sufficient:
 
 1. **Automatic.** `schema_repair.py` runs at startup and issues
-   `ALTER TABLE contacts ALTER COLUMN phone_number DROP NOT NULL`
-   (on SQLite, which cannot alter a constraint, it uses the existing table
-   rebuild). It also adds the seven enrichment columns. It only ever *removes* a
-   constraint — no row is read, rewritten or dropped.
+   `ALTER TABLE contacts ALTER COLUMN phone_number DROP NOT NULL`. SQLite cannot
+   alter a constraint in place, so there the table is rebuilt on the same boot —
+   keeping every other column's type, nullability and default exactly as they
+   were, so a legacy table whose later-added columns hold NULL (the normal case)
+   is not a problem. It also adds the seven enrichment columns. It only ever
+   *removes* a constraint — no row is read, rewritten or dropped.
 2. **Manual.** `scripts/migrate_existing_db.sql` carries the same statements plus
    the indexes and a backfill of `email_lower` for pre-existing addresses.
 
