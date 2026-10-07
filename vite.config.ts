@@ -6,10 +6,11 @@ import path from "path";
  * Everything the backend serves is proxied in development — not just ``/api``.
  *
  * The MCP surface does not live under ``/api``: the connector endpoints are at
- * ``/connectors/{client}/mcp``, the OAuth discovery documents at
- * ``/.well-known/…`` and the generic endpoint at ``/mcp``. Without those
- * entries the preview would 404 the very requests the AI-connector screen and
- * the connector self-test make, which looks exactly like "the MCP is broken".
+ * ``/connectors/{client}/mcp``, the shared OAuth endpoints are at ``/oauth/*``,
+ * discovery documents are at ``/.well-known/…`` and the generic endpoint is at
+ * ``/mcp``. Without those entries the preview would 404 the very requests the
+ * AI-connector screen and the hosted clients make, which looks exactly like
+ * "the MCP is broken".
  *
  * ``xfwd: true`` is what makes the backend's public-URL detection work through
  * the proxy: it forwards X-Forwarded-Host/Proto, so the OAuth metadata names the
@@ -18,7 +19,7 @@ import path from "path";
 const API_TARGET = process.env.VITE_API_TARGET || "http://0.0.0.0:8000";
 
 const proxy = Object.fromEntries(
-  ["/api", "/mcp", "/connectors", "/.well-known", "/health"].map((context) => [
+  ["/api", "/mcp", "/oauth", "/connectors", "/.well-known", "/health"].map((context) => [
     context,
     { target: API_TARGET, changeOrigin: true, xfwd: true, secure: false },
   ])
