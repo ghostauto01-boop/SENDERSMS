@@ -17,8 +17,9 @@ WHAT THIS DOES
    Gmail API (OAuth), whichever the operator connected.
 2. **Recognises a reply** rather than importing a whole mailbox: a message
    counts when its ``In-Reply-To``/``References`` name a Message-ID this app
-   sent, or when its sender is a known contact, or when it answers a subject we
-   used. Anything else is left alone.
+   sent, or when a reply-prefixed subject matches mail sent to that contact.
+   A known sender by itself is not enough, so newsletters and promotions stay
+   out of the CRM inbox. Anything else is left alone.
 3. **Rescues it from Spam** — with the Gmail API that is one label change
    (remove ``SPAM``, add ``INBOX``); over IMAP it is a copy to INBOX plus a
    delete from Spam, which is what Gmail's own "Not spam" button does.
@@ -285,18 +286,12 @@ def _message_ids(item: dict) -> list[str]:
 async def classify_inbound(
     db: AsyncSession, item: dict, mailbox: EmailMailbox, our_addresses: set[str]
 ) -> tuple[bool, str]:
-    """Decide whether a mailbox message is a reply this app should store.
+    """Decide whether a mailbox message answers something this app sent.
 
-    Returns ``(wanted, reason)``. The rules, in order of confidence:
-
-    1. It is from the operator → never wanted (that is our own Sent copy, or an
-       auto-forward loop waiting to happen).
-    2. Its threading headers name a Message-ID we sent → definitely a reply.
-    3. Its sender is a known contact → a reply, even if the client dropped the
-       References header (some webmail does).
-    4. Its subject answers one we sent → a reply.
-    5. Otherwise: only with ``import_all`` on, because importing a whole mailbox
-       into a CRM inbox is never what the operator meant.
+    A sender's presence in Contacts is deliberately insufficient: known people
+    receive newsletters and promotions too. We import explicit RFC-threaded
+    messages, a reply subject tied to that known contact's outbound mail, or an
+    unambiguous reply subject from a changed/personal sender.
     """
     sender = str((item.get("From") or {}).get("Address") or "").strip().lower()
     if not sender:
@@ -307,39 +302,33 @@ async def classify_inbound(
     if mailbox.import_all:
         return True, "import-all"
 
-    chain = _message_ids(item)
-    if chain:
-        found = (
-            await db.execute(
-                select(Message.id).where(
-                    Message.channel == "email",
-                    Message.rfc_message_id.in_([c[:255] for c in chain[:20]]),
-                ).limit(1)
-            )
-        ).scalar_one_or_none()
-        if found:
-            return True, "threads a message you sent"
+    from app.services import email_service
 
-    contact = (
-        await db.execute(select(Contact.id).where(func.lower(Contact.email) == sender))
-    ).scalar_one_or_none()
-    if contact:
-        return True, "from a known contact"
+    in_reply_to = item.get("InReplyTo") or item.get("In-Reply-To") or item.get("inReplyTo")
+    references = item.get("References") or item.get("references")
+    threaded = await email_service.find_outgoing_email_by_message_ids(
+        db, str(in_reply_to or "") or None, str(references or "") or None
+    )
+    if threaded is not None:
+        return True, "threads a message you sent"
 
-    subject = re.sub(r"^\s*(re|fwd?|aw|sv|tr|rv)\s*(\[\d+\])?\s*:\s*", "",
-                     str(item.get("Subject") or ""), flags=re.IGNORECASE).strip().lower()
-    if subject:
-        answered = (
-            await db.execute(
-                select(Message.id).where(
-                    Message.channel == "email",
-                    Message.direction == "outgoing",
-                    func.lower(func.coalesce(Message.subject, "")).contains(subject[:120]),
-                ).limit(1)
-            )
-        ).scalar_one_or_none()
-        if answered:
-            return True, "answers a subject you sent"
+    contact = await email_service.find_contact_by_email(db, sender)
+    if contact is not None:
+        answered = await email_service.find_outgoing_email_by_reply_subject(
+            db, str(item.get("Subject") or ""), contact_id=contact.id
+        )
+        if answered is not None:
+            return True, "reply subject matches mail sent to this contact"
+        return False, "known contact, but no matching sent thread"
+
+    # A changed/personal address can still be recognized when a reply-prefixed
+    # subject uniquely identifies one outbound contact. The ingestion service
+    # then stores this address as an alternate instead of creating a duplicate.
+    answered = await email_service.find_outgoing_email_by_reply_subject(
+        db, str(item.get("Subject") or "")
+    )
+    if answered is not None:
+        return True, "reply subject uniquely matches mail you sent"
 
     return False, "not a reply to anything this app sent"
 

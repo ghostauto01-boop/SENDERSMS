@@ -19,6 +19,7 @@ What lives here:
 Credentials never leave the server: ``serialize_account`` returns a masked key.
 """
 
+import json
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -994,6 +995,17 @@ async def get_conversation(
         await db.execute(select(Contact).where(Contact.id == conversation.contact_id))
     ).scalar_one_or_none()
     accounts = await _accounts_by_id(db)
+    custom_fields = {}
+    tags: list[str] = []
+    email_aliases: list[str] = []
+    if contact is not None:
+        try:
+            parsed_fields = json.loads(contact.custom_fields or "{}")
+            custom_fields = parsed_fields if isinstance(parsed_fields, dict) else {}
+        except (TypeError, ValueError):
+            custom_fields = {}
+        tags = sorted({row.tag.name for row in (contact.tags or []) if row.tag and row.tag.name})
+        email_aliases = await email_service.contact_email_aliases(db, contact.id)
 
     return {
         "conversation": {
@@ -1015,8 +1027,21 @@ async def get_conversation(
                 f"{contact.first_name or ''} {contact.last_name or ''}".strip() or contact.email
             ),
             "email": contact.email,
+            "email_aliases": email_aliases,
             "phone_number": contact.phone_number,
+            "business_name": contact.business_name,
+            "city": contact.city,
+            "state": contact.state,
+            "country": contact.country,
+            "website": contact.website,
+            "industry": contact.industry,
+            "source": contact.source,
+            "lead_status": contact.lead_status,
+            "notes": contact.notes,
+            "custom_fields": custom_fields,
+            "tags": tags,
             "is_email_opted_out": bool(contact.is_email_opted_out),
+            "is_email_undeliverable": bool(contact.is_email_undeliverable),
             "email_status": contact.email_status,
         } if contact else None,
         "messages": [
@@ -1075,11 +1100,27 @@ async def reply(
     if account is None:
         account = await email_service.get_default_account(db)
 
+    latest_inbound = (
+        await db.execute(
+            select(Message.from_address)
+            .where(
+                Message.conversation_id == conversation.id,
+                Message.channel == "email",
+                Message.direction == "incoming",
+                Message.from_address.isnot(None),
+            )
+            .order_by(Message.created_at.desc(), Message.id.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    reply_address = email_service.normalize_email(latest_inbound) or email_service.normalize_email(contact.email)
+
     message, result = await email_service.send_now(
         db, contact, subject=subject, text_body=body, html_body=html, account=account,
         attachments=data.attachments,
         cc=data.cc,
         bcc=data.bcc,
+        recipient_address=reply_address,
     )
     if message is None:
         raise HTTPException(400, "This contact cannot be emailed (opted out or suppressed)")

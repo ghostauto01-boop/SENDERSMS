@@ -164,7 +164,7 @@ with httpx.Client(base_url=BASE, timeout=30, follow_redirects=True) as api:
     me_account = next(a for a in accounts if a["from_email"] == "hello@acme-leads.io")
     webhook_path = (me_account.get("webhook_url") or f"http://127.0.0.1:8000{me_account['webhook_path']}")
     hook = api.post(webhook_path.split("/api/v1")[1], json={"items": [{
-        "From": {"Address": "ada@acme-leads.io", "Name": "Ada"},
+        "From": {"Address": "ada.personal@gmail.com", "Name": "Ada"},
         "To": {"Address": "hello@acme-leads.io"},
         "Subject": "Re: Your price list, Ada",
         "TextBody": "Looks great. Can you do 500 units?",
@@ -185,6 +185,11 @@ with httpx.Client(base_url=BASE, timeout=30, follow_redirects=True) as api:
     step("reply landed in the SAME conversation (not a new thread)",
          len(detail["messages"]) == before + 1 and len(inbound) == 1,
          f"{before} -> {len(detail['messages'])} messages, {len(inbound)} matched by In-Reply-To")
+    step("personal reply address is linked without replacing the primary contact email",
+         detail.get("contact", {}).get("email") == "ada@acme-leads.io"
+         and "ada.personal@gmail.com" in detail.get("contact", {}).get("email_aliases", []),
+         json.dumps({"email": detail.get("contact", {}).get("email"),
+                     "aliases": detail.get("contact", {}).get("email_aliases", [])}))
 
     # ------------------------------------------------ reply from the inbox
     reply = api.post(f"/email/inbox/conversations/{conv_id}/reply", json={
@@ -197,6 +202,9 @@ with httpx.Client(base_url=BASE, timeout=30, follow_redirects=True) as api:
 
     wire = httpx.get(f"{FAKE}/_log").json()["entries"]
     reply_payload = wire[-1]["body"]
+    step("reply is sent to the latest personal sender address",
+         reply_payload.get("to", [{}])[0].get("email") == "ada.personal@gmail.com",
+         json.dumps(reply_payload.get("to")))
     step("reply goes out threaded (In-Reply-To the original)",
          reply_payload["headers"].get("In-Reply-To") == first["rfc_message_id"],
          json.dumps(reply_payload["headers"]))

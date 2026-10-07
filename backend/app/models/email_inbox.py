@@ -31,8 +31,8 @@ plaintext is never returned to the client and never logged.
 
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, Integer, String, Text
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
 
@@ -111,3 +111,30 @@ class EmailMailbox(Base):
 
     def __repr__(self) -> str:  # pragma: no cover - debug helper
         return f"<EmailMailbox(id={self.id}, {self.email_address}, provider={self.provider})>"
+
+
+class EmailContactAddress(Base):
+    """An alternate sender address that belongs to an existing CRM contact.
+
+    A contact's primary ``Contact.email`` is never replaced when a reply arrives
+    from a personal/changed mailbox. This row links that address back to the same
+    conversation and lets the inbox make subsequent replies to it.
+    """
+
+    __tablename__ = "email_contact_addresses"
+    __table_args__ = (
+        UniqueConstraint("email_address", name="uq_email_contact_addresses_address"),
+        Index("ix_email_contact_addresses_contact_id", "contact_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    contact_id: Mapped[int] = mapped_column(
+        ForeignKey("contacts.id", ondelete="CASCADE"), nullable=False
+    )
+    email_address: Mapped[str] = mapped_column(String(255), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
+
+    contact: Mapped["Contact"] = relationship("Contact", back_populates="email_aliases")
+
+    def __repr__(self) -> str:  # pragma: no cover - debug helper
+        return f"<EmailContactAddress(id={self.id}, contact_id={self.contact_id}, {self.email_address})>"

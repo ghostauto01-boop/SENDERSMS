@@ -112,8 +112,9 @@ def verify_pkce(verifier: str | None, challenge: str, method: str = "S256") -> b
 def normalize_scope(raw: str | None, *, maximum: str = C.DEFAULT_SCOPE) -> str:
     """Intersect a requested scope with what this deployment will grant.
 
-    An empty request means "whatever the server defaults to", which for us is
-    read-only — the safe answer when a client did not say.
+    An empty request means read-only. Callers that intentionally apply a
+    connector's configured default must substitute that value before calling
+    this helper; refresh uses the grant's original scope when omitted.
     """
     allowed = set((maximum or C.DEFAULT_SCOPE).split())
     wanted = set((raw or "").replace(",", " ").split())
@@ -402,7 +403,14 @@ async def validate_authorization_request(
         logger.warning("MCP OAuth: resource %r rejected for %s", resource, profile.key)
 
     connection = await get_connection(db, profile.key)
-    scope = normalize_scope(params.get("scope"), maximum=connection.default_scope or "write")
+    # Hosted clients (including ChatGPT) may omit `scope` or send an extension
+    # scope such as "mcp:tools". Treat that as the connector's configured
+    # default, not normalize_scope's generic read-only fallback. Otherwise the
+    # consent page offers write access while the resulting token can only read.
+    requested_scope = str(params.get("scope") or "").replace(",", " ").strip()
+    if not any(part in C.SCOPES for part in requested_scope.split()):
+        requested_scope = connection.default_scope or "write"
+    scope = normalize_scope(requested_scope, maximum=connection.default_scope or "write")
 
     return AuthorizationRequest(
         profile=profile,

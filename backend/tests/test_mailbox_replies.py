@@ -36,8 +36,9 @@ from app.database import Base, get_db
 from app.models.contact import Contact
 from app.models.conversation import Conversation, Message
 from app.models.email import EmailAccount
-from app.models.email_inbox import EmailMailbox
+from app.models.email_inbox import EmailContactAddress, EmailMailbox
 from app.models.user import User
+from app.models.notification import NotificationEvent
 from app.api.v1 import mailbox as mailbox_api
 from app.providers import gmail as gmail_provider
 from app.security.auth import get_current_user
@@ -355,6 +356,76 @@ async def test_gmail_reply_in_spam_is_rescued_and_imported(db, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_personal_sender_keeps_contact_threads_and_replies_to_that_address(
+    db, client, monkeypatch
+):
+    """A changed/personal sender stays on the campaign contact and is replyable."""
+    contact = await _contact(db)
+    account = await _account(db, from_email="me@gmail.com")
+    outgoing = await _outgoing(db, contact, subject="Quick question")
+    mailbox = await _mailbox(db, address="me@gmail.com")
+    personal = (
+        b"From: Ada <ada.personal@gmail.com>\r\n"
+        b"To: Me <me@gmail.com>\r\n"
+        b"Subject: Re: Quick question\r\n"
+        b"Date: Mon, 06 Oct 2025 09:14:22 +0100\r\n"
+        b"Message-ID: <reply-personal@gmail.com>\r\n"
+        b"In-Reply-To: <sent-1@app.example.test>\r\n"
+        b"References: <sent-1@app.example.test>\r\n"
+        b"Content-Type: text/plain; charset=utf-8\r\n\r\n"
+        b"Thursday works for me.\r\n"
+    )
+    async def fake_imap_sync(*args, **kwargs):
+        item = gmail_provider.parse_mime(
+            personal, folder="INBOX", provider_message_id="personal-reply-1"
+        )
+        return {"items": [item], "cursors": {}, "errors": []}
+
+    monkeypatch.setattr(gmail_provider, "imap_sync", fake_imap_sync)
+    summary = await mailbox_service.sync_mailbox(db, mailbox)
+    assert summary["replies"] == 1 and summary["stored"] == 1
+
+    inbound = (await db.execute(
+        select(Message).where(Message.direction == "incoming", Message.channel == "email")
+    )).scalars().one()
+    assert inbound.contact_id == contact.id
+    assert inbound.conversation_id == outgoing.conversation_id
+    assert inbound.from_address == "ada.personal@gmail.com"
+    assert contact.email == "prospect@acme.com"  # primary address is not overwritten
+    assert await email_service.contact_email_aliases(db, contact.id) == ["ada.personal@gmail.com"]
+    assert (await db.execute(
+        select(NotificationEvent).where(
+            NotificationEvent.event_type == "email_reply",
+            NotificationEvent.reference_id == outgoing.conversation_id,
+        )
+    )).scalar_one_or_none() is not None
+
+    delivered_to: list[str] = []
+
+    async def fake_deliver(db_session, message):
+        delivered_to.append(message.to_address)
+        message.status = "sent"
+        return {"success": True, "provider_message_id": "<simulated-reply@gmail.com>"}
+
+    monkeypatch.setattr(email_service, "deliver", fake_deliver)
+    response = await client.post(
+        f"/api/v1/email/inbox/conversations/{outgoing.conversation_id}/reply",
+        json={"body": "Thanks, Thursday works for me too."},
+    )
+    assert response.status_code == 200, response.text
+    assert delivered_to == ["ada.personal@gmail.com"]
+    assert response.json()["message"]["to_address"] == "ada.personal@gmail.com"
+
+    # The detail endpoint exposes the complete contact record and the retained alias.
+    detail = await client.get(
+        f"/api/v1/email/inbox/conversations/{outgoing.conversation_id}"
+    )
+    assert detail.status_code == 200
+    assert detail.json()["contact"]["email"] == "prospect@acme.com"
+    assert detail.json()["contact"]["email_aliases"] == ["ada.personal@gmail.com"]
+
+
+@pytest.mark.asyncio
 async def test_unrelated_mail_is_not_imported(db, monkeypatch):
     """Importing a whole mailbox into a CRM inbox is never what was meant."""
     await _account(db, from_email="me@gmail.com")
@@ -406,18 +477,49 @@ async def test_our_own_sent_copy_is_never_imported(db):
 
 
 @pytest.mark.asyncio
-async def test_known_contact_is_accepted_without_threading_headers(db):
-    """Some webmail clients drop References; the sender still proves it."""
+async def test_known_contact_promotional_mail_is_not_accepted(db):
+    """A contact match alone must not import their unrelated newsletter."""
     contact = await _contact(db)
+    await _outgoing(db, contact, subject="Quick question")
     mailbox = await _mailbox(db, address="me@gmail.com")
     item = gmail_provider.parse_mime(
-        b"From: Ada <prospect@acme.com>\r\nTo: me@gmail.com\r\nSubject: Something else\r\n"
-        b"Message-ID: <x1@acme.com>\r\nContent-Type: text/plain\r\n\r\nHi\r\n"
+        b"From: Ada <prospect@acme.com>\r\nTo: me@gmail.com\r\nSubject: 50% off today\r\n"
+        b"Message-ID: <promo1@acme.com>\r\nContent-Type: text/plain\r\n\r\nBuy now\r\n"
+    )
+    wanted, reason = await mailbox_service.classify_inbound(db, item, mailbox, {"me@gmail.com"})
+    assert wanted is False
+    assert reason == "known contact, but no matching sent thread"
+    assert contact.email == "prospect@acme.com"
+
+
+@pytest.mark.asyncio
+async def test_reply_subject_without_headers_matches_only_mail_sent_to_contact(db):
+    """Some clients drop References, but an actual matching reply still lands."""
+    contact = await _contact(db)
+    await _outgoing(db, contact, subject="Quick question")
+    mailbox = await _mailbox(db, address="me@gmail.com")
+    item = gmail_provider.parse_mime(
+        b"From: Ada <prospect@acme.com>\r\nTo: me@gmail.com\r\nSubject: Re: Quick question\r\n"
+        b"Message-ID: <reply-subject@acme.com>\r\nContent-Type: text/plain\r\n\r\nThursday works\r\n"
     )
     wanted, reason = await mailbox_service.classify_inbound(db, item, mailbox, {"me@gmail.com"})
     assert wanted is True
-    assert reason == "from a known contact"
-    assert contact.email == "prospect@acme.com"
+    assert reason == "reply subject matches mail sent to this contact"
+
+
+@pytest.mark.asyncio
+async def test_personal_sender_can_match_an_unambiguous_reply_subject(db):
+    """An unlisted Gmail address can still be recognized without thread headers."""
+    contact = await _contact(db)
+    await _outgoing(db, contact, subject="Quick question")
+    mailbox = await _mailbox(db, address="me@gmail.com")
+    item = gmail_provider.parse_mime(
+        b"From: Ada <ada.personal@gmail.com>\r\nTo: me@gmail.com\r\nSubject: Re: Quick question\r\n"
+        b"Message-ID: <personal-subject@gmail.com>\r\nContent-Type: text/plain\r\n\r\nThursday works\r\n"
+    )
+    wanted, reason = await mailbox_service.classify_inbound(db, item, mailbox, {"me@gmail.com"})
+    assert wanted is True
+    assert reason == "reply subject uniquely matches mail you sent"
 
 
 # ==========================================================================

@@ -170,6 +170,45 @@ async def run_connector_test(profile: C.ConnectorProfile, db: AsyncSession) -> d
     async with httpx.AsyncClient(transport=transport, base_url=base, timeout=30.0,
                                  follow_redirects=False) as client:
 
+        # Browser-hosted connectors can fail before the OAuth handshake starts
+        # if the provider's Origin is missing from this route's CORS allowlist.
+        # Exercise the real preflight, not just an unauthenticated JSON request.
+        provider_origins = {"chatgpt": "https://chatgpt.com", "claude": "https://claude.ai"}
+        if profile.key in provider_origins:
+            origin = provider_origins[profile.key]
+            response = await client.options(
+                profile.path,
+                headers={
+                    "Origin": origin,
+                    "Access-Control-Request-Method": "POST",
+                    "Access-Control-Request-Headers": (
+                        "authorization,content-type,accept,mcp-protocol-version"
+                    ),
+                },
+            )
+            allowed_headers = {
+                part.strip().lower()
+                for part in (response.headers.get("access-control-allow-headers") or "").split(",")
+                if part.strip()
+            }
+            required_headers = {"authorization", "content-type", "accept", "mcp-protocol-version"}
+            if not report.add(
+                "browser-cors-preflight",
+                response.status_code == 204
+                and response.headers.get("access-control-allow-origin") == origin
+                and response.headers.get("access-control-allow-credentials", "").lower() == "true"
+                and required_headers.issubset(allowed_headers),
+                f"OPTIONS {profile.path} from {origin} → {response.status_code}; "
+                f"allow-origin={response.headers.get('access-control-allow-origin')}, "
+                f"allow-headers={sorted(allowed_headers)}",
+                status=response.status_code,
+                fix=(
+                    "Add the exact provider Origin to MCP_CORS_ORIGINS. CORS must allow "
+                    "Authorization, Content-Type, Accept and Mcp-Protocol-Version on MCP routes."
+                ),
+            ):
+                return report.result()
+
         # --- discovery ---------------------------------------------------
         prm_url = profile.well_known_prm()
         response = await client.get(prm_url, headers=headers)
@@ -313,12 +352,16 @@ async def run_connector_test(profile: C.ConnectorProfile, db: AsyncSession) -> d
 
             # --- authorize: login, then consent --------------------------
             
+            # ChatGPT may omit scope entirely. The diagnostic deliberately
+            # exercises that provider behavior so a configured write default
+            # cannot silently degrade into a read-only token.
+            requested_scope = "" if profile.key == "chatgpt" else "&scope=read%20write"
             authorize = (
                 f"{profile.oauth_path}/authorize?response_type=code"
                 f"&client_id={quote(client_id, safe='')}"
                 f"&redirect_uri={quote(redirect_uri, safe='')}"
                 f"&code_challenge={challenge_value}&code_challenge_method=S256"
-                f"&state=selftest&scope=read%20write&resource={quote(profile.resource, safe='')}"
+                f"&state=selftest{requested_scope}&resource={quote(profile.resource, safe='')}"
             )
             response = await client.get(authorize, headers=headers)
             if not report.add(
@@ -441,6 +484,16 @@ async def run_connector_test(profile: C.ConnectorProfile, db: AsyncSession) -> d
                     "refreshes reactively after a 401."
                 ),
             )
+            if response.status_code == 200:
+                report.add(
+                    "refresh-scope-preserved",
+                    refreshed.get("scope") == tokens.get("scope"),
+                    f"original scope={tokens.get('scope')} refreshed scope={refreshed.get('scope')}",
+                    fix=(
+                        "When refresh scope is omitted, retain the original grant instead of "
+                        "downgrading a write token to read-only."
+                    ),
+                )
             if refreshed.get("access_token"):
                 access_token = str(refreshed["access_token"])
         else:

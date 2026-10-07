@@ -162,6 +162,9 @@ class ConnectorProfile:
     redirect_hosts: tuple[str, ...] = ()
     #: Exact redirect URIs that are always accepted (documented callback URLs).
     redirect_uris: tuple[str, ...] = ()
+    #: Accept any well-formed HTTPS callback? Only the generic OAuth endpoint
+    #: does this; vendor-specific connectors keep their tighter host allowlists.
+    allow_any_https_redirect: bool = False
     #: Accept http://localhost:PORT / http://127.0.0.1:PORT on any port?
     #: Required for Claude Code, which picks a random free port each run.
     allow_loopback: bool = False
@@ -195,9 +198,10 @@ class ConnectorProfile:
     def allows_redirect(self, uri: str) -> bool:
         """Is this redirect URI acceptable for this connector?
 
-        Exact match against the documented callbacks first, then host suffix,
-        then the loopback rule (any port, because Claude Code picks a random
-        one). https is required everywhere except loopback.
+        Exact match against documented callbacks first, then a host suffix, the
+        generic HTTPS rule, and finally loopback (any port, because Claude Code
+        picks a random one). Remote callbacks must use HTTPS; HTTP is accepted
+        only for loopback. Fragments and embedded credentials are never valid.
         """
         raw = (uri or "").strip()
         if not raw:
@@ -206,12 +210,20 @@ class ConnectorProfile:
             return True
         parts = urlsplit(raw)
         host = (parts.hostname or "").lower()
-        if not host:
+        if not host or parts.username is not None or parts.password is not None or parts.fragment:
             return False
-        if parts.scheme == "https" and any(
-            host == allowed or host.endswith("." + allowed) for allowed in self.redirect_hosts
-        ):
-            return True
+        try:
+            _ = parts.port  # Reject malformed/out-of-range ports.
+        except ValueError:
+            return False
+        if parts.scheme == "https":
+            if any(
+                host == allowed or host.endswith("." + allowed)
+                for allowed in self.redirect_hosts
+            ):
+                return True
+            if self.allow_any_https_redirect:
+                return True
         if self.allow_loopback and parts.scheme in ("http", "https") and host in (
             "localhost",
             "127.0.0.1",
@@ -325,9 +337,11 @@ GENERIC = ConnectorProfile(
     path="/mcp",
     oauth_path="/oauth",
     auth_modes=("bearer", "oauth"),
-    # No host allowlist: dynamic registration accepts any https redirect URI,
-    # which is what an unknown client (MCP Inspector, Cursor, Cline, a custom
-    # agent) needs. PKCE S256 is mandatory on every authorization.
+    # Accept well-formed HTTPS callback URIs from dynamic clients, plus the
+    # loopback URIs used by local tooling. This is what lets a hosted client such
+    # as ChatGPT use the canonical /mcp URL; vendor-specific connector paths
+    # retain their narrower callback allowlists. PKCE S256 is always mandatory.
+    allow_any_https_redirect=True,
     allow_loopback=True,
     cimd=True,
     toolset="full",

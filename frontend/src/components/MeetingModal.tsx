@@ -20,6 +20,8 @@ export interface MeetingInitial {
   conversationId?: number;
   date?: string; // YYYY-MM-DD
   title?: string;
+  sendInvite?: boolean;
+  sendReminder?: boolean;
 }
 
 interface Props {
@@ -113,12 +115,12 @@ export default function MeetingModal({ meetingId = null, initial, onClose, onSav
   const [description, setDescription] = useState("");
   const [tags, setTags] = useState<string[]>([]);
 
-  const [sendInvite, setSendInvite] = useState(true);
+  const [sendInvite, setSendInvite] = useState(initial?.sendInvite ?? true);
   const [inviteTemplateId, setInviteTemplateId] = useState("");
   const [inviteBody, setInviteBody] = useState("");
   const inviteRef = useRef<HTMLTextAreaElement>(null);
 
-  const [sendReminder, setSendReminder] = useState(true);
+  const [sendReminder, setSendReminder] = useState(initial?.sendReminder ?? true);
   const [reminderMinutes, setReminderMinutes] = useState<number[]>([60, 15]);
   const [customMinutes, setCustomMinutes] = useState("");
   const [reminderTemplateId, setReminderTemplateId] = useState("");

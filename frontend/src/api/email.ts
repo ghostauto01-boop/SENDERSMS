@@ -140,6 +140,28 @@ export type EmailOverview = {
   }[];
 };
 
+export type EmailContactDetails = {
+  id: number;
+  name: string;
+  email?: string | null;
+  email_aliases?: string[];
+  phone_number?: string | null;
+  business_name?: string | null;
+  city?: string | null;
+  state?: string | null;
+  country?: string | null;
+  website?: string | null;
+  industry?: string | null;
+  source?: string | null;
+  lead_status?: string | null;
+  notes?: string | null;
+  custom_fields?: Record<string, unknown>;
+  tags?: string[];
+  is_email_opted_out: boolean;
+  is_email_undeliverable?: boolean;
+  email_status?: string | null;
+};
+
 export type EmailConversation = {
   id: number;
   contact_id: number;
@@ -288,14 +310,7 @@ const emailApi = {
       email_account_id?: number | null;
       email_account_name?: string | null;
     };
-    contact: {
-      id: number;
-      name: string;
-      email?: string | null;
-      phone_number?: string | null;
-      is_email_opted_out: boolean;
-      email_status?: string | null;
-    } | null;
+    contact: EmailContactDetails | null;
     messages: EmailMessage[];
   }> => (await api.get(`/email/inbox/conversations/${id}`)).data,
   reply: async (

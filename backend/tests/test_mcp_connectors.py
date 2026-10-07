@@ -117,7 +117,7 @@ async def _register(client, profile: C.ConnectorProfile, redirect_uri: str | Non
 
 
 async def _authorize_url(profile: C.ConnectorProfile, client_id: str, challenge: str,
-                         redirect_uri: str, **extra) -> str:
+                         redirect_uri: str, *, scope: str | None = "read write", **extra) -> str:
     params = {
         "response_type": "code",
         "client_id": client_id,
@@ -125,10 +125,11 @@ async def _authorize_url(profile: C.ConnectorProfile, client_id: str, challenge:
         "code_challenge": challenge,
         "code_challenge_method": "S256",
         "state": "xyz",
-        "scope": "read write",
         "resource": profile.resource,
-        **extra,
     }
+    if scope is not None:
+        params["scope"] = scope
+    params.update(extra)
     return f"{profile.oauth_path}/authorize?{urlencode(params, quote_via=quote)}"
 
 
@@ -138,12 +139,14 @@ def _redirect_for(profile: C.ConnectorProfile) -> str:
 
 
 async def _walk_to_code(client, profile: C.ConnectorProfile,
-                        approve: tuple[str, ...] = ("read", "write")) -> tuple[str, str, str, str]:
+                        approve: tuple[str, ...] = ("read", "write"),
+                        scope: str | None = "read write",
+                        redirect_uri: str | None = None) -> tuple[str, str, str, str]:
     """Register → authorize → approve, returning (client_id, code, verifier, redirect)."""
     verifier, challenge = _pkce()
-    redirect = _redirect_for(profile)
+    redirect = redirect_uri or _redirect_for(profile)
     client_id = await _register(client, profile, redirect)
-    url = await _authorize_url(profile, client_id, challenge, redirect)
+    url = await _authorize_url(profile, client_id, challenge, redirect, scope=scope)
 
     page = await client.get(url, headers={SELFTEST_HEADER: selftest_value()})
     assert page.status_code == 200 and "<form" in page.text, page.text
@@ -167,8 +170,12 @@ async def _walk_to_code(client, profile: C.ConnectorProfile,
 
 
 async def _exchange(client, profile: C.ConnectorProfile, *, form: bool,
-                    approve: tuple[str, ...] = ("read", "write"), **overrides) -> dict:
-    client_id, code, verifier, redirect = await _walk_to_code(client, profile, approve)
+                    approve: tuple[str, ...] = ("read", "write"),
+                    authorize_scope: str | None = "read write",
+                    redirect_uri: str | None = None, **overrides) -> dict:
+    client_id, code, verifier, redirect = await _walk_to_code(
+        client, profile, approve, scope=authorize_scope, redirect_uri=redirect_uri
+    )
     body = {
         "grant_type": "authorization_code",
         "code": code,
@@ -269,6 +276,47 @@ async def test_token_endpoint_parses_json_too(client):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("origin", "path"),
+    [
+        ("https://chatgpt.com", "/connectors/chatgpt/mcp"),
+        ("https://claude.ai", "/connectors/claude/mcp"),
+    ],
+)
+async def test_provider_origin_can_preflight_mcp_but_not_the_crm_api(client, origin, path):
+    headers = {
+        "Origin": origin,
+        "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": (
+            "authorization,content-type,accept,mcp-protocol-version"
+        ),
+    }
+    response = await client.options(path, headers=headers)
+    assert response.status_code == 204
+    assert response.headers.get("access-control-allow-origin") == origin
+    assert response.headers.get("access-control-allow-credentials") == "true"
+    allowed = {h.strip().lower() for h in response.headers["access-control-allow-headers"].split(",")}
+    assert {"authorization", "content-type", "accept", "mcp-protocol-version"} <= allowed
+
+    # The hosted provider origin is not granted CORS over unrelated CRM APIs.
+    crm_response = await client.options("/api/v1/contacts/", headers=headers)
+    assert "access-control-allow-origin" not in crm_response.headers
+
+
+@pytest.mark.asyncio
+async def test_untrusted_origin_cannot_preflight_mcp(client):
+    response = await client.options(
+        "/connectors/chatgpt/mcp",
+        headers={
+            "Origin": "https://evil.example",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "authorization,content-type",
+        },
+    )
+    assert "access-control-allow-origin" not in response.headers
+
+
+@pytest.mark.asyncio
 async def test_protected_resource_metadata_resource_matches_endpoint(client):
     for profile in C.CONNECTORS:
         response = await client.get(profile.well_known_prm().replace(BASE, ""))
@@ -338,6 +386,105 @@ async def test_chatgpt_can_register_its_documented_redirect_uri(client):
     client_id = await _register(client, C.CHATGPT,
                                 "https://chatgpt.com/connector_platform_oauth_redirect")
     assert client_id.startswith("mcp_chatgpt_")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "redirect_uri",
+    [
+        "https://chatgpt.com/connector_platform_oauth_redirect",
+        "https://custom-agent.example.test/oauth/callback",
+    ],
+)
+async def test_generic_endpoint_completes_oauth_with_hosted_https_callbacks(client, redirect_uri):
+    """The canonical /mcp endpoint accepts hosted callbacks, including ChatGPT's.
+
+    Operators often paste /mcp into ChatGPT. Its hosted callback must not be
+    rejected just because it chose the generic endpoint instead of the
+    ChatGPT-specific alias.
+    """
+    tokens = await _exchange(
+        client, C.GENERIC, form=True, redirect_uri=redirect_uri
+    )
+    assert tokens.get("access_token")
+
+    initialized = await _rpc(
+        client,
+        C.GENERIC,
+        tokens["access_token"],
+        "initialize",
+        {
+            "protocolVersion": "2025-11-25",
+            "capabilities": {},
+            "clientInfo": {"name": "hosted-mcp-client", "version": "1.0"},
+        },
+    )
+    assert _body(initialized)["result"]["serverInfo"]["name"] == "sendersms"
+
+
+@pytest.mark.asyncio
+async def test_chatgpt_cimd_callback_works_when_using_generic_mcp_endpoint(client, monkeypatch):
+    """Reproduce ChatGPT's CIMD registration against the canonical /mcp URL."""
+    from app.mcp import oauth as oauth_flow
+
+    profile = C.GENERIC
+    client_id = "https://chatgpt.com/oauth/client.json"
+    redirect_uri = C.CHATGPT.redirect_uris[0]
+
+    async def chatgpt_metadata(url: str) -> dict:
+        assert url == client_id
+        return {
+            "client_name": "ChatGPT",
+            "redirect_uris": [redirect_uri],
+            "token_endpoint_auth_methods_supported": ["none"],
+            "scope": "read write",
+        }
+
+    monkeypatch.setattr(oauth_flow, "_fetch_cimd", chatgpt_metadata)
+    verifier, challenge = _pkce()
+    authorize_url = await _authorize_url(profile, client_id, challenge, redirect_uri)
+
+    page = await client.get(authorize_url, headers={SELFTEST_HEADER: selftest_value()})
+    assert page.status_code == 200 and "<form" in page.text, page.text
+    signed_in = await client.post(
+        authorize_url,
+        data={"one_tap": "1"},
+        headers={SELFTEST_HEADER: selftest_value()},
+    )
+    assert signed_in.status_code == 200, signed_in.text
+    ticket = re.search(r'name="ticket"\s+value="([^"]+)"', signed_in.text).group(1)
+    approved = await client.post(
+        authorize_url,
+        data={"decision": "approve", "ticket": ticket, "scope": ["read", "write"]},
+        headers={SELFTEST_HEADER: selftest_value()},
+    )
+    assert approved.status_code == 302, approved.text
+    location = approved.headers["location"]
+    assert location.startswith(redirect_uri) and "state=xyz" in location
+    code = re.search(r"[?&]code=([^&]+)", location).group(1)
+
+    token_response = await client.post(
+        f"{profile.oauth_path}/token",
+        content=urlencode({
+            "grant_type": "authorization_code",
+            "code": code,
+            "redirect_uri": redirect_uri,
+            "client_id": client_id,
+            "code_verifier": verifier,
+            "resource": profile.resource,
+        }),
+        headers={
+            "content-type": "application/x-www-form-urlencoded",
+            SELFTEST_HEADER: selftest_value(),
+        },
+    )
+    assert token_response.status_code == 200, token_response.text
+    initialized = await _rpc(
+        client, profile, token_response.json()["access_token"], "initialize",
+        {"protocolVersion": "2025-11-25", "capabilities": {},
+         "clientInfo": {"name": "ChatGPT", "version": "1"}},
+    )
+    assert _body(initialized)["result"]["serverInfo"]["name"] == "sendersms"
 
 
 @pytest.mark.asyncio
@@ -417,6 +564,16 @@ async def test_authorization_code_is_single_use(client):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("requested_scope", [None, "mcp:tools"])
+async def test_omitted_or_provider_extension_scope_uses_connector_default(client, requested_scope):
+    """ChatGPT may omit OAuth scope or ask for a provider-specific scope string."""
+    tokens = await _exchange(
+        client, C.CHATGPT, form=False, authorize_scope=requested_scope
+    )
+    assert tokens.get("scope") == "write"
+
+
+@pytest.mark.asyncio
 async def test_refresh_rotates_and_replay_revokes_the_client(client):
     profile = C.CLAUDE
     tokens = await _exchange(client, profile, form=True)
@@ -430,6 +587,10 @@ async def test_refresh_rotates_and_replay_revokes_the_client(client):
     )
     assert rotated.status_code == 200, rotated.text
     assert rotated.json()["refresh_token"] != refresh
+    assert tokens.get("scope") == "write"
+    assert rotated.json().get("scope") == tokens.get("scope"), (
+        "a refresh without scope must preserve the originally approved write grant"
+    )
 
     replay = await client.post(
         f"{profile.oauth_path}/token",

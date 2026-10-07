@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse, FileResponse, Response
 from fastapi.staticfiles import StaticFiles
+from starlette.datastructures import Headers, MutableHeaders
 from app.config import settings
 from app.database import init_db, async_session_factory
 from app import db_health
@@ -17,6 +18,86 @@ logger = logging.getLogger(__name__)
 
 # Signals for the idle-aware inline poller (see app.poll_scheduler).
 poll_activity = PollActivity()
+
+
+class MCPConnectorCorsMiddleware:
+    """Allow hosted MCP clients to preflight only the public MCP surface.
+
+    The app-wide CORS policy is intentionally limited to the operator's
+    configured frontend origins. ChatGPT and Claude run their connectors from
+    hosted browser contexts, so their Origin values need a separate, explicit
+    allowlist rather than widening CORS for contacts, campaigns, and the rest
+    of the CRM API.
+    """
+
+    _METHODS = "GET, POST, DELETE, OPTIONS"
+    _HEADERS = (
+        "Accept, Authorization, Content-Type, Last-Event-ID, Mcp-Protocol-Version, "
+        "Mcp-Session-Id, X-Mcp-Selftest"
+    )
+    _EXPOSE = (
+        "Content-Type, Content-Length, Location, Mcp-Session-Id, "
+        "Mcp-Protocol-Version, WWW-Authenticate"
+    )
+
+    def __init__(self, app):
+        self.app = app
+        self.origins = {origin.rstrip("/") for origin in settings.mcp_cors_origins_list}
+
+    @staticmethod
+    def _is_mcp_surface(path: str) -> bool:
+        return (
+            path == "/mcp"
+            or path.startswith("/connectors/")
+            or path.startswith("/.well-known/oauth-")
+            or path == "/.well-known/openid-configuration"
+        )
+
+    async def __call__(self, scope, receive, send):
+        if scope.get("type") != "http":
+            await self.app(scope, receive, send)
+            return
+
+        request_headers = Headers(scope=scope)
+        origin = (request_headers.get("origin") or "").rstrip("/")
+        path = str(scope.get("path") or "")
+        if not origin or origin not in self.origins or not self._is_mcp_surface(path):
+            await self.app(scope, receive, send)
+            return
+
+        cors_headers = {
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Allow-Methods": self._METHODS,
+            "Access-Control-Allow-Headers": self._HEADERS,
+            "Access-Control-Expose-Headers": self._EXPOSE,
+        }
+
+        if (
+            scope.get("method", "").upper() == "OPTIONS"
+            and request_headers.get("access-control-request-method")
+        ):
+            cors_headers["Access-Control-Max-Age"] = "600"
+            cors_headers["Vary"] = (
+                "Origin, Access-Control-Request-Method, Access-Control-Request-Headers"
+            )
+            response = Response(status_code=204, headers=cors_headers)
+            await response(scope, receive, send)
+            return
+
+        async def send_with_cors(message):
+            if message.get("type") == "http.response.start":
+                headers = MutableHeaders(scope=message)
+                for key, value in cors_headers.items():
+                    headers[key] = value
+                vary = [part.strip() for part in (headers.get("Vary") or "").split(",") if part.strip()]
+                if not any(part.lower() == "origin" for part in vary):
+                    vary.append("Origin")
+                headers["Vary"] = ", ".join(vary)
+            await send(message)
+
+        await self.app(scope, receive, send_with_cors)
+
 
 async def _startup_webhook():
     """Register our webhook URL with the gateway once per deployment target."""
@@ -911,6 +992,9 @@ app.add_middleware(
         "Content-Type", "Content-Length", "Location",
     ],
 )
+# Must wrap the global CORS layer so provider-origin OPTIONS requests are
+# handled before the app-wide policy rejects a non-local origin.
+app.add_middleware(MCPConnectorCorsMiddleware)
 
 
 @app.middleware("http")
