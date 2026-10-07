@@ -31,7 +31,7 @@ import hashlib
 import json
 import re
 import secrets
-from urllib.parse import quote, urlencode
+from urllib.parse import parse_qs, quote, urlencode, urlsplit
 
 import pytest
 import pytest_asyncio
@@ -264,6 +264,100 @@ async def test_chatgpt_endpoint_answers_with_oauth_token(client):
 
 
 @pytest.mark.asyncio
+async def test_chatgpt_can_follow_the_discovered_shared_oauth_flow(client):
+    """Exercise the URLs ChatGPT actually discovers, not only client-specific aliases."""
+    prm_response = await client.get(
+        "/.well-known/oauth-protected-resource/connectors/chatgpt/mcp"
+    )
+    assert prm_response.status_code == 200, prm_response.text
+    resource_metadata = prm_response.json()
+    resource = resource_metadata["resource"]
+    assert resource == f"{BASE}{C.CHATGPT.path}"
+
+    issuer = resource_metadata["authorization_servers"][0]
+
+    def local_path(url: str) -> str:
+        parsed = urlsplit(url)
+        assert parsed.netloc == urlsplit(BASE).netloc
+        return parsed.path
+
+    as_metadata_url = f"{issuer}/.well-known/oauth-authorization-server"
+    as_metadata_response = await client.get(local_path(as_metadata_url))
+    assert as_metadata_response.status_code == 200, as_metadata_response.text
+    as_metadata = as_metadata_response.json()
+
+    redirect_uri = C.CHATGPT.redirect_uris[0]
+    selftest = {SELFTEST_HEADER: selftest_value()}
+    registration = await client.post(
+        local_path(as_metadata["registration_endpoint"]),
+        json={
+            "client_name": "ChatGPT discovered-flow test",
+            "redirect_uris": [redirect_uri],
+            "grant_types": ["authorization_code", "refresh_token"],
+            "response_types": ["code"],
+            "token_endpoint_auth_method": "none",
+            "scope": "read write",
+        },
+        headers=selftest,
+    )
+    assert registration.status_code == 201, registration.text
+    client_id = registration.json()["client_id"]
+
+    verifier, challenge = _pkce()
+    authorize_query = urlencode(
+        {
+            "response_type": "code",
+            "client_id": client_id,
+            "redirect_uri": redirect_uri,
+            "code_challenge": challenge,
+            "code_challenge_method": "S256",
+            "state": "discovered-flow",
+            "resource": resource,
+        },
+        quote_via=quote,
+    )
+    authorize_path = f"{local_path(as_metadata['authorization_endpoint'])}?{authorize_query}"
+    login = await client.get(authorize_path, headers=selftest)
+    assert login.status_code == 200 and "<form" in login.text
+    consent = await client.post(authorize_path, data={"one_tap": "1"}, headers=selftest)
+    assert consent.status_code == 200, consent.text
+    ticket = re.search(r'name="ticket"\s+value="([^"]+)"', consent.text).group(1)
+    approved = await client.post(
+        authorize_path,
+        data={"decision": "approve", "ticket": ticket, "scope": ["read", "write"]},
+        headers=selftest,
+    )
+    assert approved.status_code == 302, approved.text
+    callback = urlsplit(approved.headers["location"])
+    assert parse_qs(callback.query)["state"] == ["discovered-flow"]
+    code = parse_qs(callback.query)["code"][0]
+
+    token_response = await client.post(
+        local_path(as_metadata["token_endpoint"]),
+        content=urlencode(
+            {
+                "grant_type": "authorization_code",
+                "code": code,
+                "redirect_uri": redirect_uri,
+                "client_id": client_id,
+                "code_verifier": verifier,
+                "resource": resource,
+            }
+        ),
+        headers={"content-type": "application/x-www-form-urlencoded", **selftest},
+    )
+    assert token_response.status_code == 200, token_response.text
+
+    tools_response = await _rpc(
+        client, C.CHATGPT, token_response.json()["access_token"], "tools/list"
+    )
+    tools = _body(tools_response)["result"]["tools"]
+    assert tools_response.status_code == 200
+    assert len(tools) < 40
+    assert "search_contacts" in {tool["name"] for tool in tools}
+
+
+@pytest.mark.asyncio
 async def test_token_endpoint_parses_json_too(client):
     """Claude posts forms; plenty of other clients post JSON. Both must work."""
     tokens = await _exchange(client, C.CLAUDE, form=False)
@@ -301,6 +395,26 @@ async def test_provider_origin_can_preflight_mcp_but_not_the_crm_api(client, ori
     # The hosted provider origin is not granted CORS over unrelated CRM APIs.
     crm_response = await client.options("/api/v1/contacts/", headers=headers)
     assert "access-control-allow-origin" not in crm_response.headers
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("origin", ["https://chatgpt.com", "https://claude.ai"])
+async def test_hosted_clients_can_preflight_shared_root_oauth_endpoints(client, origin):
+    """The discovered AS uses /oauth/*, outside the client-specific connector path."""
+    headers = {
+        "Origin": origin,
+        "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "authorization,content-type",
+    }
+    for path in ("/oauth/register", "/oauth/token", "/oauth/revoke"):
+        response = await client.options(path, headers=headers)
+        assert response.status_code == 204, (path, response.text)
+        assert response.headers.get("access-control-allow-origin") == origin
+        allowed = {
+            header.strip().lower()
+            for header in response.headers["access-control-allow-headers"].split(",")
+        }
+        assert {"authorization", "content-type"} <= allowed
 
 
 @pytest.mark.asyncio

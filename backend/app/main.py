@@ -46,11 +46,18 @@ class MCPConnectorCorsMiddleware:
 
     @staticmethod
     def _is_mcp_surface(path: str) -> bool:
+        # ChatGPT and Claude discover the shared authorization server at the
+        # deployment root, so their registration/token requests land at
+        # /oauth/* (not /connectors/<client>/oauth/*). Include both forms and
+        # the slash variants used by Streamable HTTP clients.
+        normalized = path.rstrip("/") or "/"
         return (
-            path == "/mcp"
+            normalized in {"/mcp", "/oauth"}
+            or normalized.startswith("/oauth/")
             or path.startswith("/connectors/")
             or path.startswith("/.well-known/oauth-")
-            or path == "/.well-known/openid-configuration"
+            or normalized == "/.well-known/openid-configuration"
+            or normalized.startswith("/.well-known/openid-configuration/")
         )
 
     async def __call__(self, scope, receive, send):
