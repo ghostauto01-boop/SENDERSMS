@@ -873,10 +873,12 @@ Pass `channel: "sms"` or `"email"` explicitly.
 ## The safe order of operations
 1. **Audience** — `search_contacts`, `list_contact_lists`, `create_contact_list`,
    `import_contacts_csv` (CSV text, ideally straight into a list), `add_contacts_to_list`.
-   A campaign needs a `list_id`. Records are **phone-first**: every contact needs a phone
-   number (`+234…`), even if you only ever email them, and the import drops rows without a
-   usable number — check the import result and report the skipped rows instead of assuming
-   everyone landed.
+   A campaign needs a `list_id`. A contact needs a **phone number or an email address** —
+   not both, but at least one, and rows carrying neither are dropped by the import. A row
+   with both is stored as one record with both channels, and re-importing a person you
+   already have **merges** into the existing contact rather than creating a second one.
+   Check the import result (`imported` / `merged` / `invalid` / `phone_only` / `email_only`)
+   and report the skipped rows instead of assuming everyone landed.
 2. **Message** — `create_template` for anything reusable, or pass `message_body`
    straight to a campaign. Personalise with `{{first_name}}`, `{{business_name}}`,
    `{{city}}`, `{{website}}` and any column imported from CSV (`list_variables` shows

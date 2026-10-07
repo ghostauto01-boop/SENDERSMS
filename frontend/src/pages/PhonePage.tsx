@@ -10,17 +10,14 @@ import {
 } from "lucide-react";
 import ContactActions from "../components/ContactActions";
 import { displayName, startCall, openWhatsappForCall } from "../utils/call";
+import { contactInitials } from "../utils/contact";
 
 const avatarColor = (name: string) => {
   const colors = ["bg-primary-600", "bg-primary-700", "bg-primary-800", "bg-[#34B7F1]", "bg-warning-400", "bg-accent-500", "bg-primary-400", "bg-warning-400"];
   let h = 0; for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % colors.length;
   return colors[h];
 };
-const initials = (c: Contact) => {
-  if (c.first_name || c.last_name) return `${(c.first_name?.[0] || "").toUpperCase()}${(c.last_name?.[0] || "").toUpperCase()}` || c.phone_number.slice(-2);
-  if (c.business_name) return c.business_name.slice(0, 2).toUpperCase();
-  return c.phone_number.slice(-2);
-};
+const initials = (c: Contact) => contactInitials(c);
 
 const statusMeta: Record<string, { label: string; cls: string; Icon: any }> = {
   ended: { label: "Connected", cls: "text-primary-600", Icon: CheckCircle2 },
@@ -97,8 +94,12 @@ export default function PhonePage() {
           params: { page, per_page: 25, search: debounced || undefined },
         });
         if (!live) return;
-        if (data.items.length === 0 && page > 1) { setPage((p) => Math.max(1, p - 1)); return; }
-        setContacts(data.items); setTotal(data.total);
+        // The dialer only makes sense for numbers. Email-only contacts are
+        // perfectly valid CRM records, they just have nothing to ring here, so
+        // they are dropped from this list rather than shown as un-callable rows.
+        const dialable = data.items.filter((c) => !!c.phone_number);
+        if (dialable.length === 0 && page > 1) { setPage((p) => Math.max(1, p - 1)); return; }
+        setContacts(dialable); setTotal(data.total);
       } catch { if (live) toast.error("Failed to load contacts"); }
       finally { if (live) setLoading(false); }
     })();
@@ -260,7 +261,7 @@ export default function PhonePage() {
                     {callingId === c.id ? <Loader2 size={18} className="animate-spin" /> : <Phone size={18} />}
                   </button>
                   <button
-                    onClick={() => openWhatsappForCall(c.phone_number, name)}
+                    onClick={() => openWhatsappForCall(c.phone_number as string, name)}
                     className="w-11 h-11 rounded-full bg-primary-600 hover:bg-primary-700 text-white flex items-center justify-center flex-shrink-0"
                     title={`Call ${name} on WhatsApp`}
                   >

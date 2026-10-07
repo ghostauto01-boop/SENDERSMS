@@ -2,11 +2,19 @@ import { useState, useEffect } from "react";
 import api from "../api/client";
 import { Contact, PaginatedResponse } from "../types";
 import toast from "react-hot-toast";
-import { Plus, Search, Trash2, Upload, Download, ChevronLeft, ChevronRight, X, ListPlus, MessageSquare, Phone, MapPin, Building2, User, CheckSquare, Square, IdCard } from "lucide-react";
+import { Plus, Search, Trash2, Upload, Download, ChevronLeft, ChevronRight, X, ListPlus, MessageSquare, Phone, Mail, MapPin, Building2, User, CheckSquare, Square, IdCard, Sparkles } from "lucide-react";
 import ContactProfileModal from "../components/ContactProfileModal";
 import ContactActions from "../components/ContactActions";
 import ImportContactsModal from "../components/ImportContactsModal";
 import ListPicker from "../components/ListPicker";
+import {
+  contactChannel,
+  contactInitials,
+  contactLabel,
+  emailTrust,
+  emailTrustClass,
+  emailTrustLabel,
+} from "../utils/contact";
 
 const LEAD_STATUSES = ["new","contacted","replied","interested","follow-up","meeting","customer","not_interested","closed"];
 const statusBadge = (s:string) => { const m:Record<string,string>={new:"bg-primary-50 text-primary-700",contacted:"bg-warning-100 text-warning-700",replied:"bg-primary-100 text-primary-700",interested:"bg-primary-100 text-primary-800", "follow-up":"bg-warning-200 text-warning-700",meeting:"bg-primary-50 text-primary-600",customer:"bg-primary-100 text-primary-700",not_interested:"bg-danger-100 text-danger-700",closed:"bg-gray-100 text-gray-600"}; return m[s]||"bg-gray-100 text-gray-600"; };
@@ -16,11 +24,9 @@ const avatarColor = (name:string) => {
   let h=0; for(let i=0;i<name.length;i++) h=(h*31+name.charCodeAt(i))%colors.length;
   return colors[h];
 };
-const initials = (c:Contact) => {
-  if (c.first_name||c.last_name) return `${(c.first_name?.[0]||"").toUpperCase()}${(c.last_name?.[0]||"").toUpperCase()}` || (c.phone_number.slice(-2));
-  if (c.business_name) return c.business_name.slice(0,2).toUpperCase();
-  return c.phone_number.slice(-2);
-};
+// A contact with no phone is normal now (they came in through an email
+// import), so initials and avatars must never assume one exists.
+const initials = (c:Contact) => contactInitials(c);
 
 export { customKey, detectColumns } from "../utils/csv";
 
@@ -46,6 +52,18 @@ export default function ContactsPage() {
   const [quickContact, setQuickContact] = useState<Contact|null>(null);
   // Full-record view: every column the CSV imported for this contact.
   const [profileId, setProfileId] = useState<number|null>(null);
+  // Enrichment: which provider keys exist (drives whether the button is
+  // usable) and the in-flight state.
+  const [enriching, setEnriching] = useState(false);
+  const [enrichProviders, setEnrichProviders] = useState<string[]>([]);
+  const [enrichInfo, setEnrichInfo] = useState<{with_email:number; without_email:number; verified:number; unverified:number}|null>(null);
+
+  useEffect(()=>{
+    // Best-effort: a failed status call must never break the Contacts page.
+    api.get("/contacts/enrich/status")
+      .then(({data})=>{ setEnrichProviders(data.providers || []); setEnrichInfo(data.contacts || null); })
+      .catch(()=>{ setEnrichProviders([]); });
+  },[]);
 
   useEffect(()=>{ const t=setTimeout(()=>{ setDebouncedSearch(search); },350); return ()=>clearTimeout(t); },[search]);
   useEffect(()=>{loadContacts();},[page,debouncedSearch,leadStatus,emailState]);
@@ -58,6 +76,65 @@ export default function ContactsPage() {
       setContacts(data.items); setTotal(data.total); }
     catch (err:any) { setError(err.response?.data?.detail||"Failed"); }
     finally { setLoading(false); }
+  };
+
+  /**
+   * Run email enrichment on whatever the user is looking at.
+   *
+   * Scope follows the selection so the action always means "these ones": a
+   * ticked set is enriched by id, otherwise the current filter decides. The
+   * server caps a single run (see /contacts/enrich) so one click cannot drain
+   * a provider's monthly free quota.
+   */
+  const handleEnrich = async () => {
+    const targetsNoEmail = enrichInfo ? enrichInfo.without_email : 0;
+    const useSelection = selected.size > 0 && !allMatching;
+    const scope = useSelection ? "ids" : emailState === "no_email" ? "no_email" : "all";
+    const label = useSelection
+      ? `${selected.size} selected contact${selected.size===1?"":"s"}`
+      : `up to 500 contacts matching this view`;
+    const extra = !useSelection && targetsNoEmail > 0
+      ? ` ${targetsNoEmail} have no address at all and can be looked up.`
+      : "";
+    if (!confirm(`Enrich emails for ${label}?${extra}`)) return;
+
+    setEnriching(true);
+    try {
+      const { data } = await api.post("/contacts/enrich", null, {
+        params: {
+          scope,
+          ...(useSelection ? { contact_ids: [...selected] } : {}),
+          search: useSelection ? undefined : debouncedSearch || undefined,
+          lead_status: useSelection ? undefined : leadStatus || undefined,
+        },
+        // A 500-row batch with provider calls can take a while.
+        timeout: 300000,
+      });
+      const parts = [
+        data.verified ? `${data.verified} verified` : null,
+        data.found ? `${data.found} found` : null,
+        data.inferred ? `${data.inferred} guessed` : null,
+        data.skipped ? `${data.skipped} skipped` : null,
+        data.failed ? `${data.failed} unavailable` : null,
+      ].filter(Boolean);
+      toast.success(
+        parts.length ? `Enrichment done — ${parts.join(", ")}` : "Nothing to enrich",
+      );
+      if (data.failed && !data.verified && !data.found) {
+        // Almost always a missing key or an exhausted free tier.
+        toast(
+          "No provider results — check the API keys and the monthly quota.",
+          { icon: "ℹ️" },
+        );
+      }
+      clearSelection();
+      loadContacts();
+      api.get("/contacts/enrich/status")
+        .then(({data})=>setEnrichInfo(data.contacts || null))
+        .catch(()=>{});
+    } catch (err:any) {
+      toast.error(err.response?.data?.detail || "Enrichment failed");
+    } finally { setEnriching(false); }
   };
 
   const handleExport = async () => {
@@ -243,9 +320,27 @@ export default function ContactsPage() {
           <option value="">Email: all</option>
           <option value="emailable">Emailable</option>
           <option value="no_email">No email</option>
+          <option value="verified">Verified</option>
+          <option value="unverified">Unverified</option>
+          <option value="inferred">Guessed (inferred)</option>
           <option value="unsubscribed">Unsubscribed</option>
           <option value="bounced">Bounced</option>
         </select>
+        <button
+          onClick={handleEnrich}
+          disabled={enriching || !enrichProviders}
+          title={
+            enrichProviders
+              ? "Look up missing addresses and verify the ones on file"
+              : "Add a Hunter/ZeroBounce/NeverBounce API key in Settings to enable enrichment"
+          }
+          className="w-10 h-10 lg:w-auto lg:px-3 lg:py-2.5 rounded-full lg:rounded-full bg-primary-50 dark:bg-primary-950 text-primary-700 dark:text-primary-300 flex items-center justify-center gap-1.5 text-sm font-medium hover:bg-primary-100 disabled:opacity-50"
+        >
+          {enriching
+            ? <span className="w-4 h-4 border-2 border-primary-600 border-t-transparent rounded-full animate-spin"/>
+            : <Sparkles size={16}/>}
+          <span className="hidden lg:inline">{enriching ? "Enriching…" : "Enrich emails"}</span>
+        </button>
       </div>
 
       {/* MOBILE CARDS - WhatsApp style list */}
@@ -296,11 +391,37 @@ export default function ContactsPage() {
                     <h3 className="font-semibold text-[15px] leading-tight text-gray-900 dark:text-white truncate pr-2">{name}</h3>
                     <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium whitespace-nowrap flex-shrink-0 ${statusBadge(c.lead_status)}`}>{c.lead_status}</span>
                   </div>
+                  {/* Phone when there is one, otherwise the address — an
+                      email-only contact must still show a way to reach them. */}
                   <div className="flex items-center gap-1.5 mt-1 text-[13px] text-gray-900 dark:text-gray-200">
-                    <Phone size={12} className="text-primary-600 flex-shrink-0"/>
-                    <span className="font-medium tracking-wide">{c.phone_number}</span>
-                    <button onClick={(e)=>{e.stopPropagation(); navigator.clipboard.writeText(c.phone_number); toast.success("Copied");}} className="text-gray-500 hover:text-primary-600 ml-1">⎘</button>
+                    {c.phone_number ? (
+                      <>
+                        <Phone size={12} className="text-primary-600 flex-shrink-0"/>
+                        <span className="font-medium tracking-wide">{c.phone_number}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Mail size={12} className="text-[#34B7F1] flex-shrink-0"/>
+                        <span className="font-medium truncate">{c.email || "No contact details"}</span>
+                      </>
+                    )}
+                    <button
+                      onClick={(e)=>{
+                        e.stopPropagation();
+                        const value = contactChannel(c).value;
+                        if (!value) return;
+                        navigator.clipboard.writeText(value);
+                        toast.success("Copied");
+                      }}
+                      className="text-gray-500 hover:text-primary-600 ml-1"
+                      title="Copy"
+                    >⎘</button>
                   </div>
+                  {c.phone_number && c.email && (
+                    <div className="flex items-center gap-1.5 mt-0.5 text-[12px] text-gray-500 dark:text-gray-400">
+                      <Mail size={12}/> <span className="truncate">{c.email}</span>
+                    </div>
+                  )}
                   {c.business_name && c.business_name !== name && (
                     <div className="flex items-center gap-1.5 mt-1 text-[12px] text-gray-500 dark:text-gray-400">
                       <Building2 size={12}/> <span className="truncate">{c.business_name}</span>
@@ -387,16 +508,23 @@ export default function ContactsPage() {
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
               {loading ? [...Array(5)].map((_,i)=>(<tr key={i}>{[...Array(7)].map((_,j)=>(<td key={j} className="px-4 py-3"><div className="h-4 bg-gray-100 dark:bg-gray-700 rounded animate-pulse"/></td>))}</tr>))
               : contacts.length===0 ? (<tr><td colSpan={7} className="px-4 py-12 text-center text-gray-500">{search||leadStatus||emailState?"No matches":"No contacts. Import or add one."}</td></tr>)
-              : contacts.map(c => (
+              : contacts.map(c => {
+                const contactTrust = emailTrust(c);
+                const contactTrustLabel = emailTrustLabel(contactTrust);
+                return (
                 <tr key={c.id} className={`hover:bg-gray-50 dark:hover:bg-gray-900 ${allMatching||selected.has(c.id)?"bg-primary-50 dark:bg-primary-950":""}`}>
                   <td className="px-4 py-3"><input type="checkbox" checked={allMatching||selected.has(c.id)} onChange={()=>toggleSelect(c.id)} title={allMatching?"Tap to keep this contact":"Select"} className="rounded accent-primary-600"/></td>
                   <td className="px-3 py-3">
                     <div className="flex items-center gap-2.5">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-semibold ${avatarColor(`${c.first_name||""} ${c.last_name||""}`.trim()||c.business_name||c.phone_number)}`}>{initials(c)}</div>
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-semibold ${avatarColor(contactLabel(c))}`}>{initials(c)}</div>
                       <span className="font-medium text-[13px] text-gray-900 dark:text-white">{c.first_name} {c.last_name}</span>
                     </div>
                   </td>
-                  <td className="px-3 py-3 text-[13px] font-medium text-gray-900 dark:text-gray-200">{c.phone_number}</td>
+                  <td className="px-3 py-3 text-[13px] font-medium text-gray-900 dark:text-gray-200">
+                    {c.phone_number
+                      ? c.phone_number
+                      : <span className="inline-flex items-center gap-1 text-[#34B7F1]"><Mail size={11}/>email only</span>}
+                  </td>
                   <td className="px-3 py-3 text-[13px] text-gray-500 dark:text-gray-400 max-w-[160px]">
                     <div className="truncate">{c.business_name||"—"}</div>
                     {c.tags && c.tags.length > 0 && (
@@ -407,13 +535,21 @@ export default function ContactsPage() {
                     )}
                   </td>
                   <td className="px-3 py-3 max-w-[170px]">
-                    {(c as any).email ? (
-                      <div className="truncate text-[12px] text-gray-600 dark:text-gray-400" title={(c as any).email}>
-                        {(c as any).email}
-                        {((c as any).is_email_opted_out || (c as any).email_status === "unsubscribed") && (
+                    {c.email ? (
+                      <div className="truncate text-[12px] text-gray-600 dark:text-gray-400" title={c.email}>
+                        {c.email}
+                        {contactTrustLabel && (
+                          /* "Guessed" / "Unverified" / "Verified" — the operator
+                             must never mistake an inferred address for a
+                             confirmed one. */
+                          <span className={`ml-1 text-[10px] px-1.5 py-0.5 rounded-full ${emailTrustClass(contactTrust)}`}>
+                            {contactTrustLabel}
+                          </span>
+                        )}
+                        {(c.is_email_opted_out || c.email_status === "unsubscribed") && (
                           <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded-full bg-warning-100 text-warning-700">unsub</span>
                         )}
-                        {(c as any).is_email_undeliverable || (c as any).email_status === "bounced" ? (
+                        {(c.is_email_undeliverable || c.email_status === "bounced") ? (
                           <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded-full bg-danger-100 text-danger-700">bounced</span>
                         ) : null}
                       </div>
@@ -438,7 +574,8 @@ export default function ContactsPage() {
                     </div>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -459,8 +596,8 @@ export default function ContactsPage() {
               <button onClick={()=>{setQuickSendId(null);setQuickContact(null);}} className="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center text-white"><X size={18}/></button>
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-semibold ${quickContact?avatarColor(`${quickContact.first_name||""}`):"bg-primary-600"}`}>{quickContact?initials(quickContact):"?"}</div>
               <div className="flex-1 min-w-0">
-                <p className="text-white font-semibold text-[15px] truncate">{quickContact? `${quickContact.first_name||""} ${quickContact.last_name||""}`.trim()||quickContact.business_name||quickContact.phone_number : "Send SMS"}</p>
-                <p className="text-white/70 text-[12px] truncate">{quickContact?.phone_number||""} • WhatsApp style</p>
+                <p className="text-white font-semibold text-[15px] truncate">{quickContact? contactLabel(quickContact) : "Send SMS"}</p>
+                <p className="text-white/70 text-[12px] truncate">{quickContact?.phone_number||"No phone on file"} • WhatsApp style</p>
               </div>
             </div>
 
@@ -515,7 +652,12 @@ function AddContactModal({ onClose }: { lists: any[]; onClose: () => void }) {
   const [f, setF] = useState({ first_name:"",last_name:"",business_name:"",phone_number:"",email:"",city:"",state:"",website:"",industry:"",source:"",lead_status:"new",list_id:"" });
   const [sub, setSub] = useState(false);
 
-  const handle = async (e:React.FormEvent) => { e.preventDefault(); if(!f.phone_number){toast.error("Phone required");return;} setSub(true);
+  const handle = async (e:React.FormEvent) => { e.preventDefault();
+    // A contact needs a phone number or an email address — one of the two, not
+    // necessarily the phone. The server enforces the same rule and answers 400
+    // with the reason, so this check only saves a round trip.
+    if(!f.phone_number.trim() && !f.email.trim()){toast.error("Add a phone number or an email address");return;}
+    setSub(true);
     try { const res = await api.post("/contacts/", f);
       if(f.list_id) { try { await api.post(`/lists/${f.list_id}/contacts`,[(res.data as any).id]); } catch {} }
       toast.success("Contact created"); onClose();
@@ -526,9 +668,9 @@ function AddContactModal({ onClose }: { lists: any[]; onClose: () => void }) {
   return (<div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4"><div className="bg-white dark:bg-gray-800 w-full sm:max-w-lg max-h-[92vh] overflow-y-auto rounded-t-[20px] sm:rounded-2xl"><div className="sticky top-0 bg-primary-700 dark:bg-gray-800 px-4 py-3 flex items-center justify-between"><h2 className="text-white font-semibold flex items-center gap-2"><User size={18}/> Add Contact</h2><button onClick={onClose} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white"><X size={16}/></button></div>
     <form onSubmit={handle} className="p-4 sm:p-6 space-y-3">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><div><label className="text-xs font-medium text-gray-600 dark:text-gray-400">First Name</label><input className="w-full mt-1 px-3 py-2.5 bg-gray-100 dark:bg-gray-900 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/20" value={f.first_name} onChange={e=>setF({...f,first_name:e.target.value})}/></div><div><label className="text-xs font-medium text-gray-600">Last Name</label><input className="w-full mt-1 px-3 py-2.5 bg-gray-100 dark:bg-gray-900 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/20" value={f.last_name} onChange={e=>setF({...f,last_name:e.target.value})}/></div></div>
-      <div><label className="text-xs font-medium text-gray-600">Phone Number *</label><input className="w-full mt-1 px-3 py-2.5 bg-gray-100 dark:bg-gray-900 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/20" placeholder="08012345678" value={f.phone_number} onChange={e=>setF({...f,phone_number:e.target.value})} required/></div>
+      <div><label className="text-xs font-medium text-gray-600">Phone Number <span className="text-gray-400">(or email below)</span></label><input className="w-full mt-1 px-3 py-2.5 bg-gray-100 dark:bg-gray-900 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/20" placeholder="08012345678" value={f.phone_number} onChange={e=>setF({...f,phone_number:e.target.value})}/></div>
       <div><label className="text-xs font-medium text-gray-600">Business / Restaurant Name</label><input className="w-full mt-1 px-3 py-2.5 bg-gray-100 dark:bg-gray-900 rounded-xl text-sm" placeholder="e.g. Chicken Republic, Mama Gold" value={f.business_name} onChange={e=>setF({...f,business_name:e.target.value})}/></div>
-      <div><label className="text-xs font-medium text-gray-600">Email</label><input className="w-full mt-1 px-3 py-2.5 bg-gray-100 dark:bg-gray-900 rounded-xl text-sm" type="email" value={f.email} onChange={e=>setF({...f,email:e.target.value})}/></div>
+      <div><label className="text-xs font-medium text-gray-600">Email <span className="text-gray-400">(or phone number above)</span></label><input className="w-full mt-1 px-3 py-2.5 bg-gray-100 dark:bg-gray-900 rounded-xl text-sm" type="email" placeholder="ada@example.com" value={f.email} onChange={e=>setF({...f,email:e.target.value})}/></div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><div><label className="text-xs font-medium text-gray-600">City</label><input className="w-full mt-1 px-3 py-2.5 bg-gray-100 dark:bg-gray-900 rounded-xl text-sm" value={f.city} onChange={e=>setF({...f,city:e.target.value})}/></div><div><label className="text-xs font-medium text-gray-600">State</label><input className="w-full mt-1 px-3 py-2.5 bg-gray-100 dark:bg-gray-900 rounded-xl text-sm" value={f.state} onChange={e=>setF({...f,state:e.target.value})}/></div></div>
       <div><label className="text-xs font-medium text-gray-600">Industry</label><input className="w-full mt-1 px-3 py-2.5 bg-gray-100 dark:bg-gray-900 rounded-xl text-sm" placeholder="Restaurant, Fast Food, etc." value={f.industry} onChange={e=>setF({...f,industry:e.target.value})}/></div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

@@ -25,9 +25,11 @@ class _NameLike(Protocol):
 def contact_display_name(contact: Optional[_NameLike], fallback: str = "Unknown") -> str:
     """Best human-readable label for a contact.
 
-    Falls back through person name -> business name -> phone number, and
-    tolerates a missing contact so callers do not each repeat a None check.
-    Whitespace-only names are treated as absent.
+    Falls back through person name -> business name -> phone number -> email
+    address, and tolerates a missing contact so callers do not each repeat a
+    None check. Whitespace-only names are treated as absent, and the email step
+    exists because an email-only contact has no phone to fall back to — without
+    it the inbox and follow-up lists would label them "Unknown".
     """
     if contact is None:
         return fallback
@@ -43,4 +45,8 @@ def contact_display_name(contact: Optional[_NameLike], fallback: str = "Unknown"
         return business
 
     phone = (getattr(contact, "phone_number", None) or "").strip()
-    return phone or fallback
+    if phone:
+        return phone
+
+    email = (getattr(contact, "email", None) or "").strip()
+    return email or fallback

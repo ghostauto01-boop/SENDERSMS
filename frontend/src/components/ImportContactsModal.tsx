@@ -17,6 +17,9 @@ import TagPicker from "./TagPicker";
 
 export interface ImportResult {
   imported: number;
+  /** Rows that matched an existing contact and improved it (not rejected). */
+  merged?: number;
+  merged_by_name?: number;
   duplicates: number;
   invalid: number;
   skipped: number;
@@ -24,6 +27,13 @@ export interface ImportResult {
   errors: any[];
   imported_ids: number[];
   new_variables: number;
+  // Channel split of what was imported, so "these will never get an SMS" is
+  // visible immediately instead of being discovered at campaign time.
+  with_phone?: number;
+  with_email?: number;
+  email_only?: number;
+  phone_only?: number;
+  both?: number;
   list: { id: number; name: string; contact_count: number } | null;
 }
 
@@ -93,6 +103,29 @@ export default function ImportContactsModal({ onClose, onDone, defaultListId = "
   };
 
   const phoneMapped = preview?.headers.some((h) => mapping[h] === "phone_number");
+  const emailMapped = preview?.headers.some((h) => mapping[h] === "email");
+  // A contact needs a phone OR an email. Requiring a phone column (as this
+  // modal used to) made it impossible to import the perfectly ordinary file
+  // that only carries addresses.
+  const identityMapped = phoneMapped || emailMapped;
+  // Which rows can be imported, counted from the preview so the operator sees
+  // the split before committing rather than in the result afterwards.
+  const channelCounts = (() => {
+    if (!preview) return null;
+    const idx = (field: string) =>
+      preview.headers.findIndex((h) => mapping[h] === field);
+    const phoneIdx = idx("phone_number");
+    const emailIdx = idx("email");
+    let withPhone = 0, withEmail = 0, neither = 0;
+    preview.rows.forEach((row) => {
+      const hasPhone = phoneIdx >= 0 && (row[phoneIdx] || "").trim() !== "";
+      const hasEmail = emailIdx >= 0 && (row[emailIdx] || "").trim() !== "";
+      if (hasPhone) withPhone += 1;
+      if (hasEmail) withEmail += 1;
+      if (!hasPhone && !hasEmail) neither += 1;
+    });
+    return { withPhone, withEmail, neither, sampled: preview.rows.length };
+  })();
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4">
@@ -129,9 +162,28 @@ export default function ImportContactsModal({ onClose, onDone, defaultListId = "
               <p className="text-sm font-semibold text-gray-900 dark:text-white">
                 Map columns <span className="font-normal text-gray-500">(auto-detected)</span>
               </p>
-              {!phoneMapped && (
+              {!identityMapped && (
                 <p className="text-xs bg-danger-100 text-danger-700 rounded-xl px-3 py-2">
-                  ⚠ No column is mapped to Phone — every row would be rejected. Map one below.
+                  ⚠ Map a column to <b>Phone</b> or <b>Email</b> — a contact needs at
+                  least one of the two to be reachable.
+                </p>
+              )}
+              {identityMapped && !phoneMapped && (
+                <p className="text-xs bg-primary-100 text-primary-700 rounded-xl px-3 py-2">
+                  📧 Email-only import — every contact will be reachable by email
+                  and skipped by SMS campaigns.
+                </p>
+              )}
+              {identityMapped && !emailMapped && (
+                <p className="text-xs bg-warning-200 text-warning-700 rounded-xl px-3 py-2">
+                  📱 Phone-only import — no addresses in this file, so nobody in it
+                  can be emailed. You can add emails later with “Enrich emails”.
+                </p>
+              )}
+              {channelCounts && channelCounts.neither > 0 && (
+                <p className="text-xs bg-warning-200 text-warning-700 rounded-xl px-3 py-2">
+                  {channelCounts.neither} of the first {channelCounts.sampled} rows have
+                  neither a phone nor an email and will be reported as invalid.
                 </p>
               )}
               <div className="max-h-40 overflow-auto text-xs border border-gray-200 dark:border-gray-700 rounded-xl">
@@ -215,7 +267,7 @@ export default function ImportContactsModal({ onClose, onDone, defaultListId = "
               </p>
               <button
                 onClick={doImport}
-                disabled={!phoneMapped}
+                disabled={!identityMapped}
                 className="w-full py-3 rounded-full bg-primary-600 text-white font-semibold disabled:opacity-50"
               >
                 Import Contacts
@@ -239,10 +291,14 @@ export default function ImportContactsModal({ onClose, onDone, defaultListId = "
                   into list <b className="text-primary-600">{result.list.name}</b>
                 </p>
               )}
-              <div className="grid grid-cols-3 gap-2 text-sm">
+              <div className="grid grid-cols-4 gap-2 text-sm">
                 <div className="bg-primary-100 rounded-xl p-3">
                   <p className="text-2xl font-bold text-primary-700">{result.imported}</p>
                   <p className="text-xs text-gray-600">Imported</p>
+                </div>
+                <div className="bg-primary-50 rounded-xl p-3">
+                  <p className="text-2xl font-bold text-primary-600">{result.merged ?? 0}</p>
+                  <p className="text-xs text-gray-600">Merged</p>
                 </div>
                 <div className="bg-warning-200 rounded-xl p-3">
                   <p className="text-2xl font-bold text-warning-700">{result.duplicates}</p>
@@ -253,6 +309,37 @@ export default function ImportContactsModal({ onClose, onDone, defaultListId = "
                   <p className="text-xs">Invalid</p>
                 </div>
               </div>
+              {typeof result.with_phone === "number" && (
+                <div className="text-left text-xs bg-gray-100 dark:bg-gray-900 rounded-xl p-3 space-y-0.5">
+                  <p className="font-semibold text-gray-700 dark:text-gray-200">
+                    How these contacts can be reached
+                  </p>
+                  <p className="text-gray-600 dark:text-gray-400">
+                    📱 Phone only: <b>{result.phone_only ?? 0}</b>
+                  </p>
+                  <p className="text-gray-600 dark:text-gray-400">
+                    📧 Email only: <b>{result.email_only ?? 0}</b>
+                  </p>
+                  <p className="text-gray-600 dark:text-gray-400">
+                    📱📧 Both: <b>{result.both ?? 0}</b>
+                  </p>
+                  {(result.email_only ?? 0) > 0 && (
+                    <p className="text-gray-500 pt-1">
+                      Email-only contacts are skipped by SMS campaigns — filter the
+                      Contacts page by “No email”/“No phone” to see them.
+                    </p>
+                  )}
+                </div>
+              )}
+              {(result.merged ?? 0) > 0 && (
+                <p className="text-xs text-gray-500">
+                  {result.merged} existing contact{result.merged === 1 ? "" : "s"} were
+                  updated with details from this file instead of being duplicated.
+                  {(result.merged_by_name ?? 0) > 0 && (
+                    <> {result.merged_by_name} matched by name.</>
+                  )}
+                </p>
+              )}
               {result.errors.length > 0 && (
                 <details className="text-xs text-left">
                   <summary className="cursor-pointer text-gray-500">{result.errors.length} errors</summary>

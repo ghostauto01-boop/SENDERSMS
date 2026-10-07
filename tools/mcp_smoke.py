@@ -176,11 +176,19 @@ def main() -> int:
     check("endpoint catalogue lists campaigns", "POST   /api/v1/campaigns/" in catalogue)
     check("endpoint catalogue lists settings", "/api/v1/settings/sending-rules" in catalogue)
 
-    # The schema must tell the assistant a phone number is mandatory, not let it
-    # discover that from a 422.
+    # Either channel can identify a contact, so neither may be advertised as
+    # mandatory: an assistant that believes a phone is required will refuse to
+    # create the email-only contacts this app now supports.
     create_schema = next((t for t in tools if t["name"] == "create_contact"), {})
-    check("create_contact documents the phone-first rule",
-          "phone_number" in (create_schema.get("inputSchema") or {}).get("required", []))
+    create_required = (create_schema.get("inputSchema") or {}).get("required", [])
+    check("create_contact does not demand a phone number",
+          "phone_number" not in create_required, str(create_required))
+    check("create_contact does not demand an email address",
+          "email" not in create_required, str(create_required))
+    check("create_contact accepts both channels",
+          {"phone_number", "email"} <= set((create_schema.get("inputSchema") or {})
+                                           .get("properties", {})),
+          str(list((create_schema.get("inputSchema") or {}).get("properties", {}))))
     update_schema = next((t for t in tools if t["name"] == "update_contact"), {})
     check("update_contact does not advertise an unusable field",
           "phone_number" not in (update_schema.get("inputSchema") or {}).get("properties", {}))
@@ -206,12 +214,26 @@ def main() -> int:
     # -------------------------------------------------------------- contacts
     print("\n[4] Contacts, lists, imports")
     email = f"mcp-smoke-{RUN}@{EMAIL_DOMAIN}"
-    # Records are phone-first, so the assistant must supply a number.
     contact = mcp.payload("create_contact", email=email, phone_number=f"+2348033{RUN[-6:]}",
                           first_name="Maya", last_name="Smoke",
                           business_name="Smoke Analytics", city="Abuja", country="NG")
     contact_id = jget(contact, "id", "contact_id")
     check("contact created through MCP", bool(contact_id), json.dumps(contact)[:200])
+
+    # The whole point of the change: a contact with an address and no number.
+    email_only = mcp.payload("create_contact", email=f"mcp-smoke-eo-{RUN}@{EMAIL_DOMAIN}",
+                             first_name="Eve", last_name="Only",
+                             business_name="Exclusive Analytics")
+    email_only_id = jget(email_only, "id", "contact_id")
+    check("email-only contact created through MCP", bool(email_only_id),
+          json.dumps(email_only)[:200])
+    check("email-only contact really has no phone",
+          not jget(email_only, "phone_number"),
+          json.dumps(email_only)[:200])
+
+    # ...and a contact with neither channel is still refused.
+    is_error, text, _ = mcp.call("create_contact", first_name="Nameless")
+    check("contact with neither channel is refused", is_error, text[:200])
     found = mcp.payload("search_contacts", search=f"mcp-smoke-{RUN}")
     items = found.get("items") if isinstance(found, dict) else found
     check("contact is searchable", any(c.get("id") == contact_id for c in (items or [])),

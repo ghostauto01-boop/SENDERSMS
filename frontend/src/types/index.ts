@@ -19,7 +19,8 @@ export interface Contact {
   first_name: string | null;
   last_name: string | null;
   business_name: string | null;
-  phone_number: string;
+  /** Null for an email-only contact — always render through contactChannel(). */
+  phone_number: string | null;
   email: string | null;
   city: string | null;
   state: string | null;
@@ -37,6 +38,24 @@ export interface Contact {
   notes: string | null;
   custom_fields: string | null;
   tags: string[];
+  // Email-channel state (separate from the SMS opt-out above). The API has
+  // always returned these; the type was just missing them, which is why the
+  // Contacts page had to cast `(c as any).email` everywhere.
+  is_email_opted_out?: boolean;
+  is_email_undeliverable?: boolean;
+  email_status?: string;
+  emails_sent?: number;
+  emails_received?: number;
+  last_emailed_at?: string | null;
+  // Email enrichment provenance: where the address came from and whether
+  // anyone confirmed it exists. `email_source === "inferred"` means it was
+  // guessed from a name pattern and must never be presented as certain.
+  email_source?: string | null;
+  email_verified?: boolean;
+  email_verified_at?: string | null;
+  email_confidence?: number | null;
+  email_enriched_at?: string | null;
+  email_enrichment_note?: string | null;
   messages_sent: number;
   messages_received: number;
   last_contacted_at: string | null;

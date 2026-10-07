@@ -269,3 +269,55 @@ ALTER TABLE scheduled_messages ADD COLUMN IF NOT EXISTS cc_addresses TEXT;
 ALTER TABLE scheduled_messages ADD COLUMN IF NOT EXISTS bcc_addresses TEXT;
 
 COMMIT;
+
+-- ============================================================
+-- Email, phone, or both — contacts are no longer phone-only
+-- ============================================================
+-- A contact now needs a phone number OR an email address. Earlier releases
+-- declared contacts.phone_number NOT NULL, which silently rejected every
+-- email-only import row, so this has to be relaxed on an existing database
+-- before the importer can store one.
+--
+-- The startup auto-repair applies this on its own (schema_repair.py); run the
+-- statements below by hand when you want the change applied up front, or when
+-- the auto-repair could not (a restricted DB role, for example).
+
+BEGIN;
+
+-- Email-only contacts store NULL here. Safe and instant on PostgreSQL: it only
+-- drops a constraint, no row is read or rewritten.
+ALTER TABLE contacts ALTER COLUMN phone_number DROP NOT NULL;
+
+-- Where an address came from and whether it was ever confirmed. A pattern
+-- guess is stored with email_verified = FALSE and email_source = 'inferred',
+-- so it can be reviewed but never silently treated as a real address.
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS email_source VARCHAR(30);
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS email_verified_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS email_confidence INTEGER;
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS email_enriched_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS email_enrichment_note VARCHAR(255);
+
+-- Dedupe key for an email-only contact. NOT unique on purpose: an existing
+-- database may already hold the same address on two contacts, and the ALTER
+-- would abort the whole migration. Uniqueness is enforced by the application
+-- against lower(email); resolve duplicates first if you want the index:
+--
+--   SELECT lower(email), COUNT(*) FROM contacts
+--   WHERE email IS NOT NULL AND email <> ''
+--   GROUP BY 1 HAVING COUNT(*) > 1;
+--
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS email_lower VARCHAR(255);
+
+-- Backfill the dedupe key for addresses that predate it, so an old contact is
+-- still found by an email-only re-import. Idempotent: only fills blanks.
+UPDATE contacts
+   SET email_lower = lower(trim(email))
+ WHERE email IS NOT NULL AND trim(email) <> ''
+   AND (email_lower IS NULL OR email_lower = '');
+
+CREATE INDEX IF NOT EXISTS ix_contacts_email_lower    ON contacts (email_lower);
+CREATE INDEX IF NOT EXISTS ix_contacts_email          ON contacts (email);
+CREATE INDEX IF NOT EXISTS ix_contacts_email_verified ON contacts (email_verified);
+
+COMMIT;

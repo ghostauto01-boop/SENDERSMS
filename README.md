@@ -36,6 +36,23 @@ curl -s -b cookies.txt https://your-app/api/v1/guide/summary   # progress only
 missing — the mailbox and the AI connectors are deliberately not part of that,
 because they are things you add after your first campaign, not before it.
 
+## Contacts can be phone-only, email-only, or both
+
+A contact needs a phone number **or** an email address — not both. Email-only
+lists import cleanly, and when the same person appears in a numbers file and an
+addresses file they are **merged into one record carrying both channels**
+instead of becoming two half-empty rows.
+
+Email enrichment fills in what is missing, in four stages: clean and diagnose
+are free and offline (MX records, typo fixes, dead-domain and shared-inbox
+flags); find and verify use the free tiers of Hunter / ZeroBounce / NeverBounce
+once you add a key. A pattern-guessed address is stored **unverified**, badged
+"Guessed" in the UI, and held back from sends — a bounce costs sender reputation
+for every other email the app sends.
+
+Full detail, including the one-line database migration an existing install
+needs: [CONTACTS-PHONE-OR-EMAIL.md](CONTACTS-PHONE-OR-EMAIL.md).
+
 ## Email (Brevo) — what is wired
 
 The app runs SMS and email side by side. Email reuses the same tables as SMS (a

@@ -109,13 +109,30 @@ def test_path_placeholders_are_all_declared():
                 f"{tool.name}: {{name}} has no argument"
 
 
-def test_contact_creation_mirrors_the_phone_first_rule():
-    """The API requires a phone number; the tool schema must say so up front."""
+def test_contact_creation_advertises_either_channel():
+    """A contact needs a phone number *or* an email address.
+
+    Neither may be advertised as mandatory: an assistant that believes a phone
+    number is required will refuse to create an email-only contact, which is
+    exactly what the import and the API now accept. The API still refuses a
+    contact with neither, so both fields must be offered.
+    """
     create = TOOLS_BY_NAME["create_contact"].input_schema()
-    assert "phone_number" in create["required"]
+    required = create.get("required") or []
+    assert "phone_number" not in required
+    assert "email" not in required
+    assert {"phone_number", "email"} <= set(create["properties"])
+
     # …and the update endpoint has no such field, so the tool must not advertise one.
     update = TOOLS_BY_NAME["update_contact"].input_schema()
     assert "phone_number" not in update["properties"]
+
+
+def test_contact_creation_description_states_the_rule():
+    """The one thing the schema cannot express: *at least one* of the two."""
+    description = TOOLS_BY_NAME["create_contact"].description.lower()
+    assert "phone number" in description and "email" in description
+    assert "neither" in description
 
 
 def test_every_declared_tool_points_at_a_real_endpoint():

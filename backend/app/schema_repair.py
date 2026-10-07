@@ -147,7 +147,9 @@ def _add_column_sql(sync_conn, table_name: str, column) -> str:
     return f'ALTER TABLE "{table_name}" ADD COLUMN {ddl}'
 
 
-def _sqlite_rebuild_table(sync_conn, metadata, table_name: str) -> bool:
+def _sqlite_rebuild_table(
+    sync_conn, metadata, table_name: str, reason: str = "the model's unique key"
+) -> bool:
     """Rebuild one SQLite table so its constraints match the models.
 
     SQLite cannot drop a UNIQUE constraint that was declared inline in
@@ -205,9 +207,9 @@ def _sqlite_rebuild_table(sync_conn, metadata, table_name: str) -> bool:
                     pass
 
         logger.warning(
-            "schema_repair: rebuilt table %s to apply the model's unique key "
-            "(%d row(s) copied).",
+            "schema_repair: rebuilt table %s to apply %s (%d row(s) copied).",
             table_name,
+            reason,
             sync_conn.execute(text(f'SELECT COUNT(*) FROM "{table_name}"')).scalar() or 0,
         )
         return True
@@ -368,6 +370,80 @@ def _repair_widened_unique_keys(sync_conn, metadata) -> list[str]:
     return applied
 
 
+#: Columns a release deliberately RELAXED from NOT NULL to nullable.
+#:
+#: ``create_all`` never alters an existing table, so a column that was created
+#: NOT NULL stays NOT NULL forever, no matter what the model now says. That is
+#: not cosmetic: this release made ``contacts.phone_number`` optional so an
+#: email-only contact can be imported, and on any database created before it,
+#: every such insert would fail with a NOT NULL violation — the feature would
+#: work on a fresh install and break on the live one.
+#:
+#: Each entry: table -> column.
+_RELAXED_NOT_NULL_COLUMNS: tuple[tuple[str, str], ...] = (
+    ("contacts", "phone_number"),
+)
+
+
+def _repair_relaxed_not_null(sync_conn, metadata) -> list[str]:
+    """Drop NOT NULL from columns the models now declare optional.
+
+    Only ever removes a constraint; no row is read, written or dropped. On
+    PostgreSQL this is a single metadata-only ALTER. SQLite cannot alter a
+    constraint in place, so the existing table-rebuild path is used.
+    """
+    from sqlalchemy import inspect
+
+    applied: list[str] = []
+    dialect = sync_conn.dialect.name
+    tables = set(inspect(sync_conn).get_table_names())
+
+    for table_name, column_name in _RELAXED_NOT_NULL_COLUMNS:
+        if table_name not in tables:
+            continue
+        table = metadata.tables.get(table_name)
+        if table is None or column_name not in table.columns:
+            continue
+        if table.columns[column_name].nullable is not True:
+            # The model still wants it NOT NULL; nothing to relax.
+            continue
+
+        columns = {c["name"]: c for c in inspect(sync_conn).get_columns(table_name)}
+        info = columns.get(column_name)
+        if info is None or info.get("nullable", True):
+            continue  # already nullable — a clean restart reports nothing
+
+        if dialect == "sqlite":
+            # No ALTER COLUMN; rebuilding copies the column across as nullable
+            # because the rebuild takes its shape from the model.
+            if _sqlite_rebuild_table(
+                sync_conn, metadata, table_name,
+                reason=f"{table_name}.{column_name} being optional",
+            ):
+                applied.append(f"relaxed {table_name}.{column_name}")
+            continue
+
+        try:
+            sync_conn.execute(
+                text(f'ALTER TABLE "{table_name}" ALTER COLUMN "{column_name}" DROP NOT NULL')
+            )
+            applied.append(f"relaxed {table_name}.{column_name}")
+            logger.warning(
+                "schema_repair: %s.%s is now nullable (the model made it optional "
+                "so email-only contacts can be stored).",
+                table_name, column_name,
+            )
+        except Exception as exc:  # noqa: BLE001 - never take the service down
+            logger.error(
+                "schema_repair: could not drop NOT NULL on %s.%s (%s). Run "
+                "scripts/migrate_existing_db.sql by hand — email-only contacts "
+                "cannot be inserted until then.",
+                table_name, column_name, exc,
+            )
+
+    return applied
+
+
 def repair_schema_sync(sync_conn, metadata) -> list[str]:
     """Add every missing column, then every missing index.
 
@@ -390,6 +466,14 @@ def repair_schema_sync(sync_conn, metadata) -> list[str]:
                 column.name,
                 exc,
             )
+
+    # Relax NOT NULL constraints the models have since made optional. This runs
+    # before the widened-key pass because that pass may rebuild the table, and a
+    # rebuild should pick up the relaxed shape in the same boot.
+    try:
+        applied.extend(_repair_relaxed_not_null(sync_conn, metadata))
+    except Exception as exc:  # noqa: BLE001 - never take the service down
+        logger.error("schema_repair: NOT NULL relaxation failed (%s)", exc)
 
     # Widened unique keys next: they need the columns added above (the rebuild
     # path copies them), and they must exist before the index pass decides what

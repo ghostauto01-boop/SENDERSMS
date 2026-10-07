@@ -240,6 +240,7 @@ async def scan_contacts(db, contacts: list, *, quarantine: bool = True,
     counts: dict[str, int] = {}
     quarantined = 0
     sendable = 0
+    no_phone = 0
     for c in contacts:
         r = await contact_sendable(db, c, strict_patterns=strict_patterns)
         if r.sendable:
@@ -247,6 +248,12 @@ async def scan_contacts(db, contacts: list, *, quarantine: bool = True,
             continue
         reason = r.reason or "unknown"
         counts[reason] = counts.get(reason, 0) + 1
+        if reason == "empty_number":
+            # An email-only contact. It is unreachable by SMS by definition,
+            # but it is not a *bad number* — quarantine would wrongly keep it
+            # blocked if a phone number is added later.
+            no_phone += 1
+            continue
         # Opt-outs/suppressed are already skipped — don't double-flag them.
         if quarantine and reason not in ("opted_out", "suppressed", "undeliverable"):
             if not c.is_undeliverable:
@@ -255,4 +262,4 @@ async def scan_contacts(db, contacts: list, *, quarantine: bool = True,
     await db.flush()
     return {"scanned": len(contacts), "sendable": sendable,
             "blocked": len(contacts) - sendable, "by_reason": counts,
-            "quarantined": quarantined}
+            "no_phone_number": no_phone, "quarantined": quarantined}

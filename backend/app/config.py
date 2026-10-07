@@ -161,6 +161,45 @@ class Settings(BaseSettings):
     # instead of Brevo, when the mailbox is connected and the addresses match.
     GMAIL_SEND_REPLIES: bool = True
 
+    # --- Email enrichment (free tiers — every one of these is optional) ------
+    # Enrichment runs in four stages, cheapest first. Only the last two need a
+    # provider; the first two are pure Python / DNS and always available:
+    #
+    #   1. clean      — syntax, lower-casing, CSV junk stripped          free
+    #   2. diagnose   — MX records, typo correction, role/disposable flags free
+    #   3. find       — look up a missing address on the company's domain (Hunter)
+    #   4. verify     — prove the mailbox exists (ZeroBounce / NeverBounce / Hunter)
+    #
+    # A guessed (pattern-inferred) address is NEVER marked verified, and the
+    # send paths filter unverified addresses out, so a guess cannot quietly
+    # bounce and damage sender reputation.
+    EMAIL_ENRICHMENT_ENABLED: bool = True
+    # Master switch for the network calls. With it off, import still cleans and
+    # diagnoses addresses, but nothing is looked up or verified over the wire.
+    EMAIL_ENRICHMENT_USE_PROVIDERS: bool = True
+    # Pattern guessing (first.last@domain). Off by default: the results are
+    # stored but unverified, and a guess costs a bounce if it is ever sent to.
+    EMAIL_ENRICHMENT_ALLOW_INFERRED: bool = False
+    # Add an address found during enrichment as an extra reply-capable alias on
+    # the existing contact instead of overwriting the primary address.
+    EMAIL_ENRICHMENT_KEEP_PRIMARY: bool = True
+    # Email a contact whose address was pattern-GUESSED (source "inferred").
+    # Off by default: a guess is unverified by construction, and one bounce is
+    # charged against the sender reputation of every address the app sends to.
+    # An operator who has reviewed the guesses can opt in for a campaign.
+    EMAIL_SEND_INFERRED: bool = False
+    # Per-domain DNS cache TTL, in seconds. MX answers change rarely; caching
+    # them keeps a 5,000-row import from making 5,000 DNS round-trips.
+    EMAIL_ENRICHMENT_DNS_TTL: int = 3600
+    EMAIL_ENRICHMENT_TIMEOUT: int = 8
+
+    #: Hunter.io free plan — ~25 searches and ~50 verifications per month.
+    HUNTER_API_KEY: Optional[str] = None
+    #: ZeroBounce free plan — ~100 credits.
+    ZEROBOUNCE_API_KEY: Optional[str] = None
+    #: NeverBounce free plan — ~1,000 one-off credits.
+    NEVERBOUNCE_API_KEY: Optional[str] = None
+
     # --- Rate Limiting ---
     #: Brute-force protection on the password endpoints. The wall is back on,
     #: so this is the limit that matters — a human types the password once.
@@ -201,6 +240,32 @@ class Settings(BaseSettings):
         """True when the CallGate gateway has usable credentials (env-level)."""
         return bool(
             self.CALLGATE_BASE_URL and self.CALLGATE_USERNAME and self.CALLGATE_PASSWORD
+        )
+
+    @property
+    def email_enrichment_providers(self) -> dict:
+        """Configured enrichment providers, in the order they are tried.
+
+        Returns an empty dict when nothing is configured — the enrichment
+        service then runs its free local stages only (clean + diagnose) and
+        says so, instead of failing every row.
+        """
+        providers: dict = {}
+        if self.HUNTER_API_KEY:
+            providers["hunter"] = self.HUNTER_API_KEY
+        if self.ZEROBOUNCE_API_KEY:
+            providers["zerobounce"] = self.ZEROBOUNCE_API_KEY
+        if self.NEVERBOUNCE_API_KEY:
+            providers["neverbounce"] = self.NEVERBOUNCE_API_KEY
+        return providers
+
+    @property
+    def email_enrichment_active(self) -> bool:
+        """True when enrichment can do more than clean what is already there."""
+        return bool(
+            self.EMAIL_ENRICHMENT_ENABLED
+            and self.EMAIL_ENRICHMENT_USE_PROVIDERS
+            and self.email_enrichment_providers
         )
 
     def uses_default_admin_password(self) -> bool:

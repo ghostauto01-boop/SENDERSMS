@@ -113,10 +113,19 @@ async def clean_contacts(
     bounced = 0
     already = 0
     sendable = 0
+    #: Contacts that have no phone number at all. They are not "bad numbers" —
+    #: they are email-only records, so they are reported and left alone. The
+    #: distinction matters because flagging them undeliverable would also
+    #: block them the day somebody adds a phone number.
+    no_phone = 0
     by_reason: dict[str, int] = {}
     to_act: list[Contact] = []
 
     for c in contacts:
+        if not (c.phone_number or "").strip():
+            no_phone += 1
+            by_reason["no_phone_number"] = by_reason.get("no_phone_number", 0) + 1
+            continue
         if c.is_undeliverable:
             already += 1
             by_reason["already_undeliverable"] = by_reason.get("already_undeliverable", 0) + 1
@@ -188,6 +197,8 @@ async def clean_contacts(
         "invalid_format": invalid,
         "previous_failures": bounced,
         "already_undeliverable": already,
+        #: Email-only contacts: nothing to check, and nothing to quarantine.
+        "no_phone_number": no_phone,
         "quarantined": invalid + bounced,
         "by_reason": by_reason,
         "removed_from_list": removed,

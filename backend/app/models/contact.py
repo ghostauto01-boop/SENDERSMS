@@ -18,8 +18,16 @@ class Contact(Base):
     first_name: Mapped[str | None] = mapped_column(String(150), nullable=True)
     last_name: Mapped[str | None] = mapped_column(String(150), nullable=True)
     business_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    phone_number: Mapped[str] = mapped_column(String(20), nullable=False, index=True, unique=True)
-    email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Either channel identifiers the contact on its own. A row is valid with a
+    # phone, with an email, or with both — an email-only contact (a restaurant
+    # that publishes hello@ but no number) is a first-class record, not a
+    # rejected import row. NULL phone is allowed and, because SQL treats NULLs
+    # as distinct in a unique index, any number of email-only contacts can
+    # coexist without colliding on the phone column.
+    phone_number: Mapped[str | None] = mapped_column(
+        String(20), nullable=True, index=True, unique=True
+    )
+    email: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     city: Mapped[str | None] = mapped_column(String(150), nullable=True)
     state: Mapped[str | None] = mapped_column(String(150), nullable=True)
     country: Mapped[str] = mapped_column(String(100), default="Nigeria", nullable=False)
@@ -62,6 +70,39 @@ class Contact(Base):
     is_email_undeliverable: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     email_fail_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     email_last_error: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
+    # ---- Email enrichment --------------------------------------------
+    # Where the address came from and how much it can be trusted.
+    #
+    # ``email_source`` is one of:
+    #   csv / manual  — the address was supplied by a human, never a guess
+    #   website       — harvested from a page the business publishes itself
+    #   hunter        — returned by an email-finder provider
+    #   inferred      — pattern-guessed (first.last@domain …). NOT verified:
+    #                   the mailbox was never proven to exist.
+    # And ``email_verified`` is True only after a real verification call
+    # (ZeroBounce / NeverBounce / Hunter) said the mailbox exists. Guesses are
+    # stored — with email_verified False — so they can be reviewed, while every
+    # send path can filter them out. Storing a guess as if it were as good as a
+    # typed-in address is what silently wrecks sender reputation.
+    email_source: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    email_verified: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False, index=True
+    )
+    email_verified_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    #: 0-100. Provider verdicts map to a score; guesses are capped low.
+    email_confidence: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    email_enriched_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    email_enrichment_note: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    #: Dedupe key for email-only rows. ``contacts.email`` cannot carry a UNIQUE
+    #: constraint on an existing database (the ALTER would fail on pre-existing
+    #: duplicates), so uniqueness is enforced by the application against
+    #: ``func.lower(email)`` instead.
+    email_lower: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
 
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     custom_fields: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON string

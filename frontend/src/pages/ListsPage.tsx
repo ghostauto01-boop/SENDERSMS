@@ -15,10 +15,14 @@ interface ListItem {
   updated_at: string;
 }
 
+// Falls back to the email for an email-only contact, so a list row is never
+// named "null".
 const displayName = (contact: Contact) =>
   [contact.first_name, contact.last_name].filter(Boolean).join(" ") ||
   contact.business_name ||
-  contact.phone_number;
+  contact.phone_number ||
+  contact.email ||
+  `Contact #${contact.id}`;
 
 const PAGE_SIZE = 50;
 
@@ -310,7 +314,7 @@ export default function ListsPage() {
 
   const handleDeleteOneContact = async (contact: Contact) => {
     if (!viewListId) return;
-    if (!window.confirm(`Permanently delete ${displayName(contact)} (${contact.phone_number})?\n\nThis deletes the contact, its messages and all related history. It cannot be undone.`)) return;
+    if (!window.confirm(`Permanently delete ${displayName(contact)} (${contact.phone_number || contact.email || "no contact details"})?\n\nThis deletes the contact, its messages and all related history. It cannot be undone.`)) return;
     try {
       setBusyRow(`delete-${contact.id}`);
       const { data } = await api.post(`/lists/${viewListId}/contacts/delete`, { contact_ids: [contact.id] });
@@ -630,11 +634,13 @@ export default function ListsPage() {
                             />
                             <div className="min-w-0 flex-1">
                               <p className="text-sm font-medium truncate">{displayName(contact)}</p>
-                              <p className="text-xs text-gray-500 truncate">{contact.phone_number}</p>
+                              <p className="text-xs text-gray-500 truncate">
+                                {contact.phone_number || contact.email || "No contact details"}
+                              </p>
                             </div>
                             <button
                               type="button"
-                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); openWhatsappForCall(contact.phone_number, displayName(contact)); }}
+                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); openWhatsappForCall(contact.phone_number as string, displayName(contact)); }}
                               className="w-8 h-8 rounded-full bg-primary-600 text-white flex items-center justify-center flex-shrink-0 hover:bg-primary-700"
                               title={`Call ${displayName(contact)} on WhatsApp`}
                             >
@@ -791,7 +797,7 @@ export default function ListsPage() {
                             </div>
                             {/* Compact WhatsApp actions when the space is tight (phones) */}
                             <button
-                              onClick={() => openWhatsappForCall(contact.phone_number, displayName(contact))}
+                              onClick={() => openWhatsappForCall(contact.phone_number as string, displayName(contact))}
                               disabled={removing || deleting || removingBulk || deletingPermanently}
                               className="w-8 h-8 rounded-full bg-primary-600 text-white flex items-center justify-center flex-shrink-0 hover:bg-primary-700 disabled:opacity-40 sm:hidden"
                               title={`Call ${displayName(contact)} on WhatsApp`}
