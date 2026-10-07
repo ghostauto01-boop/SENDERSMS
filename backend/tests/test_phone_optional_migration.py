@@ -150,3 +150,71 @@ async def test_repair_is_idempotent():
         second = await conn.run_sync(repair_schema_sync, Base.metadata)
         assert second == []
     await engine.dispose()
+
+
+#: The shape a *sparse* legacy database really has: only the columns the old
+#: release knew about, with no defaults on the ones later releases added. This
+#: is the case the model-shaped table rebuild could not handle — it reimposed
+#: NOT NULL on `created_at` and friends, where these rows legitimately hold NULL
+#: because `_add_column_sql` adds such columns nullable on purpose.
+SPARSE_LEGACY_SCHEMA = """
+CREATE TABLE contacts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    first_name VARCHAR(150),
+    phone_number VARCHAR(20) NOT NULL UNIQUE,
+    email VARCHAR(255),
+    is_opted_out BOOLEAN DEFAULT 0,
+    is_undeliverable BOOLEAN DEFAULT 0
+)
+"""
+
+
+@pytest.mark.asyncio
+async def test_a_sparse_legacy_table_is_still_relaxed():
+    """Columns added by an earlier repair hold NULL — the relax must survive it.
+
+    A full model-shaped rebuild fails here with
+    ``NOT NULL constraint failed: contacts__repair.created_at``, which silently
+    left ``phone_number`` NOT NULL and made every email-only insert fail on the
+    databases this repair exists for.
+    """
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    async with engine.begin() as conn:
+        await conn.execute(text(SPARSE_LEGACY_SCHEMA))
+        await conn.execute(
+            text(
+                "INSERT INTO contacts (phone_number, first_name) "
+                "VALUES ('+2348031234567', 'Ada')"
+            )
+        )
+        await conn.run_sync(Base.metadata.create_all)
+
+        # One boot: the missing columns are added (nullable, so the row that is
+        # already there holds NULL in them) and phone_number is relaxed in the
+        # same pass. The relaxation must not be defeated by those NULLs.
+        def _nullable(sync_conn):
+            columns = {c["name"]: c for c in inspect(sync_conn).get_columns("contacts")}
+            return columns["phone_number"]["nullable"]
+
+        assert await conn.run_sync(_nullable) is False, "precondition"
+        await conn.run_sync(repair_schema_sync, Base.metadata)
+        assert await conn.run_sync(_nullable) is True, "NOT NULL was relaxed"
+
+        # ...and a second boot has nothing left to do.
+        second = await conn.run_sync(repair_schema_sync, Base.metadata)
+        assert [a for a in second if "relax" in a] == []
+
+        # Every column the rebuild did not touch keeps its own DEFAULT, so a
+        # client that omits them still inserts successfully.
+        await conn.execute(
+            text("INSERT INTO contacts (first_name, email) VALUES ('Chidi', 'chidi@acme.ng')")
+        )
+        rows = (
+            await conn.execute(
+                text("SELECT first_name, country FROM contacts ORDER BY id")
+            )
+        ).all()
+        assert rows[0] == ("Ada", "Nigeria"), "the pre-existing row kept its defaults"
+        assert rows[1][0] == "Chidi"
+
+    await engine.dispose()
