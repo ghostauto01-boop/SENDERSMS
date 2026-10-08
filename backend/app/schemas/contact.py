@@ -156,6 +156,12 @@ class BulkAction(BaseModel):
     search: Optional[str] = None
     lead_status: Optional[str] = None
     tag: Optional[str] = None
+    #: sms | email — mirror the Contacts page channel view in scope="all"
+    channel: Optional[str] = None
+    #: mirror the Contacts page list selector in scope="all"
+    list_id: Optional[int] = None
+    #: mirror the Contacts page email-eligibility filter in scope="all"
+    email_state: Optional[str] = None
 
 
 class CSVImportRequest(BaseModel):

@@ -200,6 +200,20 @@ class Settings(BaseSettings):
     #: NeverBounce free plan — ~1,000 one-off credits.
     NEVERBOUNCE_API_KEY: Optional[str] = None
 
+    # --- Reacher (open-source email validator, https://reacher.email) --------
+    # Point REACHER_API_URL at a Reacher instance to delegate mailbox checks
+    # to it (self-hosted: `docker run -p 8080:8080 reacherhq/check-if-email-
+    # exists`, then REACHER_API_URL=http://localhost:8080/v2/check_email; or
+    # use the hosted endpoint with REACHER_API_KEY). When it is empty — or
+    # unreachable — the app runs the identical pipeline itself (syntax, MX,
+    # disposable/role flags, SMTP RCPT probe with catch-all detection), so the
+    # list email validator always works.
+    REACHER_API_URL: Optional[str] = None
+    REACHER_API_KEY: Optional[str] = None
+    #: Let the built-in validator perform the live SMTP mailbox probe when no
+    # Reacher instance answers. Off = syntax/MX/disposable checks only.
+    EMAIL_VALIDATOR_SMTP: bool = True
+
     # --- Rate Limiting ---
     #: Brute-force protection on the password endpoints. The wall is back on,
     #: so this is the limit that matters — a human types the password once.
@@ -251,6 +265,10 @@ class Settings(BaseSettings):
         says so, instead of failing every row.
         """
         providers: dict = {}
+        if self.REACHER_API_URL:
+            # Open-source Reacher instance (https://reacher.email) — free when
+            # self-hosted, so it is tried before the paid verifiers.
+            providers["reacher"] = self.REACHER_API_URL
         if self.HUNTER_API_KEY:
             providers["hunter"] = self.HUNTER_API_KEY
         if self.ZEROBOUNCE_API_KEY:

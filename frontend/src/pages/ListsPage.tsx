@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import api from "../api/client";
 import { Contact, PaginatedResponse } from "../types";
 import toast from "react-hot-toast";
-import { Edit2, Plus, Search, Trash2, UserPlus, Users, X, ChevronLeft, ChevronRight, Minus, Sparkles, CheckSquare, PhoneCall } from "lucide-react";
+import { Edit2, Mail, Plus, Search, Trash2, UserPlus, Users, X, ChevronLeft, ChevronRight, Minus, Sparkles, CheckSquare, PhoneCall } from "lucide-react";
 import ContactActions from "../components/ContactActions";
 import { openWhatsappForCall } from "../utils/call";
 
@@ -536,6 +536,30 @@ export default function ListsPage() {
                   title="Remove invalid and previously-failed numbers so they are not billed"
                 >
                   <Sparkles size={14} /> {cleaningList ? "Cleaning…" : "Clean bad numbers"}
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!confirm(`Validate every email address in "${viewListName}"? Confirmed-bad addresses will be removed from the list so they are never billed.`)) return;
+                    setCleaningList(true);
+                    try {
+                      const { data } = await api.post(`/api/v1/lists/${viewListId}/validate-emails`, null, {
+                        params: { remove_from_list: true, deep: true },
+                      });
+                      toast.success(
+                        `Validated ${data.scanned}. ${data.deliverable} good, ${data.undeliverable} removed, ${data.risky} risky.`
+                      );
+                      loadListContacts(viewListId, 1, "", true);
+                    } catch {
+                      toast.error("Validation failed");
+                    } finally {
+                      setCleaningList(false);
+                    }
+                  }}
+                  disabled={listLoading || cleaningList}
+                  className="px-3 py-2 rounded-full bg-white/10 text-white text-xs font-semibold flex items-center gap-1.5 disabled:opacity-50"
+                  title="Validate email addresses with Reacher (https://reacher.email)"
+                >
+                  <Mail size={14} /> {cleaningList ? "Validating…" : "Validate emails"}
                 </button>
                 <button
                   onClick={openAddContacts}

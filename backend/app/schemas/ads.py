@@ -31,6 +31,21 @@ def _fill_optimize_default(v, info: ValidationInfo):
     return v
 
 
+#: The drip modes the dispatcher knows. Anything else would fall through to
+#: "send as fast as possible", so the API rejects it instead of silently
+#: blasting a list.
+DRIP_MODES = ("off", "interval", "batch", "daily", "smart")
+
+
+def _clean_drip_mode(v):
+    if v is None:
+        return v
+    mode = str(v).strip().lower()
+    if mode not in DRIP_MODES:
+        raise ValueError(f"drip_mode must be one of: {', '.join(DRIP_MODES)}")
+    return mode
+
+
 class CampaignIn(BaseModel):
     name: str = Field(..., max_length=255)
     description: Optional[str] = None
@@ -70,6 +85,11 @@ class CampaignIn(BaseModel):
     optimize_min_gap_pct: float = 25.0
     optimize_action: str = "shift"
 
+    @field_validator("drip_mode")
+    @classmethod
+    def _validate_drip_mode(cls, v):
+        return _clean_drip_mode(v)
+
 
 class CampaignPatch(BaseModel):
     name: Optional[str] = None
@@ -108,6 +128,11 @@ class CampaignPatch(BaseModel):
     optimize_min_sends: Optional[int] = None
     optimize_min_gap_pct: Optional[float] = None
     optimize_action: Optional[str] = None
+
+    @field_validator("drip_mode")
+    @classmethod
+    def _validate_drip_mode(cls, v):
+        return _clean_drip_mode(v)
 
 
 class CampaignOut(BaseModel):

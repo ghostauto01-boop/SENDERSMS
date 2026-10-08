@@ -9,7 +9,7 @@ import pytest
 import pytest_asyncio
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.database import Base
@@ -371,6 +371,59 @@ async def test_batch_drip(db):
     await make_creatives(db, ads_set, ["A"])
     await svc.build_audience(db, campaign)
     assert (await svc.dispatch_campaign(db, campaign, limit=100))["sent"] == 5
+    # The batch must hold for the whole interval — a second tick right after
+    # the first is exactly the "sends all in one go" bug.
+    assert (await svc.dispatch_campaign(db, campaign, limit=100))["sent"] == 0
+    assert (await svc.dispatch_campaign(db, campaign, limit=100))["sent"] == 0
+
+
+@pytest.mark.asyncio
+async def test_batch_drip_five_each_minute_never_bursts(db):
+    """The reported bug: '5 every minute' drained the whole list at once.
+
+    A fast poller can dispatch every few seconds (the loop wakes on user
+    activity). Within ANY rolling minute at most 5 messages may exist.
+    """
+    contacts = await make_contacts(db, 40)
+    lst = await make_list(db, contacts)
+    campaign = await make_campaign(
+        db, drip_mode="batch", drip_batch_size=5, drip_interval_minutes=1
+    )
+    ads_set = await make_set(db, campaign, lst)
+    await make_creatives(db, ads_set, ["A", "B"])
+    await svc.build_audience(db, campaign)
+
+    total = 0
+    for _ in range(10):  # ten dispatches back to back = a "hammering" poller
+        total += (await svc.dispatch_campaign(db, campaign, limit=100))["sent"]
+    assert total == 5
+
+    # After the minute rolls over, exactly one more batch — not the backlog.
+    back = datetime.now(timezone.utc) - timedelta(minutes=2)
+    await db.execute(
+        update(AdsAssignment).where(AdsAssignment.campaign_id == campaign.id).values(sent_at=back)
+    )
+    await db.flush()
+    total += (await svc.dispatch_campaign(db, campaign, limit=100))["sent"]
+    total += (await svc.dispatch_campaign(db, campaign, limit=100))["sent"]
+    assert total == 10
+
+
+@pytest.mark.asyncio
+async def test_drip_interval_zero_still_paces(db):
+    """interval=0 used to disable pacing entirely (one batch per poll tick)."""
+    contacts = await make_contacts(db, 20)
+    lst = await make_list(db, contacts)
+    campaign = await make_campaign(
+        db, drip_mode="batch", drip_batch_size=5, drip_interval_minutes=0
+    )
+    ads_set = await make_set(db, campaign, lst)
+    await make_creatives(db, ads_set, ["A"])
+    await svc.build_audience(db, campaign)
+    total = 0
+    for _ in range(5):
+        total += (await svc.dispatch_campaign(db, campaign, limit=100))["sent"]
+    assert total == 5  # normalised to "per minute", not "per tick"
 
 
 @pytest.mark.asyncio
