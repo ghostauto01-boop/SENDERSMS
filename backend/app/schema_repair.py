@@ -478,6 +478,7 @@ def _repair_widened_unique_keys(sync_conn, metadata) -> list[str]:
 #: Each entry: table -> column.
 _RELAXED_NOT_NULL_COLUMNS: tuple[tuple[str, str], ...] = (
     ("contacts", "phone_number"),
+    ("contacts", "country"),
 )
 
 

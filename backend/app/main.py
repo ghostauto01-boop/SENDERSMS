@@ -1,7 +1,8 @@
 """FastAPI — webhook auto-register, status poll, scheduled, PWA, SPA."""
-import os, logging, time
+import os, logging, time, uuid, traceback
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, BackgroundTasks, Request
+from fastapi import FastAPI, BackgroundTasks, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse, FileResponse, Response
@@ -1020,8 +1021,14 @@ async def _bind_public_base_url(request, call_next):
     keeps working exactly as before.
     """
     bind_request_base(request)
+    # Own the identifier here instead of trusting a caller-provided value; it
+    # is also the unique key for the private error record.
+    request_id = uuid.uuid4().hex
+    request.state.request_id = request_id
     try:
-        return await call_next(request)
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = request_id
+        return response
     finally:
         clear_request_base()
 
@@ -1044,39 +1051,138 @@ async def _cache_static_assets(request, call_next):
     try:
         response = await call_next(request)
     except Exception as exc:  # noqa: BLE001 — every crash must become JSON
-        return _error_response(request, exc)
+        return await _error_response(request, exc)
     if path.startswith("/assets/"):
         response.headers.setdefault("Cache-Control", "public, max-age=31536000, immutable")
     return response
 
 
-def _error_response(request: Request, exc: Exception) -> JSONResponse:
-    """Never answer with a blank 'Internal Server Error'.
+async def _store_error_record(request: Request, exc: Exception, request_id: str, code: str) -> None:
+    """Best-effort persistence of the server-side cause, keyed by request id."""
+    trace = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))[-50000:]
+    try:
+        from app.models.system_error import SystemErrorRecord
+        async with async_session_factory() as db:
+            db.add(SystemErrorRecord(
+                request_id=request_id,
+                code=code,
+                exception_type=type(exc).__name__[:255],
+                message=(str(exc) or type(exc).__name__)[:10000],
+                traceback=trace,
+                method=request.method[:12],
+                path=str(request.url.path)[:1000],
+            ))
+            await db.commit()
+    except Exception as store_exc:  # noqa: BLE001 — error reporting must not mask the original
+        logger.error("Could not persist error request_id=%s: %s", request_id, store_exc)
 
-    A database outage becomes a 503 whose JSON body says what is wrong and
-    what to do (see app.db_health), so the UI shows one clear banner instead
-    of a broken widget on every page. Anything else is a generic 500 — the
-    traceback goes to the server log only.
-    """
+
+async def _error_response(request: Request, exc: Exception) -> JSONResponse:
+    """Return a safe structured error and persist the detailed cause privately."""
+    request_id = getattr(request.state, "request_id", None) or uuid.uuid4().hex
+    request.state.request_id = request_id
+    headers = {"Cache-Control": "no-store", "X-Request-ID": request_id}
     if db_health.is_db_error(exc):
         payload = db_health.error_payload(exc)
-        logger.warning(
-            "DB error on %s %s: %s", request.method, request.url.path, payload["db"]["message"]
+        code = "DATABASE_UNAVAILABLE"
+        message = payload["db"]["message"]
+        hint = payload["db"]["hint"]
+        logger.error(
+            "Database error request_id=%s %s %s: %s",
+            request_id, request.method, request.url.path, message,
+            exc_info=(type(exc), exc, exc.__traceback__),
         )
-        return JSONResponse(status_code=503, content=payload,
-                            headers={"Retry-After": "30", "Cache-Control": "no-store"})
-    logger.error("Unhandled error on %s %s", request.method, request.url.path, exc_info=exc)
+        await _store_error_record(request, exc, request_id, code)
+        return JSONResponse(
+            status_code=503,
+            content={
+                "code": code,
+                "message": f"Database unavailable: {message}",
+                "detail": f"Database unavailable: {message}",
+                "field": None,
+                "hint": hint,
+                "request_id": request_id,
+                "error_kind": "database",
+                "db": payload.get("db"),
+            },
+            headers={**headers, "Retry-After": "30"},
+        )
+
+    code = "INTERNAL_ERROR"
+    logger.error(
+        "Unhandled error request_id=%s %s %s",
+        request_id, request.method, request.url.path,
+        exc_info=(type(exc), exc, exc.__traceback__),
+    )
+    await _store_error_record(request, exc, request_id, code)
     return JSONResponse(
         status_code=500,
-        content={"detail": "Internal server error. Please try again; if it persists check the server logs."},
-        headers={"Cache-Control": "no-store"},
+        content={
+            "code": code,
+            "message": "An unexpected server error occurred.",
+            "detail": "Internal server error. Please try again; if it persists, share the request ID with the operator.",
+            "field": None,
+            "hint": f"Share request_id {request_id} with the operator; see GET /api/v1/system/errors?request_id={request_id}.",
+            "request_id": request_id,
+        },
+        headers=headers,
+    )
+
+
+@app.exception_handler(HTTPException)
+async def _http_error(request: Request, exc: HTTPException):
+    """Standardize expected HTTP errors without dropping the legacy detail key."""
+    request_id = getattr(request.state, "request_id", None) or uuid.uuid4().hex
+    detail = exc.detail
+    message = str(detail) if not isinstance(detail, dict) else str(detail.get("message", detail))
+    codes = {
+        400: "BAD_REQUEST", 401: "UNAUTHORIZED", 403: "FORBIDDEN",
+        404: "NOT_FOUND", 409: "CONFLICT", 413: "PAYLOAD_TOO_LARGE",
+        422: "VALIDATION_ERROR", 429: "RATE_LIMITED", 503: "SERVICE_UNAVAILABLE",
+    }
+    content = {
+        "code": detail.get("code", codes.get(exc.status_code, "HTTP_ERROR")) if isinstance(detail, dict) else codes.get(exc.status_code, "HTTP_ERROR"),
+        "message": message,
+        "detail": message,
+        "field": detail.get("field") if isinstance(detail, dict) else None,
+        "hint": detail.get("hint") if isinstance(detail, dict) else None,
+        "request_id": request_id,
+    }
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=content,
+        headers={**(exc.headers or {}), "Cache-Control": "no-store", "X-Request-ID": request_id},
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def _request_validation_error(request: Request, exc: RequestValidationError):
+    """Return field-level validation errors without echoing submitted values."""
+    request_id = getattr(request.state, "request_id", None) or uuid.uuid4().hex
+    errors = exc.errors()
+    first = errors[0] if errors else {}
+    location = first.get("loc") or ()
+    field = ".".join(str(part) for part in location if part not in {"body", "query", "path", "header"}) or None
+    message = str(first.get("msg") or "Request validation failed")
+    detail = f"{field}: {message}" if field else message
+    return JSONResponse(
+        status_code=422,
+        content={
+            "code": "VALIDATION_ERROR",
+            "message": message,
+            "detail": detail,
+            "field": field,
+            "hint": "Check the request fields and try again.",
+            "request_id": request_id,
+        },
+        headers={"Cache-Control": "no-store", "X-Request-ID": request_id},
     )
 
 
 @app.exception_handler(Exception)
 async def _unhandled_error(request: Request, exc: Exception):
     """Fallback for anything that escapes the middleware above."""
-    return _error_response(request, exc)
+    return await _error_response(request, exc)
 
 
 from app.security.rate_limit import install_rate_limiting
@@ -1106,7 +1212,7 @@ async def health_db():
     code = 200 if result.get("ok") else 503
     return JSONResponse(result, status_code=code, headers={"Cache-Control": "no-store"})
 
-from app.api.v1 import ads, auth, calendar, calls, contacts, lists, campaigns, sequences, followups, inbox, overview, templates, analytics, settings as settings_api, webhooks, dashboard, send, autoreply, automations, ai, variables, campaign_followups, notifications, email as email_api, mailbox as mailbox_api, guide as guide_api, mcp as mcp_api
+from app.api.v1 import ads, auth, calendar, calls, contacts, lists, campaigns, sequences, followups, inbox, overview, templates, analytics, settings as settings_api, webhooks, dashboard, send, autoreply, automations, ai, variables, campaign_followups, notifications, email as email_api, mailbox as mailbox_api, guide as guide_api, mcp as mcp_api, system as system_api
 app.include_router(auth.router, prefix="/api/v1/auth")
 app.include_router(dashboard.router, prefix="/api/v1/dashboard")
 app.include_router(contacts.router, prefix="/api/v1/contacts")
@@ -1121,6 +1227,7 @@ app.include_router(overview.router, prefix="/api/v1/overview")
 app.include_router(templates.router, prefix="/api/v1/templates")
 app.include_router(analytics.router, prefix="/api/v1/analytics")
 app.include_router(settings_api.router, prefix="/api/v1/settings")
+app.include_router(system_api.router, prefix="/api/v1/system")
 app.include_router(webhooks.router, prefix="/api/v1/webhooks")
 app.include_router(send.router, prefix="/api/v1/send")
 app.include_router(autoreply.router, prefix="/api/v1/autoreply")

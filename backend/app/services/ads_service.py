@@ -2279,111 +2279,92 @@ async def simulate(db: AsyncSession, campaign: AdsCampaign) -> dict:
 
 
 async def validate_campaign(db: AsyncSession, campaign: AdsCampaign) -> dict:
-    """Pre-launch checks. Returns {ok, errors[], warnings[], summary}."""
-    errors: list[str] = []
+    """Return an informational, non-blocking preflight summary.
+
+    Sender/domain health belongs to delivery operations, not a campaign launch
+    gate. The API deliberately reports the configuration without making the
+    preflight depend on provider credentials or DNS state.
+    """
     warnings: list[str] = []
+    try:
+        sim = await simulate(db, campaign)
+    except Exception as exc:  # noqa: BLE001 — validate must remain informational
+        logger.exception("Campaign validation summary failed for campaign %s", campaign.id)
+        sim = {
+            "audience": None, "eligible": None, "already_queued": None,
+            "skipped": {}, "per_set": [], "daily_limit": campaign.daily_limit,
+            "total_limit": campaign.total_limit, "estimated_days": None,
+            "followup_steps": 0, "test_mode": bool(campaign.test_mode),
+        }
+        warnings.append("Audience estimate is temporarily unavailable; launch will recalculate it.")
 
     if not (campaign.name or "").strip():
-        errors.append("Campaign needs a name")
+        warnings.append("Campaign name is blank.")
     if not campaign.objective:
-        warnings.append("No objective selected; metrics will not be prioritised")
+        warnings.append("No objective selected; metrics will not be prioritised.")
 
-    sets = list(
-        (
-            await db.execute(
-                select(AdsSet).where(AdsSet.campaign_id == campaign.id, AdsSet.status == "active")
-            )
-        ).scalars().all()
-    )
+    sets = list((await db.execute(
+        select(AdsSet).where(AdsSet.campaign_id == campaign.id, AdsSet.status == "active")
+        .order_by(AdsSet.id)
+    )).scalars().all())
+    per_set = []
     email_campaign = is_email_campaign(campaign)
     if not sets:
-        errors.append("Add at least one active email set" if email_campaign else "Add at least one active SMS set")
-
-    creative_count = 0
+        warnings.append("No active audience set is configured.")
     for ads_set in sets:
-        creatives = active_creatives(
-            list(
-                (
-                    await db.execute(
-                        select(AdsCreative).where(AdsCreative.set_id == ads_set.id)
-                    )
-                ).scalars().all()
-            )
-        )
-        creative_count += len(creatives)
+        creatives = active_creatives(list((await db.execute(
+            select(AdsCreative).where(
+                AdsCreative.set_id == ads_set.id,
+                AdsCreative.is_deleted.is_(False),
+            ).order_by(AdsCreative.id)
+        )).scalars().all()))
+        per_set.append({"set_id": ads_set.id, "set_name": ads_set.name, "creatives": len(creatives)})
         if not creatives:
-            errors.append(
-                f"{'Email' if email_campaign else 'SMS'} set '{ads_set.name}' has no active creative"
-            )
+            warnings.append(f"Set '{ads_set.name}' has no active creatives.")
         for creative in creatives:
             if email_campaign:
                 if not (creative.body or "").strip() and not (creative.html_body or "").strip():
-                    errors.append(f"Email creative '{creative.name}' has no message body")
+                    warnings.append(f"Email creative '{creative.name}' has no message body.")
                 if not (creative.subject or campaign.subject or "").strip():
-                    errors.append(
-                        f"Email creative '{creative.name}' has no subject line "
-                        "(set one on the creative or on the campaign)"
-                    )
+                    warnings.append(f"Email creative '{creative.name}' has no subject line.")
             elif not (creative.body or "").strip():
-                errors.append(f"Creative '{creative.name}' has no message text")
+                warnings.append(f"Creative '{creative.name}' has no message text.")
         if (ads_set.split_mode or "") == "percentage" and creatives:
-            total = round(sum(c.allocation or 0 for c in creatives), 2)
+            total = round(sum(creative.allocation or 0 for creative in creatives), 2)
             if abs(total - 100) > 0.01:
-                errors.append(
-                    f"SMS set '{ads_set.name}' percentage split totals {total}%, must be 100%"
-                )
+                warnings.append(f"Set '{ads_set.name}' percentage split totals {total}%, not 100%.")
 
-    sim = await simulate(db, campaign)
-    if sim["eligible"] + sim["already_queued"] == 0:
-        errors.append("No eligible contacts. Widen the audience or clear exclusions.")
-
-    if not campaign.test_mode:
-        from app.config import settings
-
-        if email_campaign:
-            from app.services import email_service
-
-            primary = await email_service.get_account(db, campaign.email_account_id)
-            if primary is None:
-                primary = await email_service.get_default_account(db)
-            if primary is None:
-                errors.append(
-                    "No email sender configured. Add a Brevo API key on the Email Senders "
-                    "page, then pick it on this campaign."
-                )
-            else:
-                usable, why = await email_service.account_is_usable(primary)
-                if not usable:
-                    errors.append(
-                        f"Email sender '{primary.name}' cannot send right now ({why})."
-                    )
-                if campaign.fallback_email_account_id:
-                    fallback = await email_service.get_account(
-                        db, campaign.fallback_email_account_id
-                    )
-                    if fallback is None:
-                        warnings.append("The fallback sender chosen for this campaign no longer exists.")
-            if not (campaign.subject or "").strip() and not any(
-                (c.subject or "").strip()
-                for ads_set in sets
-                for c in active_creatives(
-                    list(
-                        (
-                            await db.execute(
-                                select(AdsCreative).where(AdsCreative.set_id == ads_set.id)
-                            )
-                        ).scalars().all()
-                    )
-                )
-            ):
-                errors.append("Every email creative needs a subject line (or a campaign subject).")
-        elif not getattr(settings, "smsgate_configured", False):
-            warnings.append("No SMS gateway configured; messages will fail until one is set up.")
-
+    if sim.get("eligible") == 0:
+        warnings.append("No eligible audience is currently estimated; check audience filters and exclusions.")
     if campaign.daily_limit is None:
-        warnings.append("No daily limit set: the whole audience may go out at once.")
+        warnings.append("No daily limit is set; the eligible audience may go out quickly.")
 
-    return {"ok": not errors, "errors": errors, "warnings": warnings, "summary": sim}
+    followups = (await db.execute(
+        select(func.count()).select_from(AdsFollowUpStep).where(
+            AdsFollowUpStep.campaign_id == campaign.id,
+            AdsFollowUpStep.is_active.is_(True),
+        )
+    )).scalar() or 0
+    send_start = campaign.send_start_hour if campaign.send_start_hour is not None else 9
+    send_end = campaign.send_end_hour if campaign.send_end_hour is not None else 18
+    summary = {
+        **sim,
+        "audience_size": sim.get("audience"),
+        "eligible_audience": sim.get("eligible"),
+        "creatives_per_set": per_set,
+        "followup_configured": followups > 0,
+        "followup_steps": followups,
+        "send_window": {
+            "start_hour": send_start,
+            "end_hour": send_end,
+            "timezone": campaign.timezone_name or "recipient-local",
+            "recipient_timezone_enabled": bool(getattr(campaign, "recipient_timezone_enabled", True)),
+        },
+        "daily_limit": campaign.daily_limit,
+    }
+    if campaign.channel == "email":
+        warnings.append("Email sender/provider checks do not block launch; failures remain visible at send time.")
+    return {"ok": True, "errors": [], "warnings": warnings, "summary": summary}
 
 
 # ==========================================================================
@@ -2392,9 +2373,22 @@ async def validate_campaign(db: AsyncSession, campaign: AdsCampaign) -> dict:
 
 
 async def launch(db: AsyncSession, campaign: AdsCampaign, *, actor: str = "user") -> dict:
+    """Prepare a campaign atomically; callers own the commit/rollback boundary."""
+    if campaign.status in ("active", "scheduled"):
+        counts = await _counts_for(
+            db, [AdsAssignment.campaign_id == campaign.id], campaign_id=campaign.id
+        )
+        return {
+            "ok": True,
+            "status": campaign.status,
+            "idempotent": True,
+            "audience": {"added": 0, "already_assigned": counts.get("assigned", 0)},
+            "warnings": [],
+        }
+
     check = await validate_campaign(db, campaign)
-    if not check["ok"]:
-        return {"ok": False, "errors": check["errors"], "warnings": check["warnings"]}
+    # Preflight is informational by design. A configured email sender/domain is
+    # never a launch blocker; the send path reports provider issues later.
     built = await build_audience(db, campaign)
     campaign.status = "scheduled" if campaign.start_date and as_utc(campaign.start_date) > now_utc() else "active"
     campaign.last_state = "preparing_audience"
@@ -2406,8 +2400,13 @@ async def launch(db: AsyncSession, campaign: AdsCampaign, *, actor: str = "user"
         actor=actor,
         detail=f"{built['added']} contacts assigned",
     )
-    await db.commit()
-    return {"ok": True, "status": campaign.status, "audience": built, "warnings": check["warnings"]}
+    return {
+        "ok": True,
+        "status": campaign.status,
+        "idempotent": False,
+        "audience": built,
+        "warnings": check.get("warnings", []),
+    }
 
 
 async def refresh_always_on(db: AsyncSession) -> int:

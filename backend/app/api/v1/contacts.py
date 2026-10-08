@@ -5,10 +5,11 @@ Contacts API routes.
 import csv
 import io
 import json
+import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form, status
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Query, UploadFile, File, Form, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select, func, or_, delete as sa_delete, update as sa_update
 from sqlalchemy.exc import OperationalError, ProgrammingError
@@ -17,8 +18,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models.contact import Contact, Tag, ContactTag
 from app.models.contact_list import ContactList, ContactListMember
+from app.models.import_job import ContactImportJob
 from app.models.user import User
-from app.schemas.contact import ContactCreate, ContactUpdate, ContactOut, ContactListOut, BulkAction
+from app.schemas.contact import (
+    ContactCreate, ContactUpdate, ContactOut, ContactListOut, BulkAction,
+    ContactImportURLRequest, ContactEnrichRequest,
+)
 from app.security.auth import get_current_user
 from app.utils.contact_identity import clean_phone, normalize_email
 
@@ -28,6 +33,48 @@ LEAD_STATUSES = [
     "new", "contacted", "replied", "interested",
     "follow-up", "meeting", "customer", "not_interested", "closed",
 ]
+
+
+async def _set_contact_tags(
+    db: AsyncSession, contact_id: int, names: list[str], operation: str = "replace"
+) -> None:
+    """Apply add/remove/replace atomically while de-duplicating tag names."""
+    cleaned = []
+    for name in names:
+        value = (name or "").strip()
+        if value and value.lower() not in {item.lower() for item in cleaned}:
+            cleaned.append(value[:100])
+    current_rows = await db.execute(
+        select(ContactTag, Tag.name)
+        .join(Tag, Tag.id == ContactTag.tag_id)
+        .where(ContactTag.contact_id == contact_id)
+    )
+    current_rows_list = current_rows.all()
+    current: dict[str, list[ContactTag]] = {}
+    for link, name in current_rows_list:
+        current.setdefault(name.lower(), []).append(link)
+    requested = {name.lower(): name for name in cleaned}
+
+    if operation == "replace":
+        for link, _name in current_rows_list:
+            await db.delete(link)
+        names_to_add = list(requested.values())
+    elif operation == "remove":
+        for key in requested:
+            for link in current.get(key, []):
+                await db.delete(link)
+        names_to_add = []
+    else:
+        names_to_add = [name for key, name in requested.items() if key not in current]
+
+    for name in names_to_add:
+        tag = (await db.execute(select(Tag).where(func.lower(Tag.name) == name.lower()))).scalars().first()
+        if tag is None:
+            tag = Tag(name=name)
+            db.add(tag)
+            await db.flush()
+        db.add(ContactTag(contact_id=contact_id, tag_id=tag.id))
+    await db.flush()
 
 
 async def _tag_names(db: AsyncSession, contact_id: int) -> list[str]:
@@ -267,7 +314,7 @@ async def create_contact(
     email = normalize_email(data.email)
 
     if data.phone_number and not normalized:
-        raise HTTPException(status_code=400, detail="Invalid Nigerian phone number")
+        raise HTTPException(status_code=422, detail="Invalid Nigerian phone number")
     if not normalized and not email:
         raise HTTPException(
             status_code=400,
@@ -296,7 +343,7 @@ async def create_contact(
         email_source="manual" if email else None,
         city=data.city,
         state=data.state,
-        country=data.country or "Nigeria",
+        country=(data.country or "").strip() or None,
         website=data.website,
         industry=data.industry,
         source=data.source,
@@ -306,6 +353,8 @@ async def create_contact(
     )
     db.add(contact)
     await db.flush()
+    if data.tags:
+        await _set_contact_tags(db, contact.id, data.tags, "replace")
     await db.refresh(contact)
     return await _serialize_contact(db, contact)
 
@@ -324,6 +373,9 @@ async def update_contact(
         raise HTTPException(status_code=404, detail="Contact not found")
 
     update_data = data.model_dump(exclude_unset=True)
+    tags_supplied = "tags" in update_data
+    contact_tags = update_data.pop("tags", None)
+    tag_operation = update_data.pop("tag_operation", "replace")
 
     # Normalise the two identity fields rather than storing whatever was typed,
     # and refuse an edit that would leave the contact with no way to be reached.
@@ -335,7 +387,7 @@ async def update_contact(
         else:
             normalized = clean_phone(raw_phone)
             if not normalized:
-                raise HTTPException(status_code=400, detail="Invalid Nigerian phone number")
+                raise HTTPException(status_code=422, detail="Invalid Nigerian phone number")
             clash = await db.execute(
                 select(Contact).where(
                     Contact.phone_number == normalized, Contact.id != contact_id
@@ -383,6 +435,8 @@ async def update_contact(
     for key, value in update_data.items():
         setattr(contact, key, value)
     contact.updated_at = datetime.now(timezone.utc)
+    if tags_supplied:
+        await _set_contact_tags(db, contact.id, contact_tags or [], tag_operation)
 
     await db.flush()
     await db.refresh(contact)
@@ -692,6 +746,340 @@ async def bulk_action(
     return {"success": True, "affected": len(contacts)}
 
 
+MAX_CONTACT_IMPORT_BYTES = 20 * 1024 * 1024
+
+
+def _parse_import_json(raw: str | None, *, default):
+    if not raw:
+        return default
+    try:
+        return json.loads(raw)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail="Invalid JSON in import options") from exc
+
+
+def _import_job_dict(job: ContactImportJob) -> dict:
+    return {
+        "id": job.id,
+        "status": job.status,
+        "file_name": job.file_name,
+        "total_rows": job.total_rows,
+        "processed_rows": job.processed_rows,
+        "progress_percent": round(job.processed_rows * 100 / job.total_rows, 1) if job.total_rows else 0,
+        "imported": job.imported,
+        "merged": job.merged,
+        "duplicates": job.duplicates,
+        "invalid": job.invalid,
+        "error": job.error,
+        "list_id": job.list_id,
+        "created_at": job.created_at.isoformat() if job.created_at else None,
+        "started_at": job.started_at.isoformat() if job.started_at else None,
+        "completed_at": job.completed_at.isoformat() if job.completed_at else None,
+    }
+
+
+async def _run_contact_import_job(job_id: str) -> None:
+    """Run one import in a separate session and durably publish progress."""
+    from app.database import async_session_factory
+    from app.services.csv_service import CSVImportService
+
+    async with async_session_factory() as db:
+        job = (await db.execute(
+            select(ContactImportJob).where(ContactImportJob.id == job_id)
+        )).scalar_one_or_none()
+        if job is None or job.status not in ("queued", "retrying"):
+            return
+        content = (job.content or "").encode("utf-8")
+        mapping = _parse_import_json(job.mapping_json, default={})
+        tags = _parse_import_json(job.tags_json, default=[])
+        auto_rules = _parse_import_json(getattr(job, "auto_tag_rules_json", None), default=[])
+        job.status = "running"
+        job.started_at = datetime.now(timezone.utc)
+        await db.commit()
+
+        async def publish_progress(processed: int, result) -> None:
+            job.processed_rows = processed
+            job.total_rows = max(job.total_rows, result.total_rows)
+            job.imported = result.imported
+            job.merged = result.merged
+            job.duplicates = result.duplicates
+            job.invalid = result.invalid
+            job.errors_json = json.dumps(result.errors, ensure_ascii=False)
+            await db.commit()
+
+        try:
+            service = CSVImportService(db)
+            result = await service.validate_and_import(
+                content,
+                mapping,
+                job.list_id,
+                bool(job.skip_duplicates),
+                tags=tags,
+                auto_tag_rules=auto_rules,
+                progress_callback=publish_progress,
+            )
+            job.status = "completed"
+            job.total_rows = result.total_rows
+            job.processed_rows = result.total_rows
+            job.imported = result.imported
+            job.merged = result.merged
+            job.duplicates = result.duplicates
+            job.invalid = result.invalid
+            job.errors_json = json.dumps(result.errors, ensure_ascii=False)
+            new_variables = 0
+            try:
+                from app.services.variable_service import sync_variables_from_contacts
+
+                variable_sync = await sync_variables_from_contacts(db)
+                new_variables = int(variable_sync.get("discovered", 0))
+            except Exception:
+                # Variable discovery is a convenience; it must not fail a
+                # committed contact import.
+                pass
+            summary = result.as_dict()
+            summary["errors"] = result.errors[:50]
+            summary["new_variables"] = new_variables
+            # Contact IDs are intentionally omitted from the persistent job
+            # result; the CRM already owns those records.
+            summary.pop("imported_ids", None)
+            job.result_json = json.dumps(summary, ensure_ascii=False)
+            job.content = None
+            job.completed_at = datetime.now(timezone.utc)
+            await db.commit()
+        except Exception as exc:  # noqa: BLE001
+            await db.rollback()
+            current = (await db.execute(
+                select(ContactImportJob).where(ContactImportJob.id == job_id)
+            )).scalar_one_or_none()
+            if current:
+                current.status = "failed"
+                current.error = f"{type(exc).__name__}: {str(exc)[:1000]}"
+                current.content = None
+                current.completed_at = datetime.now(timezone.utc)
+                await db.commit()
+
+
+async def _create_import_job(
+    db: AsyncSession,
+    user: User,
+    *,
+    file_name: str,
+    content: bytes,
+    mapping: dict[str, str] | None,
+    list_id: int | None,
+    new_list_name: str | None,
+    skip_duplicates: bool,
+    tags: list[str] | None,
+    auto_tag_rules: list[dict] | None,
+) -> ContactImportJob:
+    from app.services.csv_service import detect_column_mapping
+
+    decoded = content.decode("utf-8-sig", errors="replace")
+    headers = next(csv.reader(io.StringIO(decoded)), [])
+    if not headers:
+        raise HTTPException(status_code=422, detail="No headers found in CSV")
+    auto_mapping = detect_column_mapping(headers)
+    if mapping:
+        auto_mapping.update({str(k).strip().lower(): v for k, v in mapping.items()})
+
+    if list_id is not None:
+        target_list = (await db.execute(
+            select(ContactList).where(ContactList.id == list_id)
+        )).scalar_one_or_none()
+        if target_list is None:
+            raise HTTPException(status_code=404, detail="List not found")
+    elif new_list_name and new_list_name.strip():
+        target_list = ContactList(name=new_list_name.strip()[:255])
+        db.add(target_list)
+        await db.flush()
+        list_id = target_list.id
+
+    from app.services.csv_service import CSVImportService
+    preview = await CSVImportService(db).preview_csv(content, max_rows=0)
+    job = ContactImportJob(
+        id=str(uuid.uuid4()),
+        owner_id=user.id,
+        file_name=(file_name or "contacts.csv")[:255],
+        status="queued",
+        total_rows=preview.get("total_rows", 0),
+        content=decoded,
+        mapping_json=json.dumps(auto_mapping, ensure_ascii=False),
+        tags_json=json.dumps(tags or [], ensure_ascii=False),
+        auto_tag_rules_json=json.dumps(auto_tag_rules or [], ensure_ascii=False),
+        list_id=list_id,
+        skip_duplicates=1 if skip_duplicates else 0,
+    )
+    db.add(job)
+    await db.flush()
+    return job
+
+
+@router.post("/import/preview")
+async def preview_csv_import(
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Preview headers, mappings, first rows, and channel counts before import."""
+    content = await file.read(MAX_CONTACT_IMPORT_BYTES + 1)
+    if len(content) > MAX_CONTACT_IMPORT_BYTES:
+        raise HTTPException(status_code=413, detail="CSV file is larger than 20 MB")
+    from app.services.csv_service import CSVImportService
+    return await CSVImportService(db).preview_csv(content)
+
+
+@router.post("/import/jobs", status_code=202)
+async def create_csv_import_job(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    list_id: Optional[int] = Form(None),
+    new_list_name: Optional[str] = Form(None),
+    skip_duplicates: bool = Form(True),
+    column_mapping: Optional[str] = Form(None),
+    tags: Optional[str] = Form(None),
+    auto_tag_rules: Optional[str] = Form(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Queue a CSV import and return a pollable job id immediately."""
+    from app.services.csv_service import split_tags
+    content = await file.read(MAX_CONTACT_IMPORT_BYTES + 1)
+    if len(content) > MAX_CONTACT_IMPORT_BYTES:
+        raise HTTPException(status_code=413, detail="CSV file is larger than 20 MB")
+    mapping = _parse_import_json(column_mapping, default={})
+    auto_rules = _parse_import_json(auto_tag_rules, default=[])
+    if not isinstance(mapping, dict) or not isinstance(auto_rules, list):
+        raise HTTPException(status_code=422, detail="column_mapping must be an object and auto_tag_rules an array")
+    job = await _create_import_job(
+        db, current_user, file_name=file.filename or "contacts.csv", content=content,
+        mapping=mapping, list_id=list_id, new_list_name=new_list_name,
+        skip_duplicates=skip_duplicates, tags=split_tags(tags or ""),
+        auto_tag_rules=auto_rules,
+    )
+    await db.commit()
+    background_tasks.add_task(_run_contact_import_job, job.id)
+    return _import_job_dict(job)
+
+
+@router.post("/import/url", status_code=202)
+async def create_csv_import_job_from_url(
+    data: ContactImportURLRequest,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Fetch a public CSV URL safely, then queue the same background importer."""
+    from urllib.parse import urlsplit
+    import ipaddress
+    import socket
+    import httpx
+
+    parsed = urlsplit(data.url)
+    if parsed.scheme not in ("http", "https") or not parsed.hostname or parsed.username or parsed.password:
+        raise HTTPException(status_code=422, detail="URL must be a public HTTP or HTTPS address")
+    host = parsed.hostname.lower().rstrip(".")
+    if host in {"localhost", "metadata.google.internal"} or host.endswith((".localhost", ".local", ".internal")):
+        raise HTTPException(status_code=422, detail="Private or local URLs are not allowed")
+    try:
+        addresses = {info[4][0] for info in socket.getaddrinfo(host, parsed.port or (443 if parsed.scheme == "https" else 80))}
+        if not addresses or any(not ipaddress.ip_address(address).is_global for address in addresses):
+            raise HTTPException(status_code=422, detail="URL host must resolve to a public address")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail="Could not resolve the public CSV URL") from exc
+    try:
+        chunks: list[bytes] = []
+        downloaded = 0
+        async with httpx.AsyncClient(timeout=20, follow_redirects=False) as client:
+            async with client.stream("GET", data.url) as response:
+                if response.status_code < 200 or response.status_code >= 300:
+                    raise HTTPException(status_code=422, detail=f"CSV URL returned HTTP {response.status_code}")
+                content_length = response.headers.get("content-length")
+                if content_length and content_length.isdigit() and int(content_length) > MAX_CONTACT_IMPORT_BYTES:
+                    raise HTTPException(status_code=413, detail="CSV file is larger than 20 MB")
+                async for chunk in response.aiter_bytes():
+                    downloaded += len(chunk)
+                    if downloaded > MAX_CONTACT_IMPORT_BYTES:
+                        raise HTTPException(status_code=413, detail="CSV file is larger than 20 MB")
+                    chunks.append(chunk)
+        content = b"".join(chunks)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail="Could not download CSV from the provided URL") from exc
+    from app.services.csv_service import split_tags
+    file_name = data.file_name or (host.split(".")[0] + ".csv")
+    job = await _create_import_job(
+        db, current_user, file_name=file_name, content=content,
+        mapping=data.column_mapping, list_id=data.list_id, new_list_name=data.new_list_name,
+        skip_duplicates=data.skip_duplicates, tags=split_tags(", ".join(data.tags or [])),
+        auto_tag_rules=data.auto_tag_rules,
+    )
+    await db.commit()
+    background_tasks.add_task(_run_contact_import_job, job.id)
+    return _import_job_dict(job)
+
+
+@router.get("/import/jobs/{job_id}")
+async def read_csv_import_job(
+    job_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    job = (await db.execute(
+        select(ContactImportJob).where(ContactImportJob.id == job_id)
+    )).scalar_one_or_none()
+    if job is None or (job.owner_id != current_user.id and current_user.role != "admin"):
+        raise HTTPException(status_code=404, detail="Import job not found")
+    await db.refresh(job)
+    result = _import_job_dict(job)
+    if job.result_json:
+        result["result"] = json.loads(job.result_json)
+    if job.list_id is not None:
+        contact_list = (await db.execute(
+            select(ContactList).where(ContactList.id == job.list_id)
+        )).scalar_one_or_none()
+        if contact_list is not None:
+            actual_count = (await db.execute(
+                select(func.count(ContactListMember.id)).where(
+                    ContactListMember.list_id == contact_list.id
+                )
+            )).scalar() or 0
+            result["list"] = {
+                "id": contact_list.id,
+                "name": contact_list.name,
+                "contact_count": actual_count,
+            }
+    return result
+
+
+@router.get("/import/jobs/{job_id}/errors.csv")
+async def download_csv_import_errors(
+    job_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    job = (await db.execute(
+        select(ContactImportJob).where(ContactImportJob.id == job_id)
+    )).scalar_one_or_none()
+    if job is None or (job.owner_id != current_user.id and current_user.role != "admin"):
+        raise HTTPException(status_code=404, detail="Import job not found")
+    try:
+        errors = json.loads(job.errors_json or "[]")
+    except (ValueError, TypeError):
+        errors = []
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(["row", "level", "error"])
+    for item in errors:
+        writer.writerow([item.get("row", ""), item.get("level", "error"), item.get("error", "")])
+    return StreamingResponse(
+        iter([buffer.getvalue()]), media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="import-errors-{job.id}.csv"'},
+    )
+
+
 @router.post("/import/csv")
 async def import_csv(
     file: UploadFile = File(...),
@@ -700,6 +1088,7 @@ async def import_csv(
     skip_duplicates: bool = Form(True),
     column_mapping: Optional[str] = Form(None),
     tags: Optional[str] = Form(None),
+    auto_tag_rules: Optional[str] = Form(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -716,7 +1105,9 @@ async def import_csv(
     """
     from app.services.csv_service import CSVImportService, detect_column_mapping
 
-    content = await file.read()
+    content = await file.read(MAX_CONTACT_IMPORT_BYTES + 1)
+    if len(content) > MAX_CONTACT_IMPORT_BYTES:
+        raise HTTPException(status_code=413, detail="CSV file is larger than 20 MB")
 
     target_list: ContactList | None = None
     # Fail fast with a clean 404 if the target list does not exist, instead of
@@ -743,10 +1134,9 @@ async def import_csv(
     # Merge any mapping the user chose in the "map columns" step, so manual
     # overrides are respected on top of the auto-detection.
     if column_mapping:
-        try:
-            client_mapping = json.loads(column_mapping)
-        except (ValueError, TypeError):
-            client_mapping = {}
+        client_mapping = _parse_import_json(column_mapping, default={})
+        if not isinstance(client_mapping, dict):
+            raise HTTPException(status_code=422, detail="column_mapping must be a JSON object")
         for header, field in client_mapping.items():
             # An explicit blank/"ignore" means the user chose not to import
             # that column. Non-empty custom:<key> targets preserve arbitrary
@@ -755,10 +1145,14 @@ async def import_csv(
 
     from app.services.csv_service import split_tags
     tag_list = split_tags(tags) if tags else []
+    auto_rules = _parse_import_json(auto_tag_rules, default=[])
+    if not isinstance(auto_rules, list):
+        raise HTTPException(status_code=422, detail="auto_tag_rules must be a JSON array")
 
     service = CSVImportService(db)
     result = await service.validate_and_import(
-        content, column_mapping_map, list_id, skip_duplicates, tags=tag_list
+        content, column_mapping_map, list_id, skip_duplicates,
+        tags=tag_list, auto_tag_rules=auto_rules,
     )
 
     # Register every column this file introduced so it is immediately usable as
@@ -855,54 +1249,93 @@ async def enrichment_status(
 
 @router.post("/enrich")
 async def enrich_emails(
+    data: ContactEnrichRequest | None = Body(default=None),
     contact_ids: Optional[list[int]] = Query(default=None),
-    scope: str = Query("ids", description="ids | all | no_email | unverified"),
-    search: Optional[str] = None,
-    lead_status: Optional[str] = None,
-    tag: Optional[str] = None,
-    allow_inferred: Optional[bool] = None,
-    limit: int = Query(default=500, ge=1, le=5000),
+    scope: Optional[str] = Query(default=None, description="ids | all | no_email | unverified | list"),
+    search: Optional[str] = Query(default=None),
+    lead_status: Optional[str] = Query(default=None),
+    tag: Optional[str] = Query(default=None),
+    allow_inferred: Optional[bool] = Query(default=None),
+    limit: Optional[int] = Query(default=None, ge=1, le=5000),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Clean, find and verify email addresses for contacts that need it.
 
-    ``scope`` decides who is processed:
-
-    * ``ids``        — the listed ``contact_ids`` (the UI's selection)
-    * ``all``        — every contact matching the current filters
-    * ``no_email``   — only contacts with no address (the finders' queue)
-    * ``unverified`` — only contacts with an address nobody has confirmed yet
-
-    ``limit`` caps a single run by default so one click cannot burn an entire
-    monthly provider quota (Hunter's free plan is ~25 searches a month). The
-    caller can raise it deliberately.
+    New clients may send a typed JSON object. Existing clients may continue to
+    pass the same selection values as query parameters; an explicit query value
+    takes precedence when both forms are supplied. Selection defaults to
+    explicit contact IDs so an empty/ambiguous request can never enrich the
+    whole database by accident.
     """
     from app.services import email_enrichment as enrichment
 
-    if scope == "ids":
-        ids = sorted({int(cid) for cid in (contact_ids or []) if cid is not None})
+    body = data.model_dump(exclude_unset=True) if data is not None else {}
+    nested_filters = body.get("filters") or body.get("filter") or {}
+
+    def selected(name: str, query_value=None, default=None):
+        if query_value is not None:
+            return query_value
+        if body.get(name) is not None:
+            return body[name]
+        if nested_filters.get(name) is not None:
+            return nested_filters[name]
+        return default
+
+    ids = contact_ids
+    if ids is None:
+        ids = body.get("contact_ids")
+        if ids is None:
+            ids = body.get("ids")
+    selected_list_id = selected("list_id")
+    requested_scope = scope or body.get("scope")
+    if requested_scope is None:
+        if body.get("all") or body.get("all_matching"):
+            requested_scope = "all"
+        elif ids:
+            requested_scope = "ids"
+        elif selected_list_id is not None:
+            requested_scope = "list"
+        else:
+            requested_scope = "ids"
+    elif body.get("all") or body.get("all_matching"):
+        requested_scope = "all"
+
+    filter_search = selected("search", search)
+    filter_status = selected("lead_status", lead_status)
+    filter_tag = selected("tag", tag)
+    run_limit = limit if limit is not None else body.get("limit", 500)
+    inferred = allow_inferred if allow_inferred is not None else body.get("allow_inferred")
+
+    if requested_scope == "ids":
+        ids = sorted({int(cid) for cid in (ids or []) if cid is not None})
         if not ids:
             raise HTTPException(status_code=400, detail="No contacts selected")
         query = select(Contact).where(Contact.id.in_(ids))
     else:
-        query = _apply_contact_filters(select(Contact), search, lead_status, tag)
-        if scope == "no_email":
+        query = _apply_contact_filters(select(Contact), filter_search, filter_status, filter_tag)
+        if requested_scope == "no_email":
             query = query.where(or_(Contact.email.is_(None), Contact.email == ""))
-        elif scope == "unverified":
+        elif requested_scope == "unverified":
             query = query.where(
                 Contact.email.isnot(None),
                 Contact.email != "",
                 Contact.email_verified.is_(False),
             )
-        elif scope != "all":
+        elif requested_scope == "list":
+            if selected_list_id is None:
+                raise HTTPException(status_code=422, detail="list_id is required for scope='list'")
+            query = query.join(ContactListMember, Contact.id == ContactListMember.contact_id).where(
+                ContactListMember.list_id == selected_list_id
+            )
+        elif requested_scope != "all":
             raise HTTPException(
                 status_code=400,
-                detail="scope must be one of: ids, all, no_email, unverified",
+                detail="scope must be one of: ids, all, no_email, unverified, list",
             )
         query = query.order_by(Contact.id.asc())
 
-    contacts = list((await db.execute(query.limit(limit))).scalars().all())
+    contacts = list((await db.execute(query.limit(run_limit))).scalars().all())
     if not contacts:
         return {
             "success": True, "processed": 0, "matched": 0,
@@ -911,10 +1344,10 @@ async def enrich_emails(
         }
 
     report = await enrichment.enrich_contacts(
-        db, contacts, allow_inferred=allow_inferred
+        db, contacts, allow_inferred=inferred
     )
     report["matched"] = len(contacts)
-    report["capped"] = len(contacts) >= limit
+    report["capped"] = len(contacts) >= run_limit
     await db.commit()
     return report
 

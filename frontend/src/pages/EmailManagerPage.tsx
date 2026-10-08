@@ -1309,7 +1309,7 @@ function AccountModal({
       ? {
           ...account,
           api_key: "",
-          reply_to: account.reply_to || "",
+          reply_to: account.reply_to_addresses?.join(", ") || account.reply_to || "",
           daily_limit: account.daily_limit ?? "",
         }
       : {}),
@@ -1520,13 +1520,14 @@ function AccountModal({
         )}
 
         <div className="grid sm:grid-cols-2 gap-3">
-          <Field label="Reply-to (optional)">
+          <Field label="Reply-to addresses (optional)">
             <input
               className="input"
               value={form.reply_to}
               onChange={(e) => set("reply_to", e.target.value)}
-              placeholder="replies@yourdomain.com"
+              placeholder="replies@yourdomain.com, team@yourdomain.com"
             />
+            <p className="mt-1 text-xs text-gray-500">Use one address or separate up to 10 addresses with commas. Replies route to the connected mailbox for each address.</p>
           </Field>
           <Field label="Daily limit (optional)">
             <input

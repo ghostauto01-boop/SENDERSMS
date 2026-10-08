@@ -7,7 +7,7 @@ import logging
 import re
 import unicodedata
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Awaitable, Callable, Optional
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -120,6 +120,46 @@ def custom_field_key(header: str) -> str:
     return value
 
 
+_COUNTRY_BY_TLD = {
+    "ng": "Nigeria", "uk": "United Kingdom", "us": "United States", "ca": "Canada",
+    "au": "Australia", "de": "Germany", "fr": "France", "ie": "Ireland",
+    "es": "Spain", "it": "Italy", "nl": "Netherlands", "za": "South Africa",
+    "ke": "Kenya", "gh": "Ghana", "in": "India", "ae": "United Arab Emirates",
+    "sg": "Singapore", "nz": "New Zealand", "br": "Brazil", "mx": "Mexico",
+    "jp": "Japan", "se": "Sweden", "no": "Norway", "dk": "Denmark",
+    "ch": "Switzerland", "be": "Belgium", "at": "Austria", "pl": "Poland",
+    "pt": "Portugal", "fi": "Finland", "cz": "Czechia", "gr": "Greece",
+    "il": "Israel", "tr": "Türkiye", "ar": "Argentina", "cl": "Chile",
+    "co": "Colombia", "my": "Malaysia", "ph": "Philippines", "id": "Indonesia",
+}
+
+
+def infer_country(country: str | None, email: str | None, website: str | None) -> str | None:
+    """Use only explicit or weak public-domain clues; unknown stays empty."""
+    explicit = (country or "").strip()
+    if explicit:
+        return explicit[:100]
+    from app.services.email_enrichment import domain_from_website
+
+    domains = []
+    address = normalize_email(email)
+    if address:
+        domains.append(address.rsplit("@", 1)[-1])
+    site_domain = domain_from_website(website)
+    if site_domain:
+        domains.append(site_domain)
+    for domain in domains:
+        labels = domain.lower().split(".")
+        # Handle common compound country-code suffixes before their final label.
+        suffix = ".".join(labels[-2:]) if len(labels) > 1 else ""
+        if suffix in {"co.uk", "org.uk", "ac.uk", "gov.uk"}:
+            return "United Kingdom"
+        country = _COUNTRY_BY_TLD.get(labels[-1]) if labels else None
+        if country:
+            return country
+    return None
+
+
 def detect_column_mapping(headers: list[str]) -> dict[str, str]:
     """Map every CSV header to a Contact field or ``custom:<key>``.
 
@@ -174,6 +214,8 @@ class CSVImportResult:
         self.phone_only = 0
         self.both = 0
         self.total_rows = 0
+        self.company_duplicates = 0
+        self.company_duplicate_candidates: list[dict] = []
         self.errors: list[dict] = []
         self.imported_contact_ids: list[int] = []
 
@@ -201,6 +243,8 @@ class CSVImportResult:
             "invalid": self.invalid,
             "duplicates": self.duplicates,
             "total_rows": self.total_rows,
+            "company_duplicates": self.company_duplicates,
+            "company_duplicate_candidates": self.company_duplicate_candidates,
             "with_phone": self.with_phone,
             "with_email": self.with_email,
             "email_only": self.email_only,
@@ -438,6 +482,8 @@ class CSVImportService:
         list_id: Optional[int] = None,
         skip_duplicates: bool = True,
         tags: Optional[list[str]] = None,
+        auto_tag_rules: Optional[list[dict]] = None,
+        progress_callback: Optional[Callable[[int, CSVImportResult], Awaitable[None]]] = None,
     ) -> CSVImportResult:
         result = CSVImportResult()
         text = content.decode("utf-8-sig", errors="replace")
@@ -469,6 +515,34 @@ class CSVImportService:
             await self.db.flush()
             tag_cache[key] = tag
             return tag
+
+        # Domain/company matches are suggestions, not person merges: multiple
+        # real people at one business must remain distinct contacts.
+        from app.services.email_enrichment import FREE_MAIL_DOMAINS, domain_from_website
+
+        company_index: dict[str, list[int]] = {}
+        company_rows = (await self.db.execute(
+            select(Contact.id, Contact.email, Contact.website, Contact.business_name)
+        )).all()
+        for existing_id, existing_email, existing_website, existing_name in company_rows:
+            domain = domain_from_website(existing_website)
+            address = normalize_email(existing_email)
+            if not domain and address:
+                candidate = address.rsplit("@", 1)[-1]
+                if candidate not in FREE_MAIL_DOMAINS:
+                    domain = candidate
+            if domain:
+                company_index.setdefault(domain.lower(), []).append(existing_id)
+            if existing_name:
+                company_index.setdefault("name:" + existing_name.strip().lower(), []).append(existing_id)
+
+        last_progress = 0
+
+        async def report_progress(processed: int) -> None:
+            nonlocal last_progress
+            if progress_callback and (processed - last_progress >= 100 or processed == 0):
+                await progress_callback(processed, result)
+                last_progress = processed
 
         # Dedupe keys already seen in THIS file: "p:+234…" for phones and
         # "e:ada@example.com" for email-only contacts, so a mixed file with a
@@ -508,6 +582,23 @@ class CSVImportService:
                     if key not in CONTACT_FIELDS:
                         custom_data[key] = value
 
+            # Optional rule-based tags. Rules address either a standard field,
+            # a custom-field key, or an original CSV column heading.
+            for rule in auto_tag_rules or []:
+                if not isinstance(rule, dict):
+                    continue
+                field = str(rule.get("field") or "").strip()
+                contains = str(rule.get("contains") or "").strip()
+                tag_name = str(rule.get("tag") or "").strip()[:100]
+                value = (
+                    contact_data.get(field)
+                    or custom_data.get(custom_field_key(field))
+                    or row_lower.get(field.lower())
+                    or ""
+                )
+                if field and contains and tag_name and contains.lower() in str(value).lower():
+                    row_tags.append(tag_name)
+
             # --- Identity: a contact needs a phone OR an email ---------------
             # Not both. Many businesses publish only an address (a restaurant
             # with a reservation inbox and no mobile) and many leads arrive
@@ -534,22 +625,37 @@ class CSVImportService:
                     "error": "No phone number and no email address"
                     + (f" (phone '{raw_phone}' is not valid)" if raw_phone else ""),
                 })
+                await report_progress(row_num)
                 continue
 
             key = contact_key(normalized, email)
             if key is None:  # pragma: no cover - guarded by the check above
                 result.invalid += 1
                 result.errors.append({"row": row_num, "error": "Row has no usable contact detail"})
+                await report_progress(row_num)
                 continue
+
+            company_keys: list[tuple[str, str]] = []
+            site_domain = domain_from_website(contact_data.get("website"))
+            email_domain = email.rsplit("@", 1)[-1] if email else ""
+            if site_domain:
+                company_keys.append((site_domain.lower(), "domain"))
+            elif email_domain and email_domain not in FREE_MAIL_DOMAINS:
+                company_keys.append((email_domain.lower(), "domain"))
+            business = (contact_data.get("business_name") or "").strip().lower()
+            if business:
+                company_keys.append(("name:" + business, "company_name"))
 
             if skip_duplicates:
                 if key in seen_keys:
                     result.duplicates += 1
+                    await report_progress(row_num)
                     continue
                 existing_contact, matched_by = await self._find_existing(
                     normalized, email, contact_data
                 )
                 if existing_contact is not None:
+                    seen_keys.add(key)
                     if matched_by == "name":
                         # Say so out loud: a name match is the one merge the
                         # operator may want to double-check.
@@ -609,7 +715,25 @@ class CSVImportService:
                             self.db.add(
                                 ContactTag(contact_id=existing_contact.id, tag_id=tag.id)
                             )
+                    await report_progress(row_num)
                     continue
+
+            # Domain/company matches are suggestions, not person merges: multiple
+            # real people at one business must remain distinct contacts.
+            candidate_pairs = []
+            for signature, match_type in company_keys:
+                for candidate_id in company_index.get(signature, []):
+                    candidate_pairs.append((candidate_id, match_type, signature))
+            if candidate_pairs:
+                result.company_duplicates += 1
+                for candidate_id, match_type, signature in candidate_pairs[:5]:
+                    if len(result.company_duplicate_candidates) < 1000:
+                        result.company_duplicate_candidates.append({
+                            "row": row_num,
+                            "contact_id": candidate_id,
+                            "matched_by": match_type,
+                            "company_key": signature,
+                        })
 
             seen_keys.add(key)
             if normalized:
@@ -618,7 +742,9 @@ class CSVImportService:
                 contact_data.pop("phone_number", None)
             if email:
                 contact_data["email"] = email
-            contact_data.setdefault("country", "Nigeria")
+            contact_data["country"] = infer_country(
+                contact_data.get("country"), email, contact_data.get("website")
+            )
             contact_data.setdefault("lead_status", "new")
             if contact_data.get("email"):
                 contact_data["email_lower"] = contact_data["email"]
@@ -644,10 +770,16 @@ class CSVImportService:
                 tag = await _ensure_tag(tag_name)
                 self.db.add(ContactTag(contact_id=contact.id, tag_id=tag.id))
 
+            for signature, _match_type in company_keys:
+                company_index.setdefault(signature, []).append(contact.id)
+
             if contact_list is not None:
                 self.db.add(ContactListMember(list_id=contact_list.id, contact_id=contact.id))
                 added_to_list += 1
+            await report_progress(row_num)
 
         if contact_list is not None and added_to_list:
             contact_list.contact_count = (contact_list.contact_count or 0) + added_to_list
+        if progress_callback:
+            await progress_callback(result.total_rows, result)
         return result

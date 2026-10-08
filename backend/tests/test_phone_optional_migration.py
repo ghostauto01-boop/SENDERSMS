@@ -214,7 +214,7 @@ async def test_a_sparse_legacy_table_is_still_relaxed():
                 text("SELECT first_name, country FROM contacts ORDER BY id")
             )
         ).all()
-        assert rows[0] == ("Ada", "Nigeria"), "the pre-existing row kept its defaults"
-        assert rows[1][0] == "Chidi"
+        assert rows[0] == ("Ada", None), "an unknown country stays unknown"
+        assert rows[1] == ("Chidi", None), "the newly added country column has no assumed default"
 
     await engine.dispose()

@@ -14,9 +14,10 @@ from app.api.v1.contacts import (
     _safe_update,
 )
 from app.database import get_db
-from app.models.contact import Contact
+from app.models.contact import Contact, ContactTag, Tag
 from app.models.contact_list import ContactList, ContactListMember
 from app.models.user import User
+from app.schemas.contact import ContactOut
 from app.security.auth import get_current_user
 
 router = APIRouter()
@@ -244,21 +245,30 @@ async def get_list_contacts(
     query = query.order_by(Contact.created_at.desc()).offset((page - 1) * per_page).limit(per_page)
     contacts = (await db.execute(query)).scalars().all()
 
+    tag_map: dict[int, list[str]] = {}
+    if contacts:
+        tag_rows = await db.execute(
+            select(ContactTag.contact_id, Tag.name)
+            .join(Tag, ContactTag.tag_id == Tag.id)
+            .where(ContactTag.contact_id.in_([contact.id for contact in contacts]))
+            .order_by(Tag.name.asc())
+        )
+        for contact_id, name in tag_rows.all():
+            tag_map.setdefault(contact_id, []).append(name)
+
+    # Keep the existing pagination envelope and its original fields, while
+    # returning the same useful, typed contact shape as GET /contacts/.
+    items = []
+    for contact in contacts:
+        values = {key: value for key, value in vars(contact).items() if not key.startswith("_")}
+        values["tags"] = tag_map.get(contact.id, [])
+        items.append(ContactOut.model_validate(values).model_dump(mode="json"))
+
     return {
         "total": total,
         "page": page,
         "per_page": per_page,
-        "items": [
-            {
-                "id": contact.id,
-                "first_name": contact.first_name,
-                "last_name": contact.last_name,
-                "business_name": contact.business_name,
-                "phone_number": contact.phone_number,
-                "lead_status": contact.lead_status,
-            }
-            for contact in contacts
-        ],
+        "items": items,
     }
 
 

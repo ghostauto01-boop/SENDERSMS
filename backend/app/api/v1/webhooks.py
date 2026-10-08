@@ -58,6 +58,27 @@ def _inbound_text(event_type: str, payload: dict) -> str:
     return str(payload.get("message") or payload.get("text") or payload.get("body") or "")
 
 
+def _redact_sensitive_payload(body: dict, reason: str) -> dict:
+    """Make a webhook event safe to persist without copying inbound content."""
+    content_keys = {"message", "text", "body", "data", "attachments", "subject", "content", "media"}
+
+    def clean(value):
+        if isinstance(value, dict):
+            return {
+                key: clean(item)
+                for key, item in value.items()
+                if str(key).lower() not in content_keys
+            }
+        if isinstance(value, list):
+            return [clean(item) for item in value]
+        return value
+
+    safe = clean(body)
+    safe["content_redacted"] = True
+    safe["redaction_reason"] = reason
+    return safe
+
+
 def _verify_signature(request: Request, raw_body: bytes) -> None:
     """Reject webhook deliveries that are not signed by our SMS gateway.
 
@@ -163,9 +184,21 @@ async def smsgateway_webhook(request: Request, db: AsyncSession = Depends(get_db
     msg_id = payload.get("messageId") or ""
     idem_key = f"wh-{event_id or msg_id or datetime.now(timezone.utc).timestamp()}"[:255]
 
+    sensitive_reason = None
+    if event_type in INBOUND_EVENTS:
+        from app.services.inbound_safety import sensitive_inbound_reason
+
+        sensitive_reason = sensitive_inbound_reason(_inbound_text(event_type, payload))
+    elif event_type not in STATUS_EVENTS and event_type not in ("system:ping", "app:started"):
+        generic_text = payload.get("message") or payload.get("text") or payload.get("body") or ""
+        if generic_text:
+            from app.services.inbound_safety import sensitive_inbound_reason
+
+            sensitive_reason = sensitive_inbound_reason(str(generic_text))
+
     logger.info(
-        "WEBHOOK: event=%s eventId=%s msgId=%s keys=%s",
-        event_type, event_id, msg_id, sorted(payload.keys()),
+        "WEBHOOK: event=%s eventId=%s msgId=%s keys=%s redacted=%s",
+        event_type, event_id, msg_id, sorted(payload.keys()), bool(sensitive_reason) or event_type == "sms:data-received",
     )
 
     if (await db.execute(
@@ -179,7 +212,11 @@ async def smsgateway_webhook(request: Request, db: AsyncSession = Depends(get_db
         provider="smsgate",
         provider_event_id=msg_id or event_id,
         idempotency_key=idem_key,
-        payload=json.dumps(body)[:100000],
+        payload=json.dumps(
+            _redact_sensitive_payload(body, sensitive_reason or "non_text_data")
+            if sensitive_reason or event_type == "sms:data-received"
+            else body
+        )[:100000],
         status="received",
     )
     db.add(evt)
@@ -190,7 +227,14 @@ async def smsgateway_webhook(request: Request, db: AsyncSession = Depends(get_db
     result = {"ok": True}
 
     try:
-        if event_type in INBOUND_EVENTS:
+        if sensitive_reason:
+            # Keep only the coarse reason and provider identifiers. Do not create
+            # a contact/message or retain the original text in a second table.
+            evt.status = "suppressed"
+            evt.error = f"Sensitive inbound content suppressed: {sensitive_reason}"
+            evt.processed_at = datetime.now(timezone.utc)
+            result.update({"stored": False, "suppressed": True, "reason": sensitive_reason})
+        elif event_type in INBOUND_EVENTS:
             frm = payload.get("sender") or payload.get("from") or payload.get("phoneNumber") or ""
             txt = _inbound_text(event_type, payload)
 
@@ -205,13 +249,12 @@ async def smsgateway_webhook(request: Request, db: AsyncSession = Depends(get_db
                 })
                 await db.flush()
                 result["stored"] = bool(msg)
-                logger.info("WEBHOOK INBOUND: from=%s stored=%s text=%r",
-                            frm, bool(msg), txt[:60])
+                logger.info("WEBHOOK INBOUND: eventId=%s stored=%s", event_id, bool(msg))
             else:
                 evt.error = f"missing sender/text (sender={frm!r})"
                 logger.warning(
-                    "WEBHOOK INBOUND: nothing to store. sender=%r text=%r keys=%s",
-                    frm, txt, sorted(payload.keys()),
+                    "WEBHOOK INBOUND: nothing to store. eventId=%s has_sender=%s has_text=%s",
+                    event_id, bool(frm), bool(txt.strip()),
                 )
 
         elif event_type in STATUS_EVENTS:
@@ -243,12 +286,13 @@ async def smsgateway_webhook(request: Request, db: AsyncSession = Depends(get_db
                     "messageId": msg_id, "receivedAt": payload.get("receivedAt", ""),
                 })
                 await db.flush()
-                logger.info("WEBHOOK GENERIC(%s): stored from %s", event_type, frm)
+                logger.info("WEBHOOK GENERIC(%s): stored eventId=%s", event_type, event_id)
             else:
                 logger.info("WEBHOOK: ignoring unhandled event %r", event_type)
 
-        evt.status = "processed"
-        evt.processed_at = datetime.now(timezone.utc)
+        if evt.status != "suppressed":
+            evt.status = "processed"
+            evt.processed_at = datetime.now(timezone.utc)
     except Exception as e:
         # Never 500 back at the device: it would retry this delivery for ~2 days.
         evt.status = "error"
