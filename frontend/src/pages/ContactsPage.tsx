@@ -37,6 +37,11 @@ export default function ContactsPage() {
   const [search, setSearch] = useState(""); const [leadStatus, setLeadStatus] = useState("");
   //: Email-only view of the same list: who can be emailed, who cannot, why.
   const [emailState, setEmailState] = useState("");
+  //: Channel view: SMS contacts / Email contacts / All
+  const [channel, setChannel] = useState<string>("");
+  //: Which list to view (when the user opens a list from the sidebar)
+  const [listId, setListId] = useState<string>("");
+  const [lists, setLists] = useState<{id:number;name:string}[]>([]);
   // Debounced search text — typing no longer fires a request per keystroke.
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [loading, setLoading] = useState(true); const [error, setError] = useState<string|null>(null);
@@ -63,13 +68,16 @@ export default function ContactsPage() {
     api.get("/contacts/enrich/status")
       .then(({data})=>{ setEnrichProviders(data.providers || []); setEnrichInfo(data.contacts || null); })
       .catch(()=>{ setEnrichProviders([]); });
+    api.get("/lists/",{params:{per_page:500}})
+      .then(({data})=>{ setLists(data.items||[]); })
+      .catch(()=>{});
   },[]);
 
   useEffect(()=>{ const t=setTimeout(()=>{ setDebouncedSearch(search); },350); return ()=>clearTimeout(t); },[search]);
-  useEffect(()=>{loadContacts();},[page,debouncedSearch,leadStatus,emailState]);
+  useEffect(()=>{loadContacts();},[page,debouncedSearch,leadStatus,emailState,channel,listId]);
 
   const loadContacts = async () => {
-    try { setLoading(true); const {data}=await api.get<PaginatedResponse<Contact>>("/contacts/",{params:{page,per_page:25,search:debouncedSearch||undefined,lead_status:leadStatus||undefined,email_state:emailState||undefined}});
+    try { setLoading(true); const {data}=await api.get<PaginatedResponse<Contact>>("/contacts/",{params:{page,per_page:25,search:debouncedSearch||undefined,lead_status:leadStatus||undefined,email_state:emailState||undefined,channel:channel||undefined,list_id:listId||undefined}});
       // Deleting the last row of a page must not leave the user stranded on
       // an empty page — step back one page and let the effect reload.
       if (data.items.length===0 && page>1) { setPage(p=>Math.max(1,p-1)); return; }
@@ -261,6 +269,27 @@ export default function ContactsPage() {
               <span className="hidden lg:inline">Clean list</span>
               <span className="lg:hidden">✓</span>
             </button>
+            <button onClick={async()=>{
+              const useSelection = selected.size > 0 && !allMatching;
+              const label = useSelection ? `${selected.size} selected contact${selected.size===1?"":"s"}` : `all ${total} contacts matching your view`;
+              if(!confirm(`Validate email addresses for ${label}? Confirmed-bad addresses will be quarantined for email sends.`)) return;
+              try {
+                const params: any = { deep: true };
+                if (useSelection) { params.contact_ids = [...selected]; params.scope = "ids"; }
+                else { params.scope = "all";
+                  if (search) params.search = search;
+                  if (leadStatus) params.lead_status = leadStatus;
+                  if (channel) params.channel = channel;
+                  if (listId) params.list_id = listId;
+                  if (emailState) params.email_state = emailState;
+                }
+                const {data}=await api.post("/contacts/validate-emails",null,{params});
+                toast.success(`Validated ${data.scanned}. ${data.deliverable} good, ${data.undeliverable} bad, ${data.risky} risky.`);
+                loadContacts();
+              } catch (err:any) { toast.error(err.response?.data?.detail||"Validation failed"); }
+            }} className="w-10 h-10 lg:w-auto lg:px-3 lg:py-2 rounded-full lg:rounded-lg bg-primary-50 dark:bg-primary-950 text-primary-700 dark:text-primary-300 flex items-center justify-center gap-1.5 text-sm font-medium hover:bg-primary-100 disabled:opacity-50" title="Validate email addresses with Reacher (https://reacher.email)">
+              <Sparkles size={16}/> <span className="hidden lg:inline">Validate emails</span>
+            </button>
             <button onClick={()=>setShowImport(true)} className="w-10 h-10 lg:w-auto lg:px-3 lg:py-2 rounded-full lg:rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 flex items-center justify-center gap-1.5 text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-700">
               <Upload size={16}/> <span className="hidden lg:inline">Import</span>
             </button>
@@ -315,6 +344,15 @@ export default function ContactsPage() {
         </div>
         <select className="bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-400 rounded-full px-3 py-2.5 text-sm font-medium border-0 focus:ring-2 focus:ring-primary-600/20 outline-none" value={leadStatus} onChange={e=>{setLeadStatus(e.target.value);setPage(1);clearSelection();}}>
           <option value="">All</option>{LEAD_STATUSES.map(s=><option key={s} value={s}>{s}</option>)}
+        </select>
+        <select className="bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-400 rounded-full px-3 py-2.5 text-sm font-medium border-0 focus:ring-2 focus:ring-primary-600/20 outline-none" value={channel} onChange={e=>{setChannel(e.target.value);setPage(1);clearSelection();}} title="Channel view">
+          <option value="">All contacts</option>
+          <option value="sms">SMS contacts</option>
+          <option value="email">Email contacts</option>
+        </select>
+        <select className="bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-400 rounded-full px-3 py-2.5 text-sm font-medium border-0 focus:ring-2 focus:ring-primary-600/20 outline-none" value={listId} onChange={e=>{setListId(e.target.value);setPage(1);clearSelection();}} title="Show only this list">
+          <option value="">All lists</option>
+          {lists.map(l=><option key={l.id} value={l.id}>{l.name}</option>)}
         </select>
         <select className="bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-400 rounded-full px-3 py-2.5 text-sm font-medium border-0 focus:ring-2 focus:ring-primary-600/20 outline-none" value={emailState} onChange={e=>{setEmailState(e.target.value);setPage(1);clearSelection();}} title="Filter by email eligibility">
           <option value="">Email: all</option>
@@ -507,7 +545,7 @@ export default function ContactsPage() {
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
               {loading ? [...Array(5)].map((_,i)=>(<tr key={i}>{[...Array(7)].map((_,j)=>(<td key={j} className="px-4 py-3"><div className="h-4 bg-gray-100 dark:bg-gray-700 rounded animate-pulse"/></td>))}</tr>))
-              : contacts.length===0 ? (<tr><td colSpan={7} className="px-4 py-12 text-center text-gray-500">{search||leadStatus||emailState?"No matches":"No contacts. Import or add one."}</td></tr>)
+              : contacts.length===0 ? (<tr><td colSpan={7} className="px-4 py-12 text-center text-gray-500">{search||leadStatus||channel||listId||emailState?"No matches":"No contacts. Import or add one."}</td></tr>)
               : contacts.map(c => {
                 const contactTrust = emailTrust(c);
                 const contactTrustLabel = emailTrustLabel(contactTrust);

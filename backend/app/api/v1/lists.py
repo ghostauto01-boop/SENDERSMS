@@ -498,6 +498,78 @@ async def clean_list(
     return {"success": True, **result}
 
 
+@router.post("/{list_id}/validate-emails")
+async def validate_list_emails(
+    list_id: int,
+    remove_from_list: bool = Query(
+        True, description="Unlink addresses that are confirmed undeliverable"
+    ),
+    delete_contacts: bool = Query(
+        False, description="Permanently delete contacts with confirmed-bad addresses"
+    ),
+    deep: bool = Query(
+        True,
+        description="Live mailbox check (Reacher instance or built-in SMTP probe); "
+        "false = syntax/MX/disposable checks only",
+    ),
+    limit: int = Query(200, ge=1, le=2000),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Validate every email address in a list — the email twin of ``/clean``.
+
+    Uses the open-source Reacher validator (https://reacher.email) when
+    ``REACHER_API_URL`` is configured, and the same checks built into the app
+    otherwise. Confirmed-undeliverable addresses are quarantined for email
+    (``is_email_undeliverable``) so no campaign will ever send to them and
+    burn sender reputation; risky/unknown addresses are left usable but never
+    marked verified.
+
+    Sits next to the number validator on purpose: one click cleans a list's
+    phone numbers, the next proves its addresses.
+    """
+    await _find_list(db, list_id)
+    from app.services.email_validator import validate_contacts
+
+    query = (
+        select(Contact)
+        .join(ContactListMember, Contact.id == ContactListMember.contact_id)
+        .where(ContactListMember.list_id == list_id)
+        .order_by(Contact.id.asc())
+    )
+    contacts = list((await db.execute(query.limit(limit))).scalars().all())
+    result = await validate_contacts(db, contacts, deep=deep, mark=True)
+
+    removed = deleted = 0
+    if remove_from_list or delete_contacts:
+        # A contact with a working phone STAYS in the list: the address is
+        # already quarantined for email, and the number is still textable.
+        # Only contacts who are unreachable on every channel leave.
+        def _unreachable(c: Contact) -> bool:
+            if not c.is_email_undeliverable:
+                return False
+            phone_ok = bool((c.phone_number or "").strip()) and not c.is_undeliverable
+            return not phone_ok
+
+        bad_ids = [c.id for c in contacts if _unreachable(c)]
+        if bad_ids:
+            if delete_contacts:
+                deleted = await _delete_contacts_bulk(db, bad_ids)
+                removed = deleted
+            elif remove_from_list:
+                await db.execute(
+                    sa_delete(ContactListMember).where(
+                        ContactListMember.list_id == list_id,
+                        ContactListMember.contact_id.in_(bad_ids),
+                    )
+                )
+                removed = len(bad_ids)
+            await db.flush()
+
+    await db.commit()
+    return {"success": True, "removed_from_list": removed, "deleted": deleted, **result}
+
+
 @router.get("/{list_id}/stats")
 async def get_list_stats(
     list_id: int,

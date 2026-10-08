@@ -130,9 +130,11 @@ def _apply_contact_filters(query, search: Optional[str], lead_status: Optional[s
     return query
 
 
-def _apply_channel_filters(query, email_state: Optional[str]):
-    """Channel-specific contact filters used by the Email Manager.
+def _apply_channel_filters(query, email_state: Optional[str], channel: Optional[str] = None):
+    """Channel-specific contact filters used by the Contacts and Email pages.
 
+    * ``channel=sms``   — has a phone number (the SMS contact view)
+    * ``channel=email`` — has an address (the email contact view)
     * ``emailable``   — has an address and has not opted out or bounced
     * ``no_email``    — has no usable address (nothing to send to)
     * ``unsubscribed``/``bounced`` — the two states that block email
@@ -145,6 +147,12 @@ def _apply_channel_filters(query, email_state: Optional[str]):
     is the whole reason a guess is stored with a flag instead of being passed
     off as a normal address.
     """
+    if channel:
+        kind = channel.strip().lower()
+        if kind == "sms":
+            query = query.where(Contact.phone_number.isnot(None), Contact.phone_number != "")
+        elif kind == "email":
+            query = query.where(Contact.email.isnot(None), Contact.email != "")
     if not email_state:
         return query
     state = email_state.lower()
@@ -180,6 +188,10 @@ async def list_contacts(
     undeliverable: Optional[str] = None,
     #: emailable | no_email | unsubscribed | bounced | (empty = everyone)
     email_state: Optional[str] = None,
+    #: sms | email — show only contacts reachable on that channel
+    channel: Optional[str] = None,
+    #: show only contacts belonging to this list
+    list_id: Optional[int] = None,
     sort_by: str = "created_at",
     sort_dir: str = "desc",
     exclude_list_id: Optional[int] = None,
@@ -188,13 +200,18 @@ async def list_contacts(
 ):
     """List contacts with pagination, search, filter, and sort.
 
-    ``exclude_list_id`` hides every contact that already belongs to the given
-    list — used by the list editor's "add contacts" search so it only ever
-    offers numbers the list does not have yet, no matter how large either set
-    is.
+    ``channel`` powers the two contact views ("SMS contacts" / "Email
+    contacts") and ``list_id`` the per-list view. ``exclude_list_id`` hides
+    every contact that already belongs to the given list — used by the list
+    editor's "add contacts" search so it only ever offers numbers the list
+    does not have yet, no matter how large either set is.
     """
     query = _apply_contact_filters(select(Contact), search, lead_status, tag, undeliverable)
-    query = _apply_channel_filters(query, email_state)
+    query = _apply_channel_filters(query, email_state, channel)
+    if list_id is not None:
+        query = query.join(
+            ContactListMember, Contact.id == ContactListMember.contact_id
+        ).where(ContactListMember.list_id == list_id)
     if exclude_list_id is not None:
         member_ids = select(ContactListMember.contact_id).where(
             ContactListMember.list_id == exclude_list_id
@@ -259,6 +276,57 @@ async def clean_all_contacts(
 
     result = await clean_contacts(db, delete_contacts=delete_bad)
     return {"success": True, **result}
+
+
+@router.post("/validate-emails")
+async def validate_emails(
+    contact_ids: Optional[list[int]] = Query(default=None),
+    scope: Optional[str] = Query(default=None, description="ids | all"),
+    search: Optional[str] = None,
+    lead_status: Optional[str] = None,
+    channel: Optional[str] = None,
+    list_id: Optional[int] = None,
+    email_state: Optional[str] = None,
+    deep: bool = Query(
+        True,
+        description="Live mailbox check (Reacher or built-in SMTP probe); "
+        "false = syntax/MX/disposable checks only",
+    ),
+    limit: int = Query(500, ge=1, le=2000),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Validate email addresses with the Reacher-based email validator.
+
+    Explicit ``contact_ids`` win; otherwise the current filters (search,
+    status, channel view, list selection) decide — the same selection the
+    Contacts page is showing. Confirmed-undeliverable addresses are
+    quarantined so every send path skips them; only confirmed-good addresses
+    become ``email_verified``.
+    """
+    from app.services.email_validator import validate_contacts
+
+    ids = contact_ids or []
+    if scope == "all":
+        query = _apply_contact_filters(select(Contact), search, lead_status, None)
+        query = _apply_channel_filters(query, email_state, channel)
+        if list_id is not None:
+            query = query.join(
+                ContactListMember, Contact.id == ContactListMember.contact_id
+            ).where(ContactListMember.list_id == list_id)
+    elif ids:
+        query = select(Contact).where(Contact.id.in_([int(i) for i in ids]))
+    else:
+        raise HTTPException(status_code=400, detail="No contacts selected")
+    # Only rows that actually carry an address are worth a validator call.
+    query = query.where(Contact.email.isnot(None), Contact.email != "")
+
+    contacts = list((await db.execute(query.order_by(Contact.id.asc()).limit(limit))).scalars().all())
+    result = await validate_contacts(db, contacts, deep=deep, mark=True)
+    result["matched"] = len(contacts)
+    result["capped"] = len(contacts) >= limit
+    await db.commit()
+    return result
 
 
 @router.get("/tags/", response_model=dict)
@@ -697,6 +765,11 @@ async def bulk_action(
         id_query = _apply_contact_filters(
             select(Contact.id), data.search, data.lead_status, data.tag
         )
+        id_query = _apply_channel_filters(id_query, data.email_state, data.channel)
+        if data.list_id is not None:
+            id_query = id_query.join(
+                ContactListMember, Contact.id == ContactListMember.contact_id
+            ).where(ContactListMember.list_id == data.list_id)
         matching_ids = list((await db.execute(id_query)).scalars().all())
         if matching_ids:
             # Set-based cleanup: one batch of statements, however many rows.
@@ -1357,11 +1430,19 @@ async def export_csv(
     search: Optional[str] = None,
     lead_status: Optional[str] = None,
     tag: Optional[str] = None,
+    email_state: Optional[str] = None,
+    channel: Optional[str] = None,
+    list_id: Optional[int] = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Export all matching contacts to a CSV file."""
     query = _apply_contact_filters(select(Contact), search, lead_status, tag)
+    query = _apply_channel_filters(query, email_state, channel)
+    if list_id is not None:
+        query = query.join(
+            ContactListMember, Contact.id == ContactListMember.contact_id
+        ).where(ContactListMember.list_id == list_id)
     query = query.order_by(Contact.created_at.desc())
 
     result = await db.execute(query)

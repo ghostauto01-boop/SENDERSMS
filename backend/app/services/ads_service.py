@@ -887,24 +887,91 @@ async def sent_total(db: AsyncSession, campaign: AdsCampaign) -> int:
     ).scalar() or 0
 
 
-def drip_allowance(campaign: AdsCampaign, last_sent_at: datetime | None) -> int:
-    """How many messages the drip configuration permits in this tick."""
+async def drip_allowance(db: AsyncSession, campaign: AdsCampaign) -> int:
+    """How many messages the drip configuration permits right now.
+
+    Pacing is counted over a **trailing window** ("how many went out in the
+    last N minutes?"), not "how long since the last one?". The old
+    time-since-last-send check had two holes that both produced the reported
+    blast — "I set 5 every minute and it sent everything at once":
+
+    * ``drip_interval_minutes = 0`` silently disabled pacing, so every poll
+      tick (every 15-30 s while the app is open) released a fresh batch and a
+      list could drain in a minute.
+    * The check was per-tick, so a poller that runs faster than the interval
+      (the loop wakes on every user request) could release consecutive batches
+      around a boundary.
+
+    A rolling-window count cannot over-send: in ANY window of ``interval``
+    minutes at most ``batch`` messages exist, whatever the tick pattern or how
+    many workers race. ``interval`` is normalised to at least 1 minute for
+    every paced mode — "batch of 5" now always means "5 per minute at most".
+
+    Modes
+    -----
+    ``off``      — no pacing (global Sending Rules still apply).
+    ``interval`` — 1 message per interval window.
+    ``batch``    — ``drip_batch_size`` messages per interval window.
+    ``smart``    — like batch, with the release size shaped by ``pacing``
+                   (even / front / back / random) across the sending window.
+    ``daily``    — daily budget only (enforced separately).
+    """
     mode = (campaign.drip_mode or "off").lower()
-    if mode == "off":
+    if mode in ("off", "daily"):
         return 10_000
-    interval = max(int(campaign.drip_interval_minutes or 0), 0)
+    interval = max(int(campaign.drip_interval_minutes or 0), 1)
     batch = max(int(campaign.drip_batch_size or 1), 1)
-    if mode in ("interval", "batch"):
-        if interval and last_sent_at:
-            elapsed = (now_utc() - as_utc(last_sent_at)).total_seconds() / 60.0
-            if elapsed < interval:
-                return 0
-        return 1 if mode == "interval" else batch
-    if mode in ("daily", "smart"):
-        # Daily budget is enforced separately; smart pacing spreads the daily
-        # limit over the window so each tick releases a proportional slice.
-        return batch if mode == "smart" else 10_000
-    return 10_000
+    if mode == "interval":
+        batch = 1
+    elif mode == "smart":
+        batch = _smart_slice(campaign, batch)
+    else:
+        # Unknown mode: pace like "batch" rather than blast.
+        pass
+
+    window_start = now_utc() - timedelta(minutes=interval)
+    sent_recent = (
+        await db.execute(
+            select(func.count())
+            .select_from(AdsAssignment)
+            .where(
+                AdsAssignment.campaign_id == campaign.id,
+                AdsAssignment.sent_at.is_not(None),
+                AdsAssignment.sent_at >= window_start,
+            )
+        )
+    ).scalar() or 0
+    return max(batch - int(sent_recent), 0)
+
+
+def _smart_slice(campaign: AdsCampaign, batch: int) -> int:
+    """Shape a smart-mode batch by the campaign's pacing distribution.
+
+    ``even`` releases the plain batch every interval. ``front`` / ``back``
+    tilt the release toward the start / end of the daily sending window
+    (up to 2x early or late, 0.5x on the far side), and ``random`` jitters it
+    deterministically per half hour so a run never looks machine-perfect to a
+    carrier. The average stays at ``batch``, so the daily budget still holds.
+    """
+    pacing = (campaign.pacing or "even").lower()
+    if pacing == "even" or pacing not in ("front", "back", "random"):
+        return batch
+    if pacing == "random":
+        bucket = int(now_utc().timestamp() // 1800)
+        rng = random.Random(campaign.id * 104729 + bucket)
+        return max(1, int(round(batch * rng.uniform(0.5, 1.5))))
+    start, end = campaign.send_start_hour, campaign.send_end_hour
+    if start is None or end is None or start == end:
+        return batch
+    now_local = now_utc().astimezone(_campaign_tz(campaign))
+    span = ((end - start) % 24) or 24
+    pos = ((now_local.hour - start) % 24) / span  # 0 at open, 1 at close
+    pos = min(max(pos, 0.0), 1.0)
+    if pacing == "front":
+        factor = 2.0 - 1.5 * pos  # 2x early -> 0.5x late
+    else:  # back
+        factor = 0.5 + 1.5 * pos  # 0.5x early -> 2x late
+    return max(1, int(round(batch * factor)))
 
 
 async def campaign_state(db: AsyncSession, campaign: AdsCampaign) -> str:
@@ -1067,13 +1134,8 @@ async def dispatch_campaign(
             await db.flush()
             return result
 
-    # Drip pacing
-    last_sent = (
-        await db.execute(
-            select(func.max(AdsAssignment.sent_at)).where(AdsAssignment.campaign_id == campaign.id)
-        )
-    ).scalar()
-    room = min(room, drip_allowance(campaign, last_sent))
+    # Drip pacing — rolling-window count, see drip_allowance().
+    room = min(room, await drip_allowance(db, campaign))
     if room <= 0:
         result["state"] = "sending"
         return result
@@ -2270,7 +2332,12 @@ async def simulate(db: AsyncSession, campaign: AdsCampaign) -> dict:
         "drip": {
             "mode": campaign.drip_mode,
             "batch": campaign.drip_batch_size,
-            "interval_minutes": campaign.drip_interval_minutes,
+            # Paced modes always mean "per at least one minute" (see
+            # drip_allowance) — report the number that will actually be used,
+            # so the pre-launch summary matches what happens on the wire.
+            "interval_minutes": max(int(campaign.drip_interval_minutes or 0), 1)
+            if (campaign.drip_mode or "off").lower() in ("interval", "batch", "smart")
+            else campaign.drip_interval_minutes,
             "pacing": campaign.pacing,
         },
         "followup_steps": steps,

@@ -481,8 +481,28 @@ def configured_providers() -> dict:
 
 
 async def verify_address(address: str) -> ProviderAnswer:
-    """Run the first configured verifier. Returns an error answer when none is."""
+    """Run the first configured verifier. Returns an error answer when none is.
+
+    Order: Reacher (open source, free when self-hosted) first, then the paid
+    providers. When a Reacher instance is configured but unreachable, the
+    built-in twin of its pipeline answers instead of failing the row.
+    """
     providers = configured_providers()
+    if "reacher" in providers:
+        from app.services.email_validator import validate_email
+
+        verdict = await validate_email(address, deep=True)
+        confidence = {
+            VERDICT_DELIVERABLE: 95,
+            VERDICT_RISKY: 55,
+            VERDICT_UNDELIVERABLE: 90,
+        }.get(verdict.verdict)
+        return ProviderAnswer(
+            address=normalize_email(address),
+            verdict=verdict.verdict,
+            confidence=confidence,
+            provider=verdict.provider,
+        )
     if "zerobounce" in providers:
         return await zerobounce_verify(address, api_key=providers["zerobounce"])
     if "neverbounce" in providers:
