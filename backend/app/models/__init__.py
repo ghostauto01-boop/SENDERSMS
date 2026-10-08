@@ -16,6 +16,9 @@ from app.models.suppression import SuppressionEntry
 from app.models.webhook import WebhookEvent
 from app.models.audit import AuditLog
 from app.models.system import SystemSetting
+from app.models.system_error import SystemErrorRecord
+from app.models.import_job import ContactImportJob
+from app.models.quarantine import QuarantinedSMS
 from app.models.scheduled import ScheduledMessage
 from app.models.autoreply import AutoReplyRule
 from app.models.automation import Automation
@@ -73,6 +76,9 @@ __all__ = [
     "WebhookEvent",
     "AuditLog",
     "SystemSetting",
+    "SystemErrorRecord",
+    "ContactImportJob",
+    "QuarantinedSMS",
     "ScheduledMessage",
     "AutoReplyRule",
     "Automation",

@@ -250,8 +250,10 @@ async def _our_addresses(db: AsyncSession) -> set[str]:
     """Every address that belongs to the operator, so we never import ourselves."""
     addresses: set[str] = set()
     accounts = (await db.execute(select(EmailAccount))).scalars().all()
+    from app.services.email_service import account_reply_to_addresses
+
     for account in accounts:
-        for value in (account.from_email, account.reply_to):
+        for value in [account.from_email, *account_reply_to_addresses(account)]:
             if value:
                 addresses.add(value.strip().lower())
     mailboxes = (await db.execute(select(EmailMailbox.email_address))).scalars().all()
@@ -749,9 +751,11 @@ async def mailbox_for_outgoing(db: AsyncSession, message: Message,
         return None
     if account is None:
         return None
+    from app.services.email_service import account_reply_to_addresses
+
     candidates = {
         (account.from_email or "").strip().lower(),
-        (account.reply_to or "").strip().lower(),
+        *[value.strip().lower() for value in account_reply_to_addresses(account)],
         (message.from_address or "").strip().lower(),
     }
     candidates.discard("")
@@ -785,10 +789,15 @@ async def reply_routing_report(db: AsyncSession) -> dict:
     connected = [m for m in mailboxes if m.is_active]
 
     findings: list[dict] = []
+    from app.services.email_service import account_reply_to_addresses
+
     for account in accounts:
         if not account.is_active:
             continue
-        for label, value in (("From", account.from_email), ("Reply-To", account.reply_to)):
+        reply_addresses = account_reply_to_addresses(account)
+        for label, value in [("From", account.from_email)] + [
+            ("Reply-To", address) for address in reply_addresses
+        ]:
             if is_freemail(value):
                 findings.append({
                     "severity": "high",

@@ -287,6 +287,15 @@ BEGIN;
 -- Email-only contacts store NULL here. Safe and instant on PostgreSQL: it only
 -- drops a constraint, no row is read or rewritten.
 ALTER TABLE contacts ALTER COLUMN phone_number DROP NOT NULL;
+ALTER TABLE contacts ALTER COLUMN country DROP NOT NULL;
+ALTER TABLE contacts ALTER COLUMN country DROP DEFAULT;
+
+-- Multiple reply-to targets: the legacy reply_to column stays as the primary
+-- address sent to Brevo; this JSON column keeps every routing address.
+ALTER TABLE email_accounts ADD COLUMN IF NOT EXISTS reply_to_addresses TEXT;
+UPDATE email_accounts
+SET reply_to_addresses = json_build_array(reply_to)::text
+WHERE reply_to IS NOT NULL AND reply_to_addresses IS NULL;
 
 -- Where an address came from and whether it was ever confirmed. A pattern
 -- guess is stored with email_verified = FALSE and email_source = 'inferred',
@@ -319,5 +328,68 @@ UPDATE contacts
 CREATE INDEX IF NOT EXISTS ix_contacts_email_lower    ON contacts (email_lower);
 CREATE INDEX IF NOT EXISTS ix_contacts_email          ON contacts (email);
 CREATE INDEX IF NOT EXISTS ix_contacts_email_verified ON contacts (email_verified);
+
+COMMIT;
+
+-- ============================================================
+-- Import progress, private diagnostics, and privacy quarantine
+-- ============================================================
+BEGIN;
+
+CREATE TABLE IF NOT EXISTS contact_import_jobs (
+    id VARCHAR(36) PRIMARY KEY,
+    owner_id INTEGER,
+    file_name VARCHAR(255) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'queued',
+    total_rows INTEGER NOT NULL DEFAULT 0,
+    processed_rows INTEGER NOT NULL DEFAULT 0,
+    imported INTEGER NOT NULL DEFAULT 0,
+    merged INTEGER NOT NULL DEFAULT 0,
+    duplicates INTEGER NOT NULL DEFAULT 0,
+    invalid INTEGER NOT NULL DEFAULT 0,
+    errors_json TEXT NOT NULL DEFAULT '[]',
+    result_json TEXT,
+    content TEXT,
+    mapping_json TEXT NOT NULL DEFAULT '{}',
+    tags_json TEXT NOT NULL DEFAULT '[]',
+    auto_tag_rules_json TEXT NOT NULL DEFAULT '[]',
+    list_id INTEGER,
+    skip_duplicates INTEGER NOT NULL DEFAULT 1,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    started_at TIMESTAMP WITH TIME ZONE,
+    completed_at TIMESTAMP WITH TIME ZONE,
+    error TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_contact_import_jobs_owner_id ON contact_import_jobs (owner_id);
+CREATE INDEX IF NOT EXISTS ix_contact_import_jobs_status ON contact_import_jobs (status);
+CREATE INDEX IF NOT EXISTS ix_contact_import_jobs_created_at ON contact_import_jobs (created_at);
+
+CREATE TABLE IF NOT EXISTS system_error_records (
+    id SERIAL PRIMARY KEY,
+    request_id VARCHAR(64) NOT NULL UNIQUE,
+    code VARCHAR(80) NOT NULL,
+    exception_type VARCHAR(255) NOT NULL,
+    message TEXT NOT NULL,
+    traceback TEXT NOT NULL,
+    method VARCHAR(12) NOT NULL,
+    path VARCHAR(1000) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS ix_system_error_records_request_id ON system_error_records (request_id);
+CREATE INDEX IF NOT EXISTS ix_system_error_records_code ON system_error_records (code);
+CREATE INDEX IF NOT EXISTS ix_system_error_records_created_at ON system_error_records (created_at);
+
+CREATE TABLE IF NOT EXISTS quarantined_sms (
+    id SERIAL PRIMARY KEY,
+    sender VARCHAR(40) NOT NULL,
+    body TEXT NOT NULL,
+    reason VARCHAR(60) NOT NULL,
+    provider_message_id VARCHAR(255),
+    device_id VARCHAR(120),
+    received_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS ix_quarantined_sms_sender ON quarantined_sms (sender);
+CREATE INDEX IF NOT EXISTS ix_quarantined_sms_reason ON quarantined_sms (reason);
+CREATE INDEX IF NOT EXISTS ix_quarantined_sms_received_at ON quarantined_sms (received_at);
 
 COMMIT;

@@ -53,6 +53,7 @@ export default function ImportContactsModal({ onClose, onDone, defaultListId = "
   const [selectedListId, setSelectedListId] = useState(defaultListId);
   const [tags, setTags] = useState<string[]>([]);
   const [result, setResult] = useState<ImportResult | null>(null);
+  const [importProgress, setImportProgress] = useState<{ processed: number; total: number; percent: number } | null>(null);
 
   // Silence unused warnings for the shared-field constant shape.
   void FIELD_OPTIONS;
@@ -76,6 +77,7 @@ export default function ImportContactsModal({ onClose, onDone, defaultListId = "
   const doImport = async () => {
     if (!file) return;
     setStep("importing");
+    setImportProgress(null);
     const fd = new FormData();
     fd.append("file", file);
     // Send the complete visible mapping. This preserves explicit Ignore
@@ -84,20 +86,44 @@ export default function ImportContactsModal({ onClose, onDone, defaultListId = "
     if (selectedListId) fd.append("list_id", selectedListId);
     if (tags.length > 0) fd.append("tags", tags.join(", "));
     try {
-      const { data } = await api.post("/contacts/import/csv", fd, {
+      const { data: created } = await api.post("/contacts/import/jobs", fd, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-      setResult(data as ImportResult);
+      let job = created;
+      setImportProgress({
+        processed: Number(job.processed_rows || 0),
+        total: Number(job.total_rows || 0),
+        percent: Number(job.progress_percent || 0),
+      });
+      while (job.status === "queued" || job.status === "running" || job.status === "retrying") {
+        await new Promise((resolve) => window.setTimeout(resolve, 500));
+        const response = await api.get(`/contacts/import/jobs/${encodeURIComponent(job.id)}`);
+        job = response.data;
+        setImportProgress({
+          processed: Number(job.processed_rows || 0),
+          total: Number(job.total_rows || 0),
+          percent: Number(job.progress_percent || 0),
+        });
+      }
+      if (job.status !== "completed") throw new Error(job.error || "Import failed");
+      const summary = job.result || {};
+      const outcome = {
+        ...summary,
+        imported_ids: [],
+        new_variables: Number(summary.new_variables || 0),
+        list: job.list || null,
+      } as ImportResult;
+      setResult(outcome);
       setStep("done");
       // Fresh imports register new shortcodes — drop the cached registry so
       // every composer picks them up without a reload.
       clearShortcodeCache();
       notifyDataChange("variables-changed");
-      if ((data.imported ?? 0) > 0) toast.success(`${data.imported} contacts imported`);
-      if ((data.new_variables ?? 0) > 0)
-        toast.success(`${data.new_variables} new shortcode${data.new_variables > 1 ? "s" : ""} discovered`, { icon: "🧩" });
+      if ((outcome.imported ?? 0) > 0) toast.success(`${outcome.imported} contacts imported`);
+      if ((outcome.new_variables ?? 0) > 0)
+        toast.success(`${outcome.new_variables} new shortcode${outcome.new_variables > 1 ? "s" : ""} discovered`, { icon: "🧩" });
     } catch (err: any) {
-      toast.error(err.response?.data?.detail || "Import failed");
+      toast.error(err.response?.data?.detail || err.message || "Import failed");
       setStep("map");
     }
   };
@@ -279,6 +305,16 @@ export default function ImportContactsModal({ onClose, onDone, defaultListId = "
             <div className="text-center py-8">
               <div className="w-10 h-10 border-4 border-primary-600 border-t-transparent rounded-full animate-spin mx-auto" />
               <p className="text-sm mt-4 text-gray-500">Importing…</p>
+              {importProgress && importProgress.total > 0 && (
+                <div className="mt-4 space-y-1">
+                  <div className="h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
+                    <div className="h-full bg-primary-600 transition-all" style={{ width: `${Math.min(100, importProgress.percent)}%` }} />
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    {importProgress.processed.toLocaleString()} of {importProgress.total.toLocaleString()} rows · {Math.round(importProgress.percent)}%
+                  </p>
+                </div>
+              )}
             </div>
           )}
 

@@ -101,6 +101,12 @@ class SMSService:
         return d.astimezone(timezone.utc)
 
     async def process_inbound_message(self,from_number,body,webhook_data=None):
+        from app.services.inbound_safety import sensitive_inbound_reason
+
+        sensitive_reason = sensitive_inbound_reason(body)
+        if sensitive_reason:
+            logger.info("INBOUND: sensitive content suppressed (%s)", sensitive_reason)
+            return None
         # Inbound senders are not always Nigerian mobiles: short codes, sender IDs
         # and international numbers must land in the inbox too, not be discarded.
         n=normalize_inbound_sender(from_number)

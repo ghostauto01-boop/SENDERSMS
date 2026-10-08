@@ -60,7 +60,10 @@ class EmailAccount(Base):
 
     from_name: Mapped[str] = mapped_column(String(150), nullable=False)
     from_email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    # `reply_to` remains the legacy/ESP-primary address for compatibility.
+    # Every configured reply target is stored in this JSON array as well.
     reply_to: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    reply_to_addresses: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     #: Fernet-encrypted Brevo API key (never returned to the client).
     api_key_encrypted: Mapped[str | None] = mapped_column(String(1000), nullable=True)

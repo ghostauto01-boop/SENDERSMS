@@ -92,6 +92,34 @@ def normalize_email(raw: str | None) -> str | None:
     return _shared_normalize_email(raw)
 
 
+def normalize_reply_to_addresses(raw) -> list[str]:
+    """Normalize reply routing targets, preserving the first for Brevo."""
+    if raw is None or raw == "":
+        return []
+    values = raw if isinstance(raw, list) else str(raw).split(",")
+    addresses: list[str] = []
+    for item in values:
+        value = normalize_email(item if isinstance(item, str) else None)
+        if value and value not in addresses:
+            addresses.append(value)
+    return addresses[:10]
+
+
+def account_reply_to_addresses(account: EmailAccount) -> list[str]:
+    """Read the list column, falling back to legacy one-address rows."""
+    raw = getattr(account, "reply_to_addresses", None)
+    if raw:
+        try:
+            values = json.loads(raw)
+            if isinstance(values, list):
+                parsed = normalize_reply_to_addresses(values)
+                if parsed:
+                    return parsed
+        except (TypeError, ValueError):
+            pass
+    return normalize_reply_to_addresses(account.reply_to)
+
+
 async def find_contact_by_email(db: AsyncSession, address: str | None) -> Contact | None:
     """Find a CRM contact by its primary or a verified reply address."""
     value = normalize_email(address)
@@ -388,7 +416,8 @@ def serialize_account(account: EmailAccount, *, stats: dict | None = None) -> di
         "provider": account.provider,
         "from_name": account.from_name,
         "from_email": account.from_email,
-        "reply_to": account.reply_to,
+        "reply_to": account_reply_to_addresses(account)[0] if account_reply_to_addresses(account) else None,
+        "reply_to_addresses": account_reply_to_addresses(account),
         "is_active": bool(account.is_active),
         "is_default": bool(account.is_default),
         "has_api_key": bool(account.api_key_encrypted),
@@ -451,7 +480,7 @@ async def create_account(
     from_name: str,
     from_email: str,
     api_key: str,
-    reply_to: str | None = None,
+    reply_to: str | list[str] | None = None,
     daily_limit: int | None = None,
     is_active: bool = True,
     is_default: bool = False,
@@ -459,12 +488,14 @@ async def create_account(
     track_clicks: bool = True,
 ) -> EmailAccount:
     address = normalize_email(from_email)
+    reply_to_addresses = normalize_reply_to_addresses(reply_to)
     account = EmailAccount(
         name=(name or from_email or "Brevo account").strip()[:150],
         provider="brevo",
         from_name=(from_name or name or "").strip()[:150],
         from_email=address or (from_email or "").strip()[:255],
-        reply_to=normalize_email(reply_to) or None,
+        reply_to=reply_to_addresses[0] if reply_to_addresses else None,
+        reply_to_addresses=json.dumps(reply_to_addresses),
         api_key_encrypted=encrypt_value((api_key or "").strip()),
         is_active=is_active,
         is_default=is_default,

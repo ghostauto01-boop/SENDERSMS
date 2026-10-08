@@ -30,7 +30,9 @@ class Contact(Base):
     email: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     city: Mapped[str | None] = mapped_column(String(150), nullable=True)
     state: Mapped[str | None] = mapped_column(String(150), nullable=True)
-    country: Mapped[str] = mapped_column(String(100), default="Nigeria", nullable=False)
+    # Country is optional. A missing value means unknown; never infer a home
+    # country from the operator's locale or phone gateway.
+    country: Mapped[str | None] = mapped_column(String(100), nullable=True)
     website: Mapped[str | None] = mapped_column(String(500), nullable=True)
     industry: Mapped[str | None] = mapped_column(String(255), nullable=True)
     source: Mapped[str | None] = mapped_column(String(255), nullable=True)

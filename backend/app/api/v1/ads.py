@@ -7,10 +7,11 @@ from __future__ import annotations
 
 import csv
 import io
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import RedirectResponse, StreamingResponse
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -64,6 +65,7 @@ from app.services import ads_service as svc
 from app.services.ads_service import removable_audience_filter
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 CHANNELS = ("sms", "email")
@@ -94,10 +96,11 @@ async def _require_email_sender(db: AsyncSession, campaign: AdsCampaign) -> None
         raise HTTPException(400, f"Email sender '{account.name}' cannot send ({why}).")
 
 
-async def _get_campaign(db: AsyncSession, campaign_id: int) -> AdsCampaign:
-    row = (
-        await db.execute(select(AdsCampaign).where(AdsCampaign.id == campaign_id))
-    ).scalar_one_or_none()
+async def _get_campaign(db: AsyncSession, campaign_id: int, *, for_update: bool = False) -> AdsCampaign:
+    query = select(AdsCampaign).where(AdsCampaign.id == campaign_id)
+    if for_update:
+        query = query.with_for_update()
+    row = (await db.execute(query)).scalar_one_or_none()
     if row is None:
         raise HTTPException(404, "Campaign not found")
     return row
@@ -429,9 +432,38 @@ async def delete_campaign(
 
 @router.post("/campaigns/{campaign_id}/validate")
 async def validate(
-    campaign_id: int, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)
+    campaign_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
-    return await svc.validate_campaign(db, await _get_campaign(db, campaign_id))
+    """Informational launch summary; sender and domain checks never block."""
+    campaign = await _get_campaign(db, campaign_id)
+    try:
+        return await svc.validate_campaign(db, campaign)
+    except Exception as exc:  # noqa: BLE001 — preflight itself must not 500
+        request_id = getattr(request.state, "request_id", "unknown")
+        logger.error(
+            "Campaign preflight summary failed request_id=%s campaign_id=%s",
+            request_id, campaign_id,
+            exc_info=(type(exc), exc, exc.__traceback__),
+        )
+        return {
+            "ok": True,
+            "errors": [],
+            "warnings": ["The audience estimate is temporarily unavailable; launch will recalculate it."],
+            "summary": {
+                "audience_size": None,
+                "creatives_per_set": [],
+                "followup_configured": False,
+                "send_window": {
+                    "start_hour": campaign.send_start_hour if campaign.send_start_hour is not None else 9,
+                    "end_hour": campaign.send_end_hour if campaign.send_end_hour is not None else 18,
+                    "timezone": campaign.timezone_name or "recipient-local",
+                },
+                "daily_limit": campaign.daily_limit,
+            },
+        }
 
 
 @router.post("/campaigns/{campaign_id}/simulate")
@@ -443,13 +475,27 @@ async def simulate(
 
 @router.post("/campaigns/{campaign_id}/launch")
 async def launch(
-    campaign_id: int, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)
+    campaign_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
-    campaign = await _get_campaign(db, campaign_id)
-    result = await svc.launch(db, campaign, actor=user.username)
-    if not result["ok"]:
-        raise HTTPException(400, "; ".join(result["errors"]))
-    return result
+    """Atomically assign the audience and activate the campaign, exactly once."""
+    campaign = await _get_campaign(db, campaign_id, for_update=True)
+    try:
+        result = await svc.launch(db, campaign, actor=user.username)
+        if not result["ok"]:
+            await db.rollback()
+            raise HTTPException(400, "; ".join(result.get("errors", [])))
+        # Assignment rows, status, events and activity log commit together. Any
+        # exception above or during commit is rolled back by the except block.
+        await db.commit()
+        return result
+    except HTTPException:
+        await db.rollback()
+        raise
+    except Exception:
+        await db.rollback()
+        raise
 
 
 @router.post("/campaigns/{campaign_id}/pause")

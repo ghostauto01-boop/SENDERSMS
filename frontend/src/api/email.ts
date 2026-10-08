@@ -15,6 +15,7 @@ export type EmailAccount = {
   from_name: string;
   from_email: string;
   reply_to?: string | null;
+  reply_to_addresses?: string[];
   is_active: boolean;
   is_default: boolean;
   has_api_key: boolean;
@@ -41,7 +42,7 @@ export type EmailAccountInput = {
   from_name: string;
   from_email: string;
   api_key?: string;
-  reply_to?: string | null;
+  reply_to?: string | string[] | null;
   daily_limit?: number | null;
   is_active?: boolean;
   is_default?: boolean;

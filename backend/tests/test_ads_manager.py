@@ -564,24 +564,26 @@ async def test_simulation_changes_nothing(db):
 
 
 @pytest.mark.asyncio
-async def test_validation_blocks_bad_campaigns(db):
+async def test_validation_reports_bad_campaigns_without_blocking(db):
     campaign = await make_campaign(db, status="draft", name="")
     report = await svc.validate_campaign(db, campaign)
-    assert not report["ok"]
-    assert any("name" in e.lower() for e in report["errors"])
-    assert any("sms set" in e.lower() for e in report["errors"])
+    assert report["ok"]
+    assert report["errors"] == []
+    assert any("name" in warning.lower() for warning in report["warnings"])
+    assert any("active audience set" in warning.lower() for warning in report["warnings"])
 
 
 @pytest.mark.asyncio
-async def test_percentage_split_must_total_100(db):
+async def test_percentage_split_is_an_informational_warning(db):
     contacts = await make_contacts(db, 5)
     lst = await make_list(db, contacts)
     campaign = await make_campaign(db, status="draft")
     ads_set = await make_set(db, campaign, lst, split_mode="percentage")
     await make_creatives(db, ads_set, ["A", "B"], [70, 20])
     report = await svc.validate_campaign(db, campaign)
-    assert not report["ok"]
-    assert any("100%" in e for e in report["errors"])
+    assert report["ok"]
+    assert report["errors"] == []
+    assert any("100%" in warning for warning in report["warnings"])
 
 
 @pytest.mark.asyncio

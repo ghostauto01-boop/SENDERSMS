@@ -180,6 +180,12 @@ async def update_account(
 
     updates = data.model_dump(exclude_unset=True)
     api_key = updates.pop("api_key", None)
+    if "reply_to" in updates:
+        from app.services.email_service import normalize_reply_to_addresses
+
+        addresses = normalize_reply_to_addresses(updates.pop("reply_to"))
+        account.reply_to = addresses[0] if addresses else None
+        account.reply_to_addresses = json.dumps(addresses)
     if api_key is not None and api_key.strip():
         from app.security.encryption import encrypt_value
 
