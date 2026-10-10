@@ -1010,6 +1010,14 @@ async def lifespan(app: FastAPI):
             await asyncio.wait_for(_startup_webhook(), timeout=20)
         except Exception as e:
             logger.warning("webhook: %s", e)
+        try:
+            from app.services import verification_jobs
+
+            resumed = await asyncio.wait_for(verification_jobs.resume_pending(), timeout=20)
+            if resumed:
+                logger.info("Resumed %s unfinished email verification job(s)", resumed)
+        except Exception as e:
+            logger.warning("verification jobs: %s", e)
 
     boot = asyncio.create_task(_boot())
 

@@ -10,6 +10,7 @@ testpaths = ["backend/tests"]
 pythonpath = ["backend"]
 asyncio_default_fixture_loop_scope = "function"
 markers = [
+    "real_verification_gate: run with the production email-verification gate (unverified addresses are not sent to) instead of the open gate tests normally get",
     "real_sending_defaults: run with the production sending-rule defaults (window, weekends, caps) instead of the open-door rules tests normally get",
 ]
 

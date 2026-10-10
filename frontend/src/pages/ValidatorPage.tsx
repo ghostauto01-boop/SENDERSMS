@@ -167,7 +167,7 @@ export default function ValidatorPage() {
 
   const execute = async (run: Run) => {
     try {
-      const size = Math.max(1, Math.min(status?.batch_size || 5, 5));
+      const size = Math.max(1, status?.batch_size || 5);
       while (run.next < run.total && !stop.current) {
         const result = await validatorApi.batch({
           ...(run.ids ? { contact_ids: run.ids.slice(run.next, run.next + size) } : { items: run.entries!.slice(run.next, run.next + size) }),
@@ -273,8 +273,9 @@ export default function ValidatorPage() {
         <button className="btn-secondary btn-sm" onClick={testEngine} disabled={testing || running}>{testing ? <Loader2 size={15} className="animate-spin" /> : <FlaskConical size={15} />}Run engine self-test</button>
       </div>
       <p className="text-sm text-gray-600 dark:text-gray-400">Email checks use syntax, mail-domain DNS, and optional mailbox probing. Deep checks may use a configured Reacher service. No emails or SMS are sent. Valid phone format does not prove an active SIM.</p>
-      {status && <p className="text-xs text-gray-500 dark:text-gray-400">DNS library: {status.dns_available ? "available" : "unavailable — domain checks will be Unknown"} · Built-in SMTP: {status.smtp_enabled ? "enabled (network access not guaranteed)" : "disabled"}{status.reacher_configured ? ` · Reacher key: ${status.reacher_key_configured ? "configured" : "not set (only needed if your service requires it)"}` : " · Reacher: optional, not configured"}</p>}
+      {status && <p className="text-xs text-gray-500 dark:text-gray-400">DNS library: {status.dns_available ? "available" : "unavailable — domain checks will be Unknown"} · Mailbox checks: {status.smtp_enabled ? "available" : "unavailable"}{status.reacher_configured ? ` · Reacher key: ${status.reacher_key_configured ? "configured" : "not set (only needed if your service requires it)"}` : " · Reacher: optional, not configured"}</p>}
       {statusError && <p role="alert" className="text-sm text-danger-600">{statusError} <button className="underline" onClick={loadStatus}>Retry status</button></p>}
+      {status && status.smtp_enabled === false && <div role="alert" className="rounded-xl border border-warning-300 bg-warning-50 dark:bg-warning-900/20 p-3 text-sm"><p className="font-semibold">Mailboxes cannot be confirmed from this server</p><p className="text-xs mt-1">{status.smtp_reason || "SMTP checks are unavailable."}</p></div>}
       {selfTest && <div role="status" className="rounded-xl bg-gray-50 dark:bg-gray-900 p-3 text-sm space-y-2"><p className="font-semibold">{selfTest.passed ? "Local engine self-test passed" : "Engine self-test failed"} · {new Date(selfTest.checked_at).toLocaleTimeString()}</p><ul className="grid sm:grid-cols-2 gap-1">{selfTest.checks.map(test => <li key={test.name} className="flex items-center gap-2">{test.passed ? <CheckCircle2 size={14} className="text-success-600" /> : <AlertCircle size={14} className="text-danger-600" />}{test.name}</li>)}</ul><p className="text-xs text-gray-500 dark:text-gray-400">{selfTest.notice}</p></div>}
     </section>
 

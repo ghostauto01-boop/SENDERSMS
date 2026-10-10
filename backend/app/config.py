@@ -188,6 +188,13 @@ class Settings(BaseSettings):
     # charged against the sender reputation of every address the app sends to.
     # An operator who has reviewed the guesses can opt in for a campaign.
     EMAIL_SEND_INFERRED: bool = False
+    # Outreach (campaigns, the Ads Manager, follow-ups, bulk mail) is sent only to
+    # addresses a verifier has said are deliverable (or risky, which goes last). An
+    # address nobody verified -- or one the verifier could not decide -- is "unknown",
+    # and unknown is not a yes: one bounce is charged to the sender's reputation for
+    # every address it mails afterwards. Turn this off only for a closed test
+    # environment; it is the P0-5 safety gate. One-to-one replies are never gated.
+    EMAIL_REQUIRE_VERIFIED: bool = True
     # Daily sends allowed PER MAILBOX when an account has no daily limit of its own.
     # A new sending mailbox has no reputation; the usual guidance is 20-50 a day
     # per mailbox, rising slowly. This is the deployment default for the

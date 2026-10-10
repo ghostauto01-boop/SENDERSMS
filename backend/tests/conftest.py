@@ -106,6 +106,25 @@ def _open_sending_rules(request, monkeypatch):
     monkeypatch.setattr(settings, "EMAIL_DEFAULT_DAILY_LIMIT", 0, raising=False)
 
 
+# --------------------------------------------------------------------------
+# The email-verification gate (P0-5)
+# --------------------------------------------------------------------------
+#
+# In production an address nobody has verified is not sent to by any outreach path.
+# Most tests are about something else (templates, pacing, replies...) and build their
+# contacts without a verification history, so they run with the gate open; the tests
+# that ARE about it opt back in with ``@pytest.mark.real_verification_gate``.
+
+
+@pytest.fixture(autouse=True)
+def _open_verification_gate(request, monkeypatch):
+    if request.node.get_closest_marker("real_verification_gate"):
+        return
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "EMAIL_REQUIRE_VERIFIED", False, raising=False)
+
+
 @pytest.fixture
 def sending_clock(monkeypatch):
     """Pin the instant the sending gate believes it is. Returns a setter.

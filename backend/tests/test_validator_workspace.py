@@ -12,6 +12,7 @@ from app.models.email import EmailSuppression
 from app.models.user import User
 from app.security.auth import get_current_user
 from app.services import email_validator as ev
+from app.api.v1.validator import BATCH_SIZE
 
 
 @pytest_asyncio.fixture
@@ -193,7 +194,7 @@ async def test_edited_address_does_not_get_old_verdict(client, db, monkeypatch):
 @pytest.mark.asyncio
 @pytest.mark.parametrize("payload", [
     {}, {"items": [{}], "save": True}, {"items": [{}], "contact_ids": [1]},
-    {"contact_ids": [1, 1]}, {"items": [{}] * 6}, {"contact_ids": [-1]},
+    {"contact_ids": [1, 1]}, {"items": [{}] * (BATCH_SIZE + 1)}, {"contact_ids": [-1]},
     {"items": [{"email": "a" * 1001}]}, {"items": [{}], "check": "everything"},
 ])
 async def test_invalid_or_ambiguous_requests_are_rejected(client, payload):

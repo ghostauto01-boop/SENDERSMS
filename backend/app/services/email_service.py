@@ -599,11 +599,44 @@ async def unsuppress_email(db: AsyncSession, entry: EmailSuppression) -> None:
     await db.flush()
 
 
-async def contact_email_problem(
-    db: AsyncSession, contact: Contact, address: str | None = None
-) -> str | None:
-    """Every reason this contact/recipient must not be emailed, or ``None``."""
-    recipient = normalize_email(address) if address is not None else normalize_email(contact.email)
+# What a verifier can conclude about an address (also stored as ``email_verdict``).
+STATE_DELIVERABLE = "deliverable"
+STATE_RISKY = "risky"
+STATE_UNDELIVERABLE = "undeliverable"
+STATE_UNKNOWN = "unknown"
+
+
+def verification_state(contact: Contact) -> str:
+    """deliverable | risky | undeliverable | unknown -- what we KNOW about this address.
+
+    ``unknown`` covers both "nobody ever checked it" and "the verifier could not decide"
+    (blocked SMTP, a timeout). Neither is a yes.
+    """
+    if (
+        contact.is_email_undeliverable
+        or contact.email_status in ("bounced", "invalid")
+        or (contact.email_verdict or "").lower() == STATE_UNDELIVERABLE
+    ):
+        return STATE_UNDELIVERABLE
+    if contact.email_verified:
+        return STATE_DELIVERABLE
+    if (contact.email_verdict or "").lower() == STATE_RISKY:
+        return STATE_RISKY
+    return STATE_UNKNOWN
+
+
+def send_order(contacts: Iterable[Contact]) -> list[Contact]:
+    """Deliverable addresses first, risky ones (a catch-all, a role/disposable mailbox) last.
+
+    The daily cap is then spent on the addresses most likely to land, and a bounce from a
+    risky one comes after the sender has already delivered what it could. Stable: the
+    caller's order is kept within each group.
+    """
+    return sorted(contacts, key=lambda c: 0 if verification_state(c) == STATE_DELIVERABLE else 1)
+
+
+def _static_problem(contact: Contact, recipient: str | None) -> str | None:
+    """Every reason decided from the contact row alone (no database access)."""
     problem = email_problem(recipient)
     if problem:
         return problem
@@ -625,8 +658,47 @@ async def contact_email_problem(
         and not settings.EMAIL_SEND_INFERRED
     ):
         return "inferred_unverified"
+    return None
+
+
+def _verification_problem(contact: Contact, recipient: str | None) -> str | None:
+    """``unverified`` when outreach must not go to this address because nothing proves it.
+
+    The last check on purpose: "unverified" is what is left once nothing else rules the
+    contact out, so it counts exactly the contacts that verifying could unlock. Only the
+    contact's own primary address is gated -- a reply alias is an address the person
+    wrote to us from.
+    """
+    if not settings.EMAIL_REQUIRE_VERIFIED:
+        return None
+    if recipient != normalize_email(contact.email):
+        return None
+    if verification_state(contact) == STATE_UNKNOWN:
+        return "unverified"
+    return None
+
+
+async def contact_email_problem(
+    db: AsyncSession,
+    contact: Contact,
+    address: str | None = None,
+    *,
+    outreach: bool = False,
+) -> str | None:
+    """Every reason this contact/recipient must not be emailed, or ``None``.
+
+    ``outreach`` is True for bulk and campaign mail (classic campaigns, the Ads Manager,
+    follow-ups, ``bulk`` sends): those are additionally refused an address nobody has
+    verified (``unverified``). A one-to-one message to someone is not outreach.
+    """
+    recipient = normalize_email(address) if address is not None else normalize_email(contact.email)
+    problem = _static_problem(contact, recipient)
+    if problem:
+        return problem
     if await get_suppression(db, recipient):
         return "suppressed"
+    if outreach:
+        return _verification_problem(contact, recipient)
     return None
 
 
@@ -644,9 +716,15 @@ async def _suppressed_addresses(db: AsyncSession, addresses: Iterable[str]) -> s
 
 
 async def screen_contacts_for_email(
-    db: AsyncSession, contacts: list[Contact]
+    db: AsyncSession, contacts: list[Contact], *, outreach: bool = True
 ) -> tuple[list[Contact], dict[str, int]]:
-    """Email eligibility filter used by audience screening and previews."""
+    """Email eligibility filter used by audience screening, validation and previews.
+
+    It applies exactly the rules :func:`contact_email_problem` applies at send time (they
+    share :func:`_static_problem` and :func:`_verification_problem`), so a validation
+    report promises numbers the send path will keep. It also removes duplicate addresses,
+    which the per-contact send check cannot see.
+    """
     counts: dict[str, int] = {}
 
     def bump(reason: str) -> None:
@@ -657,15 +735,9 @@ async def screen_contacts_for_email(
     seen: set[str] = set()
     for contact in contacts:
         address = normalize_email(contact.email)
-        problem = email_problem(contact.email)
+        problem = _static_problem(contact, address)
         if problem:
             bump("missing_email" if problem == "no_email" else problem)
-            continue
-        if contact.is_email_opted_out or contact.email_status in ("unsubscribed", "complained"):
-            bump("email_opted_out")
-            continue
-        if contact.is_email_undeliverable or contact.email_status == "bounced":
-            bump("email_bounced")
             continue
         if address in suppressed:
             bump("suppressed")
@@ -673,6 +745,11 @@ async def screen_contacts_for_email(
         if address in seen:
             bump("duplicate")
             continue
+        if outreach:
+            problem = _verification_problem(contact, address)
+            if problem:
+                bump(problem)
+                continue
         seen.add(address)
         eligible.append(contact)
     return eligible, counts
@@ -1114,7 +1191,9 @@ async def queue_email(
     "skipped", exactly like an opted-out SMS contact.
     """
     address = normalize_email(recipient_address) if recipient_address else normalize_email(contact.email)
-    problem = await contact_email_problem(db, contact, address)
+    # Campaign and bulk mail is outreach; a one-to-one message or a reply is not.
+    outreach = bool(bulk or campaign_id is not None or ads_campaign_id is not None or followup)
+    problem = await contact_email_problem(db, contact, address, outreach=outreach)
     if problem:
         logger.info("EMAIL: skipping contact %s (%s)", contact.id, problem)
         return None

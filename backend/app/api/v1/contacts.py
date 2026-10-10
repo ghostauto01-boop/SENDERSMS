@@ -701,6 +701,8 @@ async def update_contact(
                 update_data["email_source"] = "manual"
                 update_data["email_verified"] = False
                 update_data["email_verified_at"] = None
+                # What was learned about the OLD address says nothing about the new one.
+                update_data["email_verdict"] = None
                 update_data["email_confidence"] = None
 
     resulting_phone = update_data.get("phone_number", contact.phone_number)

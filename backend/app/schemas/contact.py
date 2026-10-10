@@ -125,6 +125,8 @@ class ContactOut(BaseModel):
     email_source: Optional[str] = None
     email_verified: bool = False
     email_verified_at: Optional[datetime] = None
+    email_verdict: Optional[str] = None
+    email_confidence: Optional[int] = None
     email_confidence: Optional[int] = None
     email_enriched_at: Optional[datetime] = None
     email_enrichment_note: Optional[str] = None

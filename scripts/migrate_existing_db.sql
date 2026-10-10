@@ -304,6 +304,13 @@ ALTER TABLE contacts ADD COLUMN IF NOT EXISTS email_source VARCHAR(30);
 ALTER TABLE contacts ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE contacts ADD COLUMN IF NOT EXISTS email_verified_at TIMESTAMP WITH TIME ZONE;
 ALTER TABLE contacts ADD COLUMN IF NOT EXISTS email_confidence INTEGER;
+
+-- P0-5: what the last verification concluded (deliverable | risky | undeliverable |
+-- unknown; NULL = never checked). Campaigns only send to deliverable (and, last, risky)
+-- addresses. email_verdict is added at startup by schema_repair; this is for hand-run
+-- migrations. The queued-verification table is created at startup by create_all.
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS email_verdict VARCHAR(20);
+CREATE INDEX IF NOT EXISTS ix_contacts_email_verdict ON contacts (email_verdict);
 ALTER TABLE contacts ADD COLUMN IF NOT EXISTS email_enriched_at TIMESTAMP WITH TIME ZONE;
 ALTER TABLE contacts ADD COLUMN IF NOT EXISTS email_enrichment_note VARCHAR(255);
 

@@ -268,6 +268,54 @@ TOOLS: list[Tool] = [
         ],
     ),
     Tool(
+        name="validator_status",
+        description=(
+            "Can this server actually CONFIRM a mailbox? Reports the engine (builtin | reacher), "
+            "`smtp_enabled` and -- when it is false -- `smtp_reason` (for example outbound port 25 "
+            "is blocked) and what to do about it. When mailboxes cannot be confirmed every address "
+            "stays 'unknown', and unknown addresses are not sent to by campaigns."
+        ),
+        method="GET", path="/api/v1/validator/status", group="contacts",
+    ),
+    Tool(
+        name="verify_contacts",
+        description=(
+            "Queue verification of contacts (a list, a filtered set, or explicit ids) as a "
+            "background job and return its id: follow it with `verification_job`. Every verdict is "
+            "written onto the contact (email_verified, email_verified_at, email_confidence, "
+            "email_verdict). Campaigns only send to deliverable (and, last, risky) addresses, so "
+            "this is what unlocks a list for sending. Contacts with no address, and ones already "
+            "proven deliverable, are left out of the total."
+        ),
+        method="POST", path="/api/v1/validator/jobs", group="contacts", scope="write",
+        body_always=True,
+        params=[
+            Param("scope", enum=["all", "list", "ids"], default="all", where="body"),
+            Param("list_id", type="integer", where="body", description="Required when scope=list."),
+            Param("contact_ids", type="array", items="integer", where="body",
+                  description="Required when scope=ids (max 1000)."),
+            Param("search", where="body"),
+            Param("lead_status", where="body"),
+            Param("channel", enum=["sms", "email"], where="body"),
+            Param("email_state", where="body"),
+            Param("deep", type="boolean", default=True, where="body",
+                  description="Ask the mailbox (SMTP) as well as DNS. Falls back to DNS-only, and "
+                              "says why, when this server cannot reach port 25."),
+            Param("recheck", type="boolean", default=False, where="body",
+                  description="Re-check contacts already proven deliverable."),
+        ],
+    ),
+    Tool(
+        name="verification_job",
+        description=(
+            "Progress of a verification job: status (queued | running | done | failed | cancelled), "
+            "total, processed, valid / invalid / risky / unknown counts, and `smtp_enabled` / "
+            "`smtp_reason` when the run could not confirm mailboxes."
+        ),
+        method="GET", path="/api/v1/validator/jobs/{job_id}", group="contacts",
+        params=[Param("job_id", required=True, where="path")],
+    ),
+    Tool(
         name="export_contacts_csv",
         description=(
             "Export contacts as CSV, ONE PAGE AT A TIME. Every page reports 'returned', 'total', "

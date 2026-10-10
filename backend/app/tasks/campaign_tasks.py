@@ -369,7 +369,7 @@ async def _process_campaign_contact(db: AsyncSession, campaign: Campaign, cc: Ca
         # usable phone number, and an SMS STOP is a different consent.
         from app.services import email_service
 
-        problem = await email_service.contact_email_problem(db, contact)
+        problem = await email_service.contact_email_problem(db, contact, outreach=True)
         if problem:
             cc.status = "opted_out" if problem in ("email_opted_out", "suppressed", "email_bounced") else "failed"
             cc.last_error = f"Not emailable: {problem}"

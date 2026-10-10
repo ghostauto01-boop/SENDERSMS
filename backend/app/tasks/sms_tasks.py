@@ -186,7 +186,10 @@ async def _send_one_email(db, m, contact, *, final_on_failure=False):
     """
     from app.services import email_service
 
-    problem = await email_service.contact_email_problem(db, contact)
+    # A campaign message (classic or Ads Manager) is outreach: it is refused an address
+    # nobody has verified even if it was queued before the address was edited.
+    outreach = bool(m.campaign_id or m.ads_campaign_id or getattr(m, "bulk_send", False))
+    problem = await email_service.contact_email_problem(db, contact, outreach=outreach)
     if problem:
         m.status = "failed"
         m.last_error = f"Filtered before send: {problem}"

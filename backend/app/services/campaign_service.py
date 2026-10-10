@@ -357,14 +357,33 @@ class CampaignService:
                 else:
                     eligible.append(contact)
 
-        check.audience.update(
-            list_members=len(contacts), sendable=len(eligible), skipped=skipped
+        unverified = skipped.get("unverified", 0) if channel == "email" else 0
+        risky = (
+            sum(1 for c in eligible if email_service.verification_state(c) == "risky")
+            if channel == "email" else 0
         )
-        skipped_total = sum(skipped.values())
+        check.audience.update(
+            list_members=len(contacts), sendable=len(eligible), skipped=skipped,
+            unverified=unverified, risky=risky,
+        )
+        # "Unverified" is reported as its own error below, not buried in the skip warning.
+        other_skips = {r: n for r, n in skipped.items() if r != "unverified"}
+        skipped_total = sum(other_skips.values())
         if skipped_total:
-            detail = ", ".join(f"{n} {reason}" for reason, n in sorted(skipped.items()))
+            detail = ", ".join(f"{n} {reason}" for reason, n in sorted(other_skips.items()))
             check.warnings.append(
                 f"{skipped_total} of {len(contacts)} contacts will be skipped ({detail})."
+            )
+        if unverified:
+            check.errors.append(
+                f"{unverified} of {len(contacts)} contacts have an unknown email verification "
+                "status and will not be sent to. Verify them (POST /api/v1/validator/jobs with "
+                "this list) or remove them from the list, then validate again."
+            )
+        if risky:
+            check.warnings.append(
+                f"{risky} contact{'s are' if risky != 1 else ' is'} risky (a catch-all domain, "
+                "or a role/disposable mailbox): sent last, after every verified address."
             )
         if channel == "email" and contacts and not eligible:
             check.errors.append(
@@ -597,56 +616,55 @@ class CampaignService:
         return campaign
 
     async def _populate_campaign_contacts(self, campaign: Campaign):
-        """Add all list contacts to the campaign."""
+        """Add the list's sendable contacts to the campaign.
+
+        Set-based (three queries however long the list is -- it used to issue several per
+        contact), and it uses the SAME screening ``validate`` reports on, so the audience a
+        campaign really gets is the audience its validation promised. For email that screening
+        includes the verification gate, and verified addresses are queued before risky ones.
+        """
         if not campaign.list_id:
             return
 
-        # Get all contacts in the list
-        members_result = await self.db.execute(
-            select(ContactListMember).where(ContactListMember.list_id == campaign.list_id)
+        contacts = await self._members(campaign)
+        existing = set(
+            (
+                await self.db.execute(
+                    select(CampaignContact.contact_id).where(
+                        CampaignContact.campaign_id == campaign.id
+                    )
+                )
+            ).scalars().all()
         )
-        members = members_result.scalars().all()
+
+        # The eligibility gate has to match the channel. Screening an EMAIL
+        # campaign with the SMS rules dropped every email-only contact —
+        # exactly the contacts an email campaign exists to reach — because
+        # they have no phone number to classify.
+        if (campaign.channel or "sms") == "email":
+            from app.services import email_service
+
+            eligible, _skipped = await email_service.screen_contacts_for_email(
+                self.db, contacts, outreach=True
+            )
+            eligible = email_service.send_order(eligible)
+        else:
+            from app.services.list_hygiene import contact_is_blocked_from_send
+
+            eligible = [c for c in contacts if not contact_is_blocked_from_send(c)]
 
         added = 0
-        for member in members:
-            # Check if already exists
-            existing = await self.db.execute(
-                select(CampaignContact).where(
-                    CampaignContact.campaign_id == campaign.id,
-                    CampaignContact.contact_id == member.contact_id,
+        for contact in eligible:
+            if contact.id in existing:
+                continue
+            self.db.add(
+                CampaignContact(
+                    campaign_id=campaign.id,
+                    contact_id=contact.id,
+                    status="pending",
+                    sequence_step=0,
                 )
             )
-            if existing.scalar_one_or_none():
-                continue
-
-            contact = (
-                await self.db.execute(select(Contact).where(Contact.id == member.contact_id))
-            ).scalar_one_or_none()
-            if not contact:
-                continue
-
-            # The eligibility gate has to match the channel. Screening an EMAIL
-            # campaign with the SMS rules dropped every email-only contact —
-            # exactly the contacts an email campaign exists to reach — because
-            # they have no phone number to classify.
-            if (campaign.channel or "sms") == "email":
-                from app.services import email_service
-
-                if await email_service.contact_email_problem(self.db, contact):
-                    continue
-            else:
-                from app.services.list_hygiene import contact_is_blocked_from_send
-
-                if contact_is_blocked_from_send(contact):
-                    continue
-
-            cc = CampaignContact(
-                campaign_id=campaign.id,
-                contact_id=member.contact_id,
-                status="pending",
-                sequence_step=0,
-            )
-            self.db.add(cc)
             added += 1
 
         campaign.total_contacts = added

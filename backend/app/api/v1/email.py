@@ -770,7 +770,9 @@ async def send_email(
 
     sent, skipped, failed, message_ids = 0, 0, 0, []
     for contact in targets:
-        problem = await email_service.contact_email_problem(db, contact)
+        problem = await email_service.contact_email_problem(
+            db, contact, outreach=bool(bulk or data.list_id)
+        )
         if problem:
             skipped += 1
             continue

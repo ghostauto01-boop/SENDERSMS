@@ -482,7 +482,7 @@ async def email_blocked_reason(db: AsyncSession, contact: Contact) -> str | None
     """Why this contact cannot be emailed at send time, or ``None``."""
     from app.services.email_service import contact_email_problem
 
-    return await contact_email_problem(db, contact)
+    return await contact_email_problem(db, contact, outreach=True)
 
 
 async def _suppressed_numbers(db: AsyncSession, numbers: Iterable[str]) -> set[str]:
@@ -2481,7 +2481,20 @@ async def validate_campaign(db: AsyncSession, campaign: AdsCampaign) -> dict:
     }
     if campaign.channel == "email":
         warnings.append("Email sender/provider checks do not block launch; failures remain visible at send time.")
-    return {"ok": True, "errors": [], "warnings": warnings, "summary": summary}
+
+    # An email audience containing contacts nobody has verified FAILS validation, with the
+    # count (P0-5). Launch still assigns only the eligible contacts, so an unverified
+    # address is never mailed -- but the operator is told, instead of finding out later
+    # that the audience was smaller than they thought.
+    errors: list[str] = []
+    unverified = (sim.get("skipped") or {}).get("unverified", 0) if email_campaign else 0
+    if unverified:
+        errors.append(
+            f"{unverified} contact{'s have' if unverified != 1 else ' has'} an unknown email "
+            "verification status and will not be sent to. Verify them "
+            "(POST /api/v1/validator/jobs) or remove them from the audience, then validate again."
+        )
+    return {"ok": not errors, "errors": errors, "warnings": warnings, "summary": summary}
 
 
 # ==========================================================================
