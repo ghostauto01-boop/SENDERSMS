@@ -679,6 +679,24 @@ class TestPreviewChannels:
         assert body["channels"]["neither"] == 1
 
 
+@pytest_asyncio.fixture
+async def senders(db, monkeypatch):
+    """Starting a campaign validates it, so it needs the senders a real one has."""
+    from app.config import settings
+    from app.models.email import EmailAccount
+    from app.security.encryption import encrypt_value
+
+    monkeypatch.setattr(settings, "SMSGATE_BASE_URL", "https://api.sms-gate.app/3rdparty/v1")
+    monkeypatch.setattr(settings, "SMSGATE_USERNAME", "user")
+    monkeypatch.setattr(settings, "SMSGATE_PASSWORD", "pass")
+    db.add(EmailAccount(
+        name="main", from_email="hello@brandmail.io", from_name="Brand",
+        api_key_encrypted=encrypt_value("key"), is_default=True, is_active=True,
+    ))
+    await db.flush()
+
+
+@pytest.mark.usefixtures("senders")
 class TestEmailCampaignReachesEmailOnlyContacts:
     """The whole point, end to end: an email-only contact gets emailed.
 
@@ -845,6 +863,7 @@ class TestGuessedAddressesAreHeldBackFromSends:
 
         assert await email_service.contact_email_problem(db, contact) is None
 
+    @pytest.mark.usefixtures("senders")
     @pytest.mark.asyncio
     async def test_a_guessed_address_is_held_back_from_an_email_campaign(self, db):
         from app.models.campaign import Campaign

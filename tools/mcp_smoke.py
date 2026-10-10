@@ -329,7 +329,12 @@ def main() -> int:
     check("campaign updated",
           "Updated by MCP" in json.dumps(mcp.payload("get_campaign", campaign_id=campaign_id)))
     validated = mcp.payload("validate_campaign", campaign_id=campaign_id)
-    check("campaign validates", jget(validated, "success") is True, json.dumps(validated)[:220])
+    check("campaign validates", jget(validated, "valid") is True, json.dumps(validated)[:220])
+    # Validate is a report: it must not have moved the campaign anywhere.
+    check("validate changed nothing",
+          jget(validated, "changed") is False
+          and str(jget(mcp.payload("get_campaign", campaign_id=campaign_id), "status")).lower()
+          == "draft", json.dumps(validated)[:220])
     analytics = mcp.payload("campaign_analytics", campaign_id=campaign_id)
     check("campaign analytics readable", isinstance(analytics, (dict, list)))
     # Not running, so pausing must be refused — with the app's own reason, not a
@@ -339,7 +344,7 @@ def main() -> int:
         check("pausing a campaign that is not running is refused", False, "it was allowed")
     except RuntimeError as exc:
         check("pausing a campaign that is not running is refused",
-              "Only running campaigns can be paused" in str(exc), str(exc)[:160])
+              "Only running or scheduled campaigns can be paused" in str(exc), str(exc)[:160])
 
     # Park the campaign a year out: nothing the smoke created can then fire by
     # itself, and the "send it tomorrow at 9" tool gets exercised for real.
@@ -473,9 +478,9 @@ def main() -> int:
           query_token.status_code == 401)
 
     # ------------------------------------------------------------- clean up
-    # A validated campaign cannot be deleted in this app — only drafts can — so
-    # tidy-up clears what it may and leaves the rest paused under a name this
-    # obvious, instead of pretending the rule is not there.
+    # A campaign that has sent cannot be deleted (draft/scheduled/failed ones that
+    # have sent nothing can), so tidy-up clears what it may and leaves the rest
+    # paused under a name this obvious, instead of pretending the rule is not there.
     cleaned, note = mcp_tidy(app, campaign_id)
     check("cleanup left nothing running", cleaned, note)
 
@@ -496,18 +501,18 @@ def main() -> int:
 def mcp_tidy(app: httpx.Client, campaign_id) -> tuple[bool, str]:
     """Tidy up after the smoke run.
 
-    Deletes the campaign when the app allows it (drafts) and pauses it when it
-    does not (anything already validated) — the point is that nothing the smoke
-    created is left able to send.
+    Deletes the campaign when the app allows it (nothing sent yet) and pauses it
+    when it does not — the point is that nothing the smoke created is left able
+    to send.
     """
     if not campaign_id:
         return True, ""
     response = app.delete(f"/api/v1/campaigns/{campaign_id}")
     if response.status_code in (200, 204, 404):
         return True, "deleted"
-    if response.status_code == 400:
-        # Validated campaigns are immutable in this app, and pausing only applies
-        # to a running one — so "it is not running" is the promise worth checking.
+    if response.status_code in (400, 409):
+        # The app refused (it has sent), so "it is not running" is the promise
+        # worth checking.
         paused = app.post(f"/api/v1/campaigns/{campaign_id}/pause")
         state = app.get(f"/api/v1/campaigns/{campaign_id}").json()
         if paused.status_code in (200, 204, 400) and state.get("status") != "running":

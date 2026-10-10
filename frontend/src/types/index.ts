@@ -87,6 +87,11 @@ export interface Campaign {
   interested: number;
   // Future time the campaign launches by itself. null = manual start.
   scheduled_start_at: string | null;
+  // Set while paused: "scheduled" when it was held before ever starting.
+  paused_from?: string | null;
+  paused_at?: string | null;
+  // Why it is paused (an automatic pause always says why).
+  paused_reason?: string | null;
   //: "sms" or "email" — nullable rows predate the email channel.
   channel?: string | null;
   email_account_id?: number | null;

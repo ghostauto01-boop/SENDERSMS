@@ -97,7 +97,8 @@ async def launch_due_campaigns_async() -> list[int]:
                 # every 2 minutes forever -- drop it back to draft so the
                 # user sees it did not go out and why.
                 logger.error("SCHEDULE: campaign %s not startable: %s", campaign.id, e)
-                campaign.status = "draft"
+                if campaign.status == "scheduled":
+                    service.transition(campaign, "draft")
             except Exception as e:
                 logger.error("SCHEDULE: campaign %s failed to launch: %s", campaign.id, e)
 

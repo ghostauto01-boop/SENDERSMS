@@ -422,7 +422,7 @@ TOOLS: list[Tool] = [
             "Create a campaign (draft). Pick ONE channel: 'sms' or 'email'. Provide the audience "
             "(list_id) and the message — either message_body, or template_id to use a saved "
             "template. Email campaigns also take subject, html_body and email_account_id. "
-            "Nothing is sent until you validate and start it."
+            "Nothing is sent until you start it (or schedule it for a time)."
         ),
         method="POST", path="/api/v1/campaigns/", scope="write", group="campaigns",
         params=[
@@ -465,9 +465,10 @@ TOOLS: list[Tool] = [
     Tool(
         name="delete_campaign",
         description=(
-            "Delete a DRAFT campaign (the operator usually wants this after a failed attempt). "
-            "A campaign that has already been validated or started cannot be deleted — the app "
-            "refuses, and duplicating it is the way forward."
+            "Delete a campaign that has not sent anything: a draft, a scheduled one (or one "
+            "paused while scheduled), or a failed one. Once a campaign has sent even one "
+            "message the app refuses (409) — stop it instead to keep the history. An unknown "
+            "id is a 404."
         ),
         method="DELETE", path="/api/v1/campaigns/{campaign_id}", scope="write",
         group="campaigns",
@@ -480,7 +481,8 @@ TOOLS: list[Tool] = [
             "'send it tomorrow at 9' request. The app validates the campaign first, so a "
             "scheduled launch cannot fail later for a reason that exists now. Pass a future "
             "ISO 8601 timestamp with an offset (e.g. 2026-05-01T09:00:00+01:00); pass null to "
-            "clear the schedule and leave it for a manual start."
+            "CANCEL the schedule — the campaign goes back to draft. The reply carries "
+            "'changed': false when the call did nothing (e.g. cancelling an unscheduled draft)."
         ),
         method="POST", path="/api/v1/campaigns/{campaign_id}/schedule", scope="write",
         group="campaigns", body_always=True,
@@ -493,9 +495,13 @@ TOOLS: list[Tool] = [
     Tool(
         name="validate_campaign",
         description=(
-            "Check a campaign before sending: audience, message, sender and consent. Call this "
-            "after creating or editing an email campaign — it is what catches a missing subject "
-            "or an unusable Brevo sender."
+            "Check a campaign before sending: audience, message, sender and consent. REPORT "
+            "ONLY — it changes nothing (status, schedule, contacts), so call it as often as you "
+            "like; the reply says 'valid', lists 'errors' and 'warnings', and always carries "
+            "'changed': false. It does not schedule or arm anything: to send use "
+            "start_campaign (now) or schedule_campaign (later). Call it after creating or "
+            "editing an email campaign — it catches a missing subject or an unusable Brevo "
+            "sender."
         ),
         method="POST", path="/api/v1/campaigns/{campaign_id}/validate", scope="write",
         group="campaigns",
@@ -504,8 +510,9 @@ TOOLS: list[Tool] = [
     Tool(
         name="start_campaign",
         description=(
-            "START SENDING a campaign. This really sends messages to real people — confirm the "
-            "channel, audience and message with the operator first."
+            "START SENDING a campaign now. This really sends messages to real people — confirm "
+            "the channel, audience and message with the operator first. A draft is validated as "
+            "part of starting (a problem comes back as a 400 listing every error)."
         ),
         method="POST", path="/api/v1/campaigns/{campaign_id}/start", scope="write",
         group="campaigns",
@@ -513,14 +520,21 @@ TOOLS: list[Tool] = [
     ),
     Tool(
         name="pause_campaign",
-        description="Pause a running campaign.",
+        description=(
+            "Pause a RUNNING campaign, or hold a SCHEDULED one so it does not launch. "
+            "resume_campaign puts it back where it was."
+        ),
         method="POST", path="/api/v1/campaigns/{campaign_id}/pause", scope="write",
         group="campaigns",
         params=[Param("campaign_id", type="integer", required=True, where="path")],
     ),
     Tool(
         name="resume_campaign",
-        description="Resume a paused campaign.",
+        description=(
+            "Resume a paused campaign. One paused mid-send continues sending; one paused while "
+            "scheduled goes back to scheduled and does NOT start sending (use start_campaign "
+            "for that). A campaign paused by the circuit breaker says why in 'paused_reason'."
+        ),
         method="POST", path="/api/v1/campaigns/{campaign_id}/resume", scope="write",
         group="campaigns",
         params=[Param("campaign_id", type="integer", required=True, where="path")],

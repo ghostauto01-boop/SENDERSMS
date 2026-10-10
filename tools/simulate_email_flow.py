@@ -267,7 +267,10 @@ with httpx.Client(base_url=BASE, timeout=30, follow_redirects=True) as api:
 
     val = api.post(f"/campaigns/{camp_id}/validate")
     step("email campaign validates against the Brevo sender",
-         val.status_code == 200, val.text[:220])
+         val.status_code == 200 and val.json().get("valid") is True, val.text[:220])
+    step("validate is a report: the campaign is still a draft",
+         api.get(f"/campaigns/{camp_id}").json().get("status") == "draft"
+         and val.json().get("changed") is False, val.text[:120])
 
     start = api.post(f"/campaigns/{camp_id}/start")
     if start.status_code == 200:

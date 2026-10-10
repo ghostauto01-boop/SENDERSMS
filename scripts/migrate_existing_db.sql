@@ -392,4 +392,16 @@ CREATE INDEX IF NOT EXISTS ix_quarantined_sms_sender ON quarantined_sms (sender)
 CREATE INDEX IF NOT EXISTS ix_quarantined_sms_reason ON quarantined_sms (reason);
 CREATE INDEX IF NOT EXISTS ix_quarantined_sms_received_at ON quarantined_sms (received_at);
 
+-- ------------------------------------------------------------
+-- Campaign lifecycle: where a pause came from, and why (P0-1)
+-- ------------------------------------------------------------
+-- A campaign paused while "scheduled" has never sent anything, so resuming it
+-- must put the schedule back instead of starting to send. paused_reason is what
+-- the bounce circuit breaker writes when it pauses a campaign on its own.
+-- The app adds these columns itself at startup (schema_repair); this statement
+-- is for operators who run the migration by hand. NULL means "paused mid-send".
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS paused_from VARCHAR(20);
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS paused_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS paused_reason VARCHAR(500);
+
 COMMIT;

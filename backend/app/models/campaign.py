@@ -18,8 +18,20 @@ class Campaign(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    # Status: draft, scheduled, running, paused, completed, stopped, failed
+    # Status: draft, scheduled, running, paused, completed, stopped, failed.
+    # The legal moves between them live in CampaignService.TRANSITIONS and every
+    # change goes through CampaignService.transition().
     status: Mapped[str] = mapped_column(String(50), default="draft", nullable=False, index=True)
+
+    #: Where a paused campaign came from ("running" is stored as NULL, which is
+    #: what every row paused before this column existed means). A campaign paused
+    #: while ``scheduled`` has never sent anything and holds no contact rows, so
+    #: resuming it must put the schedule back rather than start sending.
+    paused_from: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    #: When it was paused, and why. ``paused_reason`` is what the circuit breaker
+    #: writes ("bounce rate 5.0% ...") so an auto-pause is never a mystery.
+    paused_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    paused_reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     #: "sms" or "email" — which channel this campaign sends on. Existing rows
     #: default to "sms", so nothing about the current behaviour changes.

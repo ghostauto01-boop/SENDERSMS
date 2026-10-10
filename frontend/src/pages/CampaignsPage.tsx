@@ -169,11 +169,39 @@ export default function CampaignsPage() {
 
   const handleAction = async (id: number, action: string) => {
     try {
-      await api.post(`/campaigns/${id}/${action}`);
-      toast.success(`Campaign ${action}ed`);
+      const { data } = await api.post(`/campaigns/${id}/${action}`);
+      // The server says what actually happened (and when nothing did).
+      toast.success(data?.message || `Campaign ${action} done`);
       loadCampaigns();
     } catch (err: any) {
       toast.error(err.response?.data?.detail || `Failed to ${action} campaign`);
+    }
+  };
+
+  /** Validate is a report. It never changes the campaign, however often it is clicked. */
+  const handleValidate = async (id: number) => {
+    try {
+      const { data } = await api.post(`/campaigns/${id}/validate`);
+      if (data.valid) {
+        toast.success(data.message || "Campaign is valid. Nothing was changed.");
+      } else {
+        toast.error((data.errors || []).join("\n") || data.message || "Validation found problems", {
+          duration: 9000,
+        });
+      }
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || "Could not validate the campaign");
+    }
+  };
+
+  /** Cancel a schedule: the campaign goes back to draft and will not launch by itself. */
+  const handleUnschedule = async (id: number) => {
+    try {
+      const { data } = await api.post(`/campaigns/${id}/schedule`, { scheduled_start_at: null });
+      toast.success(data?.message || "Schedule cancelled");
+      loadCampaigns();
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || "Could not cancel the schedule");
     }
   };
 
@@ -196,8 +224,8 @@ export default function CampaignsPage() {
       await api.delete(`/campaigns/${id}`);
       toast.success("Campaign deleted");
       loadCampaigns();
-    } catch {
-      toast.error("Failed to delete");
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || "Failed to delete");
     }
   };
 
@@ -261,6 +289,19 @@ export default function CampaignsPage() {
                       Sends automatically on {formatWhen(camp.scheduled_start_at)}
                     </p>
                   )}
+                  {camp.scheduled_start_at && camp.status === "draft" && (
+                    <p className="text-sm text-gray-500 mt-1 flex items-center gap-1">
+                      <CalendarClock size={14} />
+                      Launch time {formatWhen(camp.scheduled_start_at)} is saved but the campaign is
+                      not scheduled yet. Click Schedule to arm it.
+                    </p>
+                  )}
+                  {camp.status === "paused" && (
+                    <p className="text-sm text-warning-600 dark:text-warning-500 mt-1">
+                      {camp.paused_from === "scheduled" ? "Scheduled launch on hold. " : ""}
+                      {camp.paused_reason || ""}
+                    </p>
+                  )}
                   {(() => {
                     // Prefer the inbox-derived numbers when we have them.
                     const l = live[camp.id];
@@ -317,12 +358,28 @@ export default function CampaignsPage() {
                 <div className="flex gap-1 flex-wrap">
                   {camp.status === "draft" && (
                     <>
-                      <button onClick={() => handleAction(camp.id, "validate")} className="btn-primary btn-sm">Validate</button>
-                      <button onClick={() => handleDelete(camp.id)} className="btn-ghost btn-sm text-danger-600"><Trash2 size={14} /></button>
+                      <button
+                        onClick={() => handleValidate(camp.id)}
+                        className="btn-secondary btn-sm"
+                        title="Check the campaign. Changes nothing."
+                      >
+                        Validate
+                      </button>
+                      <button onClick={() => handleAction(camp.id, "start")} className="btn-primary btn-sm" title="Validates, then sends now">
+                        <Play size={14} className="mr-1" /> Start now
+                      </button>
+                      <button onClick={() => handleDelete(camp.id)} className="btn-ghost btn-sm text-danger-600" title="Delete draft"><Trash2 size={14} /></button>
                     </>
                   )}
                   {camp.status === "scheduled" && (
-                    <button onClick={() => handleAction(camp.id, "start")} className="btn-primary btn-sm"><Play size={14} className="mr-1" /> Start now</button>
+                    <>
+                      <button onClick={() => handleAction(camp.id, "start")} className="btn-primary btn-sm"><Play size={14} className="mr-1" /> Start now</button>
+                      <button onClick={() => handleAction(camp.id, "pause")} className="btn-secondary btn-sm" title="Hold the scheduled launch"><Pause size={14} className="mr-1" /> Pause</button>
+                      <button onClick={() => handleUnschedule(camp.id)} className="btn-ghost btn-sm" title="Cancel the schedule and go back to draft">Cancel schedule</button>
+                      {(camp.messages_sent || 0) === 0 && (
+                        <button onClick={() => handleDelete(camp.id)} className="btn-ghost btn-sm text-danger-600" title="Delete campaign"><Trash2 size={14} /></button>
+                      )}
+                    </>
                   )}
                   {(camp.status === "draft" || camp.status === "scheduled") && (
                     <button
@@ -331,7 +388,7 @@ export default function CampaignsPage() {
                       title="Send automatically at a chosen time"
                     >
                       <CalendarClock size={14} className="mr-1" />
-                      {camp.scheduled_start_at ? "Reschedule" : "Schedule"}
+                      {camp.status === "scheduled" ? "Reschedule" : "Schedule"}
                     </button>
                   )}
                   {camp.status === "running" && (
@@ -344,6 +401,9 @@ export default function CampaignsPage() {
                     <>
                       <button onClick={() => handleAction(camp.id, "resume")} className="btn-primary btn-sm"><Play size={14} className="mr-1" /> Resume</button>
                       <button onClick={() => handleAction(camp.id, "stop")} className="btn-danger btn-sm"><Square size={14} className="mr-1" /> Stop</button>
+                      {camp.paused_from === "scheduled" && (camp.messages_sent || 0) === 0 && (
+                        <button onClick={() => handleDelete(camp.id)} className="btn-ghost btn-sm text-danger-600" title="Delete campaign"><Trash2 size={14} /></button>
+                      )}
                     </>
                   )}
                   {(camp.status === "draft" || camp.status === "scheduled") && (
@@ -541,7 +601,7 @@ function CampaignModal({
         </h2>
         {editing && campaign!.status === "scheduled" && (
           <p className="text-xs text-warning-600 dark:text-warning-500 -mt-2 mb-3">
-            Saving changes returns this campaign to draft, so it must be validated again.
+            Saving changes returns this campaign to draft. Schedule it again afterwards.
           </p>
         )}
         <form onSubmit={handleSubmit} className="space-y-3">

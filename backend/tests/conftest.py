@@ -1,8 +1,76 @@
 """
 Shared test fixtures for SendSMS backend tests.
+
+``api_db`` / ``api_client`` are opt-in building blocks for tests that drive the
+real FastAPI app over HTTP against an in-memory SQLite database. They are named
+differently from the ``db`` / ``client`` fixtures many older modules define
+locally on purpose: a module-level fixture always wins, so adding these cannot
+change what an existing test sees.
 """
 
 import pytest
+import pytest_asyncio
 
 # Event loop is managed automatically by pytest-asyncio.
 # No manual override needed.
+
+
+@pytest_asyncio.fixture
+async def api_db():
+    """One in-memory database + session, shared by the test and the app."""
+    from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
+    from app.database import Base
+
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    async with factory() as session:
+        yield session
+    await engine.dispose()
+
+
+@pytest_asyncio.fixture
+async def api_client(api_db):
+    """The real app, authenticated as an admin, using ``api_db``."""
+    from httpx import ASGITransport, AsyncClient
+
+    from app.database import get_db
+    from app.main import app
+    from app.models.user import User
+    from app.security.auth import get_current_user
+
+    async def _get_db():
+        yield api_db
+
+    app.dependency_overrides[get_db] = _get_db
+    app.dependency_overrides[get_current_user] = lambda: User(
+        id=1, username="tester", email="tester@example.com",
+        password_hash="x", role="admin", is_active=True,
+    )
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        yield client
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def sms_gateway_configured(monkeypatch):
+    """Pretend SMS-Gate credentials are present, as in a normal deployment."""
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "SMSGATE_BASE_URL", "https://api.sms-gate.app/3rdparty/v1")
+    monkeypatch.setattr(settings, "SMSGATE_USERNAME", "user")
+    monkeypatch.setattr(settings, "SMSGATE_PASSWORD", "pass")
+
+
+@pytest.fixture
+def stub_queue(monkeypatch):
+    """Swallow Celery enqueues (no broker in tests); returns the list of calls."""
+    calls: list[tuple] = []
+
+    def _enqueue(task, *args, **kwargs):
+        calls.append((getattr(task, "name", str(task)), args))
+
+    monkeypatch.setattr("app.tasks.queue.enqueue", _enqueue)
+    return calls

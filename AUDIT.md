@@ -175,7 +175,7 @@ static/logic issues that are DB-independent; finding 2 reproduces whenever Redis
 
 | # | Finding | Status | Verified by |
 |---|---|---|---|
-| 1 | Campaigns can never be launched | **Fixed** | `POST /campaigns/1/validate` → `200 {"status":"scheduled"}` |
+| 1 | Campaigns can never be launched | **Fixed** (since changed — see P0-1 in `CHANGELOG.md`: `/validate` is now report-only; launch with `/start`, or `/schedule` for a later time) | `POST /campaigns/1/start` on a valid draft → `200 {"status":"running"}` |
 | 2 | Redis outage → 500, campaign stuck `running` | **Fixed** | Returns `503` in 0.68s (was 19s); status rolls back to `scheduled` |
 | 3 | Hardcoded gateway credentials | **Fixed in code — rotation still required** | Defaults removed; env-only |
 | 4 | Unauthenticated webhook / inbox injection | **Fixed** | Forged payload → `401`; signed → `200`; stale timestamp → `401` |
