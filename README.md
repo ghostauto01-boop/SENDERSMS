@@ -216,8 +216,11 @@ reply still reads as personal.
 # 1. A stand-in Brevo that records every payload it receives
 python -m uvicorn tools.fake_brevo:app --port 8799
 
-# 2. The app, pointed at it
+# 2. The app, pointed at it. EMAIL_REQUIRE_VERIFIED=false because the simulator mails a
+#    fake address no verifier can confirm; leave it out and the simulator instead checks
+#    that the verification gate refuses the campaign (and stops there).
 cd backend && DATABASE_URL="sqlite+aiosqlite:////tmp/sim.db" APP_ENV=development \
+  EMAIL_REQUIRE_VERIFIED=false \
   BREVO_API_BASE="http://127.0.0.1:8799/v3" PUBLIC_BASE_URL="http://127.0.0.1:8000" \
   python -m uvicorn app.main:app --port 8000
 

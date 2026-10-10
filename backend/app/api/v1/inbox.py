@@ -368,6 +368,21 @@ async def resume_seq(conversation_id:int,db:AsyncSession=Depends(get_db),cu:User
 # https://docs.sms-gate.app/features/reading-messages/
 
 DEVICE_ID_KEY = "gateway.device_id"
+
+
+def _mask_device(device):
+    """A gateway device record with its id reduced to a hint (everything else is kept).
+
+    The id addresses the phone in the gateway's API, so diagnostics must not print it.
+    """
+    from app.services.email_service import mask_secret
+
+    if not isinstance(device, dict):
+        return device
+    return {
+        key: (mask_secret(str(value)) if key in ("id", "deviceId", "device_id") and value else value)
+        for key, value in device.items()
+    }
 LAST_EXPORT_KEY = "gateway.last_inbox_export"
 
 
@@ -403,9 +418,9 @@ async def get_device_info(db:AsyncSession=Depends(get_db),cu:User=Depends(get_cu
     hooks = wh.get("webhooks", [])
     return {
         "success": True,
-        "devices": devices,
+        "devices": [_mask_device(d) for d in devices],
         "device_count": len(devices),
-        "cached_device_id": await get_setting(db, DEVICE_ID_KEY, "") or "",
+        "cached_device_id": _mask_device({"id": await get_setting(db, DEVICE_ID_KEY, "") or ""})["id"],
         "webhook_url": target,
         "registered_webhooks": hooks,
         "webhook_ok": bool(target) and any(
@@ -484,7 +499,9 @@ async def sync_full_inbox(db:AsyncSession=Depends(get_db),cu:User=Depends(get_cu
     device_id, live = await _resolve_device_id(db)
     stats["device_online"] = live
     if device_id:
-        stats["device"] = device_id[:16] + "..."
+        from app.services.email_service import mask_secret
+
+        stats["device"] = mask_secret(device_id)
     if not live:
         stats["problems"].append(
             "No device is currently reporting to SMS-Gate. Open the app on the phone "
@@ -607,7 +624,7 @@ async def poll_debug(db:AsyncSession=Depends(get_db),cu:User=Depends(get_current
     result = {
         "success": True,
         "webhook_url": target,
-        "devices": {"count": len(devices), "list": devices[:5]},
+        "devices": {"count": len(devices), "list": [_mask_device(d) for d in devices[:5]]},
         "registered_webhooks": hooks,
         "matching_events": sorted(
             h.get("event", "") for h in hooks

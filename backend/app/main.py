@@ -844,6 +844,7 @@ async def _process_scheduled_email(db, sm) -> None:
         idempotency_key=f"scheduled-{sm.id}",
         attachments=email_service.load_attachments(getattr(sm, "attachments", None)),
         bulk=bool(sm.list_id),
+        outreach=bool(sm.list_id),
         cc=email_service.clean_addresses(getattr(sm, "cc_addresses", None)),
         bcc=email_service.clean_addresses(getattr(sm, "bcc_addresses", None)),
     )

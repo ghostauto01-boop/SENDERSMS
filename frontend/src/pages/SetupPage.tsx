@@ -14,7 +14,8 @@ import {
   RefreshCw,
   Rocket,
 } from "lucide-react";
-import guideApi, { GuideStep, SetupGuide, StepStatus } from "../api/guide";
+import api from "../api/client";
+import guideApi, { GuideCopy, GuideStep, SetupGuide, StepStatus } from "../api/guide";
 
 /**
  * SETUP GUIDE — the in-app tutorial for setting everything up.
@@ -43,7 +44,7 @@ const STATUS_META: Record<
   optional: { label: "Optional", chip: "badge-gray", icon: CircleDashed, colour: "text-gray-400" },
 };
 
-function CopyRow({ label, value }: { label: string; value: string }) {
+function CopyRow({ label, value, reveal }: { label: string; value: string; reveal?: GuideCopy["reveal"] }) {
   const [done, setDone] = useState(false);
   if (!value) return null;
   return (
@@ -58,7 +59,13 @@ function CopyRow({ label, value }: { label: string; value: string }) {
         className="btn-secondary btn-sm mt-4 shrink-0"
         onClick={async () => {
           try {
-            await navigator.clipboard.writeText(value);
+            let text = value;
+            if (reveal) {
+              // The shown value is masked; fetch the real one only now, on this click.
+              const res = await api.post(reveal.path.replace(/^\/api\/v1/, ""));
+              text = res.data?.[reveal.field] || res.data?.webhook_path || value;
+            }
+            await navigator.clipboard.writeText(text);
             setDone(true);
             setTimeout(() => setDone(false), 1500);
           } catch {
@@ -136,7 +143,7 @@ function StepCard({
           {step.copy.length > 0 && (
             <div className="space-y-2">
               {step.copy.map((c) => (
-                <CopyRow key={c.label} label={c.label} value={c.value} />
+                <CopyRow key={c.label} label={c.label} value={c.value} reveal={c.reveal} />
               ))}
             </div>
           )}

@@ -164,9 +164,15 @@ async def test_a_gateway_and_a_sender_turn_their_steps_done(db, monkeypatch):
 
     brevo_hook = _step(guide, "brevo-webhook")
     assert brevo_hook["status"] == "attention"
-    value = brevo_hook["copy"][0]["value"]
+    row = brevo_hook["copy"][0]
+    value = row["value"]
     assert value.startswith("https://app.example.test/api/v1/webhooks/brevo/")
-    assert "token=" in value and len(value.split("token=")[1]) >= 16
+    # C10: the token is a credential and the guide is a read endpoint (an assistant reads
+    # it too), so the row carries a masked hint -- this used to assert a full-length token
+    # -- and says where the dashboard fetches the real URL when the copy button is pressed.
+    assert "token=****" in value and len(value.split("token=")[1]) == 8
+    assert row["reveal"]["path"].endswith("/webhook/reveal")
+    assert row["reveal"]["field"] == "webhook_url"
 
 
 @pytest.mark.asyncio

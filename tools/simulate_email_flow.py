@@ -170,7 +170,21 @@ with httpx.Client(base_url=BASE, timeout=30, follow_redirects=True) as api:
     # Brevo is configured with the account's own webhook URL + token.
     accounts = api.get("/email/accounts").json()["items"]
     me_account = next(a for a in accounts if a["from_email"] == "hello@acme-leads.io")
-    webhook_path = (me_account.get("webhook_url") or f"http://127.0.0.1:8000{me_account['webhook_path']}")
+    # C10: account reads carry only a masked hint of the webhook token (it is the
+    # credential for this endpoint). The real URL comes from the deliberate reveal action,
+    # exactly as the dashboard's "Copy webhook URL" button fetches it.
+    shown = me_account.get("webhook_url") or me_account.get("webhook_path") or ""
+    step("account reads show a masked webhook token, never the real one",
+         "token=****" in shown and me_account.get("webhook_token_masked", "").startswith("****"),
+         shown)
+    revealed = api.post(f"/email/accounts/{me_account['id']}/webhook/reveal")
+    step("reveal returns the full webhook URL (not cacheable)",
+         revealed.status_code == 200 and "token=" in revealed.json()["webhook_url"]
+         and "****" not in revealed.json()["webhook_url"]
+         and "no-store" in revealed.headers.get("cache-control", ""),
+         revealed.text[:160].replace(revealed.json().get("webhook_url", "-").split("token=")[-1], "<token>"))
+    webhook_path = revealed.json()["webhook_url"]
+    me_account["webhook_url"] = webhook_path  # the later steps post events to it
     hook = api.post(webhook_path.split("/api/v1")[1], json={"items": [{
         "From": {"Address": "ada.personal@gmail.com", "Name": "Ada"},
         "To": {"Address": "hello@acme-leads.io"},
@@ -181,9 +195,8 @@ with httpx.Client(base_url=BASE, timeout=30, follow_redirects=True) as api:
                     "References": first["rfc_message_id"]},
     }]})
     step("inbound webhook accepted", hook.status_code == 200, hook.text[:200])
-    step("account exposes a ready-to-paste webhook URL",
-         "token=" in (me_account.get("webhook_url") or me_account.get("webhook_path") or ""),
-         str(me_account.get("webhook_url") or me_account.get("webhook_path")))
+    wrong = httpx.post(webhook_path.split("token=")[0] + "token=wrong-token", json={"event": "delivered"})
+    step("a wrong webhook token is refused", wrong.status_code == 403, str(wrong.status_code))
 
     detail = api.get(f"/email/inbox/conversations/{conv_id}").json()
     inbound = [
@@ -274,6 +287,27 @@ with httpx.Client(base_url=BASE, timeout=30, follow_redirects=True) as api:
          json.dumps({k: dup.json().get(k) for k in ("channel", "subject", "attachments")})[:200])
 
     val = api.post(f"/campaigns/{camp_id}/validate")
+    # P0-5: campaigns only send to addresses a verifier has confirmed, and the address in
+    # this run is a fake one no verifier can check. A server running with the gate on (the
+    # default) must therefore FAIL this audience, with the count -- assert that, then stop:
+    # nothing past this point can send. Start the server with EMAIL_REQUIRE_VERIFIED=false
+    # (see README) to run the rest of the flow against the fake Brevo.
+    unverified = (val.json().get("audience") or {}).get("unverified", 0) if val.status_code == 200 else 0
+    if unverified:
+        step("P0-5: validate fails an email audience with an unverified contact, and counts it",
+             val.json().get("valid") is False and unverified == 1
+             and any("unknown email verification status" in e for e in val.json().get("errors", [])),
+             val.text[:260])
+        refused = api.post(f"/campaigns/{camp_id}/start")
+        step("P0-5: start refuses it, and nothing is queued",
+             refused.status_code == 400
+             and api.get(f"/campaigns/{camp_id}").json().get("status") == "draft",
+             refused.text[:160])
+        print("\nNOTE: the rest of this flow (campaign send, unsubscribe) is skipped because the "
+              "server enforces the verification gate. Restart it with "
+              "EMAIL_REQUIRE_VERIFIED=false to run it against the fake Brevo.")
+        print("\nRESULT:", "ALL PASS (gate verified; remainder skipped)" if ok else "FAILURES PRESENT")
+        sys.exit(0 if ok else 1)
     step("email campaign validates against the Brevo sender",
          val.status_code == 200 and val.json().get("valid") is True, val.text[:220])
     step("validate is a report: the campaign is still a draft",

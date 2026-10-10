@@ -438,7 +438,18 @@ async def _email_steps(db: AsyncSession) -> list[dict]:
                 if hook else
                 "Blocked by the missing PUBLIC_BASE_URL above."
             ),
-            copy=[{"label": "Brevo webhook URL", "value": hook or ""}] if hook else [],
+            # The token in this URL is a credential and the guide is a read endpoint (an
+            # assistant reads it too): show it masked and tell the dashboard where to fetch
+            # the real value when the copy button is pressed.
+            copy=[{
+                "label": "Brevo webhook URL",
+                "value": hook or "",
+                "reveal": {
+                    "method": "POST",
+                    "path": f"/api/v1/email/accounts/{default.id}/webhook/reveal",
+                    "field": "webhook_url",
+                },
+            }] if hook else [],
             steps=[
                 "Copy the URL below.",
                 "In Brevo: Transactional → Settings → Webhook → add it for the events you want "

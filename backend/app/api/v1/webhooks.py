@@ -1,5 +1,5 @@
 """Webhook handler — receives SMS-Gate.app events. Parses nested payload format."""
-import json, logging
+import hmac, json, logging
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import select, func
@@ -508,6 +508,26 @@ def _payload_account_id(token: str | None) -> int | None:
         return None
 
 
+def _header_token(request: Request) -> str | None:
+    """The token from ``X-Webhook-Token`` or ``Authorization: Bearer``.
+
+    A header keeps the credential out of access logs and Referer headers, which a query
+    string does not; the query form stays supported because Brevo can only be given a URL.
+    """
+    value = request.headers.get("x-webhook-token")
+    if value:
+        return value.strip()
+    auth = request.headers.get("authorization") or ""
+    if auth.lower().startswith("bearer "):
+        return auth[7:].strip()
+    return None
+
+
+def _token_matches(supplied: str | None, expected: str) -> bool:
+    """Constant-time comparison. Bytes, so a non-ASCII guess is a mismatch, not a crash."""
+    return hmac.compare_digest((supplied or "").encode("utf-8"), expected.encode("utf-8"))
+
+
 @router.post("/brevo")
 @router.post("/brevo/{account_id}")
 async def brevo_webhook(
@@ -549,7 +569,8 @@ async def brevo_webhook(
     if account is None:
         raise HTTPException(404, "Unknown email sender account")
 
-    if not account.webhook_token or token != account.webhook_token:
+    supplied = token or _header_token(request)
+    if not account.webhook_token or not _token_matches(supplied, account.webhook_token):
         logger.error("BREVO webhook rejected: bad/missing token for account %s", account.id)
         raise HTTPException(403, "Invalid webhook token")
 

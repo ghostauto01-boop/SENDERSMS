@@ -1141,16 +1141,49 @@ function SendersTab({ accounts, reload, onEdit, onAdd }: any) {
     }
   };
 
+  // The webhook token is a credential: account reads only carry a masked hint, and the
+  // real URL is fetched here, on an explicit click.
+  const copyText = async (text: string, success: string, fallbackPrompt: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(success);
+    } catch {
+      window.prompt(fallbackPrompt, text);
+    }
+  };
+
   const copyWebhook = async (account: EmailAccount) => {
     if (!account.webhook_url) {
       toast.error("Set PUBLIC_BASE_URL on the server to get a webhook URL");
       return;
     }
     try {
-      await navigator.clipboard.writeText(account.webhook_url);
-      toast.success("Webhook URL copied — paste it into Brevo");
-    } catch {
-      window.prompt("Copy this webhook URL into Brevo:", account.webhook_url);
+      const revealed = await emailApi.revealWebhook(account.id);
+      await copyText(
+        revealed.webhook_url || revealed.webhook_path,
+        "Webhook URL copied — paste it into Brevo",
+        "Copy this webhook URL into Brevo:",
+      );
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Could not fetch the webhook URL");
+    }
+  };
+
+  const rotateWebhook = async (account: EmailAccount) => {
+    if (!window.confirm(
+      `Rotate the webhook token for "${account.name}"? The current URL stops working immediately, ` +
+      "so Brevo's deliveries are refused until you paste the new URL into Brevo.",
+    )) return;
+    try {
+      const rotated = await emailApi.rotateWebhook(account.id);
+      await copyText(
+        rotated.webhook_url || rotated.webhook_path,
+        "Token rotated — the new URL is copied. Paste it into Brevo now.",
+        "New webhook URL — paste it into Brevo now:",
+      );
+      reload();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Could not rotate the webhook token");
     }
   };
 
@@ -1234,6 +1267,13 @@ function SendersTab({ accounts, reload, onEdit, onAdd }: any) {
               </button>
               <button className="btn-secondary text-sm" onClick={() => copyWebhook(account)}>
                 Copy webhook URL
+              </button>
+              <button
+                className="text-gray-500 hover:text-primary-600 text-sm px-2"
+                title="Issue a new webhook token; the current one stops working"
+                onClick={() => rotateWebhook(account)}
+              >
+                Rotate token
               </button>
               <button className="text-gray-500 hover:text-primary-600 text-sm px-2" onClick={() => onEdit(account)}>
                 Edit

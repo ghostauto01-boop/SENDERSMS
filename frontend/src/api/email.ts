@@ -28,13 +28,23 @@ export type EmailAccount = {
   connection_status?: string | null;
   last_tested_at?: string | null;
   last_error?: string | null;
+  /** The token in these two is masked (****a1b2): use revealWebhook() for the real URL. */
   webhook_url?: string | null;
+  webhook_path?: string | null;
+  webhook_token_masked?: string;
+  webhook_reveal_path?: string;
   created_at?: string | null;
   updated_at?: string | null;
   // account_stats() adds these
   sent_total?: number;
   failed_total?: number;
   campaigns_using?: number;
+};
+
+export type WebhookSecret = {
+  account_id: number;
+  webhook_url: string | null;
+  webhook_path: string;
 };
 
 export type EmailAccountInput = {
@@ -235,6 +245,12 @@ const emailApi = {
   updateAccount: async (id: number, payload: Partial<EmailAccountInput>): Promise<EmailAccount> =>
     (await api.patch(`/email/accounts/${id}`, payload)).data,
   deleteAccount: async (id: number) => (await api.delete(`/email/accounts/${id}`)).data,
+  /** The full Brevo webhook URL (the token is a credential, so reads only show a hint). */
+  revealWebhook: async (id: number): Promise<WebhookSecret> =>
+    (await api.post(`/email/accounts/${id}/webhook/reveal`)).data,
+  /** Replace the token; the old one stops working at once. */
+  rotateWebhook: async (id: number): Promise<WebhookSecret & { message: string }> =>
+    (await api.post(`/email/accounts/${id}/webhook/rotate`)).data,
   makeDefault: async (id: number): Promise<EmailAccount> =>
     (await api.post(`/email/accounts/${id}/default`)).data,
   testAccount: async (id: number): Promise<{ success: boolean; error?: string; account: EmailAccount }> =>

@@ -339,17 +339,93 @@ async def test_the_send_path_refuses_an_unverified_contact_even_if_a_row_exists(
 
 
 @pytest.mark.asyncio
-async def test_bulk_queue_email_refuses_an_unverified_contact(api_db):
+async def test_outreach_queue_email_refuses_an_unverified_contact(api_db):
+    contact = await _contact(api_db)
+    account = await make_account(api_db, default=True)
+    kw = dict(subject="Hi", text_body="Hello", account=account)
+
+    explicit = await email_service.queue_email(api_db, contact, outreach=True, **kw)
+    campaign = await email_service.queue_email(api_db, contact, campaign_id=7, **kw)
+    followup = await email_service.queue_email(api_db, contact, followup=True, **kw)
+    one_to_one = await email_service.queue_email(api_db, contact, **kw)
+
+    assert explicit is None and campaign is None and followup is None, \
+        "mail to an audience is refused an unverified address"
+    assert one_to_one is not None, "a deliberate one-to-one message is not"
+
+
+@pytest.mark.asyncio
+async def test_unsubscribe_headers_do_not_turn_a_one_to_one_message_into_outreach(api_db):
+    """Found by running the email simulator against a real server: a single contact emailed
+    with a marketing template carries List-Unsubscribe headers (`bulk`), and was refused.
+    `bulk` says what the message looks like; `outreach` says who chose the recipient."""
     contact = await _contact(api_db)
     account = await make_account(api_db, default=True)
 
-    bulk = await email_service.queue_email(
+    message = await email_service.queue_email(
         api_db, contact, subject="Hi", text_body="Hello", account=account, bulk=True)
-    one_to_one = await email_service.queue_email(
-        api_db, contact, subject="Hi", text_body="Hello", account=account)
 
-    assert bulk is None, "bulk mail to an unverified address is refused"
-    assert one_to_one is not None, "a deliberate one-to-one message is not"
+    assert message is not None and message.bulk_send is True
+
+
+@pytest_asyncio.fixture
+async def delivered(monkeypatch):
+    """Delivery succeeds without touching Brevo."""
+    async def ok(db, message):
+        message.status = "sent"
+        message.sent_at = datetime.now(timezone.utc)
+        return {"success": True}
+
+    monkeypatch.setattr(email_service, "deliver", ok)
+
+
+@pytest.mark.asyncio
+async def test_send_to_one_contact_with_a_marketing_template_is_not_held_back(
+        api_client, api_db, delivered):
+    from app.models.template import Template
+
+    contact = await _contact(api_db)
+    await make_account(api_db, default=True)
+    template = Template(name="Price list", channel="email", subject="Hi {{first_name}}",
+                        body="Hello {{first_name}}", include_unsubscribe=True)
+    api_db.add(template)
+    await api_db.flush()
+
+    response = await api_client.post("/api/v1/email/send", json={
+        "contact_id": contact.id, "template_id": template.id})
+
+    assert response.status_code == 200, response.text
+    assert response.json()["sent"] == 1 and response.json()["skipped"] == 0
+
+
+@pytest.mark.asyncio
+async def test_a_list_send_skips_the_unverified_contacts(api_client, api_db, delivered):
+    good = await _contact(api_db, verified=True, verdict="deliverable")
+    unknown = [await _contact(api_db) for _ in range(2)]
+    lst = await _list_of(api_db, [good] + unknown)
+    await make_account(api_db, default=True)
+
+    response = await api_client.post("/api/v1/email/send", json={
+        "list_id": lst.id, "subject": "Hello", "body": "Hi there"})
+
+    assert response.status_code == 200, response.text
+    assert response.json()["sent"] == 1 and response.json()["skipped"] == 2
+    sent_to = (await api_db.execute(select(Message.contact_id))).scalars().all()
+    assert sent_to == [good.id]
+
+
+@pytest.mark.asyncio
+async def test_replies_and_test_sends_are_never_gated(api_db):
+    """A reply goes to an address the person wrote to us from (a recipient override), and the
+    one-to-one path never consults the verification gate."""
+    contact = await _contact(api_db)
+    account = await make_account(api_db, default=True)
+
+    reply = await email_service.queue_email(
+        api_db, contact, subject="Re: hi", text_body="Thanks", account=account,
+        recipient_address="their.other.address@theirdomain.io", is_auto_reply=False)
+
+    assert reply is not None
 
 
 # --------------------------------------------------------------------------

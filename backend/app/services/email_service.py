@@ -26,6 +26,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import secrets
 import uuid
 from datetime import date, datetime, time, timedelta, timezone
 from typing import Iterable, Optional
@@ -465,12 +466,14 @@ def serialize_account(
         "connection_status": account.connection_status,
         "last_tested_at": account.last_tested_at.isoformat() if account.last_tested_at else None,
         "last_error": account.last_error,
+        # The token is a credential: reads carry a hint only (C10). The full URL comes
+        # from POST .../webhook/reveal, which the assistant bridge cannot call.
         "webhook_url": email_webhook_url(account),
         # Path-only form so the UI can build an absolute URL from the browser's
         # own origin when PUBLIC_BASE_URL has not been configured yet.
-        "webhook_path": (
-            f"/api/v1/webhooks/brevo/{account.id}?token={account.webhook_token or ''}"
-        ),
+        "webhook_path": email_webhook_path(account),
+        "webhook_token_masked": mask_secret(account.webhook_token),
+        "webhook_reveal_path": f"/api/v1/email/accounts/{account.id}/webhook/reveal",
         "public_base_url": public_base_url(),
         "created_at": account.created_at.isoformat() if account.created_at else None,
         "updated_at": account.updated_at.isoformat() if account.updated_at else None,
@@ -478,19 +481,49 @@ def serialize_account(
     }
 
 
-def email_webhook_url(account: EmailAccount) -> str | None:
-    """The inbound/events webhook URL to paste into Brevo for this account."""
+def mask_secret(value: str | None, *, keep: int = 4) -> str:
+    """``****a1b2`` -- enough to tell two secrets apart, useless to anyone who needs the value."""
+    if not value:
+        return ""
+    tail = value[-keep:] if len(value) >= keep * 2 else ""
+    return f"****{tail}"
+
+
+def email_webhook_path(account: EmailAccount, *, reveal: bool = False) -> str:
+    token = account.webhook_token or ""
+    shown = token if reveal else mask_secret(token)
+    return f"/api/v1/webhooks/brevo/{account.id}?token={shown}"
+
+
+def email_webhook_url(account: EmailAccount, *, reveal: bool = False) -> str | None:
+    """The inbound/events webhook URL to paste into Brevo for this account.
+
+    The token in it IS the credential for the endpoint (whoever holds it can inject inbound
+    mail and fake bounces), so it is masked unless ``reveal`` is set. Only the deliberate
+    reveal / rotate actions pass ``reveal=True``; every read shows a hint instead.
+    """
     base = (public_base_url() or "").rstrip("/")
     if not base:
         return None
-    return f"{base}/api/v1/webhooks/brevo/{account.id}?token={account.webhook_token or ''}"
+    return f"{base}{email_webhook_path(account, reveal=reveal)}"
+
+
+def _new_webhook_token() -> str:
+    return secrets.token_urlsafe(32)
 
 
 async def ensure_webhook_token(db: AsyncSession, account: EmailAccount) -> str:
     """Give an account its inbound webhook token (idempotent)."""
     if not account.webhook_token:
-        account.webhook_token = uuid.uuid4().hex
+        account.webhook_token = _new_webhook_token()
         await db.flush()
+    return account.webhook_token
+
+
+async def rotate_webhook_token(db: AsyncSession, account: EmailAccount) -> str:
+    """Replace the webhook token. The old one stops working immediately."""
+    account.webhook_token = _new_webhook_token()
+    await db.flush()
     return account.webhook_token
 
 
@@ -537,7 +570,7 @@ async def create_account(
         daily_limit=daily_limit,
         track_opens=track_opens,
         track_clicks=track_clicks,
-        webhook_token=uuid.uuid4().hex,
+        webhook_token=_new_webhook_token(),
         last_reset_date=_now().date(),
     )
     db.add(account)
@@ -1182,17 +1215,24 @@ async def queue_email(
     cc: list[str] | str | None = None,
     bcc: list[str] | str | None = None,
     recipient_address: str | None = None,
+    outreach: bool | None = None,
 ) -> Message | None:
     """Create the outbound email ``Message`` row (delivery happens elsewhere).
 
     ``attachments`` are base64 entries from the composer/template; ``bulk``
-    marks campaign mail (adds the List-Unsubscribe headers a bulk sender needs).
+    marks mail that carries the List-Unsubscribe headers a bulk sender needs.
     Returns ``None`` when the contact cannot be emailed — callers treat that as
     "skipped", exactly like an opted-out SMS contact.
+
+    ``outreach`` says the recipient was picked from an AUDIENCE (a campaign, a follow-up,
+    a list) rather than by a person choosing one contact; outreach is refused an address
+    nobody has verified. It is deliberately NOT inferred from ``bulk``: a single contact
+    emailed with a marketing template carries unsubscribe headers (``bulk``) and is still a
+    one-to-one message. When left as ``None`` it is true for campaigns and follow-ups.
     """
     address = normalize_email(recipient_address) if recipient_address else normalize_email(contact.email)
-    # Campaign and bulk mail is outreach; a one-to-one message or a reply is not.
-    outreach = bool(bulk or campaign_id is not None or ads_campaign_id is not None or followup)
+    if outreach is None:
+        outreach = bool(campaign_id is not None or ads_campaign_id is not None or followup)
     problem = await contact_email_problem(db, contact, address, outreach=outreach)
     if problem:
         logger.info("EMAIL: skipping contact %s (%s)", contact.id, problem)
@@ -1282,6 +1322,7 @@ async def send_now(
     cc: list[str] | str | None = None,
     bcc: list[str] | str | None = None,
     recipient_address: str | None = None,
+    outreach: bool | None = None,
 ) -> tuple[Message | None, dict]:
     """Queue + deliver in one call. Used by the API's "send now" paths."""
     message = await queue_email(
@@ -1289,7 +1330,7 @@ async def send_now(
         subject=subject, text_body=text_body, html_body=html_body,
         account=account, campaign_id=campaign_id, ads_campaign_id=ads_campaign_id,
         is_auto_reply=is_auto_reply, attachments=attachments, bulk=bulk,
-        cc=cc, bcc=bcc, recipient_address=recipient_address,
+        cc=cc, bcc=bcc, recipient_address=recipient_address, outreach=outreach,
     )
     if message is None:
         return None, {"success": False, "error": "contact_not_emailable"}

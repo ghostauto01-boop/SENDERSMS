@@ -12,7 +12,13 @@ import api from "./client";
 
 export type StepStatus = "done" | "todo" | "attention" | "optional";
 
-export type GuideCopy = { label: string; value: string };
+/** A value the operator copies. When `reveal` is present, `value` is a masked preview and the
+ *  real value comes from calling that endpoint (it is a credential, so reads do not carry it). */
+export type GuideCopy = {
+  label: string;
+  value: string;
+  reveal?: { method: "POST"; path: string; field: string };
+};
 export type GuideDoc = { label: string; url: string };
 
 export type GuideStep = {

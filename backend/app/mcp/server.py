@@ -299,7 +299,11 @@ async def call_app(
         response = await client.request(
             method.upper(),
             path,
-            headers={"Cookie": f"sendsms_session={cookie}"},
+            # Marks the request as coming from the assistant bridge. Endpoints that hand
+            # out a secret (reveal / rotate a webhook token) refuse it: an assistant must
+            # not be able to read a credential, nor reach one through the generic
+            # `api_request` tool. The client cannot add or remove headers here.
+            headers={"Cookie": f"sendsms_session={cookie}", "X-Sendsms-Via": "mcp"},
             **request_kwargs,
         )
 
