@@ -105,11 +105,26 @@ async def get_dashboard_stats(
     )
     interested = interested_result.scalar() or 0
 
-    # Active campaigns
-    active_result = await db.execute(
-        select(func.count(Campaign.id)).where(Campaign.status == "running")
-    )
-    active_campaigns = active_result.scalar() or 0
+    # Active campaigns, across BOTH campaign systems. The classic engine calls a
+    # sending campaign "running" and the Ads Manager calls it "active"; this used
+    # to count the classic table only, so the campaign that was actually sending
+    # (an Ads Manager one) never showed up in the headline number.
+    from app.api.v1.overview import SENDING_ADS, SENDING_CLASSIC
+    from app.models.ads import AdsCampaign
+
+    async def _campaigns_in(statuses_classic, statuses_ads) -> dict:
+        classic_q = select(func.count(Campaign.id)).where(Campaign.status.in_(statuses_classic))
+        ads_q = select(func.count(AdsCampaign.id)).where(AdsCampaign.status.in_(statuses_ads))
+        if wanted:
+            classic_q = classic_q.where(func.coalesce(Campaign.channel, "sms") == wanted)
+            ads_q = ads_q.where(func.coalesce(AdsCampaign.channel, "sms") == wanted)
+        return {
+            "campaign": (await db.execute(classic_q)).scalar() or 0,
+            "ads": (await db.execute(ads_q)).scalar() or 0,
+        }
+
+    active_by_kind = await _campaigns_in(SENDING_CLASSIC, SENDING_ADS)
+    active_campaigns = sum(active_by_kind.values())
 
     # Follow-ups due today
     today_start, today_end = local_day_utc_bounds()
@@ -131,11 +146,8 @@ async def get_dashboard_stats(
     )
     overdue = overdue_result.scalar() or 0
 
-    # Completed campaigns
-    completed_result = await db.execute(
-        select(func.count(Campaign.id)).where(Campaign.status == "completed")
-    )
-    completed_campaigns = completed_result.scalar() or 0
+    # Completed campaigns (both systems, same reason as above)
+    completed_campaigns = sum((await _campaigns_in(("completed",), ("completed",))).values())
 
     # Gateway status (from config — no DB table)
     gateway_status = "configured"
@@ -172,6 +184,9 @@ async def get_dashboard_stats(
     for camp in camp_result.scalars().all():
         recent_campaigns.append({
             "id": camp.id,
+            # The id only means something together with its kind (the two campaign
+            # systems number independently); get_campaign needs both.
+            "kind": "campaign",
             "name": camp.name,
             "status": camp.status,
             "channel": getattr(camp, "channel", "sms") or "sms",
@@ -197,6 +212,7 @@ async def get_dashboard_stats(
         "delivery_rate": delivery_rate,
         "interested_leads": interested,
         "active_campaigns": active_campaigns,
+        "active_campaigns_by_kind": active_by_kind,
         "followups_due_today": followups_due,
         "overdue_followups": overdue,
         "completed_campaigns": completed_campaigns,

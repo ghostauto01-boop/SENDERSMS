@@ -2,6 +2,12 @@
 
 ## Unreleased — reliability, imports, contact hygiene, and compliance
 
+- **P0-2 — one campaign directory across both systems.** The classic campaigns and the Ads Manager number their campaigns independently, so id 2 names two different campaigns, and the MCP `list_campaigns` / `get_campaign` only read the classic table.
+  - `GET /api/v1/overview/campaigns` now takes `kind`, `channel`, `status`, `live`, `search`, `page` and `per_page` (max 200), and reports `total` and `next_page`. Every row carries `kind` (`campaign` or `ads`; `legacy` is accepted as an alias of `campaign`), `system` (`legacy` or `ads`) and `channel`. With no parameters the response is unchanged apart from the added fields.
+  - New `GET /api/v1/overview/campaigns/{id}?kind=` returns the full definition plus metrics. An id that exists in both systems and is requested without `kind` is a 409 `AMBIGUOUS_CAMPAIGN_ID` listing the candidates, never a silent pick. An unknown id or a wrong kind is 404.
+  - MCP `list_campaigns` and `get_campaign` use these endpoints (new optional `kind` argument).
+  - `dashboard/stats.active_campaigns` (and `completed_campaigns`) count both systems, honour the `channel` filter, and add `active_campaigns_by_kind`. The classic and Ads Manager campaign payloads now include `kind`.
+  - The API error envelope now passes through extra keys from a dict `detail` (for example `candidates`).
 - **P0-1 — campaign lifecycle (legacy `/api/v1/campaigns`).**
   - `POST /campaigns/{id}/validate` is now a **report**: HTTP 200 with `valid`, `errors`, `warnings`, `audience` and `changed: false`. It no longer moves the campaign to `scheduled`. Previously a validated draft that carried a past launch time was picked up by the scheduler and sent. **Behaviour change:** callers that treated `validate` as "arm it" must call `/start` (now) or `/schedule` (later); a draft is validated inline by `/start`.
   - `scheduled` now has real exits. `POST /pause` works on a scheduled campaign and records `paused_from`, and `/resume` restores `scheduled` rather than starting to send. If the launch time passed while it was held, the time is dropped so it cannot fire on its own. `DELETE` works for a scheduled campaign (or one paused while scheduled) that has sent nothing.

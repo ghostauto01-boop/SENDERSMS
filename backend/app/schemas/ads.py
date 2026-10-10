@@ -137,6 +137,9 @@ class CampaignPatch(BaseModel):
 
 class CampaignOut(BaseModel):
     id: int
+    #: Which campaign system this id belongs to. The classic campaigns and the Ads
+    #: Manager number independently, so an id is only meaningful with its kind.
+    kind: str = "ads"
     name: str
     description: Optional[str]
     objective: str

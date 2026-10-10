@@ -400,21 +400,45 @@ TOOLS: list[Tool] = [
     # -------------------------------------------------------------- campaigns
     Tool(
         name="list_campaigns",
-        description="Campaigns for one channel, with their status and counters.",
-        method="GET", path="/api/v1/campaigns/", group="campaigns",
+        description=(
+            "Every campaign in the account, from BOTH campaign systems: the classic campaigns "
+            "(kind 'campaign', also spelled 'legacy') and the Ads Manager campaigns (kind "
+            "'ads'). Ids are only unique within a kind — campaign 2 and ads campaign 2 are "
+            "different campaigns — so always keep an id together with its 'kind' and pass both "
+            "to get_campaign. Rows carry channel, status, is_live and sent/delivered/failed/"
+            "replied counts. 'total' is how many rows match; 'next_page' is null on the last "
+            "page. Filters: kind, channel, status (exact, per system: classic 'running' = Ads "
+            "'active'), live, search."
+        ),
+        method="GET", path="/api/v1/overview/campaigns", group="campaigns",
         params=[
-            Param("channel", enum=["sms", "email", "all"], default="sms", where="query"),
+            Param("kind", enum=["campaign", "legacy", "ads"], where="query",
+                  description="Restrict to one system. Omit for both."),
+            Param("channel", enum=["sms", "email", "all"], where="query",
+                  description="Omit (or 'all') for both channels."),
             Param("status", where="query"),
+            Param("live", type="boolean", where="query",
+                  description="true = only campaigns that are running/scheduled/paused."),
             Param("search", where="query"),
             Param("page", type="integer", default=1, where="query"),
-            Param("per_page", type="integer", default=25, where="query"),
+            Param("per_page", type="integer", default=50, where="query",
+                  description="Max 200."),
         ],
     ),
     Tool(
         name="get_campaign",
-        description="One campaign's full definition and results.",
-        method="GET", path="/api/v1/campaigns/{campaign_id}", group="campaigns",
-        params=[Param("campaign_id", type="integer", required=True, where="path")],
+        description=(
+            "One campaign's full definition and results. Pass the 'kind' the id was listed "
+            "with (campaign | ads): the two systems number their campaigns independently, so "
+            "an id that exists in both is refused as ambiguous (the error lists the candidates) "
+            "instead of guessed. An id that exists in only one system resolves without 'kind'."
+        ),
+        method="GET", path="/api/v1/overview/campaigns/{campaign_id}", group="campaigns",
+        params=[
+            Param("campaign_id", type="integer", required=True, where="path"),
+            Param("kind", enum=["campaign", "legacy", "ads"], where="query",
+                  description="Which system the id belongs to (see list_campaigns)."),
+        ],
     ),
     Tool(
         name="create_campaign",

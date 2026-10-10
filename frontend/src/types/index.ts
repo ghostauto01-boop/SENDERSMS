@@ -353,7 +353,9 @@ export interface DashboardStats {
   reply_rate: number;
   delivery_rate: number;
   interested_leads: number;
+  // Classic campaigns running + Ads Manager campaigns active.
   active_campaigns: number;
+  active_campaigns_by_kind?: { campaign: number; ads: number };
   followups_due_today: number;
   overdue_followups: number;
   completed_campaigns: number;

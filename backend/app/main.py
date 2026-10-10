@@ -1148,6 +1148,12 @@ async def _http_error(request: Request, exc: HTTPException):
         "hint": detail.get("hint") if isinstance(detail, dict) else None,
         "request_id": request_id,
     }
+    if isinstance(detail, dict):
+        # Structured errors may carry machine-readable extras (the candidates of
+        # an ambiguous id, the list of validation problems, ...). They ride along
+        # as top-level keys; the envelope above always wins on a name clash.
+        for key, value in detail.items():
+            content.setdefault(key, value)
     return JSONResponse(
         status_code=exc.status_code,
         content=content,
