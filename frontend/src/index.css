@@ -290,7 +290,9 @@
 
 /* Route-change transition, driven by the key on <main> in MainLayout. */
 .page-enter {
-  animation: fade-up 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  /* Do not leave a transformed ancestor around fixed dialogs. Even a
+     translateY(0) traps modal overlays inside the page instead of the viewport. */
+  animation: fade-in 240ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* react-hot-toast, restyled onto the app's palette. */
@@ -298,4 +300,10 @@
   @apply rounded-xl border border-gray-200/80 bg-white/95 text-gray-800 shadow-pop backdrop-blur
          dark:border-gray-700/70 dark:bg-gray-800/95 dark:text-gray-100;
   font-size: 0.875rem;
+}
+
+/* Full-screen overlays must ignore a parent's space-y sibling margins. Without
+   this, contact dialogs start below the viewport and leave an uncovered strip. */
+.fixed.inset-0 {
+  margin: 0 !important;
 }

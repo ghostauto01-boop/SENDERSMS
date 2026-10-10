@@ -205,9 +205,9 @@ class Settings(BaseSettings):
     # to it (self-hosted: `docker run -p 8080:8080 reacherhq/check-if-email-
     # exists`, then REACHER_API_URL=http://localhost:8080/v2/check_email; or
     # use the hosted endpoint with REACHER_API_KEY). When it is empty — or
-    # unreachable — the app runs the identical pipeline itself (syntax, MX,
+    # unreachable — the app runs built-in checks itself (syntax, MX,
     # disposable/role flags, SMTP RCPT probe with catch-all detection), so the
-    # list email validator always works.
+    # validator needs no API key. Blocked probes are reported as unknown.
     REACHER_API_URL: Optional[str] = None
     REACHER_API_KEY: Optional[str] = None
     #: Let the built-in validator perform the live SMTP mailbox probe when no

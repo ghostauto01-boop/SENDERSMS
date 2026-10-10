@@ -53,6 +53,11 @@ function SendPageInner() {
     );
   }
 
+  return <SmsSendPage />;
+}
+
+// Separate components keep the hook order stable when SMS/Email is switched.
+function SmsSendPage() {
   const [mode, setMode] = useState<"contact" | "number" | "list">("contact");
   const [sendType, setSendType] = useState<"now" | "scheduled">("now");
   const [contacts, setContacts] = useState<any[]>([]);

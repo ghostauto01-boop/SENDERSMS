@@ -1212,10 +1212,11 @@ async def health_db():
     code = 200 if result.get("ok") else 503
     return JSONResponse(result, status_code=code, headers={"Cache-Control": "no-store"})
 
-from app.api.v1 import ads, auth, calendar, calls, contacts, lists, campaigns, sequences, followups, inbox, overview, templates, analytics, settings as settings_api, webhooks, dashboard, send, autoreply, automations, ai, variables, campaign_followups, notifications, email as email_api, mailbox as mailbox_api, guide as guide_api, mcp as mcp_api, system as system_api
+from app.api.v1 import validator, ads, auth, calendar, calls, contacts, lists, campaigns, sequences, followups, inbox, overview, templates, analytics, settings as settings_api, webhooks, dashboard, send, autoreply, automations, ai, variables, campaign_followups, notifications, email as email_api, mailbox as mailbox_api, guide as guide_api, mcp as mcp_api, system as system_api
 app.include_router(auth.router, prefix="/api/v1/auth")
 app.include_router(dashboard.router, prefix="/api/v1/dashboard")
 app.include_router(contacts.router, prefix="/api/v1/contacts")
+app.include_router(validator.router, prefix="/api/v1/validator")
 app.include_router(lists.router, prefix="/api/v1/lists")
 app.include_router(campaigns.router, prefix="/api/v1/campaigns")
 app.include_router(sequences.router, prefix="/api/v1/sequences")

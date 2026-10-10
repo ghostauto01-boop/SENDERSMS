@@ -62,7 +62,7 @@ function stripAny(text: string, prefixes: string[]): string | null {
 /** Names and statuses look better without the decorative emoji in the title. */
 function stripLeadingEmoji(text: string): string {
   return text.replace(
-    /^[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}]+\s*/u,
+    /^(?:[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}]\u{FE0F}?)+\s*/u,
     ""
   );
 }

@@ -123,7 +123,7 @@ describe("ContactsPage — select all matching -> bulk add to list", () => {
 
     // Pick the list in the ListPicker dropdown.
     fireEvent.click(screen.getByRole("button", { name: /select list/i }));
-    const option = await screen.findByText("Bulk Target");
+    const option = await screen.findByText("Bulk Target", { selector: "span" });
     fireEvent.click(option);
 
     // Confirm: the server-scoped add-all endpoint is used, NOT per-id adds.
@@ -155,11 +155,51 @@ describe("ContactsPage — select all matching -> bulk add to list", () => {
 
     fireEvent.click(screen.getByText("Add to list"));
     fireEvent.click(await screen.findByRole("button", { name: /select list/i }));
-    fireEvent.click(await screen.findByText("Bulk Target"));
+    fireEvent.click(await screen.findByText("Bulk Target", { selector: "span" }));
     fireEvent.click(screen.getByText("Add to List", { selector: "button" }));
 
     await waitFor(() =>
       expect(apiPost).toHaveBeenCalledWith("/lists/7/contacts", expect.arrayContaining([1, 2]))
     );
+  });
+});
+
+describe("Contacts filters and validator navigation", () => {
+  it("opens Validator with the exact channel, list and email filters", async () => {
+    await renderContacts();
+    fireEvent.change(screen.getByLabelText("Channel"), { target: { value: "email" } });
+    fireEvent.change(screen.getByLabelText("Contact list"), { target: { value: "7" } });
+    fireEvent.change(screen.getByLabelText("Email eligibility"), { target: { value: "unverified" } });
+    const link = screen.getByRole("link", { name: "Validator" });
+    const url = new URL(link.getAttribute("href")!, "http://test");
+    expect(url.searchParams.get("channel")).toBe("email");
+    expect(url.searchParams.get("list_id")).toBe("7");
+    expect(url.searchParams.get("email_state")).toBe("unverified");
+  });
+
+  it("bulk delete honors ALL visible filters, not just search and status", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    apiPost.mockResolvedValue({ data: { success: true } });
+    await renderContacts();
+    fireEvent.change(screen.getByLabelText("Channel"), { target: { value: "email" } });
+    fireEvent.change(screen.getByLabelText("Contact list"), { target: { value: "7" } });
+    fireEvent.change(screen.getByLabelText("Email eligibility"), { target: { value: "unverified" } });
+    fireEvent.click(document.querySelector("table thead input[type=checkbox]")!);
+    fireEvent.click(screen.getAllByText("Select all 60 matching")[0]);
+    fireEvent.click(screen.getByText("Delete permanently", { selector: "button" }));
+    await waitFor(() => expect(apiPost).toHaveBeenCalledWith("/contacts/bulk", expect.objectContaining({ scope: "all", channel: "email", list_id: 7, email_state: "unverified" })));
+  });
+
+  it("recovers after a contacts request fails and Retry succeeds", async () => {
+    const original = apiGet.getMockImplementation()!;
+    let failed = false;
+    apiGet.mockImplementation((url, options) => {
+      if (url === "/contacts/" && !failed) { failed = true; return Promise.reject(new Error("offline")); }
+      return original(url, options);
+    });
+    render(<ContactsPage />);
+    fireEvent.click(await screen.findByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(screen.getAllByText("First1 Tester").length).toBeGreaterThan(0));
+    expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
   });
 });

@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Users, List, Megaphone, GitBranch, Sparkles,
   Inbox, Send, Clock, FileText, BarChart3, Settings, MessageSquareReply,
   Zap, Moon, Sun, Menu, X, LogOut, Search, Braces, Repeat, Calendar, Target,
-  Activity, Phone, Mail, MailOpen, GraduationCap, MoreHorizontal,
+  Activity, Phone, Mail, MailOpen, GraduationCap, MoreHorizontal, ShieldCheck,
 } from "lucide-react";
 import BrandMark from "../components/BrandMark";
 import ChannelSwitch from "../components/ChannelSwitch";
@@ -41,6 +41,7 @@ const OVERVIEW: NavItem[] = [
 const WORK: NavItem[] = [
   { to: "/send", label: "Send", icon: Send },
   { to: "/contacts", label: "Contacts", icon: Users },
+  { to: "/validator", label: "Validator", icon: ShieldCheck },
   { to: "/phone", label: "Phone", icon: Phone },
   { to: "/lists", label: "Lists", icon: List },
   { to: "/audiences", label: "Audiences", icon: Target },
@@ -176,7 +177,7 @@ export default function MainLayout() {
         className={`
           fixed top-0 left-0 z-50 h-full w-72 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700/70
           transform transition-transform duration-200 ease-gentle flex flex-col
-          lg:translate-x-0 lg:static lg:z-auto
+          shrink-0 lg:translate-x-0 lg:sticky lg:top-0 lg:h-dvh lg:z-auto
           ${sidebarOpen ? "translate-x-0 shadow-pop" : "-translate-x-full"}
         `}
       >
@@ -307,7 +308,7 @@ export default function MainLayout() {
         </header>
 
         {/* Page content */}
-        <main key={location.pathname} className="flex-1 p-3 sm:p-4 lg:p-6 overflow-auto page-enter pb-tabbar">
+        <main key={location.pathname} className="flex-1 min-w-0 p-3 sm:p-4 lg:p-6 page-enter pb-tabbar">
           <Outlet />
         </main>
       </div>

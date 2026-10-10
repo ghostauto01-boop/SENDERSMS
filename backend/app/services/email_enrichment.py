@@ -159,9 +159,6 @@ class EnrichmentResult:
 # Stage 2 — DNS (optional dependency, cached)
 # --------------------------------------------------------------------------
 
-_MX_CACHE: dict[str, tuple[Optional[bool], float]] = {}
-
-
 def _dns_available() -> bool:
     """True when MX lookups are possible in this process.
 
@@ -178,41 +175,10 @@ def _dns_available() -> bool:
 
 
 def mx_records_exist(domain: str) -> Optional[bool]:
-    """Does the domain publish MX records? ``None`` when it cannot be checked.
+    """True/False only for definitive DNS answers; outages stay unknown."""
+    from app.services.mail_dns import mail_route
 
-    A domain with no MX record cannot receive mail, which is the single
-    cheapest way to spot a dead address without paying a verifier. The answer
-    is cached for ``EMAIL_ENRICHMENT_DNS_TTL`` seconds so a 5,000-row import
-    performs a handful of lookups instead of 5,000.
-    """
-    domain = (domain or "").strip().lower()
-    if not domain:
-        return None
-
-    now = datetime.now(timezone.utc).timestamp()
-    cached = _MX_CACHE.get(domain)
-    if cached and (now - cached[1]) < max(settings.EMAIL_ENRICHMENT_DNS_TTL, 0):
-        return cached[0]
-
-    try:
-        import dns.resolver
-    except Exception:
-        return None
-
-    answer: Optional[bool]
-    try:
-        dns.resolver.resolve(domain, "MX", lifetime=settings.EMAIL_ENRICHMENT_TIMEOUT)
-        answer = True
-    except Exception:
-        # No MX is not always fatal (RFC 5321 allows an A-record fallback),
-        # but for a business domain it is a very strong "this address is dead".
-        try:
-            dns.resolver.resolve(domain, "A", lifetime=settings.EMAIL_ENRICHMENT_TIMEOUT)
-            answer = False
-        except Exception:
-            answer = False
-    _MX_CACHE[domain] = (answer, now)
-    return answer
+    return mail_route(domain).accepts_mail
 
 
 # --------------------------------------------------------------------------
