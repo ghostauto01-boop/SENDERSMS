@@ -178,7 +178,7 @@ async def send_sms_now(
     for contact in recipients:
         # Respect Settings -> Sending Rules (hourly/daily/per-minute caps and
         # pacing) so a manual "send to list" cannot trip a carrier flag either.
-        slot = await await_slot(db, cap_seconds=10)
+        slot = await await_slot(db, cap_seconds=10, channel="sms")
         if not slot["allowed"]:
             if len(recipients) == 1:
                 raise HTTPException(
@@ -485,7 +485,7 @@ async def retry_message(mid: int, db: AsyncSession = Depends(get_db), cu: User =
     from app.providers.smsgate import send_sms_direct
     from app.services.system_settings import get_sim_number
     from app.services.sending_limits import await_slot
-    slot = await await_slot(db, cap_seconds=8)
+    slot = await await_slot(db, cap_seconds=8, channel="sms")
     if not slot["allowed"]:
         raise HTTPException(
             429,

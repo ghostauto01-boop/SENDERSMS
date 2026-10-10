@@ -45,6 +45,22 @@ class CampaignStateError(CampaignError):
     """The request is fine but the campaign's current state forbids it (HTTP 409)."""
 
 
+class BreakerTripped(CampaignStateError):
+    """The campaign was paused by the bounce circuit breaker and has not been acknowledged.
+
+    Resuming is allowed -- a person may know better than a percentage -- but only
+    deliberately (``acknowledge_breaker=true``), never by a reflexive click.
+    """
+
+    def __init__(self, campaign):
+        self.campaign_id = campaign.id
+        self.reason = campaign.paused_reason or ""
+        super().__init__(
+            f"This campaign was paused automatically. {self.reason} Fix the list first "
+            "(verify the addresses), then repeat with acknowledge_breaker=true to resume anyway."
+        )
+
+
 @dataclass
 class CampaignCheck:
     """Everything a validation pass learned. Reading it changes nothing."""
@@ -96,7 +112,7 @@ class CampaignService:
                 "No email sender configured. Add a Brevo API key and From address on the "
                 "Email Senders page, then choose it for this campaign."
             )
-        usable, why = await email_service.account_is_usable(account)
+        usable, why = await email_service.account_is_usable(account, check_room=False)
         if not usable:
             return f"Email sender '{account.name}' cannot send right now ({why})."
         if not (campaign.subject or "").strip():
@@ -298,7 +314,77 @@ class CampaignService:
         gateway_error = await self._check_gateway(campaign)
         if gateway_error:
             errors.append(gateway_error)
+
+        if campaign.list_id and check.audience.get("list_members"):
+            await self._analyse_audience(campaign, check)
         return check
+
+    async def _members(self, campaign: Campaign) -> list[Contact]:
+        """Every contact on the campaign's list."""
+        return list(
+            (
+                await self.db.execute(
+                    select(Contact)
+                    .join(ContactListMember, ContactListMember.contact_id == Contact.id)
+                    .where(ContactListMember.list_id == campaign.list_id)
+                    .order_by(Contact.id)
+                )
+            ).scalars().all()
+        )
+
+    async def _analyse_audience(self, campaign: Campaign, check: CampaignCheck) -> None:
+        """Who would actually be messaged, and how long that takes under the sending rules.
+
+        Uses the same eligibility rules the send path applies, so the numbers in a
+        validation report are the numbers the campaign will really produce.
+        """
+        from app.services import sending_limits
+
+        channel = campaign.channel or "sms"
+        contacts = await self._members(campaign)
+        if channel == "email":
+            from app.services import email_service
+
+            eligible, skipped = await email_service.screen_contacts_for_email(self.db, contacts)
+        else:
+            from app.services.list_hygiene import contact_is_blocked_from_send
+
+            eligible, skipped = [], {}
+            for contact in contacts:
+                reason = contact_is_blocked_from_send(contact)
+                if reason:
+                    skipped[reason] = skipped.get(reason, 0) + 1
+                else:
+                    eligible.append(contact)
+
+        check.audience.update(
+            list_members=len(contacts), sendable=len(eligible), skipped=skipped
+        )
+        skipped_total = sum(skipped.values())
+        if skipped_total:
+            detail = ", ".join(f"{n} {reason}" for reason, n in sorted(skipped.items()))
+            check.warnings.append(
+                f"{skipped_total} of {len(contacts)} contacts will be skipped ({detail})."
+            )
+        if channel == "email" and contacts and not eligible:
+            check.errors.append(
+                "None of the contacts on this list can be emailed "
+                f"({', '.join(f'{n} {r}' for r, n in sorted(skipped.items()))})."
+            )
+
+        account_ids = None
+        if channel == "email":
+            from app.services import email_service
+
+            account = await email_service.get_account(self.db, campaign.email_account_id)
+            account = account or await email_service.get_default_account(self.db)
+            account_ids = [account.id] if account else None
+        check.projection = await sending_limits.project_send(
+            self.db, channel=channel, sendable=len(eligible), account_ids=account_ids,
+        )
+        warning = sending_limits.projection_warning(check.projection)
+        if warning:
+            check.warnings.append(warning)
 
     async def validate_report(self, campaign_id: int) -> dict:
         """Check a campaign and report. **Changes nothing**, however often it is called.
@@ -464,7 +550,9 @@ class CampaignService:
             ),
         }
 
-    async def start_campaign(self, campaign_id: int) -> Campaign:
+    async def start_campaign(
+        self, campaign_id: int, *, acknowledge_breaker: bool = False
+    ) -> Campaign:
         """Start a campaign: queue all contacts for processing.
 
         A ``draft`` is validated *here*, inline, so "start" is one honest step
@@ -476,6 +564,8 @@ class CampaignService:
 
         This creates CampaignContact records; actual sending is done by the workers.
         """
+        from app.services import circuit_breaker
+
         campaign = await self._get(campaign_id)
         status = campaign.status
         fresh = status in ("draft", "scheduled") or (
@@ -483,6 +573,11 @@ class CampaignService:
         )
         if not fresh and status != "paused":
             raise CampaignStateError(f"Cannot start campaign in {status} status")
+        if circuit_breaker.is_breaker_pause(campaign):
+            # /start must not be a back door around the breaker's acknowledgement.
+            if not acknowledge_breaker:
+                raise BreakerTripped(campaign)
+            circuit_breaker.acknowledge(campaign)
 
         if fresh:
             check = await self._collect(campaign)
@@ -580,7 +675,9 @@ class CampaignService:
         await self.db.flush()
         return campaign
 
-    async def resume_campaign(self, campaign_id: int) -> Campaign:
+    async def resume_campaign(
+        self, campaign_id: int, *, acknowledge_breaker: bool = False
+    ) -> Campaign:
         """Resume a paused campaign.
 
         Paused mid-send: back to ``running``. Paused while scheduled: back to
@@ -595,7 +692,7 @@ class CampaignService:
                 f"Only paused campaigns can be resumed (this one is {campaign.status})"
             )
         if campaign.paused_from != "scheduled":
-            return await self.start_campaign(campaign_id)
+            return await self.start_campaign(campaign_id, acknowledge_breaker=acknowledge_breaker)
 
         self.transition(campaign, "scheduled")
         campaign.paused_from = None
@@ -618,6 +715,19 @@ class CampaignService:
         self.transition(campaign, "stopped")
         campaign.completed_at = datetime.now(timezone.utc)
         campaign.paused_from = None
+
+        # Mail already created but not yet sent must not go out after a stop.
+        from app.models.conversation import Message
+
+        await self.db.execute(
+            update(Message)
+            .where(
+                Message.campaign_id == campaign_id,
+                Message.direction == "outgoing",
+                Message.status.in_(["queued", "retrying"]),
+            )
+            .values(status="cancelled", last_error="Campaign stopped")
+        )
 
         # Cancel all pending contacts
         await self.db.execute(

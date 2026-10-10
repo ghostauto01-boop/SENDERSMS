@@ -247,6 +247,10 @@ async def _poll() -> int:
         # asleep (free tier) or Redis unreachable — otherwise campaigns stay
         # “running” with pending contacts forever.
         work += await _process_running_campaigns_inline()
+        # Bounce circuit breaker: pause any email campaign over the bounce limit.
+        # The webhook checks as events arrive; this is the backstop (and the
+        # no-worker fallback for the Celery beat task of the same name).
+        work += await _check_circuit_breakers_inline()
         # Sweep any queued messages that were rate-limited / deferred (or that
         # a dead broker left behind). Uses the same atomic claim as Celery so
         # the two can never double-send the same message.
@@ -299,7 +303,8 @@ async def _pending_work_snapshot() -> tuple[bool, "float | None"]:
         )).scalar() or 0
         queued = (await db.execute(
             select(func.count()).select_from(Message).where(
-                Message.direction == "outgoing", Message.status == "queued")
+                Message.direction == "outgoing", Message.status == "queued",
+                _not_held_by_paused_campaign(Message))
         )).scalar() or 0
         settling = (await db.execute(
             select(func.count()).select_from(Message).where(
@@ -361,7 +366,11 @@ async def _process_queued_messages_inline() -> int:
         async with async_session_factory() as db:
             rows = await db.execute(
                 _select(_Message.id)
-                .where(_Message.direction == "outgoing", _Message.status == "queued")
+                .where(
+                    _Message.direction == "outgoing",
+                    _Message.status == "queued",
+                    _not_held_by_paused_campaign(_Message),
+                )
                 .order_by(_Message.created_at.asc())
                 .limit(20)
             )
@@ -508,6 +517,41 @@ async def _process_meeting_reminders() -> int:
     except Exception as exc:
         logger.warning("Meeting reminders: %s", exc)
         return 0
+
+
+async def _check_circuit_breakers_inline() -> int:
+    """Run the circuit-breaker sweep when no Celery worker is awake to do it."""
+    try:
+        from app.tasks.campaign_tasks import check_circuit_breakers_async
+
+        tripped = await check_circuit_breakers_async()
+        for t in tripped:
+            logger.warning("CIRCUIT BREAKER (inline): paused %s %s: %s", t["kind"], t["id"], t.get("reason"))
+        return len(tripped)
+    except Exception as exc:
+        logger.warning("Circuit breaker sweep: %s", exc)
+        return 0
+
+
+def _not_held_by_paused_campaign(message_model):
+    """SQL condition: the message's campaign is not paused.
+
+    Mail created before a pause is *held* (left queued) until the campaign
+    resumes. The sweeps must not keep picking it up -- it would starve everything
+    behind it and keep the poller awake forever.
+    """
+    from sqlalchemy import or_ as _or, select as _select
+    from app.models.ads import AdsCampaign
+    from app.models.campaign import Campaign
+
+    paused_classic = _select(Campaign.id).where(Campaign.status == "paused")
+    paused_ads = _select(AdsCampaign.id).where(AdsCampaign.status == "paused")
+    from sqlalchemy import and_ as _and
+
+    return _and(
+        _or(message_model.campaign_id.is_(None), message_model.campaign_id.not_in(paused_classic)),
+        _or(message_model.ads_campaign_id.is_(None), message_model.ads_campaign_id.not_in(paused_ads)),
+    )
 
 
 async def _process_running_campaigns_inline() -> int:
@@ -930,6 +974,16 @@ async def _poll_loop():
             logger.warning("Poll loop: %s", e)
             delay = float(settings.INLINE_POLL_INTERVAL)
 
+async def _apply_safe_sending_defaults() -> None:
+    """One-time: switch the protective sending rules on for a never-configured database."""
+    from app.services.sending_limits import apply_safe_defaults
+
+    async with async_session_factory() as db:
+        result = await apply_safe_defaults(db)
+        await db.commit()
+    logger.info("Sending rules safe-defaults step: %s", result)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     import asyncio
@@ -948,6 +1002,10 @@ async def lifespan(app: FastAPI):
                 logger.error("init_db failed (%s): %s", kind, msg)
             else:
                 logger.warning("init_db: %s", e)
+        try:
+            await asyncio.wait_for(_apply_safe_sending_defaults(), timeout=20)
+        except Exception as e:
+            logger.warning("safe sending defaults: %s", e)
         try:
             await asyncio.wait_for(_startup_webhook(), timeout=20)
         except Exception as e:

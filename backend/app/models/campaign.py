@@ -32,6 +32,10 @@ class Campaign(Base):
     #: writes ("bounce rate 5.0% ...") so an auto-pause is never a mystery.
     paused_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     paused_reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    #: Start of the circuit breaker's rolling window. Set when an operator resumes
+    #: a campaign the breaker paused, so the bounces that tripped it are not judged
+    #: again the moment it runs.
+    breaker_reset_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     #: "sms" or "email" — which channel this campaign sends on. Existing rows
     #: default to "sms", so nothing about the current behaviour changes.

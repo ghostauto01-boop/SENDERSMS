@@ -126,12 +126,17 @@ async def list_accounts(
     cu: User = Depends(get_current_user),
 ):
     """Every saved Brevo key, with its usage. The keys themselves are masked."""
+    from app.services.sending_limits import default_mailbox_limit, get_sending_rules
+
+    default_limit = default_mailbox_limit(await get_sending_rules(db))
     accounts = await email_service.list_accounts(db)
     items = []
     for account in accounts:
         await email_service.reset_daily_counter(account)
         stats = await email_service.account_stats(db, account.id)
-        items.append(email_service.serialize_account(account, stats=stats))
+        items.append(
+            email_service.serialize_account(account, stats=stats, default_limit=default_limit)
+        )
     await db.flush()
     return {"total": len(items), "items": items}
 
@@ -433,10 +438,15 @@ async def overview(
     """Everything the Email Manager landing tab shows, in one round trip."""
     totals = await email_service.email_totals(db, days=days, account_id=account_id)
 
+    from app.services.sending_limits import default_mailbox_limit, get_sending_rules
+
+    default_limit = default_mailbox_limit(await get_sending_rules(db))
     accounts = []
     for account in await email_service.list_accounts(db):
         stats = await email_service.account_stats(db, account.id)
-        accounts.append(email_service.serialize_account(account, stats=stats))
+        accounts.append(
+            email_service.serialize_account(account, stats=stats, default_limit=default_limit)
+        )
 
     unread = (
         await db.execute(

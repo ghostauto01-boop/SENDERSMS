@@ -292,11 +292,16 @@ async def test_csv_import_is_multipart_with_an_uploaded_file(captured):
 @pytest.mark.asyncio
 async def test_tools_whose_body_is_mandatory_always_send_one(captured):
     """POST /campaigns/{id}/schedule rejects a missing body with 422."""
+    # Campaign tools first look the id up (it may name a classic AND an Ads Manager
+    # campaign), so pick out the schedule call itself rather than assuming it is first.
+    def schedule_calls():
+        return [c for c in captured if c["path"].endswith("/schedule")]
+
     await _run("schedule_campaign", campaign_id=3)
-    assert captured[0]["body"] == {}
+    assert schedule_calls()[0]["body"] == {}
     await _run("schedule_campaign", campaign_id=3,
                scheduled_start_at="2030-01-01T09:00:00+01:00")
-    assert captured[1]["body"] == {"scheduled_start_at": "2030-01-01T09:00:00+01:00"}
+    assert schedule_calls()[1]["body"] == {"scheduled_start_at": "2030-01-01T09:00:00+01:00"}
 
 
 @pytest.mark.asyncio

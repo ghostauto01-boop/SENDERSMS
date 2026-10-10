@@ -188,6 +188,13 @@ class Settings(BaseSettings):
     # charged against the sender reputation of every address the app sends to.
     # An operator who has reviewed the guesses can opt in for a campaign.
     EMAIL_SEND_INFERRED: bool = False
+    # Daily sends allowed PER MAILBOX when an account has no daily limit of its own.
+    # A new sending mailbox has no reputation; the usual guidance is 20-50 a day
+    # per mailbox, rising slowly. This is the deployment default for the
+    # ``email_daily_per_mailbox`` sending rule (Settings -> Sending Rules can
+    # override it); an account's own daily_limit can only lower it. 0 = no
+    # per-mailbox default.
+    EMAIL_DEFAULT_DAILY_LIMIT: int = 30
     # Per-domain DNS cache TTL, in seconds. MX answers change rarely; caching
     # them keeps a 5,000-row import from making 5,000 DNS round-trips.
     EMAIL_ENRICHMENT_DNS_TTL: int = 3600

@@ -178,6 +178,28 @@ export default function CampaignsPage() {
     }
   };
 
+  /** Resume. A pause by the bounce circuit breaker needs a deliberate "yes", not a reflex click. */
+  const handleResume = async (camp: Campaign) => {
+    const tripped = (camp.paused_reason || "").startsWith("Circuit breaker");
+    if (
+      tripped &&
+      !window.confirm(`${camp.paused_reason}\n\nResume anyway? Fix the list first (verify the addresses).`)
+    ) {
+      return;
+    }
+    try {
+      const { data } = await api.post(
+        `/campaigns/${camp.id}/resume`,
+        null,
+        tripped ? { params: { acknowledge_breaker: true } } : undefined,
+      );
+      toast.success(data?.message || "Campaign resumed");
+      loadCampaigns();
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || "Failed to resume campaign");
+    }
+  };
+
   /** Validate is a report. It never changes the campaign, however often it is clicked. */
   const handleValidate = async (id: number) => {
     try {
@@ -399,7 +421,7 @@ export default function CampaignsPage() {
                   )}
                   {camp.status === "paused" && (
                     <>
-                      <button onClick={() => handleAction(camp.id, "resume")} className="btn-primary btn-sm"><Play size={14} className="mr-1" /> Resume</button>
+                      <button onClick={() => handleResume(camp)} className="btn-primary btn-sm"><Play size={14} className="mr-1" /> Resume</button>
                       <button onClick={() => handleAction(camp.id, "stop")} className="btn-danger btn-sm"><Square size={14} className="mr-1" /> Stop</button>
                       {camp.paused_from === "scheduled" && (camp.messages_sent || 0) === 0 && (
                         <button onClick={() => handleDelete(camp.id)} className="btn-ghost btn-sm text-danger-600" title="Delete campaign"><Trash2 size={14} /></button>

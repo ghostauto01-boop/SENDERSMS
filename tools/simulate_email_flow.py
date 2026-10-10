@@ -38,6 +38,14 @@ with httpx.Client(base_url=BASE, timeout=30, follow_redirects=True) as api:
     me = api.get("/auth/me")
     step("login", me.status_code == 200, str(me.status_code))
 
+    # Sending rules are ON by default (09:00-17:00, weekends off, a daily cap per
+    # mailbox), so a campaign started at night or on a weekend would -- correctly --
+    # send nothing, and this simulator would fail depending on the clock. It is a
+    # throwaway database against a fake Brevo: open the rules for the run.
+    api.put("/settings/sending-rules", params={
+        "dl": "false", "ss": "", "se": "", "aw": "true", "pc": "false",
+    })
+
     # ------------------------------------------------------ add Brevo sender
     resp = api.post("/email/accounts", json={
         "name": "Acme Leads",

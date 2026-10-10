@@ -325,3 +325,92 @@ async def test_mcp_get_campaign_explains_the_ambiguity_instead_of_guessing(api_c
     assert result["is_error"] is True
     assert "kind" in result["text"].lower()
     assert ADS_UGC in result["text"] and LEGACY_DRAFT_EMAIL in result["text"]
+
+
+# --------------------------------------------------------------------------
+# writes: an ambiguous id must never pause/start/delete "whichever it found"
+# --------------------------------------------------------------------------
+
+
+async def _status_of(db, model, name):
+    from sqlalchemy import select as _select
+
+    row = (await db.execute(_select(model).where(model.name == name))).scalar_one()
+    await db.refresh(row)
+    return row.status
+
+
+@pytest.mark.asyncio
+async def test_mcp_pause_on_an_ambiguous_id_is_refused_not_guessed(api_client, api_db, seeded):
+    """Id 1 is a running classic campaign AND an active Ads Manager campaign."""
+    result = await _call("pause_campaign", campaign_id=1)
+
+    assert result["is_error"] is True
+    assert "kind" in result["text"].lower()
+    assert LEGACY_RUNNING in result["text"] and ADS_EMAIL_ONE in result["text"]
+    assert await _status_of(api_db, Campaign, LEGACY_RUNNING) == "running"
+    assert await _status_of(api_db, AdsCampaign, ADS_EMAIL_ONE) == "active"
+
+
+@pytest.mark.asyncio
+async def test_mcp_pause_with_a_kind_touches_only_that_system(api_client, api_db, seeded):
+    paused_ads = await _call("pause_campaign", campaign_id=1, kind="ads")
+    assert not paused_ads["is_error"], paused_ads["text"]
+    assert await _status_of(api_db, AdsCampaign, ADS_EMAIL_ONE) == "paused"
+    assert await _status_of(api_db, Campaign, LEGACY_RUNNING) == "running", (
+        "the classic campaign with the same id must be untouched"
+    )
+
+    paused_classic = await _call("pause_campaign", campaign_id=1, kind="campaign")
+    assert not paused_classic["is_error"], paused_classic["text"]
+    assert await _status_of(api_db, Campaign, LEGACY_RUNNING) == "paused"
+
+
+@pytest.mark.asyncio
+async def test_mcp_write_on_an_unambiguous_id_routes_to_the_right_system(
+    api_client, api_db, seeded
+):
+    # Only the Ads Manager has a campaign 3 (and it is paused).
+    result = await _call("resume_campaign", campaign_id=3)
+
+    assert not result["is_error"], result["text"]
+    assert await _status_of(api_db, AdsCampaign, ADS_SMS_PAUSED) == "active"
+
+
+@pytest.mark.asyncio
+async def test_mcp_validate_and_analytics_route_by_kind(api_client, seeded):
+    ads = await _call("validate_campaign", campaign_id=2, kind="ads")
+    assert not ads["is_error"], ads["text"]
+    assert "summary" in ads["json"], "the Ads Manager's own validate report"
+
+    classic = await _call("validate_campaign", campaign_id=2, kind="campaign")
+    assert not classic["is_error"], classic["text"]
+    assert "valid" in classic["json"] and "changed" in classic["json"]
+
+
+@pytest.mark.asyncio
+async def test_mcp_action_the_ads_manager_does_not_have_is_explained(api_client, seeded):
+    result = await _call("schedule_campaign", campaign_id=3, scheduled_start_at=None)
+
+    assert result["is_error"] is True
+    assert "ads" in result["text"].lower() and "not available" in result["text"].lower()
+
+
+@pytest.mark.asyncio
+async def test_mcp_write_on_a_missing_id_is_a_404_not_a_wrong_campaign(api_client, seeded):
+    result = await _call("pause_campaign", campaign_id=999)
+    assert result["is_error"] is True
+    assert "404" in result["text"] or "no campaign" in result["text"].lower()
+
+
+def test_every_kind_specific_tool_path_exists_in_the_app():
+    """The ads variants of the campaign tools must point at real routes."""
+    from app.main import app
+
+    spec = app.openapi()
+    for tool in TOOLS_BY_NAME.values():
+        for kind, (method, path) in (getattr(tool, "kind_paths", None) or {}).items():
+            template = path.replace("{campaign_id}", "{campaign_id}")
+            operations = spec["paths"].get(template)
+            assert operations is not None, f"{tool.name}[{kind}]: {path} is not a route"
+            assert method.lower() in operations, f"{tool.name}[{kind}]: {method} {path}"

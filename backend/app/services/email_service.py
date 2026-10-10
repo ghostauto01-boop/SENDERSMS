@@ -379,14 +379,30 @@ async def reset_daily_counter(account: EmailAccount, today: date | None = None) 
         account.last_reset_date = today
 
 
-async def account_room(account: EmailAccount) -> int | None:
+def effective_daily_limit(account: EmailAccount, default_limit: int | None = None) -> int | None:
+    """The daily ceiling for this mailbox, or None for unlimited.
+
+    ``default_limit`` is the protective per-mailbox default from Sending Rules. An
+    account's own ``daily_limit`` can only *lower* it: Brevo's quota says what the
+    provider will accept, not what a mailbox with no reputation can safely send.
+    """
+    explicit = int(account.daily_limit) if account.daily_limit else None
+    if default_limit is None:
+        return explicit
+    return default_limit if explicit is None else min(explicit, default_limit)
+
+
+async def account_room(account: EmailAccount, default_limit: int | None = None) -> int | None:
     """Remaining sends today for this account, or None when unlimited."""
-    if not account.daily_limit:
+    limit = effective_daily_limit(account, default_limit)
+    if not limit:
         return None
-    return max(account.daily_limit - (account.sent_today or 0), 0)
+    return max(limit - (account.sent_today or 0), 0)
 
 
-async def account_is_usable(account: EmailAccount) -> tuple[bool, str | None]:
+async def account_is_usable(
+    account: EmailAccount, *, default_limit: int | None = None, check_room: bool = True
+) -> tuple[bool, str | None]:
     if not account.is_active:
         return False, "account_disabled"
     if not account.api_key_encrypted:
@@ -400,16 +416,28 @@ async def account_is_usable(account: EmailAccount) -> tuple[bool, str | None]:
         return False, "api_key_unreadable"
     if not account.from_email:
         return False, "no_from_address"
+    if not check_room:
+        # Validation asks "can this mailbox send at all?", not "has it already
+        # used today's allowance?" -- with a per-mailbox default cap, every
+        # mailbox is routinely at its limit by the afternoon.
+        return True, None
     await reset_daily_counter(account)
-    room = await account_room(account)
+    room = await account_room(account, default_limit)
     if room == 0:
         return False, "daily_limit_reached"
     return True, None
 
 
-def serialize_account(account: EmailAccount, *, stats: dict | None = None) -> dict:
-    """Account shape for the API. The API key itself is never returned."""
+def serialize_account(
+    account: EmailAccount, *, stats: dict | None = None, default_limit: int | None = None
+) -> dict:
+    """Account shape for the API. The API key itself is never returned.
+
+    ``default_limit`` is the per-mailbox default from Sending Rules; pass it to get
+    ``effective_daily_limit`` (what the app will really let this mailbox send).
+    """
     api_key = decrypt_value(account.api_key_encrypted or "")
+    effective = effective_daily_limit(account, default_limit)
     return {
         "id": account.id,
         "name": account.name,
@@ -423,6 +451,13 @@ def serialize_account(account: EmailAccount, *, stats: dict | None = None) -> di
         "has_api_key": bool(account.api_key_encrypted),
         "api_key_masked": mask_api_key(account.api_key_encrypted) if api_key else "",
         "daily_limit": account.daily_limit,
+        # What the app will actually allow: the lower of this account's own limit
+        # and the per-mailbox default in Sending Rules (None = unlimited).
+        "effective_daily_limit": effective,
+        "daily_limit_source": (
+            "account" if account.daily_limit and (default_limit is None or account.daily_limit <= default_limit)
+            else "sending_rules" if default_limit is not None else "none"
+        ),
         "sent_today": account.sent_today or 0,
         "total_sent": account.total_sent or 0,
         "track_opens": bool(account.track_opens),
@@ -1292,9 +1327,19 @@ async def deliver(db: AsyncSession, message: Message) -> dict:
                 if fallback is not None:
                     candidates.append(fallback)
 
+    # The protective per-mailbox default governs outreach only. A reply to someone
+    # who wrote to us is never held back by a cap meant for cold sends; only an
+    # account's own explicit limit (as before) can stop it.
+    outreach = bool(message.bulk_send or message.campaign_id or message.ads_campaign_id)
+    default_limit = None
+    if outreach:
+        from app.services.sending_limits import default_mailbox_limit, get_sending_rules
+
+        default_limit = default_mailbox_limit(await get_sending_rules(db))
+
     unusable: list[str] = []
     for candidate in candidates:
-        usable, why = await account_is_usable(candidate)
+        usable, why = await account_is_usable(candidate, default_limit=default_limit)
         if not usable:
             logger.info("EMAIL: account %s unusable (%s)", candidate.id, why)
             unusable.append(why or "unknown")
@@ -1304,6 +1349,11 @@ async def deliver(db: AsyncSession, message: Message) -> dict:
         if result.get("success") or not result.get("_try_next"):
             return result
 
+    if unusable and all(reason == "daily_limit_reached" for reason in unusable):
+        # Nothing is wrong with the sender; today's allowance is simply used up.
+        # The caller must hold the message for tomorrow, not burn its retries and
+        # mark it failed.
+        return {"success": False, "deferred": True, "error": _no_sender_error(unusable)}
     return {"success": False, "error": _no_sender_error(unusable)}
 
 
@@ -1574,6 +1624,14 @@ async def _apply_bounce(db: AsyncSession, message: Message, event_type: str, dat
         ).scalar_one_or_none()
         if campaign is not None:
             campaign.messages_failed = (campaign.messages_failed or 0) + 1
+    # A bounce is what the circuit breaker watches for: this is where it learns of
+    # one, so a campaign that is hurting the sender stops as soon as the rate is over
+    # the limit instead of when somebody next looks.
+    from app.services import circuit_breaker
+
+    await circuit_breaker.check_after_event(
+        db, campaign_id=message.campaign_id, ads_campaign_id=message.ads_campaign_id
+    )
 
 
 async def send_composer_test(

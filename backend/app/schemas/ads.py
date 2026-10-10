@@ -144,6 +144,9 @@ class CampaignOut(BaseModel):
     description: Optional[str]
     objective: str
     status: str
+    #: Why it is paused (an automatic pause by the circuit breaker always says why).
+    paused_reason: Optional[str] = None
+    paused_at: Optional[datetime] = None
     channel: str = "sms"
     email_account_id: Optional[int] = None
     fallback_email_account_id: Optional[int] = None
@@ -184,7 +187,7 @@ class CampaignOut(BaseModel):
 
     _tz = field_validator(
         "start_date", "end_date", "last_activity_at", "created_at", "updated_at",
-        "optimize_last_run_at", mode="after"
+        "optimize_last_run_at", "paused_at", mode="after"
     )(lambda v: _utc(v))
 
     _fill = field_validator(

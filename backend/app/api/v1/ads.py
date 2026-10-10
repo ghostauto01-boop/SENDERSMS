@@ -91,9 +91,36 @@ async def _require_email_sender(db: AsyncSession, campaign: AdsCampaign) -> None
             "No email sender is configured. Add a Brevo API key and From address on the "
             "Email Senders page, then choose it on this campaign.",
         )
-    usable, why = await email_service.account_is_usable(account)
+    usable, why = await email_service.account_is_usable(account, check_room=False)
     if not usable:
         raise HTTPException(400, f"Email sender '{account.name}' cannot send ({why}).")
+
+
+def _breaker_conflict(campaign: AdsCampaign) -> HTTPException:
+    """409 for a campaign the bounce circuit breaker paused and nobody has acknowledged."""
+    return HTTPException(
+        status_code=409,
+        detail={
+            "code": "BREAKER_TRIPPED",
+            "message": (
+                f"This campaign was paused automatically. {campaign.paused_reason or ''} Fix the "
+                "list first (verify the addresses), then repeat with acknowledge_breaker=true "
+                "to resume anyway."
+            ),
+            "hint": "Repeat the request with acknowledge_breaker=true to resume anyway.",
+            "paused_reason": campaign.paused_reason,
+        },
+    )
+
+
+def _clear_pause(campaign: AdsCampaign, *, acknowledged_breaker: bool) -> None:
+    """Forget why it was paused; after a breaker trip, also restart the rolling window."""
+    if acknowledged_breaker:
+        from app.services import circuit_breaker
+
+        circuit_breaker.acknowledge(campaign)
+    campaign.paused_reason = None
+    campaign.paused_at = None
 
 
 async def _get_campaign(db: AsyncSession, campaign_id: int, *, for_update: bool = False) -> AdsCampaign:
@@ -215,10 +242,13 @@ async def overview(
 
     from app.services import email_service
 
+    from app.services.sending_limits import default_mailbox_limit, get_sending_rules
+
+    default_limit = default_mailbox_limit(await get_sending_rules(db))
     accounts = []
     for account in await email_service.list_accounts(db):
         await email_service.reset_daily_counter(account)
-        accounts.append(email_service.serialize_account(account))
+        accounts.append(email_service.serialize_account(account, default_limit=default_limit))
 
     return {
         "channel": channel or "all",
@@ -476,13 +506,25 @@ async def simulate(
 @router.post("/campaigns/{campaign_id}/launch")
 async def launch(
     campaign_id: int,
+    acknowledge_breaker: bool = Query(
+        False, description="Only needed to relaunch a campaign the circuit breaker paused."
+    ),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
     """Atomically assign the audience and activate the campaign, exactly once."""
     campaign = await _get_campaign(db, campaign_id, for_update=True)
+    from app.services import circuit_breaker
+
+    breaker_paused = circuit_breaker.is_breaker_pause(campaign)
+    if breaker_paused and not acknowledge_breaker:
+        # Launch re-activates a paused campaign, so it must not be a way around
+        # the acknowledgement that resume requires.
+        raise _breaker_conflict(campaign)
     try:
         result = await svc.launch(db, campaign, actor=user.username)
+        if result["ok"] and campaign.status in ("active", "scheduled") and campaign.paused_reason:
+            _clear_pause(campaign, acknowledged_breaker=breaker_paused)
         if not result["ok"]:
             await db.rollback()
             raise HTTPException(400, "; ".join(result.get("errors", [])))
@@ -506,6 +548,8 @@ async def pause(
     if campaign.status not in ("active", "scheduled"):
         raise HTTPException(409, f"Cannot pause a campaign that is {campaign.status}")
     campaign.status = "paused"
+    campaign.paused_reason = "Paused manually"
+    campaign.paused_at = svc.now_utc()
     svc.log_activity(db, "campaign_paused", campaign_id=campaign.id, actor=user.username)
     await db.commit()
     return {"ok": True, "status": campaign.status}
@@ -513,14 +557,29 @@ async def pause(
 
 @router.post("/campaigns/{campaign_id}/resume")
 async def resume(
-    campaign_id: int, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)
+    campaign_id: int,
+    acknowledge_breaker: bool = Query(
+        False, description="Required to resume a campaign the bounce circuit breaker paused."
+    ),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
     campaign = await _get_campaign(db, campaign_id)
     if campaign.status != "paused":
         raise HTTPException(409, "Only a paused campaign can be resumed")
+    from app.services import circuit_breaker
+
+    breaker_paused = circuit_breaker.is_breaker_pause(campaign)
+    if breaker_paused and not acknowledge_breaker:
+        raise _breaker_conflict(campaign)
     campaign.status = "active"
+    _clear_pause(campaign, acknowledged_breaker=breaker_paused)
     svc.log_activity(db, "campaign_resumed", campaign_id=campaign.id, actor=user.username)
     await db.commit()
+    # Mail created before the pause was held back, not dropped: send it now.
+    from app.tasks.campaign_tasks import republish_queued
+
+    await republish_queued(db, ads_campaign_id=campaign.id)
     return {"ok": True, "status": campaign.status}
 
 
@@ -2162,11 +2221,21 @@ async def bulk_campaigns(
         (await db.execute(select(AdsCampaign).where(AdsCampaign.id.in_(data.ids)))).scalars().all()
     )
     changed = 0
+    held_by_breaker: list[int] = []
     for campaign in rows:
         if data.action == "pause" and campaign.status in ("active", "scheduled"):
             campaign.status = "paused"
+            campaign.paused_reason = "Paused manually"
+            campaign.paused_at = svc.now_utc()
         elif data.action == "resume" and campaign.status == "paused":
+            from app.services import circuit_breaker
+
+            if circuit_breaker.is_breaker_pause(campaign):
+                # A bulk click is not the deliberate acknowledgement a trip needs.
+                held_by_breaker.append(campaign.id)
+                continue
             campaign.status = "active"
+            _clear_pause(campaign, acknowledged_breaker=False)
         elif data.action == "archive":
             campaign.status = "archived"
         elif data.action == "delete":
@@ -2175,7 +2244,7 @@ async def bulk_campaigns(
             continue
         changed += 1
     await db.commit()
-    return {"changed": changed}
+    return {"changed": changed, "held_by_circuit_breaker": held_by_breaker}
 
 
 @router.post("/creatives/bulk")
@@ -2355,10 +2424,13 @@ async def reference(db: AsyncSession = Depends(get_db), user: User = Depends(get
     ).scalar() or 0
     from app.services import email_service
 
+    from app.services.sending_limits import default_mailbox_limit, get_sending_rules
+
+    default_limit = default_mailbox_limit(await get_sending_rules(db))
     accounts = []
     for account in await email_service.list_accounts(db):
         await email_service.reset_daily_counter(account)
-        accounts.append(email_service.serialize_account(account))
+        accounts.append(email_service.serialize_account(account, default_limit=default_limit))
     return {
         "lists": [{"id": l.id, "name": l.name, "count": counts.get(l.id, 0)} for l in lists],
         "tags": [t.name for t in tags],

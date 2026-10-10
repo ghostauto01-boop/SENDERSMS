@@ -53,16 +53,45 @@ async def _send_one(mid, final_on_failure=False, rate_wait_cap=_INLINE_RATE_WAIT
         m.status = "sending"
         await db.commit()
 
-        # Email has no SIM to protect: the SMS pacing gate exists to keep a
-        # handset/carrier happy, and Brevo enforces its own rate limits (a 429
-        # is retried by the normal retry path). Skipping it here also means an
-        # email campaign is never blocked by an SMS hourly cap and vice versa.
         is_email = (m.channel or "sms") == "email"
 
-        # Enforce sending limits + pacing before touching the gateway.
+        # A campaign that was paused or stopped after this message was created
+        # must not send it. (A breaker trip that kept sending the 25 messages
+        # already in flight would be a poor breaker.)
+        hold = await _campaign_hold(db, m)
+        if hold == "stopped":
+            m.status = "cancelled"
+            m.last_error = "Campaign stopped"
+            await db.commit()
+            return False
+        if hold == "paused":
+            # Left queued, not failed: resume re-publishes it, and the inline
+            # sweeper skips mail whose campaign is paused.
+            m.status = "queued"
+            m.last_error = "Campaign is paused"
+            await db.commit()
+            return False
+
+        # Enforce sending limits + pacing before touching the gateway. This used to
+        # be skipped for email ("no SIM to protect"), which meant an email campaign
+        # could send its whole audience in minutes from one brand-new mailbox. A
+        # mailbox has a reputation to protect just as a SIM does, so outreach email
+        # goes through the same gate -- scoped to email and to the mailbox about to
+        # send. A one-to-one reply to someone who wrote to us is not outreach and is
+        # never held by the window or the cap.
         from app.services.sending_limits import SendingGate
-        gate = SendingGate(db)
-        check = await gate.check() if not is_email else {"allowed": True}
+        if is_email:
+            outreach = bool(m.bulk_send or m.campaign_id or m.ads_campaign_id)
+            account_id = m.email_account_id
+            if account_id is None and outreach:
+                from app.services import email_service
+                default = await email_service.get_default_account(db)
+                account_id = default.id if default else None
+            gate = SendingGate(db, "email", account_id=account_id)
+            check = await gate.check() if outreach else {"allowed": True}
+        else:
+            gate = SendingGate(db, "sms")
+            check = await gate.check()
         if not check["allowed"]:
             wait = int(check["wait_seconds"] or 60)
             if final_on_failure and 0 < wait <= rate_wait_cap:
@@ -128,6 +157,25 @@ async def _send_one(mid, final_on_failure=False, rate_wait_cap=_INLINE_RATE_WAIT
         return m.status=="retrying"
 
 
+async def _campaign_hold(db, m):
+    """"paused" / "stopped" when the message's campaign is no longer sending, else None."""
+    if m.campaign_id:
+        from app.models.campaign import Campaign
+        status = (await db.execute(
+            select(Campaign.status).where(Campaign.id == m.campaign_id)
+        )).scalar_one_or_none()
+        if status in ("paused", "stopped"):
+            return status
+    if getattr(m, "ads_campaign_id", None):
+        from app.models.ads import AdsCampaign
+        status = (await db.execute(
+            select(AdsCampaign.status).where(AdsCampaign.id == m.ads_campaign_id)
+        )).scalar_one_or_none()
+        if status == "paused":
+            return "paused"
+    return None
+
+
 async def _send_one_email(db, m, contact, *, final_on_failure=False):
     """Deliver one claimed email ``Message`` through Brevo.
 
@@ -148,6 +196,13 @@ async def _send_one_email(db, m, contact, *, final_on_failure=False):
         return False
 
     result = await email_service.deliver(db, m)
+    if result.get("deferred"):
+        # Today's allowance for the mailbox is used up. Hold the message (it is not
+        # a failure, and must not use up its retries); try again in an hour.
+        m.status = "queued"
+        m.last_error = str(result.get("error") or "daily limit reached")[:500]
+        await db.commit()
+        return 3600
     if result.get("success"):
         contact.emails_sent = (contact.emails_sent or 0) + 1
         contact.last_emailed_at = datetime.now(timezone.utc)
@@ -166,6 +221,13 @@ async def _send_one_email(db, m, contact, *, final_on_failure=False):
             contact.email_fail_count = (contact.email_fail_count or 0) + 1
             contact.email_last_error = m.last_error
         await _record_campaign_outcome(db, m, False)
+        if m.status == "failed":
+            # A provider that refuses our mail is exactly what the circuit breaker
+            # watches for; a refusal never produces a bounce webhook of its own.
+            from app.services import circuit_breaker
+            await circuit_breaker.check_after_event(
+                db, campaign_id=m.campaign_id, ads_campaign_id=m.ads_campaign_id
+            )
     await db.commit()
     return m.status == "retrying"
 

@@ -59,6 +59,14 @@ class Tool:
     #: optional (FastAPI rejects a missing body with 422). An empty object is
     #: sent in that case.
     body_always: bool = False
+    #: True for tools that act on ONE campaign by id. The classic campaigns and the
+    #: Ads Manager number independently, so a bare id can name two campaigns; the
+    #: server resolves which one (or refuses, listing the candidates) before it
+    #: acts, rather than pausing/deleting whichever it happened to find first.
+    by_kind: bool = False
+    #: Where the action lives for an Ads Manager campaign: ``{"ads": (method,
+    #: path)}``. Absent = the action does not exist for Ads Manager campaigns.
+    kind_paths: dict = field(default_factory=dict)
 
     def input_schema(self) -> dict:
         properties = {p.name: p.schema() for p in self.params}
@@ -474,8 +482,13 @@ TOOLS: list[Tool] = [
         name="update_campaign",
         description="Edit a campaign that has not started sending yet.",
         method="PUT", path="/api/v1/campaigns/{campaign_id}", scope="write", group="campaigns",
+        by_kind=True,
         params=[
             Param("campaign_id", type="integer", required=True, where="path"),
+            Param("kind", enum=["campaign", "legacy", "ads"], where="meta",
+                  description="Which campaign system the id belongs to (see list_campaigns). "
+                              "Optional when the id exists in only one system; required when "
+                              "it exists in both (the call is refused, listing the candidates)."),
             Param("name", where="body"),
             Param("list_id", type="integer", where="body"),
             Param("message_body", where="body"),
@@ -492,11 +505,18 @@ TOOLS: list[Tool] = [
             "Delete a campaign that has not sent anything: a draft, a scheduled one (or one "
             "paused while scheduled), or a failed one. Once a campaign has sent even one "
             "message the app refuses (409) — stop it instead to keep the history. An unknown "
-            "id is a 404."
+            "id is a 404. Classic campaigns only: an Ads Manager campaign (kind 'ads') is "
+            "paused or archived, never deleted from here."
         ),
         method="DELETE", path="/api/v1/campaigns/{campaign_id}", scope="write",
-        group="campaigns",
-        params=[Param("campaign_id", type="integer", required=True, where="path")],
+        group="campaigns", by_kind=True,
+        params=[
+            Param("campaign_id", type="integer", required=True, where="path"),
+            Param("kind", enum=["campaign", "legacy", "ads"], where="meta",
+                  description="Which campaign system the id belongs to (see list_campaigns). "
+                              "Optional when the id exists in only one system; required when "
+                              "it exists in both (the call is refused, listing the candidates)."),
+        ],
     ),
     Tool(
         name="schedule_campaign",
@@ -509,9 +529,14 @@ TOOLS: list[Tool] = [
             "'changed': false when the call did nothing (e.g. cancelling an unscheduled draft)."
         ),
         method="POST", path="/api/v1/campaigns/{campaign_id}/schedule", scope="write",
-        group="campaigns", body_always=True,
+        group="campaigns", body_always=True, by_kind=True,
         params=[
             Param("campaign_id", type="integer", required=True, where="path"),
+            Param("kind", enum=["campaign", "legacy", "ads"], where="meta",
+                  description="Which campaign system the id belongs to (see list_campaigns). "
+                              "Optional when the id exists in only one system; required when "
+                              "it exists in both (the call is refused, listing the candidates)."),
+
             Param("scheduled_start_at", description="Future ISO 8601 time, or null to clear.",
                   where="body"),
         ],
@@ -528,8 +553,15 @@ TOOLS: list[Tool] = [
             "sender."
         ),
         method="POST", path="/api/v1/campaigns/{campaign_id}/validate", scope="write",
-        group="campaigns",
-        params=[Param("campaign_id", type="integer", required=True, where="path")],
+        group="campaigns", by_kind=True,
+        kind_paths={"ads": ("POST", "/api/v1/ads/campaigns/{campaign_id}/validate")},
+        params=[
+            Param("campaign_id", type="integer", required=True, where="path"),
+            Param("kind", enum=["campaign", "legacy", "ads"], where="meta",
+                  description="Which campaign system the id belongs to (see list_campaigns). "
+                              "Optional when the id exists in only one system; required when "
+                              "it exists in both (the call is refused, listing the candidates)."),
+        ],
     ),
     Tool(
         name="start_campaign",
@@ -539,8 +571,17 @@ TOOLS: list[Tool] = [
             "part of starting (a problem comes back as a 400 listing every error)."
         ),
         method="POST", path="/api/v1/campaigns/{campaign_id}/start", scope="write",
-        group="campaigns",
-        params=[Param("campaign_id", type="integer", required=True, where="path")],
+        group="campaigns", by_kind=True,
+        kind_paths={"ads": ("POST", "/api/v1/ads/campaigns/{campaign_id}/launch")},
+        params=[
+            Param("campaign_id", type="integer", required=True, where="path"),
+            Param("kind", enum=["campaign", "legacy", "ads"], where="meta",
+                  description="Which campaign system the id belongs to (see list_campaigns). "
+                              "Optional when the id exists in only one system; required when "
+                              "it exists in both (the call is refused, listing the candidates)."),
+            Param("acknowledge_breaker", type="boolean", where="query",
+                  description="Only to continue a campaign the bounce circuit breaker paused."),
+        ],
     ),
     Tool(
         name="pause_campaign",
@@ -549,8 +590,15 @@ TOOLS: list[Tool] = [
             "resume_campaign puts it back where it was."
         ),
         method="POST", path="/api/v1/campaigns/{campaign_id}/pause", scope="write",
-        group="campaigns",
-        params=[Param("campaign_id", type="integer", required=True, where="path")],
+        group="campaigns", by_kind=True,
+        kind_paths={"ads": ("POST", "/api/v1/ads/campaigns/{campaign_id}/pause")},
+        params=[
+            Param("campaign_id", type="integer", required=True, where="path"),
+            Param("kind", enum=["campaign", "legacy", "ads"], where="meta",
+                  description="Which campaign system the id belongs to (see list_campaigns). "
+                              "Optional when the id exists in only one system; required when "
+                              "it exists in both (the call is refused, listing the candidates)."),
+        ],
     ),
     Tool(
         name="resume_campaign",
@@ -560,14 +608,31 @@ TOOLS: list[Tool] = [
             "for that). A campaign paused by the circuit breaker says why in 'paused_reason'."
         ),
         method="POST", path="/api/v1/campaigns/{campaign_id}/resume", scope="write",
-        group="campaigns",
-        params=[Param("campaign_id", type="integer", required=True, where="path")],
+        group="campaigns", by_kind=True,
+        kind_paths={"ads": ("POST", "/api/v1/ads/campaigns/{campaign_id}/resume")},
+        params=[
+            Param("campaign_id", type="integer", required=True, where="path"),
+            Param("kind", enum=["campaign", "legacy", "ads"], where="meta",
+                  description="Which campaign system the id belongs to (see list_campaigns). "
+                              "Optional when the id exists in only one system; required when "
+                              "it exists in both (the call is refused, listing the candidates)."),
+            Param("acknowledge_breaker", type="boolean", where="query",
+                  description="Required to resume a campaign the bounce circuit breaker paused "
+                              "(read 'paused_reason' first; fix the list)."),
+        ],
     ),
     Tool(
         name="campaign_analytics",
         description="Performance of one campaign: sent, delivered, failed, replies, interested.",
         method="GET", path="/api/v1/campaigns/{campaign_id}/analytics", group="campaigns",
-        params=[Param("campaign_id", type="integer", required=True, where="path")],
+        by_kind=True, kind_paths={"ads": ("GET", "/api/v1/ads/campaigns/{campaign_id}/analytics")},
+        params=[
+            Param("campaign_id", type="integer", required=True, where="path"),
+            Param("kind", enum=["campaign", "legacy", "ads"], where="meta",
+                  description="Which campaign system the id belongs to (see list_campaigns). "
+                              "Optional when the id exists in only one system; required when "
+                              "it exists in both (the call is refused, listing the candidates)."),
+        ],
     ),
     # -------------------------------------------------------------- one-offs
     Tool(

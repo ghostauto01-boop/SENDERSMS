@@ -9,6 +9,9 @@ addopts = [
 testpaths = ["backend/tests"]
 pythonpath = ["backend"]
 asyncio_default_fixture_loop_scope = "function"
+markers = [
+    "real_sending_defaults: run with the production sending-rule defaults (window, weekends, caps) instead of the open-door rules tests normally get",
+]
 
 [tool.black]
 line-length = 100

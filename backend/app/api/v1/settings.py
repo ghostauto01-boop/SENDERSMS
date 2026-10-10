@@ -199,8 +199,17 @@ async def get_sr_status(db:AsyncSession=Depends(get_db),cu:User=Depends(get_curr
     return await SendingGate(db).status()
 
 @router.put("/sending-rules")
-async def put_sr(dl:Optional[bool]=Query(None),dm:Optional[int]=Query(None),hl:Optional[bool]=Query(None),hm:Optional[int]=Query(None),ml:Optional[bool]=Query(None),mm:Optional[int]=Query(None),ss:Optional[str]=Query(None),se:Optional[str]=Query(None),aw:Optional[bool]=Query(None),ah:Optional[bool]=Query(None),pc:Optional[bool]=Query(None),md:Optional[int]=Query(None),db:AsyncSession=Depends(get_db),cu:User=Depends(get_current_user)):
-    for k,v in{"enable_daily_limit":dl,"daily_maximum":dm,"enable_hourly_limit":hl,"hourly_maximum":hm,"enable_per_minute_limit":ml,"messages_per_minute":mm,"sending_start_time":ss,"sending_end_time":se,"allow_weekends":aw,"allow_holidays":ah,"enable_pacing":pc,"min_delay_seconds":md}.items():
+async def put_sr(dl:Optional[bool]=Query(None),dm:Optional[int]=Query(None),hl:Optional[bool]=Query(None),hm:Optional[int]=Query(None),ml:Optional[bool]=Query(None),mm:Optional[int]=Query(None),ss:Optional[str]=Query(None),se:Optional[str]=Query(None),aw:Optional[bool]=Query(None),ah:Optional[bool]=Query(None),pc:Optional[bool]=Query(None),md:Optional[int]=Query(None),
+    # Email caps and the bounce circuit breaker. Descriptive names (the short ones
+    # above are the Settings page's); bounded so a typo cannot disable a safeguard.
+    email_daily_per_mailbox:Optional[int]=Query(None,ge=1,le=500,description="Daily sends allowed per mailbox when the account sets no limit of its own. 20-50 is the usual guidance for a mailbox with no reputation."),
+    breaker_enabled:Optional[bool]=Query(None,description="Pause an email campaign automatically when its bounce/complaint rate is over the limit."),
+    breaker_bounce_pct:Optional[float]=Query(None,gt=0,le=50,description="Pause when more than this % of recent sends bounce or are refused (default 2)."),
+    breaker_complaint_pct:Optional[float]=Query(None,gt=0,le=5,description="Pause when more than this % of recent sends draw a spam complaint (default 0.10)."),
+    breaker_min_sample:Optional[int]=Query(None,ge=1,le=10000,description="Fewer recent sends than this can never trip the breaker (default 20)."),
+    breaker_window_hours:Optional[int]=Query(None,ge=1,le=720,description="How far back the rolling window looks (default 168 = 7 days)."),
+    db:AsyncSession=Depends(get_db),cu:User=Depends(get_current_user)):
+    for k,v in{"enable_daily_limit":dl,"daily_maximum":dm,"enable_hourly_limit":hl,"hourly_maximum":hm,"enable_per_minute_limit":ml,"messages_per_minute":mm,"sending_start_time":ss,"sending_end_time":se,"allow_weekends":aw,"allow_holidays":ah,"enable_pacing":pc,"min_delay_seconds":md,"email_daily_per_mailbox":email_daily_per_mailbox,"breaker_enabled":breaker_enabled,"breaker_bounce_pct":breaker_bounce_pct,"breaker_complaint_pct":breaker_complaint_pct,"breaker_min_sample":breaker_min_sample,"breaker_window_hours":breaker_window_hours}.items():
         if v is not None:
             s=(await db.execute(select(SystemSetting).where(SystemSetting.key==k))).scalar_one_or_none()
             val=str(v).lower()if isinstance(v,bool)else str(v)

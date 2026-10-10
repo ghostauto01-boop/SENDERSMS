@@ -175,4 +175,38 @@ describe("CampaignsPage lifecycle", () => {
     expect(within(rowOf("Held one")).queryByTitle("Delete campaign")).not.toBeNull();
     expect(within(rowOf("Tripped one")).queryByTitle("Delete campaign")).toBeNull();
   });
+
+  it("resuming after a circuit-breaker pause asks first, then acknowledges it", async () => {
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    await renderPage();
+
+    fireEvent.click(within(rowOf("Tripped one")).getByText("Resume"));
+
+    await waitFor(() =>
+      expect(apiPost).toHaveBeenCalledWith("/campaigns/4/resume", null, {
+        params: { acknowledge_breaker: true },
+      }),
+    );
+    expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining("Circuit breaker"));
+  });
+
+  it("declining the circuit-breaker prompt resumes nothing", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(false);
+    await renderPage();
+
+    fireEvent.click(within(rowOf("Tripped one")).getByText("Resume"));
+
+    expect(apiPost).not.toHaveBeenCalledWith("/campaigns/4/resume", expect.anything(), expect.anything());
+  });
+
+  it("a manual pause resumes without any ceremony", async () => {
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    confirmSpy.mockClear(); // the spy is shared with earlier tests in this file
+    await renderPage();
+
+    fireEvent.click(within(rowOf("Held one")).getByText("Resume"));
+
+    await waitFor(() => expect(apiPost).toHaveBeenCalledWith("/campaigns/3/resume", null, undefined));
+    expect(confirmSpy).not.toHaveBeenCalled();
+  });
 });

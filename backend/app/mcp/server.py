@@ -381,11 +381,68 @@ async def run_tool(db: AsyncSession, token: TokenView, tool: Tool, args: dict) -
                            token_error=str(exc))
 
 
+_KIND_ALIASES = {"campaign": "campaign", "legacy": "campaign", "classic": "campaign", "ads": "ads"}
+
+
+async def _route_by_kind(
+    db: AsyncSession, token: TokenView, tool: Tool, args: dict, started: float
+) -> "ToolOutcome | tuple[str, str]":
+    """Decide which campaign system a campaign tool should act on.
+
+    The classic campaigns and the Ads Manager number independently, so
+    ``pause_campaign(2)`` can name two different campaigns. Acting on whichever
+    the classic API happened to find would pause (or start, or delete) the wrong
+    one -- and the one that is actually sending is usually the other. So: an
+    explicit ``kind`` is honoured; without one the id is looked up, an id that
+    exists in both systems is *refused* with the candidates listed, and only an
+    unambiguous id is acted on.
+
+    Returns ``(method, path)`` to call, or a finished :class:`ToolOutcome` (the
+    refusal) when it must not proceed.
+    """
+    campaign_id = args.get("campaign_id")
+    raw = args.get("kind")
+    if raw not in (None, ""):
+        kind = _KIND_ALIASES.get(str(raw).strip().lower())
+        if kind is None:
+            message = f"Unknown kind {raw!r}: use 'campaign' (alias 'legacy') or 'ads'."
+            return ToolOutcome(_tool_result(message, is_error=True), token_error=message)
+    else:
+        lookup = f"/api/v1/overview/campaigns/{urllib.parse.quote(str(campaign_id))}"
+        status, payload = await call_app("GET", lookup)
+        if status >= 400:
+            detail = payload.get("detail") if isinstance(payload, dict) else None
+            failure = f"HTTP {status} from GET {lookup}: {_one_line(detail or payload, 700)}"
+            await _audit(db, token, tool.name, f"GET {lookup}", False, status, failure, args, started)
+            return ToolOutcome(_tool_result(failure, is_error=True), token_error=failure)
+        kind = payload.get("kind")
+
+    if kind != "ads":
+        return tool.method, tool.path
+    alternative = tool.kind_paths.get("ads")
+    if alternative is None:
+        message = (
+            f"{tool.name} is not available for Ads Manager campaigns (kind 'ads'). "
+            "Use pause_campaign / resume_campaign / start_campaign / validate_campaign for them, "
+            "or app_api_request for anything else under /api/v1/ads/campaigns/{id}."
+        )
+        await _audit(db, token, tool.name, f"{tool.method} {tool.path}", False, 400, message,
+                     args, started)
+        return ToolOutcome(_tool_result(message, is_error=True), token_error=message)
+    return alternative
+
+
 async def _run_declared(
     db: AsyncSession, token: TokenView, tool: Tool, args: dict
 ) -> ToolOutcome:
     started = time.time()
     path = tool.path
+    method_override: str | None = None
+    if tool.by_kind:
+        routed = await _route_by_kind(db, token, tool, args, started)
+        if isinstance(routed, ToolOutcome):
+            return routed
+        method_override, path = routed
     query: dict = {}
     body: dict = {}
     form: dict = {}
@@ -402,6 +459,8 @@ async def _run_declared(
         value = args[param.name]
         if param.root:
             root_body = value
+        elif param.where == "meta":
+            continue  # consumed by the server (routing), not sent to the endpoint
         elif param.where == "path":
             path = path.replace("{" + param.name + "}", urllib.parse.quote(str(value)))
         elif param.where == "query":
@@ -418,7 +477,7 @@ async def _run_declared(
             raw = value.encode("utf-8") if isinstance(value, str) else bytes(value)
             files["file"] = ("import.csv", raw, "text/csv")
 
-    method = tool.method.upper()
+    method = (method_override or tool.method).upper()
     status, payload = await call_app(
         method,
         path,

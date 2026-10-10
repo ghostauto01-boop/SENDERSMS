@@ -56,7 +56,7 @@ class SMSService:
         # next slot is not available yet, the message is left queued and the
         # poller's queued-message sweep (or Celery) sends it once allowed.
         from app.services.sending_limits import SendingGate
-        gate=await SendingGate(self.db).check()
+        gate=await SendingGate(self.db, "sms").check()
         if not gate["allowed"]:
             msg.status="queued"
             msg.last_error=f"Rate limited: {gate['reason']}"

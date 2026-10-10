@@ -120,6 +120,53 @@ async def launch_due_campaigns_async() -> list[int]:
 
 
 @celery_app.task
+def check_circuit_breakers():
+    """Beat entrypoint: pause any email campaign whose bounce rate is over the limit.
+
+    The bounce webhook already checks as events arrive; this sweep is the backstop
+    for a missed webhook and for failures that never produce one.
+    """
+    loop = asyncio.get_event_loop()
+    if loop.is_closed():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    return loop.run_until_complete(check_circuit_breakers_async())
+
+
+async def check_circuit_breakers_async() -> list[dict]:
+    """The sweep itself, shared by the Celery task and the inline poller."""
+    from app.services import circuit_breaker
+
+    async with async_session_factory() as db:
+        tripped = await circuit_breaker.check_all(db)
+        await db.commit()
+    return tripped
+
+
+async def republish_queued(
+    db, *, campaign_id: int | None = None, ads_campaign_id: int | None = None, limit: int = 1000
+) -> int:
+    """Hand a campaign's still-queued messages back to the broker.
+
+    A paused campaign *holds* mail that was already created (``_send_one`` leaves
+    it queued instead of sending); when the campaign resumes this puts that mail
+    back in motion immediately rather than waiting for a sweep. Returns how many
+    were published. Best effort: the sweeps pick up anything the broker refuses.
+    """
+    from app.tasks.sms_tasks import send_sms
+
+    query = select(Message.id).where(
+        Message.direction == "outgoing", Message.status == "queued"
+    )
+    if campaign_id is not None:
+        query = query.where(Message.campaign_id == campaign_id)
+    if ads_campaign_id is not None:
+        query = query.where(Message.ads_campaign_id == ads_campaign_id)
+    ids = list((await db.execute(query.order_by(Message.id).limit(limit))).scalars().all())
+    return sum(1 for mid in ids if try_enqueue(send_sms, mid))
+
+
+@celery_app.task
 def launch_due_campaigns():
     """Beat entrypoint for scheduled campaign launches.
 
@@ -150,6 +197,22 @@ async def process_campaign_batch_async(
         if not campaign or campaign.status != "running":
             return 0
 
+        # How many messages the sending rules allow out right now. Without this a
+        # campaign released its whole audience in 50-contact batches, one every
+        # couple of minutes, whatever the daily cap or the sending window said:
+        # the rules were only consulted per message, long after the 525 messages
+        # had been created. ``None`` means no cap applies; zero means "not now"
+        # (window closed, weekend, or today's allowance is already used), and the
+        # campaign stays ``running`` -- waiting is not completing.
+        from app.services.sending_limits import gate_for_campaign
+
+        room = await (await gate_for_campaign(db, campaign)).room()
+        limit = batch_size
+        if room is not None:
+            if room <= 0:
+                return 0
+            limit = min(batch_size, room)
+
         contacts = (
             await db.execute(
                 select(CampaignContact)
@@ -157,10 +220,11 @@ async def process_campaign_batch_async(
                     CampaignContact.campaign_id == campaign_id,
                     CampaignContact.status == "pending",
                 )
+                .order_by(CampaignContact.id)
                 # Worker beat and inline polling can overlap. PostgreSQL skips
                 # rows already claimed by the other processor.
                 .with_for_update(skip_locked=True)
-                .limit(batch_size)
+                .limit(limit)
             )
         ).scalars().all()
 
@@ -525,6 +589,11 @@ async def _send_template_message(
     subject = None
     html_body = None
     account = None
+    # Bound up front: it is only looked up when the campaign lacks a subject or
+    # HTML of its own, but the Message below reads its attachments either way.
+    # Without this an email campaign that carries its own message and no template
+    # (and no attachments) raised UnboundLocalError on its very first contact.
+    template = None
     if is_email:
         # Subject/HTML come from the campaign, then from the template it used.
         from app.models.template import Template

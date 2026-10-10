@@ -20,6 +20,7 @@ from app.schemas.campaign import (
 )
 from app.security.auth import get_current_user
 from app.services.campaign_service import (
+    BreakerTripped,
     CampaignNotFound,
     CampaignService,
     CampaignStateError,
@@ -43,6 +44,16 @@ def _problem(exc: ValueError) -> HTTPException:
     """
     if isinstance(exc, CampaignNotFound):
         return HTTPException(status_code=404, detail=str(exc))
+    if isinstance(exc, BreakerTripped):
+        return HTTPException(
+            status_code=409,
+            detail={
+                "code": "BREAKER_TRIPPED",
+                "message": str(exc),
+                "hint": "Repeat the request with acknowledge_breaker=true to resume anyway.",
+                "paused_reason": exc.reason,
+            },
+        )
     if isinstance(exc, CampaignStateError):
         return HTTPException(status_code=409, detail=str(exc))
     return HTTPException(status_code=400, detail=str(exc))
@@ -301,6 +312,10 @@ async def schedule_campaign(
 @router.post("/{campaign_id}/start")
 async def start_campaign(
     campaign_id: int,
+    acknowledge_breaker: bool = Query(
+        default=False,
+        description="Only needed to continue a campaign the bounce circuit breaker paused.",
+    ),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -316,10 +331,13 @@ async def start_campaign(
         "paused_from": existing.paused_from,
         "paused_at": existing.paused_at,
         "paused_reason": existing.paused_reason,
+        "breaker_reset_at": existing.breaker_reset_at,
         "started_at": existing.started_at,
     }
     try:
-        campaign = await service.start_campaign(campaign_id)
+        campaign = await service.start_campaign(
+            campaign_id, acknowledge_breaker=acknowledge_breaker
+        )
     except ValueError as e:
         raise _problem(e)
 
@@ -346,11 +364,34 @@ async def start_campaign(
         await db.commit()
         raise HTTPException(status_code=503, detail=str(e))
 
+    message = "Campaign started"
+    waiting = None
+    try:
+        # Tell the operator when the rules mean nothing will go out yet (night,
+        # weekend, today's cap used) rather than leaving a "running" campaign that
+        # appears to do nothing.
+        from app.services.sending_limits import gate_for_campaign
+
+        check = await (await gate_for_campaign(db, campaign)).check()
+        reason = check.get("reason") or ""
+        if not check["allowed"] and not reason.startswith("pacing"):
+            waiting = {
+                "reason": reason,
+                "next_window": check.get("next_window"),
+                "wait_seconds": check.get("wait_seconds"),
+            }
+            message = (
+                f"Campaign started, but nothing will send yet: {reason}. "
+                + (f"The first messages go out at {check['next_window']}." if check.get("next_window") else "")
+            ).strip()
+    except Exception:  # noqa: BLE001 — the hint must never fail the start
+        pass
     return {
         "success": True,
         "changed": True,
         "status": campaign.status,
-        "message": "Campaign started",
+        "message": message,
+        "waiting": waiting,
     }
 
 
@@ -383,13 +424,19 @@ async def pause_campaign(
 @router.post("/{campaign_id}/resume")
 async def resume_campaign(
     campaign_id: int,
+    acknowledge_breaker: bool = Query(
+        default=False,
+        description="Required to resume a campaign the bounce circuit breaker paused.",
+    ),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Resume a paused campaign.
 
     Paused mid-send it goes back to ``running``. Paused while scheduled it goes
-    back to ``scheduled`` and does **not** start sending.
+    back to ``scheduled`` and does **not** start sending. A campaign the bounce
+    circuit breaker paused is refused (409 ``BREAKER_TRIPPED``) until you repeat
+    the request with ``acknowledge_breaker=true``.
     """
     service = CampaignService(db)
     existing = (
@@ -402,10 +449,13 @@ async def resume_campaign(
         "paused_from": existing.paused_from,
         "paused_at": existing.paused_at,
         "paused_reason": existing.paused_reason,
+        "breaker_reset_at": existing.breaker_reset_at,
         "scheduled_start_at": existing.scheduled_start_at,
     }
     try:
-        campaign = await service.resume_campaign(campaign_id)
+        campaign = await service.resume_campaign(
+            campaign_id, acknowledge_breaker=acknowledge_breaker
+        )
     except ValueError as e:
         raise _problem(e)
 
@@ -424,7 +474,7 @@ async def resume_campaign(
             ),
         }
 
-    from app.tasks.campaign_tasks import process_campaign
+    from app.tasks.campaign_tasks import process_campaign, republish_queued
     from app.tasks.queue import QueueUnavailable, enqueue
 
     await db.commit()
@@ -436,6 +486,8 @@ async def resume_campaign(
             setattr(campaign, name, value)
         await db.commit()
         raise HTTPException(status_code=503, detail=str(e))
+    # Mail created before the pause was held back, not dropped: send it now.
+    await republish_queued(db, campaign_id=campaign_id)
 
     return {
         "success": True,

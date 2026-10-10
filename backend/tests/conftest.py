@@ -74,3 +74,57 @@ def stub_queue(monkeypatch):
 
     monkeypatch.setattr("app.tasks.queue.enqueue", _enqueue)
     return calls
+
+
+# --------------------------------------------------------------------------
+# The sending gate and the wall clock
+# --------------------------------------------------------------------------
+#
+# The sending rules are ON by default in production: a 09:00-17:00 window,
+# weekends off, a daily cap. Left alone, that would make every test that sends
+# something pass or fail depending on what time of day (and which weekday) the
+# suite happens to run. Tests that are not ABOUT those rules therefore run with
+# the old open-door rules; tests that are about them opt back in with
+# ``@pytest.mark.real_sending_defaults`` and pin the clock with ``sending_clock``.
+
+
+@pytest.fixture(autouse=True)
+def _open_sending_rules(request, monkeypatch):
+    if request.node.get_closest_marker("real_sending_defaults"):
+        return
+    from app.config import settings
+    from app.services import sending_limits
+
+    for key, value in {
+        "enable_daily_limit": False,
+        "sending_start_time": "",
+        "sending_end_time": "",
+        "allow_weekends": True,
+    }.items():
+        monkeypatch.setitem(sending_limits.DEFAULTS, key, value)
+    monkeypatch.setitem(sending_limits.DEFAULTS, "email_daily_per_mailbox", 0)
+    monkeypatch.setattr(settings, "EMAIL_DEFAULT_DAILY_LIMIT", 0, raising=False)
+
+
+@pytest.fixture
+def sending_clock(monkeypatch):
+    """Pin the instant the sending gate believes it is. Returns a setter.
+
+    Default: Wednesday 2026-09-02 12:00 Africa/Lagos -- a weekday, inside the
+    09:00-17:00 window.
+    """
+    from datetime import datetime, timezone
+    from zoneinfo import ZoneInfo
+
+    from app.services import sending_limits
+
+    state = {"now": datetime(2026, 9, 2, 12, 0, tzinfo=ZoneInfo("Africa/Lagos"))
+             .astimezone(timezone.utc)}
+    monkeypatch.setattr(sending_limits, "_utcnow", lambda: state["now"])
+
+    def _set(moment):
+        state["now"] = moment.astimezone(timezone.utc)
+        return state["now"]
+
+    _set.now = lambda: state["now"]
+    return _set
