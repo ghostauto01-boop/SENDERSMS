@@ -31,8 +31,9 @@ def _custom_fields(contact: Optional[Contact]) -> dict:
 
 @router.get("/conversations")
 async def list_conversations(
-    page:int=1,
-    per_page:int=500,
+    page:int=Query(1, ge=1),
+    # A ceiling, documented in the OpenAPI: above it the answer is 422, not a silent clamp.
+    per_page:int=Query(500, ge=1, le=500),
     status:Optional[str]=None,
     search:Optional[str]=None,
     # Which channel's inbox to list. Defaults to SMS, so the SMS inbox keeps

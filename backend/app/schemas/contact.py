@@ -146,6 +146,10 @@ class ContactOut(BaseModel):
 class ContactListOut(BaseModel):
     total: int
     items: list[ContactOut]
+    # Where this page sits, so a client never has to guess whether there is more.
+    page: Optional[int] = None
+    per_page: Optional[int] = None
+    next_page: Optional[int] = None
 
 
 class BulkAction(BaseModel):

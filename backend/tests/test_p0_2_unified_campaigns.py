@@ -291,7 +291,10 @@ async def _call(tool: str, **args) -> dict:
     result = outcome.result if hasattr(outcome, "result") else outcome
     text = result["content"][0]["text"]
     is_error = bool(result.get("isError", False))
-    return {"is_error": is_error, "text": text, "json": None if is_error else _loads(text)}
+    body = None if is_error else _loads(text)
+    if isinstance(body, dict) and "data" in body and "http_status" in body:
+        body = body["data"]  # the response envelope wraps the endpoint's own payload
+    return {"is_error": is_error, "text": text, "json": body}
 
 
 def _loads(text: str):

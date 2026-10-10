@@ -47,6 +47,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.mcp import connectors as connector_profiles
+from app.mcp import response as tool_response
 from app.mcp.connectors import ConnectorProfile
 from app.mcp.registry import TOOLS, TOOLS_BY_NAME, Tool, tools_for
 from app.models.mcp import McpCall, McpToken
@@ -256,6 +257,10 @@ async def admin_user_id(db: AsyncSession) -> int:
 # ---------------------------------------------------------------------------
 
 
+#: The most of a non-JSON body held in memory for one tool call.
+_RAW_CEILING = 5_000_000
+
+
 async def call_app(
     method: str,
     path: str,
@@ -301,7 +306,16 @@ async def call_app(
     try:
         payload = response.json()
     except ValueError:
-        payload = {"raw": response.text[:4000]}
+        # A body that is not JSON (a CSV download). It used to be cut to its first
+        # 4,000 characters here -- 29 of 1,297 rows -- with nothing saying so. Keep it
+        # whole (up to a sanity ceiling) and report its true size; the response
+        # builder shortens it by whole lines and says how many it kept.
+        text = response.text
+        payload = {
+            "raw": text[:_RAW_CEILING],
+            "content_type": response.headers.get("content-type"),
+            "chars": len(text),
+        }
     return response.status_code, payload
 
 
@@ -323,12 +337,41 @@ class ToolOutcome:
     token_error: str | None = None
 
 
-def _tool_result(text: str, *, is_error: bool = False, data: Any = None) -> dict:
-    result: dict = {"content": [{"type": "text", "text": text}], "isError": is_error}
+def _tool_result(
+    text: str, *, is_error: bool = False, data: Any = None, envelope: dict | None = None
+) -> dict:
+    """An MCP tool result whose text is always ONE valid JSON object.
+
+    Payload results pass their ``envelope`` (see :mod:`app.mcp.response`); a plain
+    message -- a refusal, the guide, a validation problem -- becomes
+    ``{"ok": ..., "message": ...}``. A client can ``json.loads`` any tool response
+    without special cases.
+    """
+    document = envelope if envelope is not None else tool_response.message_envelope(
+        text, is_error=is_error
+    )
+    result: dict = {
+        "content": [{"type": "text", "text": json.dumps(document, default=str, ensure_ascii=False)}],
+        "isError": is_error,
+    }
     if isinstance(data, (dict, list)):
-        # Structured clients (and newer spec revisions) get the raw JSON too.
+        # Structured clients (and newer spec revisions) get the JSON too, bounded the
+        # same way as the text and flagged (``_truncated``) when anything was cut.
         result["structuredContent"] = data if isinstance(data, dict) else {"items": data}
     return result
+
+
+def _payload_outcome(
+    method: str, path: str, status: int, payload: Any, query: dict | None = None
+) -> "ToolOutcome":
+    """Build the outcome for an endpoint's answer: the envelope, bounded and honest."""
+    envelope, structured = tool_response.build_envelope(method, path, status, payload, query=query)
+    if status >= 400:
+        failure = envelope["message"]
+        return ToolOutcome(
+            _tool_result(failure, is_error=True, envelope=envelope), token_error=failure
+        )
+    return ToolOutcome(_tool_result("", data=structured, envelope=envelope))
 
 
 async def run_tool(db: AsyncSession, token: TokenView, tool: Tool, args: dict) -> ToolOutcome:
@@ -493,13 +536,7 @@ async def _run_declared(
     await _audit(db, token, tool.name, f"{method} {path}", ok, status,
                  None if ok else _one_line(payload), args, started)
 
-    if not ok:
-        detail = payload.get("detail") if isinstance(payload, dict) else None
-        failure = f"HTTP {status} from {method} {path}: {_one_line(detail or payload, 400)}"
-        return ToolOutcome(_tool_result(failure, is_error=True), token_error=failure)
-    return ToolOutcome(_tool_result(
-        f"{method} {path} → HTTP {status}\n\n{_one_line(payload, 6000)}", data=payload
-    ))
+    return _payload_outcome(method, path, status, payload, query)
 
 
 async def _run_escape_hatch(
@@ -522,13 +559,7 @@ async def _run_escape_hatch(
     ok = status < 400
     await _audit(db, token, tool.name, f"{method} {target}", ok, status,
                  None if ok else _one_line(payload), args, started)
-    if not ok:
-        detail = payload.get("detail") if isinstance(payload, dict) else None
-        failure = f"HTTP {status} from {method} {target}: {_one_line(detail or payload, 400)}"
-        return ToolOutcome(_tool_result(failure, is_error=True), token_error=failure)
-    return ToolOutcome(_tool_result(
-        f"{method} {target} → HTTP {status}\n\n{_one_line(payload, 6000)}", data=payload
-    ))
+    return _payload_outcome(method, target, status, payload, query)
 
 
 #: Contact fields the app's renderer fills in. Kept in step with the sample
@@ -587,12 +618,7 @@ async def _run_preview_template(
         return ToolOutcome(_tool_result(failure, is_error=True), token_error=failure)
 
     payload = {"template_id": template_id, "template_name": template.get("name"), **payload}
-    return ToolOutcome(_tool_result(
-        f"Rendered \"{template.get('name')}\" with "
-        f"{'contact ' + str(contact_id) if contact_id else 'sample'} values:\n\n"
-        f"{json.dumps(payload, indent=2, default=str)[:6000]}",
-        data=payload,
-    ))
+    return _payload_outcome("PREVIEW_TEMPLATE", f"/api/v1/templates/{template_id}", 200, payload)
 
 
 async def _endpoint_catalogue() -> str:
@@ -883,6 +909,17 @@ PROMPTS = [
 ]
 
 
+def _resource_json(document: Any) -> str:
+    """A JSON resource, complete or -- if too large -- shortened and marked as such.
+
+    These used to be ``json.dumps(...)[:12000]``: cut mid-string, no longer JSON, and
+    silent about it.
+    """
+    _, structured = tool_response.build_envelope("GET", "resource", 200, document, budget=24_000)
+    return json.dumps(structured if isinstance(structured, dict) else document, default=str,
+                      ensure_ascii=False)
+
+
 async def _read_resource(uri: str) -> str:
     if uri == "sendsms://guide":
         return APP_GUIDE
@@ -890,21 +927,18 @@ async def _read_resource(uri: str) -> str:
         status, payload = await call_app("GET", "/api/v1/email/reference")
         lists_status, lists = await call_app("GET", "/api/v1/lists/")
         variables_status, variables = await call_app("GET", "/api/v1/variables/")
-        return json.dumps(
+        return _resource_json(
             {
                 "reference": payload if status < 400 else {"error": payload},
                 "lists": lists if lists_status < 400 else [],
                 "variables": variables if variables_status < 400 else [],
-            },
-            indent=2, default=str,
-        )[:12000]
+            }
+        )
     if uri == "sendsms://inbox/recent":
         status, payload = await call_app(
             "GET", "/api/v1/inbox/conversations", query={"per_page": 15}
         )
-        return json.dumps(
-            payload if status < 400 else {"error": payload}, indent=2, default=str
-        )[:12000]
+        return _resource_json(payload if status < 400 else {"error": payload})
     return "{}"
 
 

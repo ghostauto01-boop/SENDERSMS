@@ -91,13 +91,22 @@ class Mcp:
         is_error, text, data = self.call(tool_name, **args)
         if is_error:
             raise RuntimeError(f"{tool_name} failed: {text[:400]}")
+        # Every tool response is one JSON envelope (P0-4): {ok, http_status, request,
+        # truncated, returned, total, next_cursor, data, ...}. The endpoint's own
+        # payload is under "data".
+        try:
+            envelope = json.loads(text)
+        except ValueError:
+            envelope = None
+        if isinstance(envelope, dict) and "http_status" in envelope and "data" in envelope:
+            if envelope.get("truncated") and envelope.get("cut"):
+                print(f"   (note: {tool_name} response was shortened: {envelope.get('note')})")
+            data = envelope["data"]
         if isinstance(data, dict) and set(data.keys()) == {"items"}:
             return data["items"]
-        if isinstance(data, dict):
+        if isinstance(data, (dict, list)):
             return data
-        # Fall back to the JSON that follows the status line.
-        _, _, tail = text.partition("\n\n")
-        return json.loads(tail) if tail.strip() else text
+        return envelope if envelope is not None else text
 
 
 def jget(data, *keys, default=None):

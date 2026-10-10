@@ -1,7 +1,7 @@
 """Webhook handler — receives SMS-Gate.app events. Parses nested payload format."""
 import json, logging
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
@@ -589,7 +589,7 @@ async def brevo_webhook(
 
 
 @router.get("/logs")
-async def logs(page: int=1, per_page: int=25, event_type: str=None,
+async def logs(page: int=Query(1, ge=1), per_page: int=Query(25, ge=1, le=200), event_type: str=None,
                db: AsyncSession = Depends(get_db), cu: User = Depends(get_current_user)):
     q = select(WebhookEvent)
     if event_type: q = q.where(WebhookEvent.event_type == event_type)

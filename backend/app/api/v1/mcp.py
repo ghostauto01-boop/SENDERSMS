@@ -35,7 +35,7 @@ from collections import defaultdict, deque
 from datetime import datetime, timezone
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import (
     HTMLResponse,
     JSONResponse,
@@ -965,11 +965,11 @@ async def revoke_token(token_id: int, db: AsyncSession = Depends(get_db),
 
 
 @router.get("/activity")
-async def activity(limit: int = 50, db: AsyncSession = Depends(get_db),
+async def activity(limit: int = Query(50, ge=1, le=200), db: AsyncSession = Depends(get_db),
                    cu: User = Depends(get_current_user)):
     """What the assistant actually did — every tool call, newest first."""
     rows = (
-        await db.execute(select(McpCall).order_by(McpCall.id.desc()).limit(min(limit, 200)))
+        await db.execute(select(McpCall).order_by(McpCall.id.desc()).limit(limit))
     ).scalars().all()
     total = (await db.execute(select(func.count()).select_from(McpCall))).scalar() or 0
     return {

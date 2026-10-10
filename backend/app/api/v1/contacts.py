@@ -2,7 +2,9 @@
 Contacts API routes.
 """
 
+import base64
 import csv
+import hashlib
 import io
 import json
 import uuid
@@ -222,12 +224,14 @@ async def list_contacts(
     count_query = select(func.count()).select_from(query.subquery())
     total = (await db.execute(count_query)).scalar() or 0
 
-    # Sort
+    # Sort. ``id`` breaks ties: a bulk import gives hundreds of contacts the same
+    # created_at, and without a tiebreaker the database may order them differently
+    # from one page to the next -- so paging could skip or repeat a contact.
     sort_col = getattr(Contact, sort_by, Contact.created_at)
     if sort_dir == "asc":
-        query = query.order_by(sort_col.asc())
+        query = query.order_by(sort_col.asc(), Contact.id.asc())
     else:
-        query = query.order_by(sort_col.desc())
+        query = query.order_by(sort_col.desc(), Contact.id.desc())
 
     # Paginate
     offset = (page - 1) * per_page
@@ -257,7 +261,214 @@ async def list_contacts(
         data = {k: v for k, v in vars(contact).items() if not k.startswith("_")}
         data["tags"] = tag_map.get(contact.id, [])
         items.append(ContactOut.model_validate(data).model_dump(mode="json"))
-    return ContactListOut(total=total, items=items)
+    return ContactListOut(
+        total=total,
+        items=items,
+        page=page,
+        per_page=per_page,
+        next_page=page + 1 if offset + len(items) < total else None,
+    )
+
+
+# --------------------------------------------------------------------------
+# Cursor-paginated export
+# --------------------------------------------------------------------------
+
+#: The fixed columns of an export. Custom fields and tags follow them.
+EXPORT_COLUMNS = [
+    "first_name", "last_name", "business_name", "phone_number", "email",
+    "city", "state", "country", "website", "industry", "source", "lead_status",
+    "notes",
+]
+
+
+def _encode_cursor(payload: dict) -> str:
+    raw = json.dumps(payload, separators=(",", ":")).encode()
+    return base64.urlsafe_b64encode(raw).decode().rstrip("=")
+
+
+def _decode_cursor(token: str) -> dict:
+    try:
+        padded = token + "=" * (-len(token) % 4)
+        data = json.loads(base64.urlsafe_b64decode(padded.encode()))
+        if not isinstance(data, dict) or not isinstance(data.get("last_id"), int):
+            raise ValueError("shape")
+        return data
+    except Exception:  # noqa: BLE001 — any malformed token is the caller's mistake
+        raise HTTPException(
+            status_code=422,
+            detail="Invalid export cursor. Use the next_cursor from the previous page, unchanged.",
+        )
+
+
+def _custom_values(contact: Contact) -> dict:
+    try:
+        values = json.loads(contact.custom_fields or "{}")
+    except (ValueError, TypeError):
+        return {}
+    return values if isinstance(values, dict) else {}
+
+
+async def _tag_map(db: AsyncSession, contact_ids: list[int]) -> dict[int, str]:
+    """Comma-joined tag names for a page of contacts, in ONE query."""
+    names: dict[int, list[str]] = {}
+    if contact_ids:
+        rows = await db.execute(
+            select(ContactTag.contact_id, Tag.name)
+            .join(Tag, ContactTag.tag_id == Tag.id)
+            .where(ContactTag.contact_id.in_(contact_ids))
+            .order_by(Tag.name.asc())
+        )
+        for contact_id, name in rows.all():
+            names.setdefault(contact_id, []).append(name)
+    return {cid: ", ".join(values) for cid, values in names.items()}
+
+
+def _export_row(contact: Contact, tags: str, custom_columns: list[str]) -> list:
+    custom = _custom_values(contact)
+    return (
+        [getattr(contact, col) or "" for col in EXPORT_COLUMNS]
+        + [tags]
+        + [custom.get(col, "") for col in custom_columns]
+    )
+
+
+def _export_query(search, lead_status, tag, email_state, channel, list_id):
+    query = _apply_contact_filters(select(Contact), search, lead_status, tag)
+    query = _apply_channel_filters(query, email_state, channel)
+    if list_id is not None:
+        query = query.join(
+            ContactListMember, Contact.id == ContactListMember.contact_id
+        ).where(ContactListMember.list_id == list_id)
+    return query
+
+
+@router.get("/export")
+async def export_contacts_page(
+    cursor: Optional[str] = Query(
+        default=None,
+        description="The next_cursor of the previous page, unchanged. Omit for the first page.",
+    ),
+    limit: int = Query(default=200, ge=1, le=500, description="Rows per page (maximum 500)."),
+    max_bytes: int = Query(
+        default=20_000, ge=1_000, le=200_000,
+        description="Stop a page once its CSV text reaches this size (at least one row is "
+                    "always returned). The cursor makes up the difference, so nothing is skipped.",
+    ),
+    format: str = Query(default="csv", pattern="^(csv|json)$",
+                        description="csv: a 'csv' text per page. json: 'rows' as objects."),
+    search: Optional[str] = None,
+    lead_status: Optional[str] = None,
+    tag: Optional[str] = None,
+    email_state: Optional[str] = None,
+    channel: Optional[str] = None,
+    list_id: Optional[int] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Export contacts a page at a time, following ``next_cursor`` until it is null.
+
+    Every page reports ``returned`` (rows in this page), ``total`` (rows matching the
+    filters), ``truncated`` (more pages follow) and ``next_cursor``. The cursor is a
+    keyset on the contact id, so a contact added or removed mid-export never makes a
+    page skip or repeat a row, and the columns are fixed by the first page (the union
+    of custom fields at that moment) so every page has the same shape. With
+    ``format=csv`` only the first page carries the header row: concatenating the
+    ``csv`` of every page gives one valid CSV file.
+    """
+    filters = {
+        "search": search, "lead_status": lead_status, "tag": tag,
+        "email_state": email_state, "channel": channel, "list_id": list_id,
+    }
+    fingerprint = hashlib.sha1(
+        json.dumps(filters, sort_keys=True, default=str).encode()
+    ).hexdigest()[:12]
+
+    base = _export_query(**filters)
+    total = (await db.execute(select(func.count()).select_from(base.subquery()))).scalar() or 0
+
+    if cursor:
+        state = _decode_cursor(cursor)
+        if state.get("f") != fingerprint:
+            raise HTTPException(
+                status_code=422,
+                detail="This cursor was issued for different filters. Repeat the same "
+                       "filters on every page, or start again without a cursor.",
+            )
+        last_id = state["last_id"]
+        custom_columns = [str(c) for c in (state.get("columns") or [])]
+    else:
+        last_id = 0
+        custom_columns = []
+        seen: set[str] = set(EXPORT_COLUMNS) | {"tags"}
+        custom_rows = await db.execute(
+            select(Contact.custom_fields)
+            .where(Contact.id.in_(select(base.subquery().c.id)))
+            .where(Contact.custom_fields.is_not(None))
+            .order_by(Contact.id.asc())
+        )
+        for (raw,) in custom_rows.all():
+            try:
+                values = json.loads(raw or "{}")
+            except (ValueError, TypeError):
+                continue
+            for key in values if isinstance(values, dict) else []:
+                if key not in seen:
+                    seen.add(key)
+                    custom_columns.append(key)
+
+    columns = EXPORT_COLUMNS + ["tags"] + custom_columns
+    page_query = base.where(Contact.id > last_id).order_by(Contact.id.asc()).limit(limit + 1)
+    fetched = list((await db.execute(page_query)).scalars().all())
+    has_more_rows = len(fetched) > limit
+    contacts = fetched[:limit]
+    tags = await _tag_map(db, [c.id for c in contacts])
+
+    rows: list[list] = []
+    header_text = ""
+    if format == "csv" and not cursor:
+        buffer = io.StringIO()
+        csv.writer(buffer).writerow(columns)
+        header_text = buffer.getvalue()
+    used = len(header_text)
+    kept: list[Contact] = []
+    stopped_early = False
+    for contact in contacts:
+        row = _export_row(contact, tags.get(contact.id, ""), custom_columns)
+        if format == "csv":
+            line = io.StringIO()
+            csv.writer(line).writerow(row)
+            cost = len(line.getvalue())
+            if kept and used + cost > max_bytes:
+                stopped_early = True
+                break
+            used += cost
+        kept.append(contact)
+        rows.append(row)
+
+    more = has_more_rows or stopped_early
+    next_cursor = (
+        _encode_cursor({"last_id": kept[-1].id, "columns": custom_columns, "f": fingerprint})
+        if more and kept else None
+    )
+    body: dict = {
+        "format": format,
+        "columns": columns,
+        "returned": len(kept),
+        "total": total,
+        "truncated": next_cursor is not None,
+        "next_cursor": next_cursor,
+    }
+    if format == "json":
+        body["rows"] = [dict(zip(columns, row)) for row in rows]
+    else:
+        out = io.StringIO()
+        out.write(header_text)
+        writer = csv.writer(out)
+        for row in rows:
+            writer.writerow(row)
+        body["csv"] = out.getvalue()
+    return body
 
 
 @router.post("/clean")
@@ -1448,11 +1659,7 @@ async def export_csv(
     result = await db.execute(query)
     contacts = result.scalars().all()
 
-    columns = [
-        "first_name", "last_name", "business_name", "phone_number", "email",
-        "city", "state", "country", "website", "industry", "source", "lead_status",
-        "notes",
-    ]
+    columns = list(EXPORT_COLUMNS)
 
     # Include the union of imported custom fields so an export/re-import is
     # lossless and users can inspect fields such as pain_point or account_tier.
@@ -1474,8 +1681,9 @@ async def export_csv(
     buffer = io.StringIO()
     writer = csv.writer(buffer)
     writer.writerow(all_columns)
+    tag_by_contact = await _tag_map(db, [c.id for c in contacts])
     for contact, custom in zip(contacts, parsed_custom):
-        tag_names = ", ".join(await _tag_names(db, contact.id))
+        tag_names = tag_by_contact.get(contact.id, "")
         writer.writerow(
             [getattr(contact, col) or "" for col in columns]
             + [tag_names]

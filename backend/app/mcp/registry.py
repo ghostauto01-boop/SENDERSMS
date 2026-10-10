@@ -29,6 +29,10 @@ class Param:
     enum: list[str] | None = None
     default: Any = None
     items: str | None = None  # element type when type == "array"
+    #: Documented bounds (JSON-schema ``minimum``/``maximum``). A page size above the
+    #: endpoint's ceiling is a 422, so the schema must say what the ceiling is.
+    minimum: int | None = None
+    maximum: int | None = None
     #: True when the endpoint takes this value AS the whole request body (a bare
     #: JSON array, e.g. POST /lists/{id}/contacts), instead of a named field.
     root: bool = False
@@ -43,6 +47,10 @@ class Param:
             out["items"] = {"type": self.items}
         if self.default is not None:
             out["default"] = self.default
+        if self.minimum is not None:
+            out["minimum"] = self.minimum
+        if self.maximum is not None:
+            out["maximum"] = self.maximum
         return out
 
 
@@ -201,7 +209,8 @@ TOOLS: list[Tool] = [
             Param("lead_status", where="query"),
             Param("list_id", type="integer", description="Only contacts in this list.", where="query"),
             Param("page", type="integer", default=1, where="query"),
-            Param("per_page", type="integer", default=50, where="query"),
+            Param("per_page", type="integer", default=25, minimum=1, maximum=100, where="query",
+                  description="Page size, 1-100 (above 100 is refused, not clamped)."),
         ],
     ),
     Tool(
@@ -260,8 +269,29 @@ TOOLS: list[Tool] = [
     ),
     Tool(
         name="export_contacts_csv",
-        description="Download every contact as CSV text.",
-        method="GET", path="/api/v1/contacts/export/csv", group="contacts",
+        description=(
+            "Export contacts as CSV, ONE PAGE AT A TIME. Every page reports 'returned', 'total', "
+            "'truncated' and 'next_cursor'; repeat the call with that next_cursor (and the same "
+            "filters) until it is null, then concatenate the 'csv' of each page — only the first "
+            "carries the header row. Nothing is skipped or repeated even if contacts change "
+            "meanwhile. (The old one-shot download was cut to a few dozen rows by the response "
+            "limit; this is how to get all of them.) Use format='json' for rows as objects."
+        ),
+        method="GET", path="/api/v1/contacts/export", group="contacts",
+        params=[
+            Param("cursor", where="query",
+                  description="The next_cursor of the previous page, unchanged. Omit for page 1."),
+            Param("limit", type="integer", default=100, minimum=1, maximum=500, where="query",
+                  description="Rows per page, 1-500 (above 500 is refused, not clamped)."),
+            Param("format", enum=["csv", "json"], default="csv", where="query"),
+            Param("search", where="query"),
+            Param("lead_status", where="query"),
+            Param("tag", where="query"),
+            Param("email_state", where="query"),
+            Param("channel", enum=["sms", "email"], where="query"),
+            Param("list_id", type="integer", where="query",
+                  description="Only contacts on this list."),
+        ],
     ),
     Tool(
         name="set_email_opt_out",
@@ -429,8 +459,8 @@ TOOLS: list[Tool] = [
                   description="true = only campaigns that are running/scheduled/paused."),
             Param("search", where="query"),
             Param("page", type="integer", default=1, where="query"),
-            Param("per_page", type="integer", default=50, where="query",
-                  description="Max 200."),
+            Param("per_page", type="integer", default=25, minimum=1, maximum=200, where="query",
+                  description="Page size, 1-200 (above 200 is refused, not clamped)."),
         ],
     ),
     Tool(
@@ -703,7 +733,8 @@ TOOLS: list[Tool] = [
         description="Recent SMS sends with their status.",
         method="GET", path="/api/v1/send/history", group="sending",
         params=[Param("page", type="integer", default=1, where="query"),
-                Param("per_page", type="integer", default=25, where="query")],
+                Param("per_page", type="integer", default=25, minimum=1, maximum=100, where="query",
+                      description="Page size, 1-100 (above 100 is refused, not clamped).")],
     ),
     Tool(
         name="scheduled_messages",
@@ -715,7 +746,8 @@ TOOLS: list[Tool] = [
         description="Recent email sends with status, opens, clicks and attachments.",
         method="GET", path="/api/v1/email/history", group="sending",
         params=[Param("page", type="integer", default=1, where="query"),
-                Param("per_page", type="integer", default=25, where="query")],
+                Param("per_page", type="integer", default=25, minimum=1, maximum=200, where="query",
+                      description="Page size, 1-200 (above 200 is refused, not clamped).")],
     ),
     # ------------------------------------------------------------------ email
     Tool(
@@ -734,7 +766,8 @@ TOOLS: list[Tool] = [
         params=[Param("status", where="query"),
                 Param("unread_only", type="boolean", where="query"),
                 Param("page", type="integer", default=1, where="query"),
-                Param("per_page", type="integer", default=25, where="query")],
+                Param("per_page", type="integer", default=25, minimum=1, maximum=100, where="query",
+                      description="Page size, 1-100 (above 100 is refused, not clamped).")],
     ),
     Tool(
         name="get_email_conversation",
@@ -795,7 +828,8 @@ TOOLS: list[Tool] = [
         params=[Param("channel", enum=["all", "sms", "email"], default="all", where="query"),
                 Param("status", where="query"),
                 Param("page", type="integer", default=1, where="query"),
-                Param("per_page", type="integer", default=25, where="query")],
+                Param("per_page", type="integer", default=25, minimum=1, maximum=500, where="query",
+                      description="Page size, 1-500 (above 500 is refused, not clamped).")],
     ),
     Tool(
         name="get_inbox_conversation",
