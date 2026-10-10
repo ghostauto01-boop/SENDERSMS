@@ -1,6 +1,6 @@
 # Sprint 1 report (QA sweep of 10 Oct 2026, §G → §J)
 
-Branch `arena/191f89ff-sendersms`, five commits on top of `45c0937`
+Branch `arena/191f89ff-sendersms`, six commits on top of `45c0937`
 (`d9002cf` P0-1, `b9eedb5` P0-2, `38d3b87` P0-3, `60c0f4f` P0-4, `abeb293` P0-5, `04f946b` C10 + P0-5 follow-up).
 Evidence (raw before/after output) is in [`docs/evidence/sprint-1/`](evidence/sprint-1/).
 
@@ -49,10 +49,13 @@ Each fix has a test that **failed on the pre-change code and passes now** (the f
   Reproduced: a draft with a past `scheduled_start_at` was launched by the scheduler right after a `validate`.
   Now `validate` is a report (`changed: false`, any number of calls leaves the status alone); `scheduled` has exits —
   pause (records `paused_from`, resume restores `scheduled`), delete when `messages_sent == 0`, stop, edit —
-  `schedule(null)` returns it to `draft`; a missing id is 404 (was 400); `TRANSITIONS` is a tested state machine in which
-  every status has at least one outgoing transition **except `completed`/`stopped`, which are terminal by design**.
+  `schedule(null)` returns it to `draft`; a missing id is 404 (was 400). `TRANSITIONS` is now enforced, and a test derives the real
+  graph from the HTTP API and compares it with the declared table.
 * **Differs from the brief:** `POST /schedule` already existed, and `scheduled` could already be stopped, started and
-  edited — pause and delete were the missing exits.
+  edited — pause and delete were the missing exits. The brief's "every status has at least one outgoing transition" is **not literally
+  true in the result**: `completed` and `stopped` are terminal by design (a finished or stopped campaign is not restarted), and the test asserts
+  exactly that — every *non-terminal* status has an exit and the terminal ones have none. If you want an exit from them (say, "duplicate
+  and restart") that is a product decision I did not make.
 * **Not verified:** the UI in a browser (only vitest), production data.
 
 ## P0-2 — one campaign directory (commit `b9eedb5`)
@@ -62,8 +65,9 @@ Each fix has a test that **failed on the pre-change code and passes now** (the f
 * **Verify:** `python -m pytest backend/tests/test_p0_2_unified_campaigns.py`
 * **Before → after:** dashboard `active_campaigns` **1 → 3** on a fixture with overlapping ids; `get_campaign(2, kind=ads)`
   returned the classic "Legacy email draft" (now the ads campaign); MCP `pause_campaign(1)` guessed a system (now an id in
-  both systems is a 409 `AMBIGUOUS_CAMPAIGN_ID` listing the candidates). Test: every id surfaced by `list_campaigns`,
-  the dashboard and activity resolves through `get_campaign`.
+  both systems is a 409 `AMBIGUOUS_CAMPAIGN_ID` listing the candidates). The "surfaced anywhere" test collects every campaign id shown by the
+  campaign directory and by the inbox conversation badges (each now carries a `kind`) and checks each resolves to the same campaign it was
+  shown as; it covers those two surfaces, not every endpoint that mentions a campaign.
 * **Differs from the brief:** `kind` is `campaign | ads` (the classic payloads already say "campaign"); `system` carries
   `legacy | ads`, and `kind=legacy` is accepted as an input alias. The MCP registry has no ads tools; the generic
   `api_request` tool reaches them.
@@ -137,7 +141,7 @@ Each fix has a test that **failed on the pre-change code and passes now** (the f
   13 of 19 tests fail on the old code; the new UI test fails on the old page. Rotation replaces the token and the old one gets a 403 immediately; reveal and
   rotate are refused to the MCP bridge, including through the generic `api_request` tool.
 * **Not done:** HMAC-signing of webhooks (Brevo does not sign its transactional webhooks, so there is nothing to verify; the SMS gateway webhook already has a
-  signature check). The device id is masked in the two diagnostic endpoints that returned it; other secrets-in-reads were not audited. Because Brevo can only be
+  signature check). The gateway device id is masked in `/inbox/device-info`, `/inbox/poll-debug` and the device hint in the inbox status, but only `/inbox/device-info` has a test; other secrets-in-reads were not audited. Because Brevo can only be
   given a URL, the token still appears in web-server access logs for Brevo's calls (the header form exists for senders that can set one). How Brevo reacts to
   deliveries refused after a rotation (retry or drop) was not verified.
 
@@ -154,8 +158,8 @@ Each fix has a test that **failed on the pre-change code and passes now** (the f
 
 ## Extra findings
 
-* **Live SMS-Gate credentials are printed in plaintext in `AUDIT.md`, `START_HERE.md` and `backend/debug_poll.py`, and are in git history** (`AUDIT.md` cites commit
-  `74c9cc2`). Rotate them. I did not copy them anywhere and did not edit those files: scrubbing does not remove history, and `debug_poll.py` is a working script.
+* **SMS-Gate credentials are printed in plaintext in `AUDIT.md`, `START_HERE.md` and `backend/debug_poll.py`, and are in git history** (`AUDIT.md` cites commit
+  `74c9cc2` and says rotation was still pending; I cannot tell whether it happened). If they were not rotated, rotate them. I did not copy them anywhere and did not edit those files: scrubbing does not remove history, and `debug_poll.py` is a working script.
 * `UnboundLocalError` in `_send_template_message` (fixed, P0-3).
 * `GET /mcp/activity` silently clamped `limit` with `min(limit, 200)`; it is now a 422 like the other lists.
 * `tools/mcp_smoke.py` defaults `ADMIN_PASSWORD` to `admin`, while the app's shipped default is `12345678`; I passed the variable and did not change the default.
