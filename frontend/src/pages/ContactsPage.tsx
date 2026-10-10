@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import api from "../api/client";
 import { Contact, PaginatedResponse } from "../types";
 import toast from "react-hot-toast";
-import { Plus, Search, Trash2, Upload, Download, ChevronLeft, ChevronRight, X, ListPlus, MessageSquare, Phone, Mail, MapPin, Building2, User, CheckSquare, Square, IdCard, Sparkles } from "lucide-react";
+import { Plus, Search, Trash2, Upload, Download, ChevronLeft, ChevronRight, X, ListPlus, MessageSquare, Phone, Mail, MapPin, Building2, User, CheckSquare, Square, IdCard, Sparkles, ShieldCheck } from "lucide-react";
 import ContactProfileModal from "../components/ContactProfileModal";
 import ContactActions from "../components/ContactActions";
 import ImportContactsModal from "../components/ImportContactsModal";
@@ -34,7 +34,7 @@ export default function ContactsPage() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [search, setSearch] = useState(""); const [leadStatus, setLeadStatus] = useState("");
+  const [search, setSearch] = useState(() => new URLSearchParams(window.location.search).get("search") || ""); const [leadStatus, setLeadStatus] = useState("");
   //: Email-only view of the same list: who can be emailed, who cannot, why.
   const [emailState, setEmailState] = useState("");
   //: Channel view: SMS contacts / Email contacts / All
@@ -43,7 +43,8 @@ export default function ContactsPage() {
   const [listId, setListId] = useState<string>("");
   const [lists, setLists] = useState<{id:number;name:string}[]>([]);
   // Debounced search text — typing no longer fires a request per keystroke.
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState(search);
+  const loadId = useRef(0);
   const [loading, setLoading] = useState(true); const [error, setError] = useState<string|null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   // "Select all N matching" — the selection covers every contact matching the
@@ -68,22 +69,30 @@ export default function ContactsPage() {
     api.get("/contacts/enrich/status")
       .then(({data})=>{ setEnrichProviders(data.providers || []); setEnrichInfo(data.contacts || null); })
       .catch(()=>{ setEnrichProviders([]); });
-    api.get("/lists/",{params:{per_page:500}})
-      .then(({data})=>{ setLists(data.items||[]); })
-      .catch(()=>{});
+    void (async () => {
+      const all: {id:number;name:string}[] = [];
+      for (let page = 1; ; page++) {
+        const {data} = await api.get("/lists/", {params:{page,per_page:100}});
+        all.push(...(data.items || []));
+        if (!data.items?.length || data.items.length < 100 || all.length >= data.total) break;
+      }
+      setLists(all);
+    })().catch(()=>{});
   },[]);
 
   useEffect(()=>{ const t=setTimeout(()=>{ setDebouncedSearch(search); },350); return ()=>clearTimeout(t); },[search]);
   useEffect(()=>{loadContacts();},[page,debouncedSearch,leadStatus,emailState,channel,listId]);
 
   const loadContacts = async () => {
-    try { setLoading(true); const {data}=await api.get<PaginatedResponse<Contact>>("/contacts/",{params:{page,per_page:25,search:debouncedSearch||undefined,lead_status:leadStatus||undefined,email_state:emailState||undefined,channel:channel||undefined,list_id:listId||undefined}});
+    const requestId = ++loadId.current;
+    try { setLoading(true); setError(null); const {data}=await api.get<PaginatedResponse<Contact>>("/contacts/",{params:{page,per_page:25,search:debouncedSearch||undefined,lead_status:leadStatus||undefined,email_state:emailState||undefined,channel:channel||undefined,list_id:listId||undefined}});
+      if (requestId !== loadId.current) return;
       // Deleting the last row of a page must not leave the user stranded on
       // an empty page — step back one page and let the effect reload.
       if (data.items.length===0 && page>1) { setPage(p=>Math.max(1,p-1)); return; }
       setContacts(data.items); setTotal(data.total); }
-    catch (err:any) { setError(err.response?.data?.detail||"Failed"); }
-    finally { setLoading(false); }
+    catch (err:any) { if (requestId === loadId.current) setError(err.response?.data?.detail||"Failed to load contacts"); }
+    finally { if (requestId === loadId.current) setLoading(false); }
   };
 
   /**
@@ -148,7 +157,7 @@ export default function ContactsPage() {
   const handleExport = async () => {
     try {
       const res = await api.get("/contacts/export/csv", {
-        params: { search: search || undefined, lead_status: leadStatus || undefined },
+        params: { search: debouncedSearch || undefined, lead_status: leadStatus || undefined, channel: channel || undefined, list_id: listId || undefined, email_state: emailState || undefined },
         responseType: "blob",
       });
       const url = window.URL.createObjectURL(new Blob([res.data], { type: "text/csv" }));
@@ -164,22 +173,22 @@ export default function ContactsPage() {
   };
 
   const [deletingId, setDeletingId] = useState<number | null>(null);
-  const handleDelete = async (id:number) => { if(!confirm("Permanently delete this phone number? This cannot be undone."))return; setDeletingId(id); try { await api.delete(`/contacts/${id}`); toast.success("Contact permanently deleted"); loadContacts(); } catch { toast.error("Failed to delete"); } finally { setDeletingId(null); } };
+  const handleDelete = async (id:number) => { if(!confirm("Permanently delete this contact? This cannot be undone."))return; setDeletingId(id); try { await api.delete(`/contacts/${id}`); toast.success("Contact permanently deleted"); loadContacts(); } catch { toast.error("Failed to delete"); } finally { setDeletingId(null); } };
   const clearSelection = () => { setSelected(new Set()); setAllMatching(false); };
   const handleBulkDelete = async () => {
     const count = allMatching ? total : selected.size;
     if (count === 0) return;
-    const label = allMatching ? `${count} matching phone numbers` : `${count} phone numbers`;
+    const label = allMatching ? `${count} matching contacts` : `${count} contacts`;
     if(!confirm(`Permanently delete ${label}? This cannot be undone.`))return;
     try {
       if (allMatching) {
         // Server-side scope: delete everything matching the current filters
         // across every page — no need to enumerate thousands of ids.
-        await api.post("/contacts/bulk",{contact_ids:[],action:"delete",scope:"all",search:search||undefined,lead_status:leadStatus||undefined});
+        await api.post("/contacts/bulk",{contact_ids:[],action:"delete",scope:"all",search:debouncedSearch||undefined,lead_status:leadStatus||undefined,channel:channel||undefined,list_id:listId?Number(listId):undefined,email_state:emailState||undefined});
       } else {
         await api.post("/contacts/bulk",{contact_ids:[...selected],action:"delete"});
       }
-      toast.success(`${count} phone numbers permanently deleted`);
+      toast.success(`${count} contacts permanently deleted`);
       clearSelection(); loadContacts();
     } catch { toast.error("Failed"); }
   };
@@ -206,6 +215,7 @@ export default function ContactsPage() {
         const { data } = await api.post(`/lists/${selectedListId}/contacts/add-all`,{
           search: debouncedSearch || undefined,
           lead_status: leadStatus || undefined,
+          channel: channel || undefined, list_id: listId ? Number(listId) : undefined, email_state: emailState || undefined,
         });
         toast.success(`${data.added} contact${data.added===1?"":"s"} added to list${data.matched>data.added?` (${data.matched-data.added} already in it)`:""}`);
       } else {
@@ -242,63 +252,33 @@ export default function ContactsPage() {
     } else setSelected(new Set(contacts.map(c=>c.id)));
   };
 
+  const validatorParams = new URLSearchParams();
+  if (selected.size > 0 && !allMatching) {
+    validatorParams.set("scope", "ids");
+    validatorParams.set("contact_ids", [...selected].join(","));
+  } else {
+    for (const [key, value] of Object.entries({search: debouncedSearch, lead_status: leadStatus, channel, list_id: listId, email_state: emailState})) {
+      if (value) validatorParams.set(key, value);
+    }
+  }
+  const validatorHref = `/validator${validatorParams.size ? `?${validatorParams}` : ""}`;
   const totalPages = Math.ceil(total/25);
   if(error) return (<div className="text-center py-12"><h2 className="text-xl font-semibold mb-2">Error</h2><p className="text-gray-500 mb-4">{error}</p><button onClick={loadContacts} className="btn-primary">Retry</button></div>);
 
   return (
-    <div className="space-y-3 pb-20 lg:pb-0">
-      {/* Header - WhatsApp style */}
+    <div className="space-y-4 min-w-0">
+      {/* Wrap actions instead of squeezing five buttons beside the heading. */}
       <div className="flex flex-col gap-3">
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-[22px] font-bold text-gray-900 dark:text-white flex items-center gap-2">
-              <span className="w-8 h-8 rounded-full bg-primary-600 flex items-center justify-center text-white text-sm"><User size={16}/></span>
-              Contacts
-            </h1>
-            <p className="text-[13px] text-gray-500 dark:text-gray-400">{total} contacts • Tap card to message</p>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Contacts</h1>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{total.toLocaleString()} contacts · Manage, validate, and reach your audience</p>
           </div>
-          <div className="flex gap-1.5">
-            <button onClick={async()=>{
-              if(!confirm("Scan all contacts and mark invalid / previously-failed numbers as undeliverable so they are never billed again?")) return;
-              try {
-                const {data}=await api.post("/contacts/clean");
-                toast.success(`Scanned ${data.scanned}. Quarantined ${data.quarantined} bad numbers (${data.invalid_format} invalid, ${data.previous_failures} bounced).`);
-                loadContacts();
-              } catch { toast.error("Clean failed"); }
-            }} className="w-10 h-10 lg:w-auto lg:px-3 lg:py-2 rounded-full lg:rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 flex items-center justify-center gap-1.5 text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-700" title="Quarantine numbers that fail delivery">
-              <span className="hidden lg:inline">Clean list</span>
-              <span className="lg:hidden">✓</span>
-            </button>
-            <button onClick={async()=>{
-              const useSelection = selected.size > 0 && !allMatching;
-              const label = useSelection ? `${selected.size} selected contact${selected.size===1?"":"s"}` : `all ${total} contacts matching your view`;
-              if(!confirm(`Validate email addresses for ${label}? Confirmed-bad addresses will be quarantined for email sends.`)) return;
-              try {
-                const params: any = { deep: true };
-                if (useSelection) { params.contact_ids = [...selected]; params.scope = "ids"; }
-                else { params.scope = "all";
-                  if (search) params.search = search;
-                  if (leadStatus) params.lead_status = leadStatus;
-                  if (channel) params.channel = channel;
-                  if (listId) params.list_id = listId;
-                  if (emailState) params.email_state = emailState;
-                }
-                const {data}=await api.post("/contacts/validate-emails",null,{params});
-                toast.success(`Validated ${data.scanned}. ${data.deliverable} good, ${data.undeliverable} bad, ${data.risky} risky.`);
-                loadContacts();
-              } catch (err:any) { toast.error(err.response?.data?.detail||"Validation failed"); }
-            }} className="w-10 h-10 lg:w-auto lg:px-3 lg:py-2 rounded-full lg:rounded-lg bg-primary-50 dark:bg-primary-950 text-primary-700 dark:text-primary-300 flex items-center justify-center gap-1.5 text-sm font-medium hover:bg-primary-100 disabled:opacity-50" title="Validate email addresses with Reacher (https://reacher.email)">
-              <Sparkles size={16}/> <span className="hidden lg:inline">Validate emails</span>
-            </button>
-            <button onClick={()=>setShowImport(true)} className="w-10 h-10 lg:w-auto lg:px-3 lg:py-2 rounded-full lg:rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 flex items-center justify-center gap-1.5 text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-700">
-              <Upload size={16}/> <span className="hidden lg:inline">Import</span>
-            </button>
-            <button onClick={handleExport} className="w-10 h-10 lg:w-auto lg:px-3 lg:py-2 rounded-full lg:rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 flex items-center justify-center gap-1.5 text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-700" title="Export CSV">
-              <Download size={16}/> <span className="hidden lg:inline">Export</span>
-            </button>
-            <button onClick={()=>setShowAdd(true)} className="w-10 h-10 lg:w-auto lg:px-4 lg:py-2 rounded-full lg:rounded-lg bg-primary-600 hover:bg-primary-500 text-white flex items-center justify-center gap-1.5 text-sm font-medium shadow-sm">
-              <Plus size={18}/> <span className="hidden lg:inline">Add</span>
-            </button>
+          <div className="grid grid-cols-2 sm:flex w-full sm:w-auto gap-2">
+            <a href={validatorHref} className="btn-secondary btn-sm" title="Validate selected contacts or the current filtered view"><ShieldCheck size={16}/>Validator</a>
+            <button onClick={()=>setShowImport(true)} className="btn-secondary btn-sm"><Upload size={16}/>Import</button>
+            <button onClick={handleExport} className="btn-secondary btn-sm" title="Export the current filtered view"><Download size={16}/>Export</button>
+            <button onClick={()=>setShowAdd(true)} className="btn-primary btn-sm"><Plus size={16}/>Add contact</button>
           </div>
         </div>
 
@@ -329,56 +309,47 @@ export default function ContactsPage() {
             </div>
             {allMatching && (
               <p className="text-[11px] text-white/80 mt-1.5 leading-snug">
-                Bulk actions cover all {total} contacts matching your current search &amp; status — across every page. “Add to list” adds them all in one go; “Delete permanently” removes them all.
+                Bulk actions cover all {total} contacts matching your current filters — across every page. “Add to list” adds them all in one go; “Delete permanently” removes them all.
               </p>
             )}
           </div>
         )}
       </div>
 
-      {/* Search + filter - card */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-2.5 flex gap-2 shadow-sm border border-gray-100 dark:border-gray-700">
-        <div className="relative flex-1">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400"/>
-          <input type="text" className="w-full pl-9 pr-3 py-2.5 bg-gray-100 dark:bg-gray-900 rounded-full text-[15px] placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-600/20 text-gray-900 dark:text-white border border-transparent" placeholder="Search name, business or phone…" value={search} onChange={e=>{setSearch(e.target.value);setPage(1);clearSelection();}}/>
+      {/* A full-width search and responsive filter grid: no horizontal overflow. */}
+      <div className="card p-3 sm:p-4 space-y-3">
+        <div className="relative min-w-0">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/>
+          <input type="search" aria-label="Search contacts" className="input pl-9" placeholder="Search name, business, email or phone…" value={search} onChange={e=>{setSearch(e.target.value);setPage(1);clearSelection();}}/>
         </div>
-        <select className="bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-400 rounded-full px-3 py-2.5 text-sm font-medium border-0 focus:ring-2 focus:ring-primary-600/20 outline-none" value={leadStatus} onChange={e=>{setLeadStatus(e.target.value);setPage(1);clearSelection();}}>
-          <option value="">All</option>{LEAD_STATUSES.map(s=><option key={s} value={s}>{s}</option>)}
-        </select>
-        <select className="bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-400 rounded-full px-3 py-2.5 text-sm font-medium border-0 focus:ring-2 focus:ring-primary-600/20 outline-none" value={channel} onChange={e=>{setChannel(e.target.value);setPage(1);clearSelection();}} title="Channel view">
-          <option value="">All contacts</option>
-          <option value="sms">SMS contacts</option>
-          <option value="email">Email contacts</option>
-        </select>
-        <select className="bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-400 rounded-full px-3 py-2.5 text-sm font-medium border-0 focus:ring-2 focus:ring-primary-600/20 outline-none" value={listId} onChange={e=>{setListId(e.target.value);setPage(1);clearSelection();}} title="Show only this list">
-          <option value="">All lists</option>
-          {lists.map(l=><option key={l.id} value={l.id}>{l.name}</option>)}
-        </select>
-        <select className="bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-400 rounded-full px-3 py-2.5 text-sm font-medium border-0 focus:ring-2 focus:ring-primary-600/20 outline-none" value={emailState} onChange={e=>{setEmailState(e.target.value);setPage(1);clearSelection();}} title="Filter by email eligibility">
-          <option value="">Email: all</option>
-          <option value="emailable">Emailable</option>
-          <option value="no_email">No email</option>
-          <option value="verified">Verified</option>
-          <option value="unverified">Unverified</option>
-          <option value="inferred">Guessed (inferred)</option>
-          <option value="unsubscribed">Unsubscribed</option>
-          <option value="bounced">Bounced</option>
-        </select>
-        <button
-          onClick={handleEnrich}
-          disabled={enriching || !enrichProviders}
-          title={
-            enrichProviders
-              ? "Look up missing addresses and verify the ones on file"
-              : "Add a Hunter/ZeroBounce/NeverBounce API key in Settings to enable enrichment"
-          }
-          className="w-10 h-10 lg:w-auto lg:px-3 lg:py-2.5 rounded-full lg:rounded-full bg-primary-50 dark:bg-primary-950 text-primary-700 dark:text-primary-300 flex items-center justify-center gap-1.5 text-sm font-medium hover:bg-primary-100 disabled:opacity-50"
-        >
-          {enriching
-            ? <span className="w-4 h-4 border-2 border-primary-600 border-t-transparent rounded-full animate-spin"/>
-            : <Sparkles size={16}/>}
-          <span className="hidden lg:inline">{enriching ? "Enriching…" : "Enrich emails"}</span>
-        </button>
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+          <div className="min-w-0"><label className="label" htmlFor="contacts-lead">Lead status</label>
+            <select id="contacts-lead" className="input" value={leadStatus} onChange={e=>{setLeadStatus(e.target.value);setPage(1);clearSelection();}}>
+              <option value="">All statuses</option>{LEAD_STATUSES.map(s=><option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <div className="min-w-0"><label className="label" htmlFor="contacts-channel">Channel</label>
+            <select id="contacts-channel" className="input" value={channel} onChange={e=>{setChannel(e.target.value);setPage(1);clearSelection();}}>
+              <option value="">All contacts</option><option value="sms">SMS contacts</option><option value="email">Email contacts</option>
+            </select>
+          </div>
+          <div className="min-w-0"><label className="label" htmlFor="contacts-list">Contact list</label>
+            <select id="contacts-list" className="input" value={listId} onChange={e=>{setListId(e.target.value);setPage(1);clearSelection();}}>
+              <option value="">All lists</option>{lists.map(l=><option key={l.id} value={l.id}>{l.name}</option>)}
+            </select>
+          </div>
+          <div className="min-w-0"><label className="label" htmlFor="contacts-email">Email eligibility</label>
+            <select id="contacts-email" className="input" value={emailState} onChange={e=>{setEmailState(e.target.value);setPage(1);clearSelection();}}>
+              <option value="">All email states</option><option value="emailable">Emailable</option><option value="no_email">No email</option><option value="verified">Verified</option><option value="unverified">Unverified</option><option value="inferred">Guessed (inferred)</option><option value="unsubscribed">Unsubscribed</option><option value="bounced">Bounced / invalid</option>
+            </select>
+          </div>
+        </div>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-t border-gray-100 dark:border-gray-700 pt-3">
+          <p className="text-xs text-gray-500 dark:text-gray-400 flex-1 min-w-0">Use Validator for detailed results. Enrichment cleans addresses and can find missing emails with optional providers.</p>
+          <button onClick={handleEnrich} disabled={enriching} className="btn-secondary btn-sm" title={enrichProviders.length ? "Use configured enrichment providers" : "Free cleaning and diagnosis; optional provider keys enable email finding"}>
+            {enriching ? <span className="w-4 h-4 border-2 border-primary-600 border-t-transparent rounded-full animate-spin"/> : <Sparkles size={16}/>}{enriching ? "Enriching…" : "Enrich emails"}
+          </button>
+        </div>
       </div>
 
       {/* MOBILE CARDS - WhatsApp style list */}
@@ -413,7 +384,7 @@ export default function ContactsPage() {
         )
         : contacts.map(c => {
           const isSelected = allMatching || selected.has(c.id);
-          const name = `${c.first_name||""} ${c.last_name||""}`.trim() || c.business_name || "Unnamed";
+          const name = contactLabel(c);
           return (
             <div key={c.id} className={`bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow-sm border ${isSelected?"border-primary-600 ring-1 ring-primary-600":"border-gray-100 dark:border-gray-700"} transition-all`}>
               {/* top row */}
@@ -435,7 +406,7 @@ export default function ContactsPage() {
                     {c.phone_number ? (
                       <>
                         <Phone size={12} className="text-primary-600 flex-shrink-0"/>
-                        <span className="font-medium tracking-wide">{c.phone_number}</span>
+                        <span className="font-medium tracking-wide truncate">{c.phone_number}</span>
                       </>
                     ) : (
                       <>
@@ -457,9 +428,10 @@ export default function ContactsPage() {
                   </div>
                   {c.phone_number && c.email && (
                     <div className="flex items-center gap-1.5 mt-0.5 text-[12px] text-gray-500 dark:text-gray-400">
-                      <Mail size={12}/> <span className="truncate">{c.email}</span>
+                      <Mail size={12} className="shrink-0"/> <span className="truncate">{c.email}</span>
                     </div>
                   )}
+                  {c.email && <span className={`${emailTrustClass(emailTrust(c))} inline-block text-[10px] px-1.5 py-0.5 rounded-full mt-1`}>{emailTrustLabel(emailTrust(c))}</span>}
                   {c.business_name && c.business_name !== name && (
                     <div className="flex items-center gap-1.5 mt-1 text-[12px] text-gray-500 dark:text-gray-400">
                       <Building2 size={12}/> <span className="truncate">{c.business_name}</span>
@@ -520,9 +492,9 @@ export default function ContactsPage() {
       </div>
 
       {/* DESKTOP TABLE */}
-      <div className="hidden lg:block bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow-sm border border-gray-100 dark:border-gray-700">
+      <div className="hidden lg:block min-w-0 bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow-sm border border-gray-100 dark:border-gray-700">
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full min-w-[900px]">
             <thead className="bg-gray-100 dark:bg-gray-900 text-left">
               <tr>
                 <th className="px-4 py-3 w-10">
@@ -554,8 +526,8 @@ export default function ContactsPage() {
                   <td className="px-4 py-3"><input type="checkbox" checked={allMatching||selected.has(c.id)} onChange={()=>toggleSelect(c.id)} title={allMatching?"Tap to keep this contact":"Select"} className="rounded accent-primary-600"/></td>
                   <td className="px-3 py-3">
                     <div className="flex items-center gap-2.5">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-semibold ${avatarColor(contactLabel(c))}`}>{initials(c)}</div>
-                      <span className="font-medium text-[13px] text-gray-900 dark:text-white">{c.first_name} {c.last_name}</span>
+                      <div className={`w-8 h-8 shrink-0 rounded-full flex items-center justify-center text-white text-xs font-semibold ${avatarColor(contactLabel(c))}`}>{initials(c)}</div>
+                      <span className="font-medium text-[13px] text-gray-900 dark:text-white max-w-[180px] truncate" title={contactLabel(c)}>{contactLabel(c)}</span>
                     </div>
                   </td>
                   <td className="px-3 py-3 text-[13px] font-medium text-gray-900 dark:text-gray-200">
@@ -574,8 +546,8 @@ export default function ContactsPage() {
                   </td>
                   <td className="px-3 py-3 max-w-[170px]">
                     {c.email ? (
-                      <div className="truncate text-[12px] text-gray-600 dark:text-gray-400" title={c.email}>
-                        {c.email}
+                      <div className="text-[12px] text-gray-600 dark:text-gray-400">
+                        <div className="truncate mb-1" title={c.email}>{c.email}</div>
                         {contactTrustLabel && (
                           /* "Guessed" / "Unverified" / "Verified" — the operator
                              must never mistake an inferred address for a
@@ -587,7 +559,7 @@ export default function ContactsPage() {
                         {(c.is_email_opted_out || c.email_status === "unsubscribed") && (
                           <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded-full bg-warning-100 text-warning-700">unsub</span>
                         )}
-                        {(c.is_email_undeliverable || c.email_status === "bounced") ? (
+                        {c.email_status === "bounced" ? (
                           <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded-full bg-danger-100 text-danger-700">bounced</span>
                         ) : null}
                       </div>
@@ -632,7 +604,7 @@ export default function ContactsPage() {
             {/* sheet header like WhatsApp */}
             <div className="bg-primary-700 dark:bg-gray-800 px-4 py-3 flex items-center gap-3 flex-shrink-0">
               <button onClick={()=>{setQuickSendId(null);setQuickContact(null);}} className="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center text-white"><X size={18}/></button>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-semibold ${quickContact?avatarColor(`${quickContact.first_name||""}`):"bg-primary-600"}`}>{quickContact?initials(quickContact):"?"}</div>
+              <div className={`w-8 h-8 shrink-0 rounded-full flex items-center justify-center text-white text-sm font-semibold ${quickContact?avatarColor(`${quickContact.first_name||""}`):"bg-primary-600"}`}>{quickContact?initials(quickContact):"?"}</div>
               <div className="flex-1 min-w-0">
                 <p className="text-white font-semibold text-[15px] truncate">{quickContact? contactLabel(quickContact) : "Send SMS"}</p>
                 <p className="text-white/70 text-[12px] truncate">{quickContact?.phone_number||"No phone on file"} • WhatsApp style</p>

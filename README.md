@@ -255,3 +255,13 @@ follows an email notification from the bell into its thread. `node tools/shot.mj
 
 Both tools use the `puppeteer-core` + `@sparticuz/chromium` dev dependencies; on a
 machine without the bundled Chromium, set `CHROME_PATH` to a local Chrome.
+
+## Contact Validator
+
+Open **Validator** in the navigation (on mobile: **More → Validator**). Check
+current contacts, a saved list, a CSV upload, or a single email/phone number.
+The **Run engine self-test** button checks the local engine without contacting
+external services. Results include Good, Bad, Risky, Unknown and Missing,
+per-field explanations, risk flags, normalization, sending restrictions, and
+filtered/full CSV exports. See [VALIDATOR.md](VALIDATOR.md) for operation,
+optional Reacher setup, safety rules and tests.

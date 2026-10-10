@@ -168,3 +168,36 @@ async def test_meeting_reminder_sweep_on_postgres(pg_db, monkeypatch):
     assert "Chidi" in sent[0]
     assert totals["checked"] >= 1
     assert meeting_service  # keep the import visibly used
+
+
+@pytest.mark.asyncio
+async def test_validator_selection_and_safe_save_on_postgres(pg_client, pg_db, monkeypatch):
+    """Exercise the row-lock/re-read path against the production database dialect."""
+    from app.models.contact_list import ContactList, ContactListMember
+    from app.services import email_validator as ev
+
+    contact = Contact(email="validator-postgres@example.com", is_email_opted_out=True)
+    contact_list = ContactList(name="Validator Postgres test")
+    pg_db.add_all([contact, contact_list])
+    await pg_db.flush()
+    pg_db.add(ContactListMember(list_id=contact_list.id, contact_id=contact.id))
+    await pg_db.commit()
+
+    async def validate(address, *, deep=True):
+        return ev.Verdict(address=address, verdict="undeliverable", problems=["test rejection"])
+    monkeypatch.setattr(ev, "validate_email", validate)
+
+    selected = await pg_client.post("/api/v1/validator/selection", json={
+        "scope": "list", "list_id": contact_list.id, "channel": "email",
+    })
+    assert selected.status_code == 200, selected.text
+    assert selected.json()["contact_ids"] == [contact.id]
+    response = await pg_client.post("/api/v1/validator/batch", json={
+        "contact_ids": [contact.id], "check": "email", "save": True,
+    })
+    assert response.status_code == 200, response.text
+    assert response.json()["items"][0]["saved"] is True
+    await pg_db.refresh(contact)
+    assert contact.is_email_undeliverable is True
+    assert contact.is_email_opted_out is True
+    assert contact.email_verified is False

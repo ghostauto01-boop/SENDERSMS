@@ -11,6 +11,7 @@ import DbStatusBanner from "./components/DbStatusBanner";
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
 const OverviewPage = lazy(() => import("./pages/OverviewPage"));
 const ContactsPage = lazy(() => import("./pages/ContactsPage"));
+const ValidatorPage = lazy(() => import("./pages/ValidatorPage"));
 const ListsPage = lazy(() => import("./pages/ListsPage"));
 const CampaignsPage = lazy(() => import("./pages/CampaignsPage"));
 const SMSManagerPage = lazy(() => import("./pages/SMSManagerPage"));
@@ -85,6 +86,7 @@ function AppRoutes() {
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/overview" element={<OverviewPage />} />
         <Route path="/contacts" element={<ContactsPage />} />
+        <Route path="/validator" element={<ValidatorPage />} />
         <Route path="/phone" element={<PhonePage />} />
         <Route path="/lists" element={<ListsPage />} />
         <Route path="/audiences" element={<AudiencesPage />} />

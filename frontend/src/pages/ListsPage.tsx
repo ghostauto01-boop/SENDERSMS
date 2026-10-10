@@ -528,7 +528,7 @@ export default function ListsPage() {
                 <h2 className="text-white font-semibold truncate">Edit {viewListName}</h2>
                 <p className="text-white/70 text-xs">{listTotal} contact{listTotal === 1 ? "" : "s"} in this list</p>
               </div>
-              <div className="flex gap-2 flex-shrink-0">
+              <div className="flex flex-wrap gap-2">
                 <button
                   onClick={handleCleanList}
                   disabled={listLoading || cleaningList}
@@ -537,30 +537,13 @@ export default function ListsPage() {
                 >
                   <Sparkles size={14} /> {cleaningList ? "Cleaning…" : "Clean bad numbers"}
                 </button>
-                <button
-                  onClick={async () => {
-                    if (!confirm(`Validate every email address in "${viewListName}"? Confirmed-bad addresses will be removed from the list so they are never billed.`)) return;
-                    setCleaningList(true);
-                    try {
-                      const { data } = await api.post(`/api/v1/lists/${viewListId}/validate-emails`, null, {
-                        params: { remove_from_list: true, deep: true },
-                      });
-                      toast.success(
-                        `Validated ${data.scanned}. ${data.deliverable} good, ${data.undeliverable} removed, ${data.risky} risky.`
-                      );
-                      loadListContacts(viewListId, 1, "", true);
-                    } catch {
-                      toast.error("Validation failed");
-                    } finally {
-                      setCleaningList(false);
-                    }
-                  }}
-                  disabled={listLoading || cleaningList}
-                  className="px-3 py-2 rounded-full bg-white/10 text-white text-xs font-semibold flex items-center gap-1.5 disabled:opacity-50"
-                  title="Validate email addresses with Reacher (https://reacher.email)"
+                <a
+                  href={`/validator?list_id=${viewListId}`}
+                  className="px-3 py-2 rounded-full bg-white/10 text-white text-xs font-semibold flex items-center gap-1.5"
+                  title="Open the full validator report for this list"
                 >
-                  <Mail size={14} /> {cleaningList ? "Validating…" : "Validate emails"}
-                </button>
+                  <Mail size={14} /> Validator
+                </a>
                 <button
                   onClick={openAddContacts}
                   disabled={listLoading}

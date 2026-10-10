@@ -4,7 +4,7 @@ WHAT THIS IS
 ------------
 Reacher is the open-source email validator (github.com/reacherhq/check-if-email-
 exists). This module talks to a Reacher instance when one is configured
-(``REACHER_API_URL``), and otherwise performs the **same pipeline itself**, so
+(``REACHER_API_URL``), and otherwise runs built-in checks at the same three stages, so
 the app has a working validator with zero external services:
 
   1. syntax     — RFC-shaped address, normalised form, typo suggestions
@@ -32,6 +32,7 @@ wrong "invalid" mark costs a real customer.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import random
 import re
@@ -58,10 +59,19 @@ from app.utils.contact_identity import is_role_address, normalize_email
 logger = logging.getLogger(__name__)
 
 #: Roughly RFC 5321/5322 — deliberately stricter than "has an @ somewhere".
-_EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$")
+_EMAIL_RE = re.compile(r"^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$")
 
-#: Answers that mean "this mailbox does not exist here".
-_SMTP_REJECT_CODES = {550, 551, 552, 553, 554}
+
+def valid_syntax(address: str) -> bool:
+    if not _EMAIL_RE.fullmatch(address) or len(address) > 254:
+        return False
+    local, domain = address.rsplit("@", 1)
+    return (
+        len(local) <= 64 and not local.startswith(".") and not local.endswith(".")
+        and ".." not in local
+        and all(label and len(label) <= 63 and not label.startswith("-")
+                and not label.endswith("-") for label in domain.split("."))
+    )
 
 
 @dataclass
@@ -98,6 +108,7 @@ class Verdict:
             "smtp_can_connect": self.smtp_can_connect,
             "provider": self.provider,
             "problems": list(self.problems),
+            "checked_at": datetime.fromtimestamp(self.checked_at, timezone.utc).isoformat(),
         }
 
 
@@ -114,7 +125,7 @@ _REACHABLE_MAP = {
 
 
 def reacher_configured() -> bool:
-    return bool(getattr(settings, "REACHER_API_URL", None))
+    return bool((getattr(settings, "REACHER_API_URL", None) or "").strip())
 
 
 async def check_with_reacher(address: str) -> Optional[Verdict]:
@@ -152,7 +163,11 @@ async def check_with_reacher(address: str) -> Optional[Verdict]:
     except Exception:
         return None
 
-    reachable = str((data or {}).get("is_reachable") or "unknown").lower()
+    if not isinstance(data, dict) or data.get("is_reachable") not in _REACHABLE_MAP:
+        return None
+    if any(not isinstance(data.get(key, {}), (dict, type(None))) for key in ("syntax", "mx", "smtp", "misc")):
+        return None
+    reachable = str(data["is_reachable"]).lower()
     syntax = data.get("syntax") or {}
     mx = data.get("mx") or {}
     smtp = data.get("smtp") or {}
@@ -170,6 +185,12 @@ async def check_with_reacher(address: str) -> Optional[Verdict]:
         suggested_email=normalize_email(syntax.get("suggested_email") or "") or None,
         smtp_can_connect=smtp.get("can_connect_smtp") if isinstance(smtp.get("can_connect_smtp"), bool) else None,
         provider="reacher",
+        problems={
+            "safe": ["Mailbox accepted by Reacher"],
+            "invalid": ["Reacher reports an undeliverable address"],
+            "risky": ["Reacher reports a risky address"],
+            "unknown": ["Reacher could not confirm the mailbox"],
+        }[reachable],
     )
 
 
@@ -177,101 +198,95 @@ async def check_with_reacher(address: str) -> Optional[Verdict]:
 # Built-in twin of the Reacher pipeline
 # ==========================================================================
 
-_MX_HOST_CACHE: dict[str, tuple[list[tuple[int, str]], float]] = {}
-
-
 def _mx_hosts(domain: str) -> list[tuple[int, str]]:
-    """(preference, host) pairs for a domain, cached; A fallback per RFC 5321."""
-    domain = (domain or "").strip().lower()
-    if not domain:
-        return []
-    now = time.time()
-    cached = _MX_HOST_CACHE.get(domain)
-    if cached and (now - cached[1]) < max(settings.EMAIL_ENRICHMENT_DNS_TTL, 0):
-        return cached[0]
+    from app.services.mail_dns import mail_route
+    return list(mail_route(domain).hosts)
 
-    hosts: list[tuple[int, str]] = []
-    try:
-        import dns.resolver
 
+def _public_mail_ips(host: str) -> list[str]:
+    """Resolve once and connect to a public IP, never a private MX target."""
+    import ipaddress
+    import dns.resolver
+
+    ips = []
+    for kind in ("A", "AAAA"):
         try:
-            answer = dns.resolver.resolve(domain, "MX", lifetime=settings.EMAIL_ENRICHMENT_TIMEOUT)
-            for record in answer:
-                hosts.append((int(record.preference), str(record.exchange).rstrip(".").lower()))
+            records = dns.resolver.resolve(host, kind, lifetime=min(settings.EMAIL_ENRICHMENT_TIMEOUT, 8))
+            for record in records:
+                value = str(record)
+                if ipaddress.ip_address(value).is_global:
+                    ips.append(value)
         except Exception:
-            # RFC 5321: a domain with no MX falls back to its A record.
-            try:
-                dns.resolver.resolve(domain, "A", lifetime=settings.EMAIL_ENRICHMENT_TIMEOUT)
-                hosts = [(0, domain)]
-            except Exception:
-                hosts = []
-    except Exception:
-        # dnspython not installed: cannot answer, do not cache the miss.
-        return []
-    hosts.sort()
-    _MX_HOST_CACHE[domain] = (hosts, now)
-    return hosts
+            continue
+    return ips
 
 
 def _smtp_probe(address: str, domain: str) -> Verdict:
-    """Live ``RCPT TO`` probe against the domain's MX, with catch-all detection.
+    """RCPT only, never DATA: no email is sent. Policy rejects are unknown.
 
-    The catch-all probe uses a random mailbox at the same domain: if the
-    server accepts *that* too, it accepts everything and an accept proves
-    nothing (Reacher reports the same condition as ``is_catch_all``).
+    A generic 550/554 can mean an IP/policy block, not a nonexistent mailbox.
+    Only an explicit unknown-user response is enough to quarantine a contact.
     """
     import smtplib
 
-    result = Verdict(address=address)
+    result = Verdict(address=address, is_valid_syntax=True)
     hosts = _mx_hosts(domain)
     if not hosts:
-        result.problems.append("no mail exchanger for domain")
+        result.problems.append("Mail routing could not be resolved")
         return result
+    probe_address = "validator-" + "".join(random.choices(string.ascii_lowercase + string.digits, k=20)) + "@" + domain
 
-    random_local = "reacher-probe-" + "".join(random.choices(string.ascii_lowercase + string.digits, k=12))
-    probe_address = f"{random_local}@{domain}"
+    def rejected(code, message) -> bool:
+        text = message.decode("utf-8", errors="replace") if isinstance(message, bytes) else str(message)
+        return code in {550, 551, 553} and bool(re.search(
+            r"5\.1\.[13]\b|no such (?:user|mailbox)|user unknown|unknown (?:user|recipient)|mailbox (?:not found|does not exist)|recipient (?:not found|does not exist)",
+            text, re.I,
+        ))
 
-    def _rcpt(target: str) -> Optional[bool]:
-        """True = accepted, False = rejected, None = could not reach."""
-        last_error = None
-        for _prio, host in hosts[:2]:
-            try:
-                with smtplib.SMTP(host, 25, timeout=min(settings.EMAIL_ENRICHMENT_TIMEOUT, 8)) as smtp:
-                    smtp.ehlo_or_helo_if_needed()
-                    smtp.mail("probe@reacher.local")
-                    code, _ = smtp.rcpt(target)
-                    result.smtp_can_connect = True
-                    if code in _SMTP_REJECT_CODES:
-                        return False
-                    if 200 <= code < 300:
-                        return True
-                    last_error = f"SMTP {code}"
-            except Exception as exc:  # noqa: BLE001 - timeout/refused/blocked
-                last_error = f"{type(exc).__name__}"
+    for _priority, host in hosts[:2]:
+        try:
+            ips = _public_mail_ips(host)
+            if not ips:
+                result.problems.append("MX has no reachable public address")
                 continue
+            with smtplib.SMTP(ips[0], 25, timeout=max(1, min(settings.EMAIL_ENRICHMENT_TIMEOUT, 8))) as smtp:
+                result.smtp_can_connect = True
+                smtp.ehlo_or_helo_if_needed()
+                # Null reverse path is legal; a refused sender is NOT a bad recipient.
+                code, _ = smtp.mail("")
+                if not 200 <= code < 300:
+                    result.problems.append(f"SMTP sender/policy refused the probe ({code})")
+                    continue
+                code, message = smtp.rcpt(address)
+                if rejected(code, message):
+                    result.verdict = VERDICT_UNDELIVERABLE
+                    result.is_reachable = "invalid"
+                    result.problems.append("Mailbox does not exist (SMTP recipient rejection)")
+                    return result
+                if not 200 <= code < 300:
+                    result.problems.append(f"SMTP recipient check inconclusive ({code}); may be policy or temporary failure")
+                    continue
+                code, message = smtp.rcpt(probe_address)
+                if 200 <= code < 300:
+                    result.is_catch_all = True
+                    result.verdict = VERDICT_RISKY
+                    result.is_reachable = "risky"
+                    result.problems.append("Domain accepts any address (catch-all)")
+                elif rejected(code, message):
+                    result.is_catch_all = False
+                    result.verdict = VERDICT_DELIVERABLE
+                    result.is_reachable = "safe"
+                    result.problems.append("Mailbox accepted; random mailbox rejected")
+                else:
+                    result.verdict = VERDICT_RISKY
+                    result.is_reachable = "risky"
+                    result.problems.append("Mailbox accepted but catch-all check is inconclusive")
+                return result
+        except Exception as exc:
+            result.problems.append(f"SMTP unavailable: {type(exc).__name__}")
+    if result.smtp_can_connect is None:
         result.smtp_can_connect = False
-        if last_error:
-            result.problems.append(f"smtp: {last_error}")
-        return None
-
-    catch_all = _rcpt(probe_address)
-    accepted = _rcpt(address)
-    result.is_catch_all = True if catch_all is True else (False if catch_all is False else None)
-
-    if accepted is False:
-        result.problems.append("mailbox rejected by SMTP server")
-        return result
-    if accepted is True:
-        if result.is_catch_all:
-            result.problems.append("domain accepts any address (catch-all)")
-        else:
-            result.verdict = VERDICT_DELIVERABLE
-            result.is_reachable = "safe"
-            return result
-        result.verdict = VERDICT_RISKY
-        result.is_reachable = "risky"
-        return result
-    result.problems.append("SMTP inconclusive (blocked or timed out)")
+    result.problems.append("SMTP inconclusive (blocked, refused or timed out); not proof of a bad address")
     return result
 
 
@@ -284,7 +299,7 @@ async def validate_email(address: Optional[str], *, deep: bool = True) -> Verdic
     Never raises.
     """
     cleaned = normalize_email(address)
-    if not cleaned or not _EMAIL_RE.match(cleaned):
+    if not cleaned or not valid_syntax(cleaned):
         return Verdict(
             address=address,
             verdict=VERDICT_UNDELIVERABLE,
@@ -302,7 +317,7 @@ async def validate_email(address: Optional[str], *, deep: bool = True) -> Verdic
     # suggestions and MX state are identical in both places. DNS runs even in
     # a shallow pass: a dead domain is worth condemning without a mailbox
     # probe.
-    diagnosis = diagnose(cleaned, check_dns=True)
+    diagnosis = await asyncio.to_thread(diagnose, cleaned, check_dns=True)
     verdict.is_free = diagnosis.is_free_mail
     verdict.suggested_email = diagnosis.suggestion
     verdict.accepts_mail = diagnosis.mx_found
@@ -312,11 +327,16 @@ async def validate_email(address: Optional[str], *, deep: bool = True) -> Verdic
         verdict.verdict = VERDICT_UNDELIVERABLE
         verdict.is_reachable = "invalid"
         return verdict
+    if verdict.is_role_account:
+        verdict.problems.append("Shared/role mailbox")
+    if diagnosis.mx_found is None:
+        verdict.problems.append("DNS unavailable or timed out; domain is not confirmed bad")
     if not deep:
         # Offline-only run: flag what is clearly bad, leave the rest unknown.
         if verdict.is_disposable or verdict.is_role_account:
             verdict.verdict = VERDICT_RISKY
             verdict.is_reachable = "risky"
+        verdict.problems.append("Mailbox not checked (quick mode)")
         return verdict
 
     # Stage 3: a real Reacher instance answers authoritatively when present.
@@ -327,6 +347,10 @@ async def validate_email(address: Optional[str], *, deep: bool = True) -> Verdic
         reacher.is_disposable = reacher.is_disposable or verdict.is_disposable
         reacher.is_role_account = reacher.is_role_account or verdict.is_role_account
         reacher.is_free = verdict.is_free
+        reacher.is_valid_syntax = verdict.is_valid_syntax
+        reacher.problems = verdict.problems + reacher.problems
+        if reacher.is_catch_all:
+            reacher.problems.append("Domain accepts any address (catch-all)")
         reacher.suggested_email = reacher.suggested_email or verdict.suggested_email
         if reacher.verdict == VERDICT_DELIVERABLE and (
             reacher.is_disposable or reacher.is_role_account or reacher.is_catch_all
@@ -336,7 +360,16 @@ async def validate_email(address: Optional[str], *, deep: bool = True) -> Verdic
         return reacher
 
     # Stage 3 fallback: do the mailbox probe ourselves.
-    probed = _smtp_probe(cleaned, domain)
+    if not settings.EMAIL_VALIDATOR_SMTP:
+        verdict.problems.append("Built-in SMTP checks are disabled; mailbox not checked")
+        if verdict.is_disposable or verdict.is_role_account:
+            verdict.verdict = VERDICT_RISKY
+            verdict.is_reachable = "risky"
+        return verdict
+    probed = await asyncio.to_thread(_smtp_probe, cleaned, domain)
+    probed.is_valid_syntax = True
+    if reacher_configured():
+        probed.problems.append("Reacher unavailable or invalid response; used built-in fallback")
     probed.is_disposable = verdict.is_disposable
     probed.is_role_account = verdict.is_role_account
     probed.is_free = verdict.is_free
@@ -361,7 +394,7 @@ def apply_verdict(contact: Contact, verdict: Verdict) -> None:
 
     Mirrors the enrichment write policy exactly: only ``deliverable`` marks
     the address verified, only a confirmed ``undeliverable`` quarantines it,
-    and ``risky`` / ``unknown`` leave the address usable but never verified.
+    ``risky`` removes verification, and ``unknown`` preserves prior flags.
     """
     now = datetime.now(timezone.utc)
     if not verdict.address:
@@ -377,8 +410,12 @@ def apply_verdict(contact: Contact, verdict: Verdict) -> None:
             pass  # spelling fix already applied by the caller, if any
     elif verdict.verdict == VERDICT_UNDELIVERABLE:
         contact.email_verified = False
+        contact.email_verified_at = None
         contact.email_status = "invalid"
         contact.is_email_undeliverable = True
+    elif verdict.verdict == VERDICT_RISKY:
+        contact.email_verified = False
+        contact.email_verified_at = None
     # risky / unknown: no hard flags. A catch-all or a timeout must never
     # quarantine a real customer's address.
 
@@ -392,7 +429,7 @@ async def validate_contacts(
 ) -> dict:
     """Validate a batch of contacts and (optionally) write the verdicts.
 
-    Returns counters plus capped per-contact detail — the same shape the list
+    Returns counters plus complete per-contact detail — the same shape the list
     cleaner returns, so one UI can show both.
     """
     counters = {
@@ -409,7 +446,7 @@ async def validate_contacts(
     items: list[dict] = []
     for contact in contacts:
         counters["scanned"] += 1
-        address = normalize_email(contact.email)
+        address = (contact.email or "").strip()
         if not address:
             counters["no_email"] += 1
             continue
@@ -422,8 +459,7 @@ async def validate_contacts(
         counters[verdict.verdict] = counters.get(verdict.verdict, 0) + 1
         if mark:
             apply_verdict(contact, verdict)
-        if len(items) < 200:
-            items.append({"contact_id": contact.id, **verdict.as_dict()})
+        items.append({"contact_id": contact.id, **verdict.as_dict()})
 
     await db.flush()
     return {

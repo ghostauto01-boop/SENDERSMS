@@ -8,6 +8,7 @@ from sqlalchemy import delete as sa_delete, func, select, update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.contacts import (
+    _apply_channel_filters,
     _apply_contact_filters,
     _delete_contacts_bulk,
     _safe_delete,
@@ -310,6 +311,9 @@ class AddMatchingContacts(BaseModel):
 
     search: Optional[str] = None
     lead_status: Optional[str] = None
+    channel: Optional[str] = None
+    email_state: Optional[str] = None
+    list_id: Optional[int] = None
 
 
 async def _insert_members(db: AsyncSession, list_id: int, contact_ids) -> int:
@@ -358,6 +362,9 @@ async def add_all_matching_contacts(
     contact_list = await _find_list(db, list_id)
 
     query = _apply_contact_filters(select(Contact.id), data.search, data.lead_status, None)
+    query = _apply_channel_filters(query, data.email_state, data.channel)
+    if data.list_id is not None:
+        query = query.where(Contact.id.in_(select(ContactListMember.contact_id).where(ContactListMember.list_id == data.list_id)))
     ids = list((await db.execute(query)).scalars().all())
 
     # _insert_members skips contacts that are already in the list, so re-running

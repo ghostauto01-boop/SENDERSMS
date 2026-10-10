@@ -119,3 +119,23 @@ async def test_add_all_filters_by_lead_status(db, client):
 async def test_add_all_to_missing_list_returns_404(db, client):
     r = await client.post("/api/v1/lists/99999/contacts/add-all", json={})
     assert r.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_add_all_honors_channel_list_and_email_filters(db, client):
+    source = await _list(db, "Source")
+    target = await _list(db, "Target")
+    good = Contact(email="ada@example.com", email_verified=False)
+    verified = Contact(email="obi@example.com", email_verified=True)
+    phone = Contact(phone_number="+2348034567891")
+    outside = Contact(email="outside@example.com")
+    db.add_all([good, verified, phone, outside])
+    await db.flush()
+    db.add_all([ContactListMember(list_id=source.id, contact_id=c.id) for c in [good, verified, phone]])
+    await db.flush()
+    response = await client.post(f"/api/v1/lists/{target.id}/contacts/add-all", json={
+        "channel": "email", "list_id": source.id, "email_state": "unverified",
+    })
+    assert response.status_code == 200, response.text
+    assert response.json()["matched"] == 1
+    assert response.json()["added"] == 1
