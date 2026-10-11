@@ -193,11 +193,13 @@ class CampaignOut(BaseModel):
     sent_count: int
     last_state: Optional[str]
     last_activity_at: Optional[datetime]
+    last_error: Optional[str] = None
+    state_changed_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
 
     _tz = field_validator(
-        "start_date", "end_date", "last_activity_at", "created_at", "updated_at",
+        "start_date", "end_date", "last_activity_at", "state_changed_at", "created_at", "updated_at",
         "optimize_last_run_at", "paused_at", mode="after"
     )(lambda v: _utc(v))
 

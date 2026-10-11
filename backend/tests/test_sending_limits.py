@@ -129,6 +129,35 @@ class TestSendingGate:
         assert SendingGate(db).effective_interval(rules) == 360  # 3600/10
 
     @pytest.mark.asyncio
+    async def test_explicit_null_account_daily_limit_stays_unlimited(self, db):
+        from app.models.email import EmailAccount
+        from app.services.email_service import effective_daily_limit
+        from app.services.sending_limits import account_daily_cap
+
+        account = EmailAccount(
+            name="Unlimited", from_name="Sender", from_email="sender@example.org",
+            daily_limit=None, daily_limit_unlimited=True,
+        )
+        rules = {
+            "enable_daily_limit": True,
+            "email_daily_per_mailbox": 30,
+            "daily_maximum": 1000,
+        }
+
+        assert account_daily_cap(account, rules) is None
+        assert effective_daily_limit(account, default_limit=30) is None
+
+        # Only legacy rows explicitly marked as inheriting may use the rules default.
+        account.daily_limit_unlimited = False
+        assert account_daily_cap(account, rules) == 30
+        assert effective_daily_limit(account, default_limit=30) == 30
+
+        account.daily_limit = 7
+        account.daily_limit_unlimited = False
+        assert account_daily_cap(account, rules) == 7
+        assert effective_daily_limit(account, default_limit=30) == 7
+
+    @pytest.mark.asyncio
     async def test_status_returns_counters(self, db):
         from app.services.sending_limits import SendingGate
         status = await SendingGate(db).status()

@@ -290,8 +290,9 @@ async def _pending_work_snapshot() -> tuple[bool, "float | None"]:
     the idle interval.
     """
     from datetime import datetime as dt, timezone as tz
-    from sqlalchemy import select, func
+    from sqlalchemy import and_, or_, select, func
     from app.models.campaign import Campaign
+    from app.models.ads import AdsCampaignJob
     from app.models.conversation import Message
     from app.models.scheduled import ScheduledMessage
     from app.models.followup import FollowUp
@@ -304,8 +305,18 @@ async def _pending_work_snapshot() -> tuple[bool, "float | None"]:
         )).scalar() or 0
         queued = (await db.execute(
             select(func.count()).select_from(Message).where(
-                Message.direction == "outgoing", Message.status == "queued",
-                _not_held_by_paused_campaign(Message))
+                Message.direction == "outgoing",
+                Message.status.in_(("queued", "retrying")),
+                or_(Message.retry_at.is_(None), Message.retry_at <= now),
+                _not_held_by_paused_campaign(Message),
+            )
+        )).scalar() or 0
+        due_ads_jobs = (await db.execute(
+            select(func.count()).select_from(AdsCampaignJob).where(
+                AdsCampaignJob.status == "queued",
+                AdsCampaignJob.scheduled_for.is_not(None),
+                AdsCampaignJob.scheduled_for <= now,
+            )
         )).scalar() or 0
         settling = (await db.execute(
             select(func.count()).select_from(Message).where(
@@ -319,6 +330,16 @@ async def _pending_work_snapshot() -> tuple[bool, "float | None"]:
             select(func.min(ScheduledMessage.schedule_at)).where(ScheduledMessage.status == "pending"),
             select(func.min(Campaign.scheduled_at)).where(Campaign.status == "scheduled"),
             select(func.min(FollowUp.scheduled_at)).where(FollowUp.status == "pending"),
+            select(func.min(Message.retry_at)).where(
+                Message.direction == "outgoing",
+                Message.status.in_(("queued", "retrying")),
+                Message.retry_at > now,
+                _not_held_by_paused_campaign(Message),
+            ),
+            select(func.min(AdsCampaignJob.scheduled_for)).where(
+                AdsCampaignJob.status == "queued",
+                AdsCampaignJob.scheduled_for > now,
+            ),
         ):
             value = (await db.execute(stmt)).scalar()
             if value is not None:
@@ -346,7 +367,7 @@ async def _pending_work_snapshot() -> tuple[bool, "float | None"]:
                     continue
                 candidates.append(starts.timestamp() - minutes * 60)
 
-    has_pending = bool(running or queued or settling)
+    has_pending = bool(running or queued or settling or due_ads_jobs)
     next_due = min(candidates) if candidates else None
     return has_pending, next_due
 
@@ -360,16 +381,23 @@ async def _process_queued_messages_inline() -> int:
     was unreachable was never actually delivered.
     """
     try:
-        from sqlalchemy import select as _select
+        from sqlalchemy import and_ as _and, or_ as _or, select as _select
         from app.models.conversation import Message as _Message
         from app.tasks.sms_tasks import _send_one
+        from datetime import datetime as _dt, timedelta as _td, timezone as _tz
 
+        now = _dt.now(_tz.utc)
+        due = _or(_Message.retry_at.is_(None), _Message.retry_at <= now)
         async with async_session_factory() as db:
             rows = await db.execute(
                 _select(_Message.id)
                 .where(
                     _Message.direction == "outgoing",
-                    _Message.status == "queued",
+                    _or(
+                        _and(_Message.status == "queued", due),
+                        _and(_Message.status == "retrying", due),
+                        _and(_Message.status == "sending", _Message.created_at < now - _td(minutes=15)),
+                    ),
                     _not_held_by_paused_campaign(_Message),
                 )
                 .order_by(_Message.created_at.asc())
@@ -380,7 +408,7 @@ async def _process_queued_messages_inline() -> int:
         sent = 0
         for mid in ids:
             try:
-                result = await _send_one(mid, final_on_failure=True)
+                result = await _send_one(mid, final_on_failure=False)
                 if result is False:
                     sent += 1
                 elif isinstance(result, int):
@@ -1036,8 +1064,10 @@ async def lifespan(app: FastAPI):
     boot = asyncio.create_task(_boot())
 
     poller = None
+    app.state.inline_poller_enabled = bool(settings.ENABLE_INLINE_POLLER)
     if settings.ENABLE_INLINE_POLLER:
         poller = asyncio.create_task(_poll_loop())
+        app.state.inline_poller_task = poller
         logger.info("Inline poller started (every %ss)", settings.INLINE_POLL_INTERVAL)
 
     yield

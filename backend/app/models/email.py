@@ -34,6 +34,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -75,6 +76,9 @@ class EmailAccount(Base):
     #: Optional daily ceiling enforced by this app (Brevo has its own quota;
     #: this one stops a runaway campaign before the provider starts rejecting).
     daily_limit: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    #: True means NULL is an intentional unlimited setting, not inheritance from
+    #: the legacy per-mailbox sending rule. New accounts default to unlimited.
+    daily_limit_unlimited: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     sent_today: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     last_reset_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     total_sent: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -165,3 +169,36 @@ class EmailEvent(Base):
 
     def __repr__(self):  # pragma: no cover - debug helper
         return f"<EmailEvent(id={self.id}, type={self.event_type})>"
+
+
+class EmailSendLog(Base):
+    """One durable row per campaign-email attempt, including queued/retry states."""
+
+    __tablename__ = "email_send_log"
+    __table_args__ = (
+        UniqueConstraint("message_id", "attempt", name="uq_email_send_log_message_attempt"),
+        UniqueConstraint("assignment_id", "attempt", name="uq_email_send_log_assignment_attempt"),
+        Index("ix_email_send_log_campaign_status", "campaign_id", "status"),
+        Index("ix_email_send_log_campaign_created", "campaign_id", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    campaign_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    contact_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    creative_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    assignment_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    message_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("messages.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    account_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    #: queued | sending | sent | delivered | bounced | deferred | failed | skipped
+    status: Mapped[str] = mapped_column(String(20), default="queued", nullable=False, index=True)
+    error_code: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    attempt: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    retry_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, onupdate=_now, nullable=False
+    )

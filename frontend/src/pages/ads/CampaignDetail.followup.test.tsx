@@ -24,6 +24,8 @@ const api = vi.hoisted(() => ({
   updateStep: vi.fn(),
   deleteStep: vi.fn(),
   createFollowupTemplate: vi.fn(),
+  sendLogs: vi.fn(),
+  campaignJobs: vi.fn(),
 }));
 
 vi.mock("../../api/ads", async () => {
@@ -124,5 +126,24 @@ describe("campaign follow-up editor", () => {
     expect(payload.name).toBe("24h nudge");
     expect(payload.body).toBe("Still keen?");
     expect(payload.delay_hours).toBe(48);
+  });
+
+  it("shows SMS recipient counts in the send summary without calling them email attempts", async () => {
+    const user = userEvent.setup();
+    api.sendLogs.mockResolvedValue({
+      summary: { sent: 1, delivered: 0, queued: 0, retrying: 0, failed: 0, skipped: 0, attempts: 0, retries: 0, total: 1 },
+      total_attempts: 0,
+      items: [],
+    });
+    api.campaignJobs.mockResolvedValue({
+      current: { status: "completed", progress: { completed: 1, total: 1 }, attempts: 1, max_retries: 5 },
+    });
+    renderDetail();
+
+    await user.click(await screen.findByRole("button", { name: "Send logs" }));
+    expect(await screen.findByText("Persistent queue job")).toBeTruthy();
+    expect(screen.getByText("Per-recipient activity")).toBeTruthy();
+    expect(screen.getByText("1 recipient record(s)")).toBeTruthy();
+    expect(screen.getByText("SMS does not use email attempt records. Recipient outcomes are summarized above; queue progress is saved in the persistent job.")).toBeTruthy();
   });
 });

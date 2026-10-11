@@ -24,7 +24,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -103,6 +103,7 @@ def _message_dict(message: Message, contact: Optional[Contact] = None,
         "rfc_message_id": message.rfc_message_id,
         "in_reply_to": message.in_reply_to,
         "retry_count": message.retry_count or 0,
+        "retry_at": _iso(message.retry_at),
         "last_error": message.last_error,
         "sent_at": _iso(message.sent_at),
         "delivered_at": _iso(message.delivered_at),
@@ -143,6 +144,57 @@ async def list_accounts(
         )
     await db.flush()
     return {"total": len(items), "items": items}
+
+
+@router.get("/health")
+async def email_health(
+    db: AsyncSession = Depends(get_db),
+    cu: User = Depends(get_current_user),
+):
+    """Stored Brevo health per sender; POST /accounts/{id}/test performs a live check."""
+    from app.services.sending_limits import default_mailbox_limit, get_sending_rules
+
+    default_limit = default_mailbox_limit(await get_sending_rules(db))
+    accounts = await email_service.list_accounts(db)
+    items = []
+    for account in accounts:
+        usable, reason = await email_service.account_is_usable(
+            account, default_limit=default_limit, check_room=False
+        )
+        status_value = (
+            "disabled" if not account.is_active else
+            "error" if account.connection_status == "error" or not usable else
+            "connected" if account.connection_status == "connected" else
+            "untested"
+        )
+        action = (
+            "Enable this sender in Email Manager." if status_value == "disabled" else
+            "Fix the sender configuration, then test its Brevo connection." if status_value == "error" else
+            "Test the Brevo connection before launching an email campaign." if status_value == "untested" else
+            "Sender is connected."
+        )
+        items.append({
+            "id": account.id,
+            "name": account.name,
+            "from_email": account.from_email,
+            "is_active": bool(account.is_active),
+            "is_default": bool(account.is_default),
+            "status": status_value,
+            "connection_status": account.connection_status,
+            "last_tested_at": _iso(account.last_tested_at),
+            "last_error": account.last_error,
+            "issue": reason,
+            "action": action,
+            "daily_limit": email_service.effective_daily_limit(account, default_limit),
+            "daily_limit_unlimited": bool(getattr(account, "daily_limit_unlimited", True)),
+        })
+    return {
+        "ok": any(item["is_active"] for item in items) and all(
+            item["status"] == "connected" for item in items if item["is_active"]
+        ),
+        "accounts": items,
+        "live_test_route": "/api/v1/email/accounts/{account_id}/test",
+    }
 
 
 @router.post("/accounts", status_code=201)
@@ -188,6 +240,10 @@ async def update_account(
         raise HTTPException(404, "Email account not found")
 
     updates = data.model_dump(exclude_unset=True)
+    # Keep NULL as a persistent user choice instead of falling back to the
+    # deprecated 30/day Sending Rules default on the next account read.
+    if "daily_limit" in updates:
+        account.daily_limit_unlimited = updates["daily_limit"] is None
     api_key = updates.pop("api_key", None)
     if "reply_to" in updates:
         from app.services.email_service import normalize_reply_to_addresses
@@ -1058,6 +1114,7 @@ async def history(
 @router.post("/messages/{message_id}/retry")
 async def retry_message(
     message_id: int,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     cu: User = Depends(get_current_user),
 ):
@@ -1072,20 +1129,25 @@ async def retry_message(
 
     message.status = "queued"
     message.retry_count = 0
+    message.retry_at = None
     message.last_error = None
     message.failed_at = None
     await db.commit()
 
-    from app.tasks.queue import try_enqueue
-    from app.tasks.sms_tasks import send_sms
+    message_id = message.id
 
-    if not try_enqueue(send_sms, message.id):
-        # No broker (single-process deployment): settle it inline so the button
-        # is never a no-op.
-        from app.tasks.sms_tasks import _send_one
+    async def _dispatch_retry():
+        import asyncio
+        from app.tasks.queue import try_enqueue
+        from app.tasks.sms_tasks import _send_one, send_sms
 
-        await _send_one(message.id, final_on_failure=True)
-        await db.refresh(message)
+        enqueued = await asyncio.to_thread(try_enqueue, send_sms, message_id)
+        if not enqueued:
+            await _send_one(message_id, final_on_failure=False)
+
+    # Sending happens after the response; the durable message retry_at poller
+    # also recovers this queued row if the process or broker is unavailable.
+    background_tasks.add_task(_dispatch_retry)
     return {"success": True, "status": message.status, "message": _message_dict(message)}
 
 

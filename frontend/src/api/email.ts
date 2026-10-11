@@ -92,6 +92,7 @@ export type EmailMessage = {
   rfc_message_id?: string | null;
   in_reply_to?: string | null;
   retry_count: number;
+  retry_at?: string | null;
   last_error?: string | null;
   sent_at?: string | null;
   delivered_at?: string | null;

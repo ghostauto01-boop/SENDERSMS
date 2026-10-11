@@ -18,6 +18,7 @@ feature.
 
 from datetime import datetime, timezone
 from typing import Optional
+from uuid import uuid4
 
 from sqlalchemy import (
     Boolean,
@@ -181,6 +182,10 @@ class AdsCampaign(Base):
     last_state: Mapped[str | None] = mapped_column(String(40), nullable=True)
     last_state_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_activity_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    #: Durable, user-facing diagnosis of the last preflight or delivery error.
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    #: Timestamp of the last lifecycle transition (draft/active/paused/etc.).
+    state_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
@@ -673,4 +678,54 @@ class AdsActivityLog(Base):
     actor: Mapped[str] = mapped_column(String(120), default="system", nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_now, nullable=False, index=True
+    )
+
+
+class AdsCampaignStateTransition(Base):
+    """Append-only record of each campaign lifecycle transition."""
+
+    __tablename__ = "ads_campaign_state_transitions"
+    __table_args__ = (Index("ix_ads_campaign_transition_created", "campaign_id", "created_at"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    campaign_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("ads_campaigns.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    from_state: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    to_state: Mapped[str] = mapped_column(String(30), nullable=False)
+    reason: Mapped[str] = mapped_column(String(500), nullable=False)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    actor: Mapped[str] = mapped_column(String(120), default="system", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
+
+
+class AdsCampaignJob(Base):
+    """Persisted campaign-send work item; Redis is an accelerator, not storage."""
+
+    __tablename__ = "ads_campaign_jobs"
+    __table_args__ = (
+        Index("ix_ads_campaign_jobs_due", "status", "scheduled_for"),
+        Index("ix_ads_campaign_jobs_campaign_status", "campaign_id", "status"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    campaign_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("ads_campaigns.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    job_type: Mapped[str] = mapped_column(String(40), default="send_campaign_batch", nullable=False)
+    #: queued | running | completed | failed | cancelled
+    status: Mapped[str] = mapped_column(String(20), default="queued", nullable=False, index=True)
+    progress_completed: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    progress_total: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    max_retries: Mapped[int] = mapped_column(Integer, default=5, nullable=False)
+    scheduled_for: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    worker_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    result_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, onupdate=_now, nullable=False
     )

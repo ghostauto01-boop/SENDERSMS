@@ -47,6 +47,7 @@ const BASE_TABS = [
   "Automation",
   "Optimization",
   "Analytics",
+  "Send logs",
   "Activity",
   "Settings",
 ];
@@ -214,8 +215,8 @@ export default function CampaignDetail({
                 className="btn-secondary btn-sm"
                 onClick={() =>
                   act(async () => {
-                    const r = await adsApi.dispatch(campaignId);
-                    toast.success(`Sent ${r.sent}`);
+                    await adsApi.dispatch(campaignId);
+                    toast.success("Next send batch queued");
                   }, "Dispatched")
                 }
               >
@@ -238,6 +239,11 @@ export default function CampaignDetail({
           </div>
         </div>
 
+        {detail.last_error && (
+          <div className="rounded-lg border border-danger-200 dark:border-danger-800 bg-danger-50 dark:bg-danger-900/20 p-3 text-sm text-danger-800 dark:text-danger-200">
+            <strong>Needs attention:</strong> {detail.last_error}
+          </div>
+        )}
         {analytics?.alerts?.length > 0 && (
           <div className="space-y-2">
             {analytics.alerts.map((a: any, i: number) => (
@@ -282,6 +288,7 @@ export default function CampaignDetail({
         {activeTab === "Analytics" && (
           <AnalyticsTab analytics={analytics} campaignId={campaignId} isEmail={isEmail} />
         )}
+        {activeTab === "Send logs" && <SendLogsTab campaignId={campaignId} isEmail={isEmail} />}
         {activeTab === "Activity" && <ActivityTab campaignId={campaignId} />}
         {activeTab === "Settings" && (
           <SettingsTab detail={detail} reload={load} onClose={onClose} onChanged={onChanged} />
@@ -2987,6 +2994,145 @@ function AnalyticsTab({
             ))}
           </tbody>
         </table>
+      </div>
+    </div>
+  );
+}
+
+function SendLogsTab({ campaignId, isEmail }: { campaignId: number; isEmail: boolean }) {
+  const [data, setData] = useState<any>(null);
+  const [jobs, setJobs] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const [logs, queue] = await Promise.all([
+        adsApi.sendLogs(campaignId, { page: 1, per_page: 50 }),
+        adsApi.campaignJobs(campaignId),
+      ]);
+      setData(logs);
+      setJobs(queue);
+      setError(null);
+    } catch (err: any) {
+      setError(err.response?.data?.detail || "Could not load send activity. Refresh to try again.");
+    } finally {
+      setLoading(false);
+    }
+  }, [campaignId]);
+
+  useEffect(() => {
+    load();
+    const timer = window.setInterval(load, 15000);
+    return () => window.clearInterval(timer);
+  }, [load]);
+
+  if (loading) return <div className="card p-5 text-sm text-gray-500">Loading send activity…</div>;
+  const summary = data?.summary || {};
+  const job = jobs?.current;
+  const progress = job?.progress || { completed: 0, total: 0 };
+  const percent = progress.total ? Math.min(100, Math.round((progress.completed / progress.total) * 100)) : 0;
+
+  return (
+    <div className="space-y-4">
+      {error && <div className="card p-4 text-sm text-danger-700 dark:text-danger-300">{String(error)}</div>}
+      <div className="card p-5 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h3 className="font-semibold">Persistent queue job</h3>
+            <p className="text-xs text-gray-500">Saved in the database; Redis is used only to wake a worker sooner.</p>
+          </div>
+          {job ? <Badge value={job.status} /> : <Badge value="queued" />}
+        </div>
+        {job ? (
+          <>
+            <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-gray-600 dark:text-gray-300">
+              <span>Progress: <b>{progress.completed} / {progress.total}</b> ({percent}%)</span>
+              <span>Worker attempts: <b>{job.attempts} / {job.max_retries}</b></span>
+              {job.scheduled_for && <span>Next run: <b>{new Date(job.scheduled_for).toLocaleString()}</b></span>}
+              {job.worker_id && <span>Worker: <b>{job.worker_id}</b></span>}
+            </div>
+            <div className="h-2 rounded bg-gray-100 dark:bg-gray-700 overflow-hidden">
+              <div className="h-full bg-primary-600 transition-all" style={{ width: `${percent}%` }} />
+            </div>
+            {job.error && <p className="text-sm text-danger-700 dark:text-danger-300">{job.error}</p>}
+            {job.status === "failed" && (
+              <button
+                className="btn-primary btn-sm"
+                onClick={async () => {
+                  try {
+                    await adsApi.retryCampaignJob(campaignId);
+                    toast.success("Campaign job queued for retry");
+                    await load();
+                  } catch (err: any) {
+                    toast.error(err.response?.data?.detail || "Could not retry campaign job");
+                  }
+                }}
+              >
+                Retry job
+              </button>
+            )}
+          </>
+        ) : (
+          <p className="text-sm text-gray-500">No job has been created yet. Launch the campaign to queue delivery.</p>
+        )}
+      </div>
+
+      <div className="card p-5 space-y-3">
+        <h3 className="font-semibold">{isEmail ? "Email delivery summary" : "Campaign send summary"}</h3>
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
+          <Metric label="Sent" value={summary.sent ?? 0} />
+          <Metric label="Delivered" value={summary.delivered ?? 0} />
+          <Metric label="Queued" value={summary.queued ?? 0} />
+          <Metric label="Retrying" value={summary.retrying ?? 0} />
+          <Metric label="Failed" value={summary.failed ?? 0} />
+          <Metric label="Skipped" value={summary.skipped ?? 0} />
+          <Metric label="Provider attempts" value={summary.attempts ?? 0} />
+          <Metric label="Retries" value={summary.retries ?? 0} />
+        </div>
+        <p className="text-xs text-gray-500">Totals count each recipient once; provider attempts and retries are shown separately.</p>
+      </div>
+
+      <div className="card overflow-hidden">
+        <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
+          <div>
+            <h3 className="font-semibold">{isEmail ? "Recent email attempts" : "Per-recipient activity"}</h3>
+            <p className="text-xs text-gray-500">
+              {isEmail
+                ? `${data?.total_attempts ?? 0} stored attempt record(s)`
+                : `${summary.total ?? 0} recipient record(s)`}
+            </p>
+          </div>
+          <button className="btn-secondary btn-sm" onClick={load}><RefreshCw size={14} className="mr-1" />Refresh</button>
+        </div>
+        {!data?.items?.length ? (
+          <div className="p-5 text-sm text-gray-500">
+            {isEmail
+              ? "No email attempts yet."
+              : "SMS does not use email attempt records. Recipient outcomes are summarized above; queue progress is saved in the persistent job."}
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-100 dark:divide-gray-700">
+            {data.items.map((item: any) => (
+              <div key={item.id} className="p-4 flex flex-wrap items-start justify-between gap-3 text-sm">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <strong>{item.contact_name}</strong>
+                    {item.email && <span className="text-gray-500">{item.email}</span>}
+                    <Badge value={item.status} />
+                    <span className="text-xs text-gray-500">Attempt {item.attempt}</span>
+                  </div>
+                  {item.error_message && <p className="mt-1 text-danger-700 dark:text-danger-300 break-words">{item.error_message}</p>}
+                  {item.error_code && <p className="mt-1 text-xs text-gray-500">Provider code: {item.error_code}</p>}
+                  {item.retry_at && <p className="mt-1 text-xs text-gray-500">Automatic retry: {new Date(item.retry_at).toLocaleString()}</p>}
+                </div>
+                <time className="text-xs text-gray-500 whitespace-nowrap" dateTime={item.created_at}>
+                  {item.created_at ? new Date(item.created_at).toLocaleString() : ""}
+                </time>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

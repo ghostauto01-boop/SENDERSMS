@@ -81,6 +81,8 @@ export type AdsCampaign = {
   sent_count: number;
   last_state?: string | null;
   last_activity_at?: string | null;
+  last_error?: string | null;
+  state_changed_at?: string | null;
   created_at: string;
   updated_at: string;
   stats?: AdsStats;
@@ -262,6 +264,9 @@ export const adsApi = {
   audience: (id: number, params: any = {}) => unwrap<any>(api.get(`/ads/campaigns/${id}/audience`, { params })),
   analytics: (id: number) => unwrap<any>(api.get(`/ads/campaigns/${id}/analytics`)),
   campaignActivity: (id: number) => unwrap<any>(api.get(`/ads/campaigns/${id}/activity`)),
+  campaignJobs: (id: number) => unwrap<any>(api.get(`/ads/campaigns/${id}/jobs`)),
+  retryCampaignJob: (id: number) => unwrap<any>(api.post(`/ads/campaigns/${id}/jobs/retry`)),
+  sendLogs: (id: number, params: any = {}) => unwrap<any>(api.get(`/ads/campaigns/${id}/send-logs`, { params })),
   bulkCampaigns: (body: any) => unwrap<any>(api.post("/ads/campaigns/bulk", body)),
 
   listSets: (campaignId: number) => unwrap<{ items: AdsSet[] }>(api.get(`/ads/campaigns/${campaignId}/sets`)),

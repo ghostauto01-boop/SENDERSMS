@@ -43,7 +43,7 @@ class EmailAccountIn(BaseModel):
     from_email: str = Field(..., max_length=255)
     api_key: Optional[str] = Field(default=None, max_length=500)
     reply_to: Optional[list[str]] = None
-    daily_limit: Optional[int] = Field(default=None, ge=0, le=1_000_000)
+    daily_limit: Optional[int] = Field(default=None, ge=1, le=1_000_000)
     is_active: bool = True
     is_default: bool = False
     track_opens: bool = True
@@ -64,7 +64,7 @@ class EmailAccountPatch(BaseModel):
     api_key: Optional[str] = Field(default=None, max_length=500)
     #: The API accepts a single address, comma-separated addresses, or an array.
     reply_to: Optional[list[str]] = None
-    daily_limit: Optional[int] = Field(default=None, ge=0, le=1_000_000)
+    daily_limit: Optional[int] = Field(default=None, ge=1, le=1_000_000)
     is_active: Optional[bool] = None
     is_default: Optional[bool] = None
     track_opens: Optional[bool] = None

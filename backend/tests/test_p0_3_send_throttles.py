@@ -59,7 +59,9 @@ async def test_defaults_are_on(api_db):
     assert rules["sending_start_time"] == "09:00"
     assert rules["sending_end_time"] == "17:00"
     assert rules["allow_weekends"] is False
-    assert 20 <= rules["email_daily_per_mailbox"] <= 50
+    assert rules["email_daily_per_mailbox"] == 0, (
+        "NULL account limits stay unlimited; Sending Rules must not silently add a mailbox cap"
+    )
     assert rules["breaker_enabled"] is True
     assert rules["breaker_bounce_pct"] == 2.0
     assert rules["breaker_complaint_pct"] == pytest.approx(0.10)
@@ -104,45 +106,42 @@ async def test_clearing_the_window_is_still_an_explicit_opt_out(api_db):
 
 
 @pytest.mark.asyncio
-async def test_email_daily_cap_is_per_mailbox_times_mailbox_count(api_db):
-    one = await make_account(api_db, default=True)
+async def test_explicit_email_account_limits_sum_across_mailboxes(api_db):
+    one = await make_account(api_db, default=True, daily_limit=30)
     capacity = await sending_limits.email_capacity(api_db)
     assert capacity["mailboxes"] == 1
-    per_mailbox = capacity["per_mailbox"]
-    assert capacity["daily_cap"] == per_mailbox
+    assert capacity["daily_cap"] == 30
 
-    await make_account(api_db)
+    await make_account(api_db, daily_limit=30)
     capacity = await sending_limits.email_capacity(api_db)
     assert capacity["mailboxes"] == 2
-    assert capacity["daily_cap"] == 2 * per_mailbox
+    assert capacity["daily_cap"] == 60
     assert one.id
 
 
 @pytest.mark.asyncio
 async def test_a_disabled_or_unusable_mailbox_adds_no_capacity(api_db):
-    await make_account(api_db, default=True)
+    await make_account(api_db, default=True, daily_limit=30)
     await make_account(api_db, active=False)
     capacity = await sending_limits.email_capacity(api_db)
     assert capacity["mailboxes"] == 1
 
 
 @pytest.mark.asyncio
-async def test_an_accounts_own_limit_can_only_lower_the_default(api_db):
+async def test_explicit_account_limits_are_used_and_null_is_not_replaced_by_default(api_db):
     await make_account(api_db, default=True, daily_limit=10)
+    unlimited = await make_account(api_db, daily_limit=None)
     capacity = await sending_limits.email_capacity(api_db)
-    assert capacity["daily_cap"] == 10
-
-    await make_account(api_db, daily_limit=5000)
-    capacity = await sending_limits.email_capacity(api_db)
-    assert capacity["daily_cap"] == 10 + capacity["per_mailbox"], (
-        "a generous provider quota must not raise the protective default"
-    )
+    assert capacity["accounts"][0]["daily_cap"] == 10
+    assert capacity["accounts"][1]["daily_cap"] is None
+    assert capacity["daily_cap"] is None, "one unlimited mailbox leaves total capacity uncapped"
+    assert unlimited.daily_limit_unlimited is True
 
 
 @pytest.mark.asyncio
 async def test_the_gate_blocks_email_once_the_daily_cap_is_used(api_db, sending_clock):
     sending_clock(WED_NOON)
-    await make_account(api_db, default=True)
+    await make_account(api_db, default=True, daily_limit=30)
     cap = (await sending_limits.email_capacity(api_db))["daily_cap"]
     await seed_email_messages(api_db, campaign_id=1, sent=cap,
                               sent_at=WED_NOON.astimezone(timezone.utc) - timedelta(minutes=10))
@@ -157,7 +156,7 @@ async def test_the_gate_blocks_email_once_the_daily_cap_is_used(api_db, sending_
 @pytest.mark.asyncio
 async def test_email_and_sms_volume_are_counted_separately(api_db, sending_clock):
     sending_clock(WED_NOON)
-    await make_account(api_db, default=True)
+    await make_account(api_db, default=True, daily_limit=30)
     cap = (await sending_limits.email_capacity(api_db))["daily_cap"]
     await seed_email_messages(api_db, campaign_id=1, sent=cap,
                               sent_at=WED_NOON.astimezone(timezone.utc) - timedelta(minutes=10))
@@ -170,7 +169,7 @@ async def test_email_and_sms_volume_are_counted_separately(api_db, sending_clock
 @pytest.mark.asyncio
 async def test_room_is_the_allowance_left_after_sent_and_in_flight(api_db, sending_clock):
     sending_clock(WED_NOON)
-    await make_account(api_db, default=True)
+    await make_account(api_db, default=True, daily_limit=30)
     cap = (await sending_limits.email_capacity(api_db))["daily_cap"]
     gate = SendingGate(api_db, channel="email")
     assert await gate.room() == cap
@@ -183,7 +182,7 @@ async def test_room_is_the_allowance_left_after_sent_and_in_flight(api_db, sendi
 @pytest.mark.asyncio
 async def test_room_is_zero_outside_the_window(api_db, sending_clock):
     sending_clock(WED_NIGHT)
-    await make_account(api_db, default=True)
+    await make_account(api_db, default=True, daily_limit=30)
     assert await SendingGate(api_db, channel="email").room() == 0
 
 
@@ -239,7 +238,7 @@ async def _message_count(db, campaign_id):
 @pytest.mark.asyncio
 async def test_a_classic_email_campaign_stops_at_the_daily_cap(api_db, batch, sending_clock):
     sending_clock(WED_NOON)
-    account = await make_account(api_db, default=True)
+    account = await make_account(api_db, default=True, daily_limit=30)
     cap = (await sending_limits.email_capacity(api_db))["daily_cap"]
     campaign = await _running_email_campaign(api_db, account, cap + 20)
 
@@ -260,7 +259,7 @@ async def test_a_classic_email_campaign_stops_at_the_daily_cap(api_db, batch, se
 @pytest.mark.asyncio
 async def test_the_rest_goes_out_on_the_next_sending_day(api_db, batch, sending_clock):
     sending_clock(WED_NOON)
-    account = await make_account(api_db, default=True)
+    account = await make_account(api_db, default=True, daily_limit=30)
     cap = (await sending_limits.email_capacity(api_db))["daily_cap"]
     campaign = await _running_email_campaign(api_db, account, cap + 20)
     await batch(campaign.id, batch_size=cap + 20)
@@ -282,7 +281,7 @@ async def test_an_email_campaign_started_after_hours_creates_nothing_and_stays_r
     api_db, batch, sending_clock
 ):
     sending_clock(WED_NIGHT)
-    account = await make_account(api_db, default=True)
+    account = await make_account(api_db, default=True, daily_limit=30)
     campaign = await _running_email_campaign(api_db, account, 5)
 
     processed = await batch(campaign.id)
@@ -296,7 +295,7 @@ async def test_an_email_campaign_started_after_hours_creates_nothing_and_stays_r
 @pytest.mark.asyncio
 async def test_a_weekend_start_waits_for_monday(api_db, batch, sending_clock):
     sending_clock(SAT_NOON)
-    account = await make_account(api_db, default=True)
+    account = await make_account(api_db, default=True, daily_limit=30)
     campaign = await _running_email_campaign(api_db, account, 5)
 
     assert await batch(campaign.id) == 0
@@ -306,7 +305,7 @@ async def test_a_weekend_start_waits_for_monday(api_db, batch, sending_clock):
 @pytest.mark.asyncio
 async def test_a_paused_campaign_creates_nothing(api_db, batch, sending_clock):
     sending_clock(WED_NOON)
-    account = await make_account(api_db, default=True)
+    account = await make_account(api_db, default=True, daily_limit=30)
     campaign = await _running_email_campaign(api_db, account, 5)
     campaign.status = "paused"
     await api_db.flush()
@@ -328,7 +327,7 @@ async def test_an_email_campaign_with_its_own_message_and_no_template_can_queue_
     throttles would have unleashed whatever the crash was holding back).
     """
     sending_clock(WED_NOON)
-    account = await make_account(api_db, default=True)
+    account = await make_account(api_db, default=True, daily_limit=30)
     campaign = await _running_email_campaign(api_db, account, 3)
     assert campaign.template_id is None and campaign.message_body
 
@@ -371,7 +370,7 @@ async def test_an_ads_email_campaign_stops_at_the_daily_cap(api_db, monkeypatch,
 
     monkeypatch.setattr("app.tasks.queue.try_enqueue", lambda *a, **k: True)
     sending_clock(WED_NOON)
-    account = await make_account(api_db, default=True)
+    account = await make_account(api_db, default=True, daily_limit=30)
     cap = (await sending_limits.email_capacity(api_db))["daily_cap"]
     campaign = await _active_ads_email_campaign(api_db, account, cap + 15)
 
@@ -388,7 +387,7 @@ async def test_an_ads_email_campaign_waits_for_the_window(api_db, monkeypatch, s
 
     monkeypatch.setattr("app.tasks.queue.try_enqueue", lambda *a, **k: True)
     sending_clock(SAT_NOON)
-    account = await make_account(api_db, default=True)
+    account = await make_account(api_db, default=True, daily_limit=30)
     campaign = await _active_ads_email_campaign(api_db, account, 5)
 
     result = await svc.dispatch_campaign(api_db, campaign, limit=25)
@@ -405,7 +404,7 @@ async def test_a_paused_ads_campaign_with_pending_rows_sends_nothing(
 
     monkeypatch.setattr("app.tasks.queue.try_enqueue", lambda *a, **k: True)
     sending_clock(WED_NOON)
-    account = await make_account(api_db, default=True)
+    account = await make_account(api_db, default=True, daily_limit=30)
     campaign = await _active_ads_email_campaign(api_db, account, 10)
     campaign.status = "paused"
     await api_db.flush()
@@ -444,7 +443,7 @@ async def _queued_email(db, account, campaign_id=None, ads_campaign_id=None, bul
 async def test_a_message_beyond_the_cap_is_deferred_not_failed(api_db, sender, sending_clock,
                                                                 monkeypatch):
     sending_clock(WED_NOON)
-    account = await make_account(api_db, default=True)
+    account = await make_account(api_db, default=True, daily_limit=30)
     cap = (await sending_limits.email_capacity(api_db))["daily_cap"]
     campaign = await make_campaign(api_db, status="running", channel="email")
     await seed_email_messages(api_db, campaign_id=campaign.id, account_id=account.id, sent=cap,
@@ -473,7 +472,7 @@ async def test_a_message_beyond_the_cap_is_deferred_not_failed(api_db, sender, s
 async def test_a_one_to_one_reply_is_not_throttled(api_db, sender, sending_clock, monkeypatch):
     """Replying to a person who wrote to us is not outreach; it ignores the cap/window."""
     sending_clock(WED_NIGHT)
-    account = await make_account(api_db, default=True)
+    account = await make_account(api_db, default=True, daily_limit=30)
     message = await _queued_email(api_db, account, bulk=False)
 
     async def fake_deliver(db, m):
@@ -494,7 +493,7 @@ async def test_a_queued_message_of_a_paused_campaign_is_held_not_sent(
     api_db, sender, sending_clock, monkeypatch
 ):
     sending_clock(WED_NOON)
-    account = await make_account(api_db, default=True)
+    account = await make_account(api_db, default=True, daily_limit=30)
     campaign = await make_campaign(api_db, status="paused", channel="email")
     message = await _queued_email(api_db, account, campaign_id=campaign.id)
     called = []
@@ -519,7 +518,7 @@ async def test_a_queued_message_of_a_stopped_campaign_is_cancelled(
     api_db, sender, sending_clock, monkeypatch
 ):
     sending_clock(WED_NOON)
-    account = await make_account(api_db, default=True)
+    account = await make_account(api_db, default=True, daily_limit=30)
     campaign = await make_campaign(api_db, status="stopped", channel="email")
     message = await _queued_email(api_db, account, campaign_id=campaign.id)
 
@@ -538,7 +537,7 @@ async def test_validate_reports_projected_duration_for_a_925_contact_email_audie
     api_client, api_db, sending_clock
 ):
     sending_clock(WED_NOON)
-    await make_account(api_db, default=True)
+    account = await make_account(api_db, default=True, daily_limit=30)
     campaign = await make_campaign(api_db, channel="email", n=925)
 
     response = await api_client.post(f"/api/v1/campaigns/{campaign.id}/validate")
@@ -546,7 +545,7 @@ async def test_validate_reports_projected_duration_for_a_925_contact_email_audie
     assert response.status_code == 200, response.text
     body = response.json()
     projection = body["projection"]
-    per_mailbox = (await sending_limits.email_capacity(api_db))["per_mailbox"]
+    per_mailbox = account.daily_limit
     assert projection["sendable"] == 925
     assert projection["daily_cap"] == per_mailbox
     assert projection["mailboxes"] == 1
@@ -584,9 +583,14 @@ async def test_validate_reports_the_sms_projection_too(api_client, api_db, sendi
 
 
 @pytest.mark.asyncio
-async def test_ads_validate_reports_the_projection(api_client, api_db, sending_clock):
+async def test_ads_validate_reports_the_projection(api_client, api_db, sending_clock, monkeypatch):
     sending_clock(WED_NOON)
-    account = await make_account(api_db, default=True)
+
+    async def brevo_ok(_api_key):
+        return {"success": True, "status_code": 200}
+
+    monkeypatch.setattr("app.providers.brevo.test_api_key", brevo_ok)
+    account = await make_account(api_db, default=True, daily_limit=30)
     campaign = await _active_ads_email_campaign(api_db, account, 100)
     campaign.status = "draft"
     await api_db.flush()
@@ -594,7 +598,7 @@ async def test_ads_validate_reports_the_projection(api_client, api_db, sending_c
     body = (await api_client.post(f"/api/v1/ads/campaigns/{campaign.id}/validate")).json()
 
     projection = body["summary"]["projection"]
-    assert projection["daily_cap"] == (await sending_limits.email_capacity(api_db))["per_mailbox"]
+    assert projection["daily_cap"] == account.daily_limit
     assert projection["sending_days_needed"] >= 2
 
 
@@ -604,18 +608,18 @@ async def test_ads_validate_reports_the_projection(api_client, api_db, sending_c
 
 
 @pytest.mark.asyncio
-async def test_sending_rules_api_exposes_the_new_rules_and_the_effective_email_cap(
+async def test_sending_rules_api_does_not_reimpose_a_cap_on_null_accounts(
     api_client, api_db
 ):
     await make_accounts(api_db, 2)
 
     rules = (await api_client.get("/api/v1/settings/sending-rules")).json()
-    assert rules["email_daily_per_mailbox"] >= 20
+    assert rules["email_daily_per_mailbox"] == 0
     assert rules["breaker_enabled"] is True
 
     status = (await api_client.get("/api/v1/settings/sending-rules/status")).json()
     assert status["email"]["mailboxes"] == 2
-    assert status["email"]["daily_cap"] == 2 * rules["email_daily_per_mailbox"]
+    assert status["email"]["daily_cap"] is None
     assert "breaker" in status
 
 
@@ -708,7 +712,7 @@ async def test_starting_after_hours_says_nothing_will_send_yet(
     api_client, api_db, sending_clock, stub_queue
 ):
     sending_clock(WED_NIGHT)
-    await make_account(api_db, default=True)
+    await make_account(api_db, default=True, daily_limit=30)
     campaign = await make_campaign(api_db, channel="email", n=5)
 
     response = await api_client.post(f"/api/v1/campaigns/{campaign.id}/start")
@@ -725,7 +729,7 @@ async def test_starting_inside_the_window_has_no_waiting_note(
     api_client, api_db, sending_clock, stub_queue
 ):
     sending_clock(WED_NOON)
-    await make_account(api_db, default=True)
+    await make_account(api_db, default=True, daily_limit=30)
     campaign = await make_campaign(api_db, channel="email", n=5)
 
     body = (await api_client.post(f"/api/v1/campaigns/{campaign.id}/start")).json()

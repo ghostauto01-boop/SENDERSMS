@@ -430,11 +430,15 @@ async def test_ads_audience_screening_includes_unknown_contacts(api_db):
 
 
 @pytest.mark.asyncio
-async def test_ads_validate_allows_unknown_contacts(api_db):
+async def test_ads_validate_allows_unknown_contacts(api_db, monkeypatch):
     from app.services import ads_service as svc
     from tests.test_ads_manager import make_campaign as ads_campaign
     from tests.test_ads_manager import make_creatives, make_set
 
+    async def brevo_ok(_api_key):
+        return {"success": True, "status_code": 200}
+
+    monkeypatch.setattr("app.providers.brevo.test_api_key", brevo_ok)
     account = await make_account(api_db, default=True)
     campaign = await ads_campaign(api_db, name="Ads email", channel="email", status="draft",
                                   test_mode=False, email_account_id=account.id, subject="Hello")

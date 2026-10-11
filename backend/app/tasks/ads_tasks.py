@@ -24,24 +24,25 @@ logger = logging.getLogger(__name__)
 
 
 async def activate_due_campaigns() -> list[int]:
-    """Flip scheduled campaigns to active once their start date passes."""
+    """Transition scheduled campaigns and wake their persisted jobs."""
     now = datetime.now(timezone.utc)
     started: list[int] = []
+    from app.services.campaign_jobs import schedule_campaign_job
+
     async with async_session_factory() as db:
-        rows = list(
-            (
-                await db.execute(
-                    select(AdsCampaign).where(AdsCampaign.status == "scheduled").limit(20)
-                )
-            ).scalars().all()
-        )
+        rows = list((await db.execute(
+            select(AdsCampaign).where(AdsCampaign.status == "scheduled").limit(100)
+        )).scalars().all())
         for campaign in rows:
             start = svc.as_utc(campaign.start_date)
             if start is None or start <= now:
-                campaign.status = "active"
+                svc.transition_campaign(
+                    db, campaign, "active", reason="Scheduled start time reached", actor="system"
+                )
                 svc.log_activity(
                     db, "campaign_started", campaign_id=campaign.id, detail="Scheduled start reached"
                 )
+                await schedule_campaign_job(db, campaign, scheduled_for=now)
                 started.append(campaign.id)
         if started:
             await db.commit()
@@ -49,9 +50,11 @@ async def activate_due_campaigns() -> list[int]:
 
 
 async def run_ads_cycle(*, send_inline: bool = False, batch: int = 25) -> dict:
-    """One full cycle: activate, refresh always-on audiences, dispatch, follow up."""
-    totals = {"activated": 0, "added": 0, "sent": 0, "followups": 0, "campaigns": 0, "optimized": 0}
-
+    """Drive persistent campaign jobs, delivery sync, follow-ups and optimization."""
+    totals = {
+        "activated": 0, "added": 0, "sent": 0, "followups": 0,
+        "campaigns": 0, "optimized": 0, "jobs_failed": 0,
+    }
     totals["activated"] = len(await activate_due_campaigns())
 
     async with async_session_factory() as db:
@@ -59,40 +62,23 @@ async def run_ads_cycle(*, send_inline: bool = False, batch: int = 25) -> dict:
             totals["added"] = await svc.refresh_always_on(db)
         except Exception as exc:  # noqa: BLE001 - never abort the cycle
             logger.warning("Ads always-on refresh failed: %s", exc)
+            await db.rollback()
 
-    async with async_session_factory() as db:
-        campaign_ids = list(
-            (
-                await db.execute(
-                    select(AdsCampaign.id)
-                    .where(AdsCampaign.status == "active")
-                    .order_by(AdsCampaign.id)
-                    .limit(10)
-                )
-            ).scalars().all()
-        )
+    # Each campaign has an append-only, persisted queue job. The poller and
+    # Celery beat can race safely because jobs are claimed with a conditional
+    # UPDATE before any work is done.
+    try:
+        from app.services.campaign_jobs import process_due_jobs
 
-    for campaign_id in campaign_ids:
-        async with async_session_factory() as db:
-            campaign = (
-                await db.execute(select(AdsCampaign).where(AdsCampaign.id == campaign_id))
-            ).scalar_one_or_none()
-            if campaign is None:
-                continue
-            try:
-                result = await svc.dispatch_campaign(
-                    db, campaign, limit=batch, send_inline=send_inline
-                )
-                totals["sent"] += result["sent"]
-                totals["campaigns"] += 1
-            except Exception as exc:  # noqa: BLE001
-                logger.error("Ads dispatch for campaign %s failed: %s", campaign_id, exc)
-                await db.rollback()
+        jobs = await process_due_jobs(send_inline=send_inline, batch=batch)
+        totals["sent"] = int(jobs.get("sent") or 0)
+        totals["campaigns"] = int(jobs.get("processed") or 0)
+        totals["jobs_failed"] = int(jobs.get("failed") or 0)
+    except Exception as exc:  # noqa: BLE001
+        logger.error("Ads durable job poll failed: %s", exc)
 
     async with async_session_factory() as db:
         try:
-            # Read gateway outcomes back onto the assignments before analytics
-            # are asked for them.
             await svc.sync_delivery(db)
             await db.commit()
         except Exception as exc:  # noqa: BLE001
@@ -112,25 +98,21 @@ async def run_ads_cycle(*, send_inline: bool = False, batch: int = 25) -> dict:
     # can never cause an unwanted automatic shift.
     async with async_session_factory() as db:
         try:
-            opt_ids = list(
-                (
-                    await db.execute(
-                        select(AdsCampaign.id).where(
-                            AdsCampaign.status == "active",
-                            AdsCampaign.auto_optimize.is_(True),
-                        )
-                    )
-                ).scalars().all()
-            )
+            opt_ids = list((await db.execute(
+                select(AdsCampaign.id).where(
+                    AdsCampaign.status == "active",
+                    AdsCampaign.auto_optimize.is_(True),
+                )
+            )).scalars().all())
         except Exception as exc:  # noqa: BLE001 - column may predate migration
             logger.warning("Ads optimization lookup failed: %s", exc)
             opt_ids = []
     for campaign_id in opt_ids:
         async with async_session_factory() as db:
             try:
-                campaign = (
-                    await db.execute(select(AdsCampaign).where(AdsCampaign.id == campaign_id))
-                ).scalar_one_or_none()
+                campaign = (await db.execute(
+                    select(AdsCampaign).where(AdsCampaign.id == campaign_id)
+                )).scalar_one_or_none()
                 if campaign is None:
                     continue
                 result = await svc.run_optimization(db, campaign, actor="andromeda")

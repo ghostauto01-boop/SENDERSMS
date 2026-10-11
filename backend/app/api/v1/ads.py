@@ -11,7 +11,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from fastapi.responses import RedirectResponse, StreamingResponse
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,6 +24,8 @@ from app.models.ads import (
     AdsAudience,
     AdsCalendarEvent,
     AdsCampaign,
+    AdsCampaignJob,
+    AdsCampaignStateTransition,
     AdsCreative,
     AdsCreativeVersion,
     AdsEvent,
@@ -331,8 +333,13 @@ async def create_campaign(
     payload = data.model_dump()
     payload["channel"] = _validate_channel(payload.get("channel"))
     campaign = AdsCampaign(**payload, owner_id=user.id, status="draft")
+    campaign.state_changed_at = svc.now_utc()
     db.add(campaign)
     await db.flush()
+    db.add(AdsCampaignStateTransition(
+        campaign_id=campaign.id, from_state=None, to_state="draft",
+        reason="Campaign created", actor=user.username,
+    ))
     if campaign.channel == "email":
         ## Refuse to create a campaign that could never send.
         await _require_email_sender(db, campaign)
@@ -400,18 +407,15 @@ async def update_campaign(
     it has a single shared message), the ads manager versions its creatives and
     keeps per-contact assignments, so live edits are safe.
     """
-    campaign = await _get_campaign(db, campaign_id)
+    campaign = await _get_campaign(db, campaign_id, for_update=True)
     payload = data.model_dump(exclude_unset=True)
-    if "status" in payload and payload["status"] not in (
-        "draft", "scheduled", "active", "paused", "completed", "archived", "error",
-    ):
-        raise HTTPException(400, "Invalid status")
+    target_status = payload.pop("status", None)
+    allowed_statuses = ("draft", "scheduled", "active", "paused", "completed", "archived")
+    if target_status is not None and target_status not in allowed_statuses:
+        raise HTTPException(400, f"Status must be one of {', '.join(allowed_statuses)}")
     if payload.get("channel") is not None:
         payload["channel"] = _validate_channel(payload["channel"])
         if payload["channel"] != campaign.channel:
-            # Switching channels mid-flight would send SMS copy as email (or
-            # vice versa) to contacts already assigned. Allow it only before
-            # anything has been queued.
             queued = (
                 await db.execute(
                     select(func.count()).select_from(AdsAssignment).where(
@@ -432,16 +436,78 @@ async def update_campaign(
     if "optimize_action" in payload and payload["optimize_action"] not in svc.OPTIMIZE_ACTIONS:
         raise HTTPException(400, f"Invalid optimize_action, expected one of {svc.OPTIMIZE_ACTIONS}")
     if "optimize_min_sends" in payload and (payload["optimize_min_sends"] or 0) < 1:
-        raise HTTPException(400, "optimize_min_sends must be at least 1")
+        raise HTTPException(422, "optimize_min_sends must be at least 1")
     if campaign.channel == "email" and not campaign.test_mode:
         await _require_email_sender(db, campaign)
+
+    if target_status is not None and target_status != campaign.status:
+        current_status = campaign.status
+        try:
+            if target_status in ("active", "scheduled"):
+                from app.services import circuit_breaker
+
+                breaker_paused = circuit_breaker.is_breaker_pause(campaign)
+                if breaker_paused:
+                    raise _breaker_conflict(campaign)
+                if target_status == "scheduled" and (
+                    campaign.start_date is None or svc.as_utc(campaign.start_date) <= svc.now_utc()
+                ):
+                    raise HTTPException(422, "Set a future start_date before scheduling this campaign.")
+                if current_status in ("draft", "paused", "error"):
+                    result = await svc.launch(db, campaign, actor=user.username)
+                    if not result.get("ok"):
+                        await db.commit()  # preserve last_error and validation activity
+                        raise HTTPException(
+                            422,
+                            detail={
+                                "message": "Campaign cannot be launched until the preflight issues are fixed.",
+                                "errors": result.get("errors", []),
+                                "checks": result.get("checks", {}),
+                            },
+                        )
+                    if campaign.paused_reason:
+                        _clear_pause(campaign, acknowledged_breaker=False)
+                elif current_status == "scheduled" and target_status == "active":
+                    if campaign.start_date and svc.as_utc(campaign.start_date) > svc.now_utc():
+                        raise HTTPException(409, "This campaign is scheduled to start later.")
+                    svc.transition_campaign(
+                        db, campaign, "active", reason="Activated by campaign edit", actor=user.username
+                    )
+                else:
+                    svc.transition_campaign(
+                        db, campaign, target_status,
+                        reason=f"Status changed from {current_status} to {target_status}",
+                        actor=user.username,
+                    )
+                    if target_status == "active":
+                        from app.services.campaign_jobs import schedule_campaign_job
+                        await schedule_campaign_job(db, campaign)
+            elif target_status == "paused":
+                svc.transition_campaign(
+                    db, campaign, "paused", reason="Paused from campaign settings", actor=user.username
+                )
+                campaign.paused_reason = "Paused manually"
+                campaign.paused_at = svc.now_utc()
+            else:
+                svc.transition_campaign(
+                    db, campaign, target_status,
+                    reason=f"Status changed from {current_status} to {target_status}",
+                    actor=user.username,
+                )
+        except ValueError as exc:
+            raise HTTPException(409, str(exc)) from exc
+        svc.log_activity(
+            db, f"campaign_{target_status}", campaign_id=campaign.id,
+            actor=user.username, detail=f"{current_status} -> {campaign.status}",
+        )
+
     campaign.updated_at = svc.now_utc()
     svc.log_activity(
         db,
         "campaign_updated",
         campaign_id=campaign.id,
         actor=user.username,
-        detail=", ".join(payload.keys()),
+        detail=", ".join([*payload.keys(), *(["status"] if target_status else [])]),
     )
     await db.commit()
     await db.refresh(campaign)
@@ -464,21 +530,31 @@ async def validate(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """Informational launch summary; sender and domain checks never block."""
+    """Return a user-readable preflight and persist the latest diagnosis."""
     campaign = await _get_campaign(db, campaign_id)
     try:
-        return await svc.validate_campaign(db, campaign)
-    except Exception as exc:  # noqa: BLE001 — preflight itself must not 500
+        result = await svc.validate_campaign(db, campaign)
+        campaign.last_error = "; ".join(result.get("errors", []))[:5000] or None
+        campaign.last_activity_at = svc.now_utc()
+        await db.commit()
+        return result
+    except Exception as exc:  # noqa: BLE001 — never expose an internal traceback
         request_id = getattr(request.state, "request_id", "unknown")
         logger.error(
-            "Campaign preflight summary failed request_id=%s campaign_id=%s",
-            request_id, campaign_id,
+            "Campaign preflight failed request_id=%s campaign_id=%s error=%s",
+            request_id, campaign_id, exc,
             exc_info=(type(exc), exc, exc.__traceback__),
         )
+        message = "Campaign validation could not be completed. Retry; if it continues, check the sender and server health."
+        campaign.last_error = message
+        await db.commit()
         return {
-            "ok": True,
-            "errors": [],
-            "warnings": ["The audience estimate is temporarily unavailable; launch will recalculate it."],
+            "ok": False,
+            "valid": False,
+            "errors": [message],
+            "warnings": [],
+            "checks": {},
+            "recommendation": message,
             "summary": {
                 "audience_size": None,
                 "creatives_per_set": [],
@@ -486,7 +562,7 @@ async def validate(
                 "send_window": {
                     "start_hour": campaign.send_start_hour if campaign.send_start_hour is not None else 9,
                     "end_hour": campaign.send_end_hour if campaign.send_end_hour is not None else 18,
-                    "timezone": campaign.timezone_name or "recipient-local",
+                    "timezone": campaign.timezone_name or "UTC",
                 },
                 "daily_limit": campaign.daily_limit,
             },
@@ -503,6 +579,7 @@ async def simulate(
 @router.post("/campaigns/{campaign_id}/launch")
 async def launch(
     campaign_id: int,
+    background_tasks: BackgroundTasks,
     acknowledge_breaker: bool = Query(
         False, description="Only needed to relaunch a campaign the circuit breaker paused."
     ),
@@ -523,12 +600,18 @@ async def launch(
         if result["ok"] and campaign.status in ("active", "scheduled") and campaign.paused_reason:
             _clear_pause(campaign, acknowledged_breaker=breaker_paused)
         if not result["ok"]:
-            await db.rollback()
+            # Preserve the existing string ``detail`` response while saving the
+            # structured checks in the campaign and validation endpoint.
+            await db.commit()
             raise HTTPException(400, "; ".join(result.get("errors", [])))
-        # Assignment rows, status, events and activity log commit together. Any
-        # exception above or during commit is rolled back by the except block.
+        # Assignment rows, state transition, audit record and durable job commit
+        # together. The response is sent before the background task takes a slice.
         await db.commit()
-        return result
+        job_id = result.get("job_id")
+        if job_id:
+            from app.services.campaign_jobs import process_campaign_job
+            background_tasks.add_task(process_campaign_job, job_id, send_inline=False)
+        return {key: value for key, value in result.items() if key != "job_id"}
     except HTTPException:
         await db.rollback()
         raise
@@ -544,7 +627,12 @@ async def pause(
     campaign = await _get_campaign(db, campaign_id)
     if campaign.status not in ("active", "scheduled"):
         raise HTTPException(409, f"Cannot pause a campaign that is {campaign.status}")
-    campaign.status = "paused"
+    try:
+        svc.transition_campaign(
+            db, campaign, "paused", reason="Paused manually", actor=user.username
+        )
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from exc
     campaign.paused_reason = "Paused manually"
     campaign.paused_at = svc.now_utc()
     svc.log_activity(db, "campaign_paused", campaign_id=campaign.id, actor=user.username)
@@ -555,6 +643,7 @@ async def pause(
 @router.post("/campaigns/{campaign_id}/resume")
 async def resume(
     campaign_id: int,
+    background_tasks: BackgroundTasks,
     acknowledge_breaker: bool = Query(
         False, description="Required to resume a campaign the bounce circuit breaker paused."
     ),
@@ -569,14 +658,28 @@ async def resume(
     breaker_paused = circuit_breaker.is_breaker_pause(campaign)
     if breaker_paused and not acknowledge_breaker:
         raise _breaker_conflict(campaign)
-    campaign.status = "active"
+    resume_state = (
+        "scheduled"
+        if campaign.start_date and svc.as_utc(campaign.start_date) > svc.now_utc()
+        else "active"
+    )
+    try:
+        svc.transition_campaign(
+            db, campaign, resume_state, reason="Campaign resumed", actor=user.username
+        )
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from exc
     _clear_pause(campaign, acknowledged_breaker=breaker_paused)
+    from app.services.campaign_jobs import schedule_campaign_job
+
+    job = await schedule_campaign_job(
+        db, campaign,
+        scheduled_for=svc.as_utc(campaign.start_date) if resume_state == "scheduled" else svc.now_utc(),
+    )
     svc.log_activity(db, "campaign_resumed", campaign_id=campaign.id, actor=user.username)
     await db.commit()
-    # Mail created before the pause was held back, not dropped: send it now.
-    from app.tasks.campaign_tasks import republish_queued
-
-    await republish_queued(db, ads_campaign_id=campaign.id)
+    from app.services.campaign_jobs import process_campaign_job
+    background_tasks.add_task(process_campaign_job, job.id, send_inline=False)
     return {"ok": True, "status": campaign.status}
 
 
@@ -585,7 +688,12 @@ async def complete(
     campaign_id: int, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)
 ):
     campaign = await _get_campaign(db, campaign_id)
-    campaign.status = "completed"
+    try:
+        svc.transition_campaign(
+            db, campaign, "completed", reason="Completed by user", actor=user.username
+        )
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from exc
     svc.log_activity(db, "campaign_completed", campaign_id=campaign.id, actor=user.username)
     await db.commit()
     return {"ok": True, "status": campaign.status}
@@ -596,7 +704,12 @@ async def archive(
     campaign_id: int, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)
 ):
     campaign = await _get_campaign(db, campaign_id)
-    campaign.status = "archived"
+    try:
+        svc.transition_campaign(
+            db, campaign, "archived", reason="Archived by user", actor=user.username
+        )
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from exc
     svc.log_activity(db, "campaign_archived", campaign_id=campaign.id, actor=user.username)
     await db.commit()
     return {"ok": True, "status": campaign.status}
@@ -619,13 +732,23 @@ async def duplicate(
 @router.post("/campaigns/{campaign_id}/dispatch")
 async def dispatch_now(
     campaign_id: int,
+    background_tasks: BackgroundTasks,
     limit: int = Query(25, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """Manually push the next slice (the background worker does this too)."""
+    """Queue a manual slice; the HTTP request never waits on provider sends."""
     campaign = await _get_campaign(db, campaign_id)
-    return await svc.dispatch_campaign(db, campaign, limit=limit, send_inline=True)
+    if campaign.status != "active":
+        return await svc.dispatch_campaign(db, campaign, limit=limit, send_inline=False)
+    from app.services.campaign_jobs import process_campaign_job, schedule_campaign_job
+
+    job = await schedule_campaign_job(db, campaign, scheduled_for=svc.now_utc())
+    await db.commit()
+    background_tasks.add_task(process_campaign_job, job.id, send_inline=False, batch=limit)
+    # Keep the existing dispatch response fields; queue details are available
+    # from the additive /jobs endpoint.
+    return {"sent": 0, "skipped": 0, "state": "sending", "reasons": {}}
 
 
 @router.post("/campaigns/{campaign_id}/contacts")
@@ -786,6 +909,159 @@ async def campaign_audience(
             }
         )
     return {"total": total, "removable": removable_total, "items": items}
+
+
+@router.get("/campaigns/{campaign_id}/jobs")
+async def campaign_jobs(
+    campaign_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Return durable queue status without requiring a live Celery result backend."""
+    await _get_campaign(db, campaign_id)
+    from app.services.campaign_jobs import list_campaign_jobs
+
+    jobs = await list_campaign_jobs(db, campaign_id)
+    return {"campaign_id": campaign_id, "jobs": jobs, "current": jobs[0] if jobs else None}
+
+
+@router.post("/campaigns/{campaign_id}/jobs/retry")
+async def retry_campaign_job(
+    campaign_id: int,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Create a fresh durable job after an operator fixes a failed worker run."""
+    campaign = await _get_campaign(db, campaign_id)
+    if campaign.status != "active":
+        raise HTTPException(409, f"Resume or activate the campaign before retrying its job (status: {campaign.status}).")
+    latest = (await db.execute(
+        select(AdsCampaignJob).where(AdsCampaignJob.campaign_id == campaign_id)
+        .order_by(AdsCampaignJob.created_at.desc()).limit(1)
+    )).scalar_one_or_none()
+    if latest is None or latest.status != "failed":
+        raise HTTPException(409, "There is no failed campaign job to retry.")
+    from app.services.campaign_jobs import process_campaign_job, schedule_campaign_job, serialize_job
+
+    latest.status = "cancelled"
+    latest.finished_at = svc.now_utc()
+    job = await schedule_campaign_job(db, campaign, scheduled_for=svc.now_utc())
+    job.attempts = 0
+    job.error = None
+    await db.commit()
+    background_tasks.add_task(process_campaign_job, job.id, send_inline=False)
+    return {"ok": True, "job": serialize_job(job)}
+
+
+@router.get("/campaigns/{campaign_id}/send-logs")
+async def campaign_send_logs(
+    campaign_id: int,
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=1, le=200),
+    status_filter: Optional[str] = Query(None, alias="status"),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Per-attempt email history plus one-row-per-recipient delivery summary."""
+    campaign = await _get_campaign(db, campaign_id)
+    from app.models.email import EmailSendLog
+    from app.services.email_send_logs import summarize_campaign
+
+    query = select(EmailSendLog).where(EmailSendLog.campaign_id == campaign_id)
+    if status_filter:
+        query = query.where(EmailSendLog.status == status_filter.strip().lower())
+    total = int((await db.execute(
+        select(func.count()).select_from(query.subquery())
+    )).scalar() or 0)
+    rows = list((await db.execute(
+        query.order_by(EmailSendLog.created_at.desc(), EmailSendLog.id.desc())
+        .offset((page - 1) * per_page).limit(per_page)
+    )).scalars().all())
+    contact_ids = {row.contact_id for row in rows if row.contact_id is not None}
+    contacts = {}
+    if contact_ids:
+        contacts = {
+            contact.id: contact
+            for contact in (await db.execute(select(Contact).where(Contact.id.in_(contact_ids)))).scalars().all()
+        }
+    logs = []
+    for row in rows:
+        contact = contacts.get(row.contact_id)
+        name = " ".join(part for part in (contact.first_name, contact.last_name) if part).strip() if contact else ""
+        if not name and contact:
+            name = contact.business_name or contact.email or contact.phone_number or f"Contact {contact.id}"
+        logs.append({
+            "id": row.id,
+            "campaign_id": row.campaign_id,
+            "assignment_id": row.assignment_id,
+            "message_id": row.message_id,
+            "contact_id": row.contact_id,
+            "contact_name": name or (f"Contact {row.contact_id}" if row.contact_id else "Unknown contact"),
+            "email": contact.email if contact else None,
+            "creative_id": row.creative_id,
+            "account_id": row.account_id,
+            "status": row.status,
+            "attempt": row.attempt,
+            "error_code": row.error_code,
+            "error_message": row.error_message,
+            "retry_at": row.retry_at,
+            "sent_at": row.sent_at,
+            "created_at": row.created_at,
+            "updated_at": row.updated_at,
+        })
+    summary = await summarize_campaign(db, campaign_id)
+    assignments = list((await db.execute(
+        select(AdsAssignment).where(AdsAssignment.campaign_id == campaign_id)
+    )).scalars().all())
+    if assignments:
+        message_ids = {row.message_id for row in assignments if row.message_id is not None}
+        messages = list((await db.execute(
+            select(Message).where(Message.id.in_(message_ids))
+        )).scalars().all()) if message_ids else []
+        messages_by_id = {message.id: message for message in messages}
+        counts = {"sent": 0, "delivered": 0, "bounced": 0, "failed": 0, "retrying": 0, "queued": 0, "skipped": 0}
+        attempts = retries = 0
+        for assignment in assignments:
+            message = messages_by_id.get(assignment.message_id)
+            status = (message.status if message else assignment.send_status or "").strip().lower()
+            delivery_status = (assignment.delivery_status or "").strip().lower()
+            if status in {"sent", "delivered"} or (
+                assignment.sent_at is not None and status not in {"bounced", "failed", "skipped", "cancelled"}
+            ):
+                counts["sent"] += 1
+            if status == "delivered" or delivery_status == "delivered":
+                counts["delivered"] += 1
+            if status == "bounced" or delivery_status == "bounced":
+                counts["bounced"] += 1
+            if status == "failed" or delivery_status == "failed":
+                counts["failed"] += 1
+            if status == "retrying":
+                counts["retrying"] += 1
+            if status in {"queued", "sending", "pending", "ready"}:
+                counts["queued"] += 1
+            if status in {"skipped", "cancelled", "blocked"}:
+                counts["skipped"] += 1
+            if message is not None:
+                retry_count = max(0, int(message.retry_count or 0))
+                retries += retry_count
+                if status in {"sent", "delivered", "bounced"}:
+                    attempts += retry_count + 1
+                elif status in {"failed", "retrying"}:
+                    attempts += retry_count
+        summary.update(counts)
+        summary["total"] = len(assignments)
+        if not svc.is_email_campaign(campaign):
+            summary["attempts"] = attempts
+            summary["retries"] = retries
+    return {
+        "campaign_id": campaign_id,
+        "summary": summary,
+        "total_attempts": total,
+        "page": page,
+        "per_page": per_page,
+        "items": logs,
+    }
 
 
 @router.get("/campaigns/{campaign_id}/analytics")
@@ -2602,7 +2878,9 @@ async def bulk_campaigns(
     held_by_breaker: list[int] = []
     for campaign in rows:
         if data.action == "pause" and campaign.status in ("active", "scheduled"):
-            campaign.status = "paused"
+            svc.transition_campaign(
+                db, campaign, "paused", reason="Paused manually", actor=user.username
+            )
             campaign.paused_reason = "Paused manually"
             campaign.paused_at = svc.now_utc()
         elif data.action == "resume" and campaign.status == "paused":
@@ -2612,10 +2890,17 @@ async def bulk_campaigns(
                 # A bulk click is not the deliberate acknowledgement a trip needs.
                 held_by_breaker.append(campaign.id)
                 continue
-            campaign.status = "active"
+            svc.transition_campaign(
+                db, campaign, "active", reason="Resumed from bulk action", actor=user.username
+            )
             _clear_pause(campaign, acknowledged_breaker=False)
         elif data.action == "archive":
-            campaign.status = "archived"
+            try:
+                svc.transition_campaign(
+                    db, campaign, "archived", reason="Archived from bulk action", actor=user.username
+                )
+            except ValueError:
+                continue
         elif data.action == "delete":
             await db.delete(campaign)
         else:

@@ -40,6 +40,7 @@ from app.models.ads import (
     AdsFollowUpStep,
     AdsFollowUpTask,
     AdsSet,
+    FOLLOWUP_ACTIONS,
 )
 from app.models.contact import Contact, ContactTag, Tag
 from app.models.contact_list import ContactListMember
@@ -127,6 +128,53 @@ def log_activity(
     )
     db.add(row)
     return row
+
+
+CAMPAIGN_TRANSITIONS: dict[str, set[str]] = {
+    "draft": {"active", "scheduled", "archived", "error"},
+    "scheduled": {"active", "paused", "draft", "archived", "error"},
+    "active": {"paused", "completed", "archived", "error"},
+    "paused": {"active", "scheduled", "completed", "archived", "error"},
+    "completed": {"archived"},
+    "error": {"draft", "active", "archived"},
+    "archived": set(),
+}
+
+
+def transition_campaign(
+    db: AsyncSession,
+    campaign: AdsCampaign,
+    to_state: str,
+    *,
+    reason: str,
+    actor: str = "system",
+    error: str | None = None,
+) -> None:
+    """Validate and persist a lifecycle transition plus its audit record."""
+    from app.models.ads import AdsCampaignStateTransition
+
+    current = campaign.status
+    if current == to_state:
+        if error is not None:
+            campaign.last_error = error[:5000]
+        return
+    allowed = CAMPAIGN_TRANSITIONS.get(current, set())
+    if to_state not in allowed:
+        raise ValueError(f"Cannot transition campaign from {current.upper()} to {to_state.upper()}")
+    now = now_utc()
+    campaign.status = to_state
+    campaign.state_changed_at = now
+    campaign.last_error = error[:5000] if error else None
+    db.add(
+        AdsCampaignStateTransition(
+            campaign_id=campaign.id,
+            from_state=current,
+            to_state=to_state,
+            reason=(reason or "State changed")[:500],
+            error=error[:5000] if error else None,
+            actor=(actor or "system")[:120],
+        )
+    )
 
 
 # ==========================================================================
@@ -870,8 +918,15 @@ async def sent_today(db: AsyncSession, campaign: AdsCampaign) -> int:
             .select_from(AdsAssignment)
             .where(
                 AdsAssignment.campaign_id == campaign.id,
-                AdsAssignment.sent_at.is_not(None),
-                AdsAssignment.sent_at >= since,
+                or_(
+                    and_(AdsAssignment.sent_at.is_not(None), AdsAssignment.sent_at >= since),
+                    and_(
+                        AdsAssignment.sent_at.is_(None),
+                        AdsAssignment.last_action_at.is_not(None),
+                        AdsAssignment.last_action_at >= since,
+                        AdsAssignment.send_status == "sending",
+                    ),
+                ),
             )
         )
     ).scalar() or 0
@@ -882,7 +937,10 @@ async def sent_total(db: AsyncSession, campaign: AdsCampaign) -> int:
         await db.execute(
             select(func.count())
             .select_from(AdsAssignment)
-            .where(AdsAssignment.campaign_id == campaign.id, AdsAssignment.sent_at.is_not(None))
+            .where(
+                AdsAssignment.campaign_id == campaign.id,
+                or_(AdsAssignment.sent_at.is_not(None), AdsAssignment.send_status == "sending"),
+            )
         )
     ).scalar() or 0
 
@@ -936,8 +994,18 @@ async def drip_allowance(db: AsyncSession, campaign: AdsCampaign) -> int:
             .select_from(AdsAssignment)
             .where(
                 AdsAssignment.campaign_id == campaign.id,
-                AdsAssignment.sent_at.is_not(None),
-                AdsAssignment.sent_at >= window_start,
+                or_(
+                    and_(
+                        AdsAssignment.last_action_at.is_not(None),
+                        AdsAssignment.last_action_at >= window_start,
+                        AdsAssignment.send_status.in_(("sending", "sent", "delivered")),
+                    ),
+                    and_(
+                        AdsAssignment.last_action_at.is_(None),
+                        AdsAssignment.sent_at.is_not(None),
+                        AdsAssignment.sent_at >= window_start,
+                    ),
+                ),
             )
         )
     ).scalar() or 0
@@ -975,7 +1043,7 @@ def _smart_slice(campaign: AdsCampaign, batch: int) -> int:
 
 
 async def campaign_state(db: AsyncSession, campaign: AdsCampaign) -> str:
-    """The system status shown to the user (never overwrites ``status``)."""
+    """Derive live progress without overwriting the lifecycle status."""
     if campaign.status != "active":
         return campaign.status
     ok, reason = window_state(campaign, now_utc())
@@ -985,21 +1053,27 @@ async def campaign_state(db: AsyncSession, campaign: AdsCampaign) -> str:
         return "daily_limit_reached"
     if campaign.total_limit and await sent_total(db, campaign) >= campaign.total_limit:
         return "completed"
-    pending = (
-        await db.execute(
-            select(func.count())
-            .select_from(AdsAssignment)
-            .where(AdsAssignment.campaign_id == campaign.id, AdsAssignment.send_status == "pending")
+    pending = int((await db.execute(
+        select(func.count()).select_from(AdsAssignment).where(
+            AdsAssignment.campaign_id == campaign.id,
+            AdsAssignment.send_status == "pending",
         )
-    ).scalar() or 0
-    if not pending:
-        return "no_eligible_contacts"
-    return "sending"
-
-
-# ==========================================================================
-# Dispatcher
-# ==========================================================================
+    )).scalar() or 0)
+    sending_assignments = int((await db.execute(
+        select(func.count()).select_from(AdsAssignment).where(
+            AdsAssignment.campaign_id == campaign.id,
+            AdsAssignment.send_status.in_(("sending", "ready")),
+        )
+    )).scalar() or 0)
+    sending_messages = int((await db.execute(
+        select(func.count()).select_from(Message).where(
+            Message.ads_campaign_id == campaign.id,
+            Message.status.in_(("queued", "sending", "retrying")),
+        )
+    )).scalar() or 0)
+    if pending or sending_assignments or sending_messages:
+        return "sending"
+    return "no_eligible_contacts"
 
 
 async def _frequency_blocked(db: AsyncSession, campaign: AdsCampaign, contact_id: int) -> bool:
@@ -1106,7 +1180,9 @@ async def dispatch_campaign(
     ok, reason = window_state(campaign)
     if not ok:
         if reason == "completed":
-            campaign.status = "completed"
+            transition_campaign(
+                db, campaign, "completed", reason="Campaign end date reached", actor="system"
+            )
             log_activity(db, "campaign_completed", campaign_id=campaign.id, detail="End date reached")
         result["state"] = reason or "waiting_for_schedule"
         campaign.last_state = result["state"]
@@ -1128,9 +1204,11 @@ async def dispatch_campaign(
     if campaign.total_limit:
         room = min(room, max(campaign.total_limit - total_used, 0))
         if room == 0:
-            campaign.status = "completed"
+            transition_campaign(
+                db, campaign, "completed", reason="Campaign total send limit reached", actor="system"
+            )
             result["state"] = "completed"
-            log_activity(db, "campaign_completed", campaign_id=campaign.id, detail="Total SMS limit reached")
+            log_activity(db, "campaign_completed", campaign_id=campaign.id, detail="Total send limit reached")
             await db.flush()
             return result
 
@@ -1225,6 +1303,12 @@ async def dispatch_campaign(
                     db, "MESSAGE_SKIPPED", campaign_id=campaign.id,
                     contact_id=contact.id, detail=problem,
                 )
+                from app.services.email_send_logs import record_skipped_assignment
+                await record_skipped_assignment(
+                    db, campaign_id=campaign.id, contact_id=contact.id,
+                    creative_id=assignment.creative_id, assignment_id=assignment.id,
+                    error_message=f"Skipped: {problem.replace('_', ' ')}.",
+                )
                 continue
         else:
             if contact.is_opted_out:
@@ -1300,6 +1384,9 @@ async def dispatch_campaign(
             assignment.last_error = None
             assignment.skip_reason = None
             assignment.delivery_status = "simulated"
+            campaign.sent_count = (campaign.sent_count or 0) + 1
+            campaign.last_activity_at = assignment.last_action_at
+            campaign.last_error = None
             record_event(
                 db,
                 "MESSAGE_SENT",
@@ -1327,7 +1414,17 @@ async def dispatch_campaign(
         ).scalar_one_or_none()
         if existing is not None:
             assignment.message_id = existing.id
-            assignment.send_status = "sent" if existing.status in ("sent", "delivered") else "pending"
+            if existing.status == "delivered":
+                assignment.send_status = "delivered"
+                assignment.sent_at = assignment.sent_at or existing.sent_at or now_utc()
+            elif existing.status == "sent":
+                assignment.send_status = "sent"
+                assignment.sent_at = assignment.sent_at or existing.sent_at or now_utc()
+            elif existing.status == "failed":
+                assignment.send_status = "failed"
+                assignment.last_error = existing.last_error
+            else:
+                assignment.send_status = "sending"
             continue
 
         thread_channel = "email" if email_campaign else "sms"
@@ -1419,14 +1516,27 @@ async def dispatch_campaign(
                 conversation.email_account_id = message.email_account_id
 
         assignment.message_id = message.id
-        assignment.send_status = "sent"
-        assignment.sent_at = now_utc()
+        assignment.send_status = "sending"
+        # Used by the durable drip scheduler as the dispatch time. ``sent_at``
+        # remains NULL until the provider accepts the message.
+        assignment.sent_at = None
         assignment.last_action_at = now_utc()
         contact.last_contacted_at = now_utc()
+        if email_campaign:
+            from app.services.email_send_logs import queue_email_send_log
+            await queue_email_send_log(
+                db,
+                campaign_id=campaign.id,
+                contact_id=contact.id,
+                creative_id=assignment.creative_id,
+                assignment_id=assignment.id,
+                message_id=message.id,
+                account_id=message.email_account_id,
+            )
 
         record_event(
             db,
-            "MESSAGE_SENT",
+            "MESSAGE_QUEUED",
             campaign_id=campaign.id,
             set_id=assignment.set_id,
             creative_id=assignment.creative_id,
@@ -1438,8 +1548,7 @@ async def dispatch_campaign(
         result["sent"] += 1
         await _schedule_followups(db, campaign, assignment)
 
-    campaign.sent_count = (campaign.sent_count or 0) + result["sent"]
-    campaign.last_activity_at = now_utc()
+    campaign.last_activity_at = now_utc() if result["sent"] or result["skipped"] else campaign.last_activity_at
     campaign.last_state = "sending" if result["sent"] else campaign.last_state
     await db.commit()
 
@@ -2158,12 +2267,7 @@ def _rate(part: int, whole: int) -> float:
 
 
 async def sync_delivery(db: AsyncSession, campaign_id: int | None = None) -> int:
-    """Copy provider outcomes from ``messages`` onto the assignments.
-
-    The gateway result lands on the Message row (shared pipeline). Rather than
-    duplicating that bookkeeping in a second place -- which is how counters
-    drift -- the ads layer reads it back here.
-    """
+    """Copy provider outcomes from ``messages`` to assignments and campaign logs."""
     query = select(AdsAssignment).where(AdsAssignment.message_id.is_not(None))
     if campaign_id is not None:
         query = query.where(AdsAssignment.campaign_id == campaign_id)
@@ -2171,45 +2275,68 @@ async def sync_delivery(db: AsyncSession, campaign_id: int | None = None) -> int
     if not rows:
         return 0
     messages = {
-        m.id: m
-        for m in (
-            await db.execute(select(Message).where(Message.id.in_([r.message_id for r in rows])))
+        message.id: message
+        for message in (
+            await db.execute(select(Message).where(Message.id.in_([row.message_id for row in rows])))
         ).scalars().all()
     }
     changed = 0
+    from app.models.ads import AdsCampaign
+    from app.services.email_send_logs import update_logs_for_message
+
     for assignment in rows:
         message = messages.get(assignment.message_id)
         if message is None:
             continue
+        campaign = (
+            await db.execute(select(AdsCampaign).where(AdsCampaign.id == assignment.campaign_id))
+        ).scalar_one_or_none()
+        if message.status in ("sent", "delivered") and assignment.sent_at is None:
+            assignment.sent_at = message.sent_at or now_utc()
+            assignment.last_action_at = assignment.sent_at
+            if campaign is not None:
+                campaign.sent_count = (campaign.sent_count or 0) + 1
+                campaign.last_activity_at = now_utc()
+                campaign.last_error = None
+            record_event(
+                db, "MESSAGE_SENT", campaign_id=assignment.campaign_id,
+                set_id=assignment.set_id, creative_id=assignment.creative_id,
+                creative_version_id=assignment.creative_version_id,
+                contact_id=assignment.contact_id, assignment_id=assignment.id,
+                detail="Accepted by provider",
+            )
+            changed += 1
         if message.status == "delivered" and assignment.delivery_status != "delivered":
             assignment.delivery_status = "delivered"
             assignment.send_status = "delivered"
             record_event(
-                db,
-                "MESSAGE_DELIVERED",
-                campaign_id=assignment.campaign_id,
-                creative_id=assignment.creative_id,
-                contact_id=assignment.contact_id,
+                db, "MESSAGE_DELIVERED", campaign_id=assignment.campaign_id,
+                creative_id=assignment.creative_id, contact_id=assignment.contact_id,
                 assignment_id=assignment.id,
             )
             changed += 1
         elif message.status == "failed" and assignment.send_status != "failed":
             assignment.send_status = "failed"
             assignment.delivery_status = "failed"
-            assignment.last_error = message.last_error
+            assignment.last_error = (message.last_error or "Email delivery failed.")[:5000]
+            if campaign is not None:
+                campaign.last_error = assignment.last_error
+                campaign.last_activity_at = now_utc()
             record_event(
-                db,
-                "MESSAGE_FAILED",
-                campaign_id=assignment.campaign_id,
-                creative_id=assignment.creative_id,
-                contact_id=assignment.contact_id,
-                assignment_id=assignment.id,
-                detail=message.last_error,
+                db, "MESSAGE_FAILED", campaign_id=assignment.campaign_id,
+                creative_id=assignment.creative_id, contact_id=assignment.contact_id,
+                assignment_id=assignment.id, detail=assignment.last_error,
             )
             changed += 1
         elif message.status == "sent" and assignment.send_status == "sending":
             assignment.send_status = "sent"
             changed += 1
+        if message.channel == "email" and message.status in ("sent", "delivered", "failed", "bounced"):
+            await update_logs_for_message(
+                db, message, status=message.status,
+                error_message=message.last_error,
+                sent_at=message.sent_at,
+            )
     if changed:
         await db.flush()
     return changed
@@ -2582,43 +2709,140 @@ async def simulate(db: AsyncSession, campaign: AdsCampaign) -> dict:
 
 
 async def validate_campaign(db: AsyncSession, campaign: AdsCampaign) -> dict:
-    """Return an informational, non-blocking preflight summary.
+    """Run an actionable preflight; required failures block campaign launch.
 
-    Sender/domain health belongs to delivery operations, not a campaign launch
-    gate. The API deliberately reports the configuration without making the
-    preflight depend on provider credentials or DNS state.
+    Brevo connectivity is checked live for real email sends. Sender-domain DNS
+    authentication is managed separately and is not a launch gate; this check
+    validates the configured sender identity and provider account instead.
     """
+    errors: list[str] = []
     warnings: list[str] = []
-    if is_email_campaign(campaign):
-        warnings.append(
-            "Email provider acceptance is reported at send time; sender-domain authentication "
-            "does not block launch."
+    checks: dict[str, dict[str, object]] = {}
+
+    def add_check(name: str, passed: bool, message: str, *, required: bool = True) -> None:
+        checks[name] = {"pass": bool(passed), "message": message}
+        if not passed:
+            (errors if required else warnings).append(message)
+
+    if not (campaign.name or "").strip():
+        add_check("campaign_name", False, "Campaign name is required.")
+    else:
+        add_check("campaign_name", True, "Campaign name is set.")
+    if not campaign.objective:
+        warnings.append("No objective is selected; campaign optimization metrics will be limited.")
+
+    email_campaign = is_email_campaign(campaign)
+    account = None
+    if email_campaign:
+        from app.services import email_service
+        from app.security.encryption import decrypt_value
+
+        account = await email_service.get_account(db, campaign.email_account_id)
+        account = account or await email_service.get_default_account(db)
+        account_issue = None
+        if account is None:
+            account_issue = "No Brevo sender is configured. Add a sender and API key in Email Manager."
+        elif not account.is_active:
+            account_issue = f"Email sender '{account.name}' is disabled. Enable it in Email Manager."
+        elif not account.from_email:
+            account_issue = f"Email sender '{account.name}' has no From address."
+        else:
+            try:
+                if not decrypt_value(account.api_key_encrypted or ""):
+                    account_issue = f"Email sender '{account.name}' has no readable Brevo API key."
+            except Exception:  # noqa: BLE001 - don't leak credential/crypto details
+                account_issue = f"Email sender '{account.name}' has an unreadable Brevo API key. Re-save it."
+        add_check(
+            "email_account", account_issue is None,
+            account_issue or f"Account '{account.name}' is active and configured.",
         )
+
+        if account_issue or account is None:
+            add_check("brevo_health", False, account_issue or "No Brevo sender is configured.")
+        elif campaign.test_mode:
+            add_check("brevo_health", True, "Skipped in test mode; no email will be sent to Brevo.")
+        else:
+            try:
+                from app.providers.brevo import test_api_key
+
+                health = await test_api_key(decrypt_value(account.api_key_encrypted or ""))
+                healthy = bool(health.get("success"))
+                message = "Brevo API is responding." if healthy else (
+                    f"Brevo connection failed: {health.get('error') or 'no response'}"
+                )
+                add_check("brevo_health", healthy, message)
+            except Exception as exc:  # noqa: BLE001 - provider failures are user-facing checks
+                add_check("brevo_health", False, f"Brevo connection failed: {str(exc)[:300]}")
+
+        sender_email = (account.from_email or "").strip() if account else ""
+        sender_ok = bool(
+            account and account.is_active and email_service.normalize_email(sender_email)
+        )
+        add_check(
+            "sender_identity", sender_ok,
+            f"Sender identity {sender_email} is configured."
+            if sender_ok else "Configure a valid sender email address in Email Manager.",
+        )
+    else:
+        from app.config import settings
+
+        sms_configured = bool(settings.smsgate_configured)
+        sms_ok = bool(campaign.test_mode or sms_configured)
+        sms_message = (
+            "SMS-Gate credentials are configured."
+            if sms_configured else
+            "Skipped in test mode; configure SMSGATE_BASE_URL, SMSGATE_USERNAME, and SMSGATE_PASSWORD before live sending."
+            if campaign.test_mode else
+            "SMS-Gate credentials are missing; set SMSGATE_BASE_URL, SMSGATE_USERNAME, and SMSGATE_PASSWORD."
+        )
+        add_check("sms_gateway", sms_ok, sms_message)
+        add_check("email_account", True, "Not required for SMS campaigns.")
+        add_check("brevo_health", True, "Not required for SMS campaigns.")
+        add_check("sender_identity", True, "Not required for SMS campaigns.")
+
+    if campaign.daily_limit is not None and int(campaign.daily_limit) <= 0:
+        add_check("daily_limit", False, "Campaign daily limit must be a positive integer or null.")
+    else:
+        add_check(
+            "daily_limit", True,
+            "Daily limit is unlimited." if campaign.daily_limit is None else f"Daily limit is {campaign.daily_limit}/day.",
+        )
+
     try:
         sim = await simulate(db, campaign)
-    except Exception as exc:  # noqa: BLE001 — validate must remain informational
+    except Exception as exc:  # noqa: BLE001 - return a diagnosis rather than a generic 500
         logger.exception("Campaign validation summary failed for campaign %s", campaign.id)
         sim = {
-            "audience": None, "eligible": None, "already_queued": None,
-            "skipped": {}, "per_set": [], "daily_limit": campaign.daily_limit,
+            "audience": 0, "eligible": 0, "already_queued": 0, "skipped": {},
+            "per_set": [], "daily_limit": campaign.daily_limit,
             "total_limit": campaign.total_limit, "estimated_days": None,
             "followup_steps": 0, "test_mode": bool(campaign.test_mode),
         }
-        warnings.append("Audience estimate is temporarily unavailable; launch will recalculate it.")
+        warnings.append(f"Audience estimate could not be calculated: {str(exc)[:250]}")
 
-    if not (campaign.name or "").strip():
-        warnings.append("Campaign name is blank.")
-    if not campaign.objective:
-        warnings.append("No objective selected; metrics will not be prioritised.")
+    audience_count = int(sim.get("eligible") or 0) + int(sim.get("already_queued") or 0)
+    add_check(
+        "audience_size", audience_count > 0,
+        f"{audience_count} eligible contact(s) matched." if audience_count else
+        "The audience is empty; select at least one eligible contact.",
+    )
 
     sets = list((await db.execute(
         select(AdsSet).where(AdsSet.campaign_id == campaign.id, AdsSet.status == "active")
         .order_by(AdsSet.id)
     )).scalars().all())
-    per_set = []
-    email_campaign = is_email_campaign(campaign)
     if not sets:
-        warnings.append("No active audience set is configured.")
+        add_check("creatives", False, "Campaign needs at least one active audience set.")
+
+    from app.services.variable_service import variable_maps, known_variable_keys
+    from app.utils.templating import BUILTIN_KEYS, build_context, normalize_key, _PLACEHOLDER
+
+    aliases, fallbacks = await variable_maps(db)
+    known_keys = await known_variable_keys(db)
+    template_errors: list[str] = []
+    per_set: list[dict] = []
+    total_creatives = 0
+
     for ads_set in sets:
         creatives = active_creatives(list((await db.execute(
             select(AdsCreative).where(
@@ -2626,44 +2850,123 @@ async def validate_campaign(db: AsyncSession, campaign: AdsCampaign) -> dict:
                 AdsCreative.is_deleted.is_(False),
             ).order_by(AdsCreative.id)
         )).scalars().all()))
+        total_creatives += len(creatives)
         per_set.append({"set_id": ads_set.id, "set_name": ads_set.name, "creatives": len(creatives)})
         if not creatives:
-            warnings.append(f"Set '{ads_set.name}' has no active creatives.")
+            template_errors.append(f"Set '{ads_set.name}' has no active creative.")
+            continue
+
+        try:
+            candidates = await resolve_audience(db, ads_set)
+            eligible_contacts, _skipped = await screen_contacts(db, campaign, candidates)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Audience validation failed for campaign %s set %s", campaign.id, ads_set.id)
+            eligible_contacts = []
+            template_errors.append(f"Could not validate the audience for set '{ads_set.name}': {str(exc)[:200]}.")
+
+        if (ads_set.split_mode or "") == "percentage":
+            total = round(sum(creative.allocation or 0 for creative in creatives), 2)
+            if abs(total - 100) > 0.01:
+                template_errors.append(f"Set '{ads_set.name}' percentage split totals {total}%, not 100%.")
+
         for creative in creatives:
             if email_campaign:
                 if not (creative.body or "").strip() and not (creative.html_body or "").strip():
-                    warnings.append(f"Email creative '{creative.name}' has no message body.")
+                    template_errors.append(f"Email creative '{creative.name}' has no message body.")
                 if not (creative.subject or campaign.subject or "").strip():
-                    warnings.append(f"Email creative '{creative.name}' has no subject line.")
-            elif not (creative.body or "").strip():
-                warnings.append(f"Creative '{creative.name}' has no message text.")
-        if (ads_set.split_mode or "") == "percentage" and creatives:
-            total = round(sum(creative.allocation or 0 for creative in creatives), 2)
-            if abs(total - 100) > 0.01:
-                warnings.append(f"Set '{ads_set.name}' percentage split totals {total}%, not 100%.")
+                    template_errors.append(f"Email creative '{creative.name}' has no subject line.")
+                texts = [creative.subject or campaign.subject or "", creative.body or "", creative.html_body or ""]
+            else:
+                if not (creative.body or "").strip():
+                    template_errors.append(f"Creative '{creative.name}' has no message text.")
+                texts = [creative.body or ""]
 
-    if sim.get("eligible") == 0:
-        warnings.append("No eligible audience is currently estimated; check audience filters and exclusions.")
+            # Check every selected recipient. Explicit and Variables-page
+            # fallbacks are accepted; implicit generic greeting text doesn't
+            # conceal a missing personalization field at launch time.
+            token_names: dict[str, str] = {}
+            token_fallbacks: set[str] = set()
+            for text in texts:
+                for match in _PLACEHOLDER.finditer(text or ""):
+                    key = normalize_key(match.group(1))
+                    if not key:
+                        continue
+                    token_names.setdefault(key, match.group(1).strip())
+                    if match.group(2) is not None and match.group(2).strip():
+                        token_fallbacks.add(key)
 
-    # How long will the audience take under the rules that really apply? The
-    # campaign's own daily limit is one input; for email so are the mailboxes.
+            for key, display in token_names.items():
+                field_key = aliases.get(key, key)
+                is_known = key in known_keys or key in BUILTIN_KEYS or field_key in known_keys
+                if not is_known:
+                    template_errors.append(
+                        f"Template error: creative '{creative.name}' uses {{{{{display}}}}}, which is not a known contact field."
+                    )
+                    continue
+                if key in token_fallbacks or fallbacks.get(field_key) or fallbacks.get(key):
+                    continue
+                missing_contact_ids = []
+                for contact in eligible_contacts:
+                    value = build_context(contact).get(field_key, "")
+                    if not str(value or "").strip():
+                        missing_contact_ids.append(contact.id)
+                if missing_contact_ids:
+                    template_errors.append(
+                        f"Template error: creative '{creative.name}' uses {{{{{display}}}}}, but "
+                        f"{len(missing_contact_ids)} contact(s) have no {field_key} value."
+                    )
+
+    creative_error = next((e for e in template_errors if any(
+        word in e.lower() for word in ("active creative", "creative '", "message body", "subject line", "percentage split")
+    )), None)
+    creatives_pass = bool(sets) and total_creatives > 0 and creative_error is None
+    add_check(
+        "creatives", creatives_pass,
+        f"{total_creatives} active creative(s) have complete subject/body content."
+        if creatives_pass else (creative_error or "One or more sets have no active creative."),
+    )
+    add_check(
+        "template_tokens", not template_errors,
+        "All template tokens resolve for every eligible contact."
+        if not template_errors else template_errors[0],
+    )
+    errors.extend(error for error in template_errors if error not in errors)
+
+    steps = list((await db.execute(
+        select(AdsFollowUpStep).where(
+            AdsFollowUpStep.campaign_id == campaign.id,
+            AdsFollowUpStep.is_active.is_(True),
+            AdsFollowUpStep.deleted_at.is_(None),
+        ).order_by(AdsFollowUpStep.step_order)
+    )).scalars().all())
+    followup_errors: list[str] = []
+    for step in steps:
+        if int(step.wait_hours or 0) < 1:
+            followup_errors.append(f"Follow-up step {step.step_order} must wait at least 1 hour.")
+        if step.action not in FOLLOWUP_ACTIONS:
+            followup_errors.append(f"Follow-up step {step.step_order} has an invalid action '{step.action}'.")
+        if step.action in ("send_email", "send_sms") and not (step.body or "").strip():
+            followup_errors.append(f"Follow-up step {step.step_order} has no message body.")
+        if step.action == "send_email" and not (step.subject or campaign.subject or "").strip():
+            followup_errors.append(f"Email follow-up step {step.step_order} has no subject.")
+    add_check(
+        "followups", not followup_errors,
+        "Follow-up steps are valid." if not followup_errors else followup_errors[0],
+    )
+    errors.extend(error for error in followup_errors if error not in errors)
+
     projection = None
     try:
-        from app.services import email_service, sending_limits
+        from app.services import sending_limits
 
         weekdays = None
         if campaign.send_days:
             weekdays = {int(x) for x in campaign.send_days.split(",") if x.strip().isdigit()} or None
-        account_ids = None
-        if email_campaign:
-            account = await email_service.get_account(db, campaign.email_account_id)
-            account = account or await email_service.get_default_account(db)
-            account_ids = [account.id] if account else None
-        to_send = (sim.get("eligible") or 0) + (sim.get("already_queued") or 0)
+        account_ids = [account.id] if email_campaign and account is not None else None
         projection = await sending_limits.project_send(
             db,
             channel="email" if email_campaign else "sms",
-            sendable=to_send,
+            sendable=audience_count,
             account_ids=account_ids,
             campaign_daily_limit=campaign.daily_limit,
             allowed_weekdays=weekdays,
@@ -2671,18 +2974,9 @@ async def validate_campaign(db: AsyncSession, campaign: AdsCampaign) -> dict:
         projection_note = sending_limits.projection_warning(projection)
         if projection_note:
             warnings.append(projection_note)
-    except Exception:  # noqa: BLE001 — validate must remain informational
-        logger.exception("Projection failed for campaign %s", campaign.id)
-    if campaign.daily_limit is None and not (projection and projection.get("daily_cap")):
-        warnings.append("No daily limit is set; the eligible audience may go out quickly.")
+    except Exception as exc:  # noqa: BLE001
+        logger.info("Campaign send projection unavailable for %s: %s", campaign.id, exc)
 
-    followups = (await db.execute(
-        select(func.count()).select_from(AdsFollowUpStep).where(
-            AdsFollowUpStep.campaign_id == campaign.id,
-            AdsFollowUpStep.is_active.is_(True),
-            AdsFollowUpStep.deleted_at.is_(None),
-        )
-    )).scalar() or 0
     send_start = campaign.send_start_hour if campaign.send_start_hour is not None else 9
     send_end = campaign.send_end_hour if campaign.send_end_hour is not None else 18
     summary = {
@@ -2690,22 +2984,32 @@ async def validate_campaign(db: AsyncSession, campaign: AdsCampaign) -> dict:
         "audience_size": sim.get("audience"),
         "eligible_audience": sim.get("eligible"),
         "creatives_per_set": per_set,
-        "followup_configured": followups > 0,
-        "followup_steps": followups,
+        "followup_configured": bool(steps),
+        "followup_steps": len(steps),
         "send_window": {
             "start_hour": send_start,
             "end_hour": send_end,
-            "timezone": campaign.timezone_name or "recipient-local",
+            "timezone": campaign.timezone_name or "UTC",
             "recipient_timezone_enabled": bool(getattr(campaign, "recipient_timezone_enabled", True)),
         },
         "daily_limit": campaign.daily_limit,
         "projection": projection,
     }
-    return {"ok": True, "errors": [], "warnings": warnings, "summary": summary}
-
-
-# ==========================================================================
-# Lifecycle
+    valid = not errors
+    recommendation = (
+        "Campaign is ready to launch."
+        if valid else f"Fix these preflight issue(s): {errors[0]}" if errors else
+        "Review warnings before launch."
+    )
+    return {
+        "ok": valid,
+        "valid": valid,
+        "errors": errors,
+        "warnings": warnings,
+        "checks": checks,
+        "recommendation": recommendation,
+        "summary": summary,
+    }
 # ==========================================================================
 
 
@@ -2715,19 +3019,49 @@ async def launch(db: AsyncSession, campaign: AdsCampaign, *, actor: str = "user"
         counts = await _counts_for(
             db, [AdsAssignment.campaign_id == campaign.id], campaign_id=campaign.id
         )
+        from app.services.campaign_jobs import schedule_campaign_job
+
+        job = await schedule_campaign_job(db, campaign)
         return {
             "ok": True,
             "status": campaign.status,
             "idempotent": True,
             "audience": {"added": 0, "already_assigned": counts.get("assigned", 0)},
             "warnings": [],
+            "job_id": job.id,
         }
 
     check = await validate_campaign(db, campaign)
-    # Preflight is informational by design. A configured email sender/domain is
-    # never a launch blocker; the send path reports provider issues later.
+    if not check.get("valid", check.get("ok", True)):
+        errors = check.get("errors") or ["Campaign validation failed."]
+        campaign.last_error = "; ".join(str(error) for error in errors)[:5000]
+        log_activity(
+            db,
+            "campaign_validation_failed",
+            campaign_id=campaign.id,
+            actor=actor,
+            detail=campaign.last_error,
+        )
+        return {
+            "ok": False,
+            "status": campaign.status,
+            "errors": errors,
+            "warnings": check.get("warnings", []),
+            "checks": check.get("checks", {}),
+        }
+
     built = await build_audience(db, campaign)
-    campaign.status = "scheduled" if campaign.start_date and as_utc(campaign.start_date) > now_utc() else "active"
+    target = "scheduled" if campaign.start_date and as_utc(campaign.start_date) > now_utc() else "active"
+    try:
+        transition_campaign(
+            db,
+            campaign,
+            target,
+            reason=f"Launched after preflight passed ({built['added']} contacts assigned)",
+            actor=actor,
+        )
+    except ValueError as exc:
+        return {"ok": False, "status": campaign.status, "errors": [str(exc)], "warnings": []}
     campaign.last_state = "preparing_audience"
     campaign.last_activity_at = now_utc()
     log_activity(
@@ -2737,12 +3071,19 @@ async def launch(db: AsyncSession, campaign: AdsCampaign, *, actor: str = "user"
         actor=actor,
         detail=f"{built['added']} contacts assigned",
     )
+    from app.services.campaign_jobs import schedule_campaign_job
+
+    job = await schedule_campaign_job(
+        db, campaign,
+        scheduled_for=as_utc(campaign.start_date) if campaign.status == "scheduled" else now_utc(),
+    )
     return {
         "ok": True,
         "status": campaign.status,
         "idempotent": False,
         "audience": built,
         "warnings": check.get("warnings", []),
+        "job_id": job.id,
     }
 
 
