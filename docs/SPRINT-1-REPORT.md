@@ -10,6 +10,8 @@ Evidence (raw before/after output) is in [`docs/evidence/sprint-1/`](evidence/sp
 > `integration.sh`: the real app + fake Brevo driven by the repo's own end-to-end tools). Where a regenerated figure differs from what I
 > first reported, this report uses the regenerated one and says so.
 
+> **Totals in this report are as of the end of Sprint 1** (backend 1130 passed). Later sprints added tests and changed some of the behaviour described here (for example the sending-rules startup step, see Sprint 2); the current totals — backend **1307 passed, 1 skipped** — and what is still open are in [`SPRINT-3-REPORT.md`](SPRINT-3-REPORT.md).
+
 **Everything below was verified in a sandbox with synthetic data. I had no production URL or credentials, so
 nothing was run against production, and none of the brief's production numbers (1,297 contacts, 184 bounced,
 525 pending, 45% failure rate…) were re-measured by me. Where my environment differs from the brief I say so.**
