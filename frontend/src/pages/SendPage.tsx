@@ -4,6 +4,7 @@ import api from "../api/client";
 import toast from "react-hot-toast";
 import { Send, UserPlus, Search, X, Users, Phone, List, Clock, AlertCircle, CheckCircle2, Hourglass, RotateCcw, Trash2, Eye, Calendar, MessageSquare, ShieldCheck } from "lucide-react";
 import { useChannel } from "../hooks/useChannel";
+import { inboxLabelFor, inboxPathFor } from "../utils/inboxRoute";
 import ChannelSwitch from "../components/ChannelSwitch";
 import EmailSendPanel from "../components/EmailSendPanel";
 import emailApi from "../api/email";
@@ -517,7 +518,9 @@ function SmsSendPage() {
                   </div>
                   <div className="flex flex-col gap-1 self-center">
                     <button onClick={()=> m._isScheduled ? retryFailed(m.id) : retryMessage(m.id)} className="w-8 h-8 rounded-full bg-primary-600 hover:bg-primary-500 text-white flex items-center justify-center" title="Retry now"><RotateCcw size={14}/></button>
-                    {m.conversation_id && <a href="/inbox" className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-900 flex items-center justify-center text-gray-600" title="View in Inbox"><Eye size={14}/></a>}
+                    {/* This panel is the SMS one, but the row still carries its
+                        channel: a mixed history must not open the wrong inbox. */}
+                    {m.conversation_id && <a href={inboxPathFor(m.channel ?? "sms")} className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-900 flex items-center justify-center text-gray-600" title={`View in ${inboxLabelFor(m.channel ?? "sms")}`}><Eye size={14}/></a>}
                   </div>
                 </div>
               ))}

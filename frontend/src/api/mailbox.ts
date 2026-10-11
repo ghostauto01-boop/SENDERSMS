@@ -40,7 +40,36 @@ export type MailboxList = {
   items: Mailbox[];
   count: number;
   google_oauth_ready: boolean;
+  /** "db" (saved in this app), "env" or "none" — where the OAuth client came from. */
+  google_oauth_source?: "db" | "env" | "none";
+  google_client_id_masked?: string;
+  /** The exact URI Google must be told to redirect to, or null when the
+   *  deployment's public address is unknown. */
+  redirect_uri?: string | null;
   poll_interval: number;
+};
+
+/**
+ * The Gmail OAuth client, as Settings → Gmail replies reads and saves it.
+ *
+ * `client_secret` is deliberately absent from the read: Google's secret is
+ * write-only here, exactly like the Brevo keys. The client ID is returned in
+ * full because Google treats it as public — it is in every consent URL.
+ */
+export type GoogleOAuthConfig = {
+  client_id: string;
+  client_id_masked: string;
+  has_secret: boolean;
+  configured: boolean;
+  source: "db" | "env" | "none";
+  redirect_uri: string | null;
+  callback_path: string;
+  javascript_origin: string | null;
+  scope: string;
+  public_base_url: string | null;
+  public_base_source: "env" | "render" | "request" | "none";
+  gmail_mailboxes: Mailbox[];
+  mailbox_count: number;
 };
 
 export type RoutingFinding = {
@@ -104,9 +133,33 @@ export const mailboxApi = {
       .get<MailboxList>("/mailbox", { params: { include_inactive: includeInactive } })
       .then((r) => r.data),
 
-  /** The Google consent URL; open it in a new tab, Google redirects back to us. */
-  googleStart: () =>
-    api.get<{ url: string; redirect_uri: string; scope: string }>("/mailbox/google/start")
+  /**
+   * The Google consent URL; open it in a new tab, Google redirects back to us.
+   *
+   * `returnTo` is the page to land on afterwards (a same-origin path), so
+   * connecting from Settings comes back to Settings. `loginHint` pre-fills the
+   * Gmail address you mean, which helps once several are signed in — the account
+   * chooser still appears, which is what makes a second inbox possible.
+   */
+  googleStart: (opts?: { loginHint?: string; returnTo?: string }) =>
+    api
+      .get<{ url: string; redirect_uri: string; scope: string; prompt: string }>(
+        "/mailbox/google/start",
+        { params: { login_hint: opts?.loginHint, return_to: opts?.returnTo } },
+      )
+      .then((r) => r.data),
+
+  /** The saved OAuth client + the exact values the Google console needs. */
+  googleConfig: () =>
+    api.get<GoogleOAuthConfig>("/settings/google-oauth").then((r) => r.data),
+
+  /** Save (or clear, with an empty string) the OAuth client from the app. */
+  saveGoogleConfig: (payload: { client_id?: string; client_secret?: string }) =>
+    api
+      .put<{ success: boolean; warnings: string[]; configured: boolean; source: string }>(
+        "/settings/google-oauth",
+        payload,
+      )
       .then((r) => r.data),
 
   connect: (payload: MailboxConnectInput) =>

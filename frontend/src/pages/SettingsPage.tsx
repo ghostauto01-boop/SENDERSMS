@@ -10,6 +10,7 @@ import {
   Clock,
   Eye,
   EyeOff,
+  Inbox,
   Lock,
   Mail,
   Phone,
@@ -27,11 +28,31 @@ import {
 import { Link } from "react-router-dom";
 import emailApi, { EmailAccount } from "../api/email";
 import McpConnectors from "../components/McpConnectors";
+import GoogleOAuthSetupCard from "../components/GoogleOAuthSetupCard";
+import MailboxRepliesTab from "../components/MailboxRepliesTab";
 
-type Tab = "gateway" | "calls" | "notifications" | "compliance" | "sending" | "access" | "email" | "ai";
+type Tab = "gateway" | "calls" | "notifications" | "compliance" | "sending" | "access" | "email" | "ai" | "gmail";
+
+const TAB_IDS: Tab[] = [
+  "access", "gateway", "email", "gmail", "ai", "calls", "notifications", "compliance", "sending",
+];
+
+/**
+ * Which tab to open when the page is reached with a query string.
+ *
+ * `/settings?tab=gmail` is where the setup guide and the "Google sign-in is not
+ * configured" warnings send the operator, so the tab they were told about is the
+ * tab they land on. Read once, the same way the Email Manager reads
+ * `?section=`: the tabs are then plain local state, and switching one does not
+ * rewrite the URL under the browser's back button.
+ */
+function tabFromQuery(): Tab {
+  const wanted = new URLSearchParams(window.location.search).get("tab") as Tab | null;
+  return wanted && TAB_IDS.includes(wanted) ? wanted : "gateway";
+}
 
 export default function SettingsPage() {
-  const [tab, setTab] = useState<Tab>("gateway");
+  const [tab, setTab] = useState<Tab>(tabFromQuery);
   const [notifs, setNotifs] = useState<NotificationProviderSettings[]>([]);
   const [comp, setComp] = useState<Record<string, string>>({});
   const [rules, setRules] = useState<Record<string, string>>({});
@@ -52,6 +73,7 @@ export default function SettingsPage() {
     { id: "access" as Tab, label: "Site access", icon: Lock },
     { id: "gateway" as Tab, label: "SMS Gateway", icon: Wifi },
     { id: "email" as Tab, label: "Email (Brevo)", icon: Mail },
+    { id: "gmail" as Tab, label: "Gmail replies", icon: Inbox },
     { id: "ai" as Tab, label: "AI (MCP)", icon: Sparkles },
     { id: "calls" as Tab, label: "Calls", icon: Phone },
     { id: "notifications" as Tab, label: "Notifications", icon: Bell },
@@ -64,7 +86,7 @@ export default function SettingsPage() {
       <div className="flex gap-2 flex-wrap">{tabs.map(t => (<button key={t.id} onClick={() => setTab(t.id)}
         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium ${tab===t.id?"bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300":"text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"}`}><t.icon size={14}/>{t.label}</button>))}</div>
       {loading ? (<div className="card p-6"><div className="skeleton h-8 w-48 mb-4"/><div className="space-y-3">{[...Array(3)].map((_,i)=>(<div key={i} className="skeleton h-10 w-full"/>))}</div></div>)
-      : (<>{tab==="access"&&<AccessTab />}{tab==="gateway"&&<GatewayTab />}{tab==="calls"&&<CallsTab />}{tab==="email"&&<EmailTab />}{tab==="ai"&&<McpTab />}{tab==="notifications"&&<NotifsTab provs={notifs} onUpdate={load}/>}{tab==="compliance"&&<CompTab s={comp} onUpdate={load}/>}{tab==="sending"&&<RulesTab s={rules} onUpdate={load}/>}</>)}
+      : (<>{tab==="access"&&<AccessTab />}{tab==="gateway"&&<GatewayTab />}{tab==="calls"&&<CallsTab />}{tab==="email"&&<EmailTab />}{tab==="gmail"&&<GmailTab />}{tab==="ai"&&<McpTab />}{tab==="notifications"&&<NotifsTab provs={notifs} onUpdate={load}/>}{tab==="compliance"&&<CompTab s={comp} onUpdate={load}/>}{tab==="sending"&&<RulesTab s={rules} onUpdate={load}/>}</>)}
     </div>);
 }
 
@@ -796,6 +818,29 @@ function EmailTab() {
           Email Manager.
         </p>
       </div>
+    </div>
+  );
+}
+
+
+/**
+ * Gmail replies — the inbox the app reads prospects' answers from.
+ *
+ * Two halves, because they are two different questions:
+ *
+ * * "How do I make Google sign-in work?" → `GoogleOAuthSetupCard`: the callback
+ *   URL to copy into the console, the client ID and secret to paste back, the
+ *   numbered walkthrough, and the list of Gmail inboxes already connected.
+ * * "Is anything actually arriving?" → the Replies panel from the Email Manager,
+ *   reused as-is: the routing diagnosis, the per-mailbox controls, and the IMAP
+ *   app-password fallback for anybody who would rather not create a Google
+ *   Cloud project.
+ */
+function GmailTab() {
+  return (
+    <div className="space-y-4">
+      <GoogleOAuthSetupCard returnTo="/settings?tab=gmail" />
+      <MailboxRepliesTab />
     </div>
   );
 }

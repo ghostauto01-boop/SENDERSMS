@@ -1,5 +1,66 @@
 # Changelog
 
+## Unreleased — the right inbox for the channel, an email Conversations page, and Gmail Google sign-in
+
+Three complaints from one screen, fixed together because they share a cause: the
+email channel was bolted onto an app whose links, pages and reply setup were all
+written for SMS.
+
+- **Clicking an email campaign's reply no longer opens the SMS inbox.** Every
+  deep link into an inbox said `/inbox`, whatever the campaign had sent on, so an
+  email conversation opened a page with no thread for that person — an empty chat
+  list and no way to answer. The channel now decides the destination:
+  `GET /overview/campaigns` builds `inbox_url`/`replies_url` per campaign channel
+  (`/email-inbox?campaign_id=…&view=replied` vs `/inbox?campaign_id=…&replied=1`),
+  the campaign replies drawer routes each row (and its footer button, which now
+  says *Open in Email Inbox* / *Open in SMS Inbox*), and the Campaigns page,
+  Overview stat cards and the Send page's "view in inbox" all go through one
+  helper (`utils/inboxRoute.ts`) instead of hardcoding a path.
+  - `GET /campaigns/{id}/conversations` and `/{id}/performance` are scoped to the
+    campaign's own channel. A contact can hold an SMS thread and an email thread,
+    and an email campaign's "leads"/"replies" used to count the text conversation
+    too — the numbers and the list now agree. Each row also carries `channel` and
+    `contact_email`, so an email lead shows an address instead of an empty phone
+    line and no longer gets a WhatsApp call button there is no number for.
+- **New: Email Inbox → Conversations** (`/email-inbox?view=replied`, in the
+  sidebar). Only the people who actually wrote back — a thread qualifies when it
+  has an inbound message, so campaign mail nobody answered stays on the *All
+  mail* page. Backed by `replied_only` on `GET /email/inbox/conversations`, which
+  also gained `campaign_id` and `contact_id` (the deep link a campaign's reply
+  row sends: the list arrives filtered and that person's thread opens itself) and
+  now reports `replied_total` and `thread_total` so both tabs carry a real count.
+  The MCP `email_inbox` tool takes the same two filters.
+- **Gmail replies now sign in with Google, from inside the app, for as many
+  inboxes as you want.** Full walkthrough: `docs/GMAIL-OAUTH.md`.
+  - **Settings → Gmail replies** (new tab, deep-linkable as `/settings?tab=gmail`)
+    shows the exact values the Google Cloud Console asks for — the authorized
+    redirect URI for *this* deployment, the JavaScript origin, the scope — each
+    with a copy button, next to a numbered setup guide (project → enable the
+    Gmail API → consent screen with **test users** → **Web application** OAuth
+    client → paste the credentials → connect → add another → never-spam filter)
+    and the failure modes with their fixes (`redirect_uri_mismatch`,
+    `access_blocked`, no `refresh_token`, `invalid_client`, `invalid_grant`).
+  - The OAuth client is saved in the app: `GET`/`PUT /settings/google-oauth`,
+    stored encrypted in `system_settings`, secret write-only (never returned),
+    client ID reported masked. Values saved here win over
+    `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`, which still work; every read
+    reports the source. "Connect with Google" was previously dead on any
+    deployment whose operator could not edit server variables.
+  - **Several Gmail inboxes:** the consent URL now asks for
+    `prompt=consent select_account`, so Google always shows the account chooser
+    instead of silently reusing the signed-in account, and each inbox gets its own
+    refresh token, poll interval and counters. The mailbox also stores the client
+    secret it was connected with, and `access_token_for` falls back to the
+    app-saved client, so the poller (which sees no request and no environment
+    override) can still refresh a mailbox connected from the UI.
+  - The consent round-trip returns you to the page you started on: `return_to`
+    travels inside the signed, 10-minute `state` (same-origin paths only — an
+    absolute or protocol-relative one is dropped, so the redirect cannot be
+    turned into an open one).
+  - The IMAP **app password** path is unchanged and still offered, as the fallback
+    for anybody who does not want a Google Cloud project; the Setup Guide now
+    leads with Google sign-in and documents the app password in the same step.
+
 ## Unreleased — reliability, imports, contact hygiene, and compliance
 
 - **P0-6 (partly) and §E — a sender the internet will deliver for.** Full description: `docs/SENDING-DOMAINS.md`.

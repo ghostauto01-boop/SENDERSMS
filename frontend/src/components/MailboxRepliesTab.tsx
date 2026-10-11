@@ -376,7 +376,15 @@ function MailboxRow({
   );
 }
 
-export default function MailboxRepliesTab({ banner }: { banner?: string | null }) {
+export default function MailboxRepliesTab({
+  banner,
+  returnTo,
+}: {
+  banner?: string | null;
+  /** Where Google sends the browser after the consent screen. Defaults to this
+   *  tab, so connecting from Settings comes back to Settings. */
+  returnTo?: string;
+}) {
   const [report, setReport] = useState<ReplyRoutingReport | null>(null);
   const [mailboxes, setMailboxes] = useState<Mailbox[]>([]);
   const [oauthReady, setOauthReady] = useState(false);
@@ -401,10 +409,17 @@ export default function MailboxRepliesTab({ banner }: { banner?: string | null }
     load();
   }, [load]);
 
+  /**
+   * One consent round-trip connects one Gmail inbox — and the consent URL forces
+   * Google's account chooser, so pressing this again with a different account
+   * signed in adds a second inbox instead of re-adding the first.
+   */
   const connectGoogle = async () => {
     setGoogleBusy(true);
     try {
-      const { url } = await mailboxApi.googleStart();
+      const { url } = await mailboxApi.googleStart({
+        returnTo: returnTo || "/email-manager?section=Replies",
+      });
       window.open(url, "_blank", "noopener,noreferrer,width=640,height=760");
       toast("Finish the Google sign-in in the window that opened", { icon: "🔑" });
       // The popup ends on a page that redirects here; poll for the new mailbox so
@@ -461,9 +476,22 @@ export default function MailboxRepliesTab({ banner }: { banner?: string | null }
           <button className="btn-secondary" onClick={load}>
             <RefreshCw size={15} className="mr-1" /> Refresh
           </button>
-          <button className="btn-primary" onClick={connectGoogle} disabled={googleBusy}>
+          <button
+            className="btn-primary"
+            onClick={connectGoogle}
+            disabled={googleBusy || !oauthReady}
+            title={
+              oauthReady
+                ? "Sign in with Google — repeat it to add another Gmail inbox"
+                : "Save your Google OAuth client under Settings → Gmail replies first"
+            }
+          >
             <Plus size={15} className="mr-1" />
-            {googleBusy ? "Opening Google…" : "Connect with Google"}
+            {googleBusy
+              ? "Opening Google…"
+              : mailboxes.some((m) => m.provider === "gmail_api")
+                ? "Add another Gmail inbox"
+                : "Connect with Google"}
           </button>
           <button className="btn-secondary" onClick={() => setConnecting(true)}>
             <KeyRound size={15} className="mr-1" /> App password
@@ -494,9 +522,16 @@ export default function MailboxRepliesTab({ banner }: { banner?: string | null }
             </p>
             <ul className="text-xs text-gray-600 dark:text-gray-300 space-y-1 list-disc pl-4">
               <li>One click, no app password, revocable from your Google account.</li>
+              <li>Connect as many Gmail inboxes as you want — each is polled separately.</li>
               <li>Reads Inbox and Spam, and can install Gmail’s “never send it to Spam” filters.</li>
               <li>Sends replies through the Gmail API so DMARC stays aligned.</li>
-              <li>Needs <code>GOOGLE_CLIENT_ID</code> and <code>GOOGLE_CLIENT_SECRET</code> on the server.</li>
+              <li>
+                Needs an OAuth client, saved under{" "}
+                <Link to="/settings?tab=gmail" className="text-primary-600 hover:underline">
+                  Settings → Gmail replies
+                </Link>{" "}
+                (or <code>GOOGLE_CLIENT_ID</code> / <code>GOOGLE_CLIENT_SECRET</code> on the server).
+              </li>
             </ul>
           </div>
           <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40 p-3 space-y-1.5">
@@ -522,13 +557,18 @@ export default function MailboxRepliesTab({ banner }: { banner?: string | null }
 
       {!oauthReady && (
         <div className="card border-l-4 border-warning-400 p-3 text-sm">
-          <p className="font-medium">“Connect with Google” needs two environment variables</p>
+          <p className="font-medium">“Connect with Google” needs an OAuth client — set it up in the app</p>
           <p className="text-gray-600 dark:text-gray-300 text-xs mt-1 leading-relaxed">
-            Set <code>GOOGLE_CLIENT_ID</code> and <code>GOOGLE_CLIENT_SECRET</code> from an OAuth
-            client (Desktop app) at console.cloud.google.com with the Gmail API enabled, and add{" "}
-            <code>{window.location.origin}/api/v1/mailbox/google/callback</code> as an authorized
-            redirect URI. Until then, use <strong>App password</strong> — it needs no Google project
-            and does everything except create Gmail filters.
+            Open{" "}
+            <Link to="/settings?tab=gmail" className="text-primary-600 hover:underline font-medium">
+              Settings → Gmail replies
+            </Link>{" "}
+            for the step-by-step: it shows the exact callback URL to paste into the Google Cloud
+            Console, takes the client ID and secret, and connects as many Gmail inboxes as you want.
+            (<code>GOOGLE_CLIENT_ID</code> / <code>GOOGLE_CLIENT_SECRET</code> in the environment
+            still work if you prefer to configure the server.) Until then, use{" "}
+            <strong>App password</strong> — it needs no Google project and does everything except
+            create Gmail filters.
           </p>
         </div>
       )}
@@ -634,10 +674,16 @@ export default function MailboxRepliesTab({ banner }: { banner?: string | null }
           title="No mailbox connected"
           body="Connect the mailbox your prospects reply to. The app then reads INBOX and Spam, threads every reply onto the conversation it answers, moves replies out of Spam, and can send your answer back from the same address."
           action={
-            <div className="flex gap-2 justify-center">
-              <button className="btn-primary" onClick={connectGoogle}>
-                Connect with Google
-              </button>
+            <div className="flex flex-wrap gap-2 justify-center">
+              {oauthReady ? (
+                <button className="btn-primary" onClick={connectGoogle}>
+                  Connect with Google
+                </button>
+              ) : (
+                <Link to="/settings?tab=gmail" className="btn-primary">
+                  Set up Google sign-in
+                </Link>
+              )}
               <button className="btn-secondary" onClick={() => setConnecting(true)}>
                 Use an app password
               </button>

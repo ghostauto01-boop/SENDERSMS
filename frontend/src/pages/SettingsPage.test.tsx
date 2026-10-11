@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import SettingsPage from "./SettingsPage";
 
 const apiGet = vi.fn();
@@ -392,5 +393,91 @@ describe("SettingsPage — AI (MCP) access", () => {
     expect(screen.getByText("create_contact")).toBeInTheDocument();
     expect(screen.getByText(/phone_number is required/)).toBeInTheDocument();
     expect(screen.getByText(/15 calls all time/)).toBeInTheDocument();
+  });
+});
+
+/**
+ * GMAIL REPLIES — the tab every "Google sign-in is not configured" warning and
+ * the setup guide link to as `/settings?tab=gmail`.
+ *
+ * It renders inside a router because the tab links to the Email Inbox and the
+ * Email Manager, and it reads the tab from the query string the same way the
+ * Email Manager reads `?section=`.
+ */
+describe("SettingsPage — Gmail replies", () => {
+  const GOOGLE_CONFIG = {
+    client_id: "",
+    client_id_masked: "",
+    has_secret: false,
+    configured: false,
+    source: "none",
+    redirect_uri: "https://app.example.test/api/v1/mailbox/google/callback",
+    callback_path: "/api/v1/mailbox/google/callback",
+    javascript_origin: "https://app.example.test",
+    scope: "https://mail.google.com/",
+    public_base_url: "https://app.example.test",
+    public_base_source: "env",
+    gmail_mailboxes: [],
+    mailbox_count: 0,
+  };
+
+  const gmailGet = (url: string) => {
+    if (url === "/settings/google-oauth") return Promise.resolve({ data: GOOGLE_CONFIG });
+    if (url === "/mailbox/report") {
+      return Promise.resolve({
+        data: {
+          findings: [], healthy: true, mailboxes: [], connected: 0, replies_imported: 0,
+          rescued_from_spam: 0, last_sync_at: null, brevo_inbound_ready: false, paths: [],
+        },
+      });
+    }
+    if (url === "/mailbox") {
+      return Promise.resolve({
+        data: { items: [], count: 0, google_oauth_ready: false, poll_interval: 60 },
+      });
+    }
+    return defaultGet(url);
+  };
+
+  afterEach(() => {
+    // The tab is read from the real query string, so do not leak it to the next
+    // test in the file.
+    window.history.pushState({}, "", "/settings");
+  });
+
+  it("opens straight from a link that names the tab", async () => {
+    window.history.pushState({}, "", "/settings?tab=gmail");
+    apiGet.mockImplementation(gmailGet);
+
+    render(
+      <MemoryRouter initialEntries={["/settings?tab=gmail"]}>
+        <SettingsPage />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("Gmail replies — Google sign-in")).toBeInTheDocument();
+    // The callback URL to paste into the Google console is on the page already.
+    expect(
+      screen.getAllByText("https://app.example.test/api/v1/mailbox/google/callback").length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("is one of the settings tabs, and holds the console walkthrough", async () => {
+    apiGet.mockImplementation(gmailGet);
+
+    render(
+      <MemoryRouter initialEntries={["/settings"]}>
+        <SettingsPage />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(await screen.findByText("Gmail replies"));
+
+    expect(
+      await screen.findByText("Setting it up in the Google Cloud Console"),
+    ).toBeInTheDocument();
+    // The replies panel is on the same tab, so the routing diagnosis and the
+    // app-password fallback are still one click away.
+    expect(await screen.findByText(/Does Brevo read my Gmail inbox?/)).toBeInTheDocument();
   });
 });

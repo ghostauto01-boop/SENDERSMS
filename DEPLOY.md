@@ -852,7 +852,7 @@ Beyond the usual `DATABASE_URL` / `REDIS_URL` / `SECRET_KEY`, this release adds:
 | `SMSGATE_WEBHOOK_SECRET` | Inbound webhooks are rejected with `401` unless their HMAC-SHA256 signature matches. Found on the device under Settings → Webhooks → Signing Key. |
 | `SMSGATE_USERNAME` / `SMSGATE_PASSWORD` | Gateway credentials. These are now **env-only** — the previous hardcoded defaults were removed. |
 | `ENABLE_INLINE_POLLER` | Set to `true` only when running without a Celery worker. |
-| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Optional. Enables "Connect with Google" for the reply mailbox (Gmail API). Without them the same mailbox connects over IMAP with an app password, which needs no Google Cloud project. |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Optional. The same OAuth client can be saved from **Settings → Gmail replies** instead (values saved there win), which is the documented path — see `docs/GMAIL-OAUTH.md`. Enables Google sign-in for the replies inbox (Gmail API, any number of Gmail inboxes). Without one, a mailbox connects over IMAP with an app password, which needs no Google Cloud project. |
 | `GMAIL_POLL_INTERVAL` | Seconds between mailbox checks for replies (default `60`). |
 | `GMAIL_RESCUE_FROM_SPAM` | Default `true`: move a recognised reply that Gmail filed in Spam back to the Inbox, then import it. |
 | `GMAIL_SEND_REPLIES` | Default `true`: send one-to-one replies from the connected mailbox instead of Brevo. Campaigns always use Brevo. |
@@ -881,12 +881,24 @@ given. Tokens are created in the same screen; they are stored as a SHA-256 hash 
 
 ### Reading email replies
 
-Replies are read from a mailbox you connect in **Email Manager → Replies**: either the Gmail
-API (needs `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`, and
-`<PUBLIC_BASE_URL>/api/v1/mailbox/google/callback` registered as an authorized redirect URI)
-or IMAP with a Google **app password** (2-Step Verification must be on; the account password
-itself is refused by IMAP). Credentials are encrypted with `CREDENTIAL_ENCRYPTION_KEY` and are
-never returned by the API.
+Replies are read from the mailboxes you connect — the setup lives in **Settings → Gmail
+replies** (and the same controls appear in **Email Manager → Replies**). Google sign-in is the
+recommended path: create a **Web application** OAuth client at console.cloud.google.com, enable
+the Gmail API, register `<PUBLIC_BASE_URL>/api/v1/mailbox/google/callback` as an authorized
+redirect URI **byte for byte**, add every Gmail address you intend to connect as a *test user*
+on the consent screen, then paste the client ID and secret into the app (or set
+`GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`). The setup screen shows the exact callback URL for
+this deployment with a copy button, and `docs/GMAIL-OAUTH.md` is the whole walkthrough with the
+failure modes. Connecting a second, third or tenth inbox is the same button again: the consent
+URL asks Google for `prompt=consent select_account`, so the account chooser always appears and
+each inbox gets its own refresh token. The fallback is IMAP with a Google **app password**
+(2-Step Verification must be on; the account password itself is refused by IMAP), which cannot
+create Gmail filters. Credentials are encrypted with `CREDENTIAL_ENCRYPTION_KEY` and are never
+returned by the API.
+
+Replies land in **Email Inbox**, whose **Conversations** page (`/email-inbox?view=replied`)
+lists only the people who actually wrote back — the threads you are in a conversation with,
+as opposed to every campaign mail that was opened and ignored.
 
 Replies are pulled by a Celery beat task (`app.tasks.mailbox_tasks.sync_mailboxes`, every 60s)
 and, when `ENABLE_INLINE_POLLER=true`, by the same in-web-process poller that drives campaigns —

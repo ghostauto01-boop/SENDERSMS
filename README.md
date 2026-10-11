@@ -182,12 +182,17 @@ metadata):
 Campaigns leave through Brevo; replies come back through one of two doors, and
 Email Manager → **Replies** shows which are open:
 
-* **A connected mailbox** (the usual one). The app reads your Gmail over IMAP with
-  an app password, or over the Gmail API with OAuth: it pulls INBOX *and* Spam,
-  keeps only mail that answers something this app sent, threads it onto the right
-  conversation, and moves the ones Gmail filed as Spam back to the inbox. One-to-one
-  replies you write in the app then leave **from that same mailbox**, which is what
-  stops the next reply being treated as spoofed. Campaigns stay on Brevo.
+* **A connected mailbox** (the usual one). Sign in with Google under
+  **Settings → Gmail replies** and the app reads that inbox through the Gmail API:
+  it pulls INBOX *and* Spam, keeps only mail that answers something this app sent,
+  threads it onto the right conversation, and moves the ones Gmail filed as Spam
+  back to the inbox. One-to-one replies you write in the app then leave **from that
+  same mailbox**, which is what stops the next reply being treated as spoofed.
+  Campaigns stay on Brevo. Connect as many Gmail inboxes as you want — the consent
+  screen always shows Google's account chooser, so each one is another click. An
+  IMAP **app password** still works for anybody who would rather not create a
+  Google Cloud project; it is the fallback, not the recommendation. The whole
+  console walkthrough, callback URL included, is in `docs/GMAIL-OAUTH.md`.
 * **Brevo inbound parsing** — only for a domain whose MX points at Brevo, which
   needs a domain you own.
 
@@ -205,7 +210,7 @@ reply still reads as personal.
 
 | Variable | Why |
 | --- | --- |
-| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Optional. Enables "Connect with Google" (Gmail API) — filters, labels and sending through the API. Without them, connect with an IMAP app password. |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Optional — the same OAuth client can be saved from **Settings → Gmail replies**, which is the documented path (`docs/GMAIL-OAUTH.md`) and takes precedence. Enables Google sign-in for the replies inbox (Gmail API): several inboxes, filters, labels and sending through the API. Without one, connect with an IMAP app password. |
 | `GMAIL_POLL_INTERVAL` | Seconds between mailbox checks (default 60). Each mailbox can override it. |
 | `GMAIL_RESCUE_FROM_SPAM` | `true` (default) moves recognised replies out of Spam. |
 | `GMAIL_SEND_REPLIES` | `true` (default) sends one-to-one replies from the connected mailbox instead of Brevo. |

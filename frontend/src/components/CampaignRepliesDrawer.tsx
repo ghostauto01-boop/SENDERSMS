@@ -8,6 +8,9 @@ import {
 } from "lucide-react";
 import type { CampaignConversation } from "../types";
 import { openWhatsappForCall } from "../utils/call";
+import {
+  contactLineFor, hasCallablePhone, inboxLabelFor, inboxLink, isEmailChannel,
+} from "../utils/inboxRoute";
 
 /**
  * CAMPAIGN -> REPLIES -> ONE CHAT
@@ -18,9 +21,17 @@ import { openWhatsappForCall } from "../utils/call";
  *   2. read the reply inline, with its automatic sentiment
  *   3. click a person to land in that exact chat in the inbox
  *
- * Step 3 is a deep link (`/inbox?campaign_id=…&contact_id=…`), so the inbox
- * opens already filtered to this campaign with the right chat selected —
- * which is what "click individual to take me to my chats with them" means.
+ * Step 3 is a deep link into **the inbox that campaign actually used**
+ * (`/email-inbox?campaign_id=…&contact_id=…` for an email campaign,
+ * `/inbox?…` for a text one), so the inbox opens already filtered to this
+ * campaign with the right chat selected — which is what "click individual to
+ * take me to my chats with them" means. It used to say `/inbox` for both, so an
+ * email campaign's replies opened the SMS inbox, where that conversation does
+ * not exist.
+ *
+ * The channel is taken from the campaign, and re-checked against what the API
+ * reports for the campaign and its threads, so a drawer opened from a stale list
+ * still routes correctly.
  */
 
 const sentimentChip = (value?: string | null) => {
@@ -42,11 +53,15 @@ const when = (iso: string | null) => {
 export default function CampaignRepliesDrawer({
   campaignId,
   campaignName,
+  channel,
   initialTab = "replies",
   onClose,
 }: {
   campaignId: number;
   campaignName: string;
+  /** "sms" | "email" — which inbox a click should open. Defaults to the
+   *  channel the API reports for this campaign, then to SMS. */
+  channel?: string | null;
   initialTab?: "replies" | "leads";
   onClose: () => void;
 }) {
@@ -84,21 +99,34 @@ export default function CampaignRepliesDrawer({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  // The prop wins; otherwise trust what the API says about this campaign, then
+  // about its threads. All three agree in practice — the fallbacks exist so a
+  // caller that does not know the channel still routes to the right inbox.
+  const effectiveChannel =
+    channel ?? performance?.channel ?? items.find((i) => i.channel)?.channel ?? "sms";
+  const email = isEmailChannel(effectiveChannel);
+
   const filtered = query.trim()
     ? items.filter((i) => {
         const q = query.toLowerCase();
         return (
           i.contact_name.toLowerCase().includes(q) ||
           i.contact_phone.toLowerCase().includes(q) ||
+          (i.contact_email || "").toLowerCase().includes(q) ||
           (i.last_reply?.body || "").toLowerCase().includes(q) ||
           (i.last_message_preview || "").toLowerCase().includes(q)
         );
       })
     : items;
 
-  /** Open this person's chat, with the inbox already scoped to the campaign. */
+  /** Open this person's chat, in the inbox their channel lives in. */
   const openChat = (row: CampaignConversation) => {
-    navigate(`/inbox?campaign_id=${campaignId}&contact_id=${row.contact_id}`);
+    navigate(
+      inboxLink(row.channel ?? effectiveChannel, {
+        campaign_id: campaignId,
+        contact_id: row.contact_id,
+      })
+    );
   };
 
   return (
@@ -111,7 +139,13 @@ export default function CampaignRepliesDrawer({
         <div className="px-4 sm:px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-xs text-primary-600 font-medium">CAMPAIGN RESULTS</p>
+              <p className="text-xs text-primary-600 font-medium flex items-center gap-1.5">
+                CAMPAIGN RESULTS
+                {/* Says which inbox a click will open, before you click it. */}
+                <span className={email ? "badge-blue" : "badge-gray"}>
+                  {email ? "email campaign" : "SMS campaign"}
+                </span>
+              </p>
               <h2 className="text-lg font-semibold truncate">{campaignName}</h2>
             </div>
             <button onClick={onClose} className="btn-ghost btn-sm flex-shrink-0" aria-label="Close">
@@ -158,7 +192,7 @@ export default function CampaignRepliesDrawer({
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               className="input !pl-9 py-1.5 text-sm"
-              placeholder="Search name, number or reply…"
+              placeholder={email ? "Search name, address or reply…" : "Search name, number or reply…"}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
@@ -185,7 +219,9 @@ export default function CampaignRepliesDrawer({
               </p>
               <p className="text-sm text-gray-500 mt-1">
                 {tab === "replies" && !query
-                  ? "Replies appear here as soon as contacts write back."
+                  ? email
+                    ? "Replies appear here as soon as contacts write back. Connect the Gmail inbox they answer to under Settings → Gmail replies and they land here automatically."
+                    : "Replies appear here as soon as contacts write back."
                   : "Leads appear once the campaign starts sending."}
               </p>
             </div>
@@ -220,7 +256,12 @@ export default function CampaignRepliesDrawer({
                             </span>
                           )}
                         </div>
-                        <p className="text-xs text-gray-400 mt-0.5">{row.contact_phone}</p>
+                        <p className="text-xs text-gray-400 mt-0.5 break-all">
+                          {contactLineFor(row.channel ?? effectiveChannel, {
+                            email: row.contact_email,
+                            phone: row.contact_phone,
+                          }) || (email ? "no address on file" : "no number on file")}
+                        </p>
                         {row.last_reply ? (
                           <p className="text-sm text-gray-700 dark:text-gray-300 mt-1.5 line-clamp-2 bg-gray-50 dark:bg-gray-700/60 rounded-lg px-2.5 py-1.5">
                             “{row.last_reply.body}”
@@ -236,13 +277,18 @@ export default function CampaignRepliesDrawer({
                           {when(row.last_reply?.created_at || row.last_message_at)}
                         </span>
                         <div className="flex items-center gap-1">
-                          <button
-                            onClick={(e) => { e.stopPropagation(); openWhatsappForCall(row.contact_phone, row.contact_name); }}
-                            className="w-8 h-8 rounded-full bg-primary-600 text-white flex items-center justify-center hover:bg-primary-700 transition-colors"
-                            title={`Call ${row.contact_name} on WhatsApp`}
-                          >
-                            <PhoneCall size={14} />
-                          </button>
+                          {/* Only where there is a number to call: an email lead
+                              has no phone, and a call button that opens WhatsApp
+                              with nothing in it is worse than no button. */}
+                          {hasCallablePhone(row.contact_phone) && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); openWhatsappForCall(row.contact_phone, row.contact_name); }}
+                              className="w-8 h-8 rounded-full bg-primary-600 text-white flex items-center justify-center hover:bg-primary-700 transition-colors"
+                              title={`Call ${row.contact_name} on WhatsApp`}
+                            >
+                              <PhoneCall size={14} />
+                            </button>
+                          )}
                           <ArrowRight
                             size={15}
                             className="text-gray-300 group-hover:text-primary-600 transition-colors"
@@ -260,10 +306,21 @@ export default function CampaignRepliesDrawer({
         {/* Footer */}
         <div className="px-4 sm:px-5 py-3 border-t border-gray-200 dark:border-gray-700 flex gap-2 flex-shrink-0">
           <button
-            onClick={() => navigate(`/inbox?campaign_id=${campaignId}${tab === "replies" ? "&replied=1" : ""}`)}
+            onClick={() =>
+              navigate(
+                inboxLink(effectiveChannel, {
+                  campaign_id: campaignId,
+                  // The email inbox spells the same filter `view=replied`.
+                  ...(email
+                    ? { view: tab === "replies" ? "replied" : undefined }
+                    : { replied: tab === "replies" ? 1 : undefined }),
+                })
+              )
+            }
             className="btn-primary btn-sm flex-1 justify-center"
+            title={`Open this campaign in the ${inboxLabelFor(effectiveChannel)}`}
           >
-            <InboxIcon size={14} className="mr-1" /> Open in inbox
+            <InboxIcon size={14} className="mr-1" /> Open in {inboxLabelFor(effectiveChannel)}
           </button>
           <button onClick={onClose} className="btn-secondary btn-sm">Close</button>
         </div>

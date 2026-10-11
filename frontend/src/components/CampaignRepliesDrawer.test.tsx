@@ -137,6 +137,85 @@ describe("CampaignRepliesDrawer — campaign to reply to chat", () => {
     expect(navigate).toHaveBeenCalledWith("/inbox?campaign_id=7&contact_id=501");
   });
 
+  /**
+   * The bug this drawer had: it said `/inbox` for every campaign, so an EMAIL
+   * campaign's replies opened the SMS inbox, which has no thread for that
+   * person. The channel decides the destination — from the prop, or from what
+   * the API reports about the campaign.
+   */
+  it("clicking a lead on an EMAIL campaign opens the email inbox, not the SMS one", async () => {
+    renderDrawer({ channel: "email" });
+    await waitFor(() => expect(screen.getByText("Chidi Okafor")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText("Chidi Okafor"));
+
+    expect(navigate).toHaveBeenCalledWith("/email-inbox?campaign_id=7&contact_id=501");
+    expect(navigate).not.toHaveBeenCalledWith("/inbox?campaign_id=7&contact_id=501");
+  });
+
+  it("takes the channel from the campaign when the caller does not know it", async () => {
+    apiGet.mockImplementation((url: string, cfg: any) => {
+      if (url === "/campaigns/7/performance")
+        return Promise.resolve({ data: { ...PERFORMANCE, channel: "email" } });
+      if (url === "/campaigns/7/conversations") {
+        const items = cfg?.params?.replied_only ? REPLIED : [...REPLIED, NO_REPLY];
+        return Promise.resolve({ data: { total: items.length, items, page: 1, per_page: 200 } });
+      }
+      return Promise.reject(new Error("unmocked GET " + url));
+    });
+    renderDrawer();
+    await waitFor(() => expect(screen.getByText("Chidi Okafor")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText("Chidi Okafor"));
+
+    expect(navigate).toHaveBeenCalledWith("/email-inbox?campaign_id=7&contact_id=501");
+  });
+
+  it("says which inbox the footer button opens, and opens that one", async () => {
+    renderDrawer({ channel: "email" });
+    await waitFor(() => expect(screen.getByText("Chidi Okafor")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText("Open in Email Inbox"));
+
+    // `view=replied` is the email inbox's spelling of "only the ones who replied".
+    expect(navigate).toHaveBeenCalledWith("/email-inbox?campaign_id=7&view=replied");
+  });
+
+  it("an email lead shows their address, and no WhatsApp call button", async () => {
+    apiGet.mockImplementation((url: string) => {
+      if (url === "/campaigns/7/performance")
+        return Promise.resolve({ data: { ...PERFORMANCE, channel: "email" } });
+      return Promise.resolve({
+        data: {
+          total: 1,
+          page: 1,
+          per_page: 200,
+          items: [{
+            ...REPLIED[0],
+            contact_phone: "",
+            contact_email: "chidi@okafor.example",
+            channel: "email",
+          }],
+        },
+      });
+    });
+    renderDrawer({ channel: "email" });
+
+    await waitFor(() => expect(screen.getByText("chidi@okafor.example")).toBeInTheDocument());
+    // No number, so no call button that would open WhatsApp with nothing in it.
+    expect(screen.queryByTitle("Call Chidi Okafor on WhatsApp")).not.toBeInTheDocument();
+    // The campaign is labelled, so the destination is not a surprise.
+    expect(screen.getByText("email campaign")).toBeInTheDocument();
+  });
+
+  it("keeps the call button on an SMS lead that has a number", async () => {
+    renderDrawer({ channel: "sms" });
+    await waitFor(() => expect(screen.getByText("Chidi Okafor")).toBeInTheDocument());
+
+    expect(screen.getByTitle("Call Chidi Okafor on WhatsApp")).toBeInTheDocument();
+    expect(screen.getByText("SMS campaign")).toBeInTheDocument();
+  });
+
   it("shows the campaign's headline performance above the list", async () => {
     renderDrawer();
     await waitFor(() => expect(screen.getByText("Chidi Okafor")).toBeInTheDocument());

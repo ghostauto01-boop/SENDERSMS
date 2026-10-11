@@ -3,6 +3,7 @@ import json,logging,os
 from datetime import datetime, timezone
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
@@ -311,3 +312,108 @@ async def del_callgate_wh(webhook_id:str,db:AsyncSession=Depends(get_db),cu:User
     if not r.get("success"):
         raise HTTPException(400,r.get("error") or "Delete failed")
     return {"success":True,"deleted":webhook_id}
+
+
+# ===========================================================================
+# Gmail replies — the Google OAuth client, saved from the app
+# ===========================================================================
+
+
+class GoogleOAuthUpdate(BaseModel):
+    """What Settings → Gmail replies saves.
+
+    ``None`` leaves a value alone (the form only sends the secret when a new one
+    was typed, so a re-save never wipes it); an empty string clears it.
+    """
+
+    client_id: Optional[str] = None
+    client_secret: Optional[str] = None
+
+
+@router.get("/google-oauth")
+async def get_google_oauth(db: AsyncSession = Depends(get_db), cu: User = Depends(get_current_user)):
+    """The Gmail OAuth client, plus everything the Google Console setup needs.
+
+    Returned in one call so the setup panel can show the exact redirect URI to
+    paste into the console *next to* the field the client ID goes into — the
+    two are only correct together, and a mismatch is the single most common
+    reason "Connect with Google" fails with ``redirect_uri_mismatch``.
+
+    The client ID is returned in full because Google treats it as public (it
+    appears in every consent URL); the client secret is never returned, only
+    whether one is stored.
+    """
+    from app.api.v1.mailbox import CALLBACK_PATH
+    from app.providers.gmail import GMAIL_SCOPE
+    from app.services import mailbox_service
+    from app.services.system_settings import get_google_oauth_settings
+    from app.utils.urls import public_base_url, public_base_url_source
+
+    cfg = await get_google_oauth_settings(db)
+    base = public_base_url()
+    mailboxes = await mailbox_service.list_mailboxes(db, include_inactive=True)
+    connected = [m for m in mailboxes if m.provider == "gmail_api"]
+
+    return {
+        "client_id": cfg["client_id"],
+        "client_id_masked": cfg["client_id_masked"],
+        "has_secret": cfg["has_secret"],
+        "configured": cfg["configured"],
+        # "db" (saved in this app), "env" (GOOGLE_CLIENT_ID/SECRET) or "none".
+        "source": cfg["source"],
+        "redirect_uri": f"{base}{CALLBACK_PATH}" if base else None,
+        "callback_path": CALLBACK_PATH,
+        # The Authorized JavaScript origin the console also asks for.
+        "javascript_origin": base,
+        "scope": GMAIL_SCOPE,
+        "public_base_url": base,
+        "public_base_source": public_base_url_source(),
+        "gmail_mailboxes": [mailbox_service.serialize_mailbox(m) for m in connected],
+        "mailbox_count": len(connected),
+    }
+
+
+@router.put("/google-oauth")
+async def put_google_oauth(body: GoogleOAuthUpdate, db: AsyncSession = Depends(get_db),
+                           cu: User = Depends(get_current_user)):
+    """Save the OAuth client created in Google Cloud Console.
+
+    Saved in the database (encrypted) rather than only in the environment, so
+    the whole Gmail setup — including connecting several inboxes — can be
+    finished from this screen. ``GOOGLE_CLIENT_ID`` / ``GOOGLE_CLIENT_SECRET``
+    still work and are used when nothing is saved here.
+    """
+    from app.services.system_settings import get_google_oauth_settings, set_google_oauth_settings
+    from app.utils.urls import public_base_url
+
+    client_id = body.client_id.strip() if body.client_id is not None else None
+    secret = body.client_secret.strip() if body.client_secret is not None else None
+
+    warnings: list[str] = []
+    if client_id:
+        if " " in client_id:
+            raise HTTPException(422, "The client ID cannot contain spaces — copy it again from "
+                                     "Google Cloud Console.")
+        if not client_id.endswith(".apps.googleusercontent.com"):
+            # Not fatal: some client kinds differ, and a typo here should not
+            # block a working setup. It is nearly always a truncated paste.
+            warnings.append("That does not end in .apps.googleusercontent.com — Google client IDs "
+                            "normally do. Check nothing was cut off when you pasted it.")
+    if secret and " " in secret:
+        raise HTTPException(422, "The client secret cannot contain spaces.")
+
+    current = await get_google_oauth_settings(db)
+    if client_id and not secret and not current["has_secret"]:
+        raise HTTPException(422, "Save the client secret too — Google needs both to exchange the "
+                                 "authorization code. It is on the same console page as the "
+                                 "client ID.")
+
+    saved = await set_google_oauth_settings(db, client_id=client_id, client_secret=secret)
+    await db.commit()
+
+    if saved["configured"] and not public_base_url():
+        warnings.append("PUBLIC_BASE_URL is not set, so Google has no address to send you back to. "
+                        "Set it to this deployment's public HTTPS address and restart.")
+
+    return {"success": True, "warnings": warnings, **{k: v for k, v in saved.items()
+                                                      if k != "client_id"}}

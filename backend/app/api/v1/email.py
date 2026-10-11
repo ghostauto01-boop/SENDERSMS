@@ -1113,15 +1113,47 @@ async def list_conversations(
     status_filter: Optional[str] = Query(default=None, alias="status"),
     search: Optional[str] = None,
     unread_only: bool = Query(default=False, description="Only threads with unread messages"),
+    replied_only: bool = Query(
+        default=False,
+        description="Only threads the contact actually replied to — a real conversation",
+    ),
+    campaign_id: Optional[int] = Query(
+        default=None, description="Only threads attributed to this campaign"
+    ),
+    contact_id: Optional[int] = Query(
+        default=None, description="Only this contact's thread (an inbox deep link)"
+    ),
     db: AsyncSession = Depends(get_db),
     cu: User = Depends(get_current_user),
 ):
-    """Email threads, newest activity first."""
+    """Email threads, newest activity first.
+
+    ``replied_only`` is what the Email Inbox's **Conversations** page is built
+    on: a thread only counts as a conversation once the person on the other end
+    has written back, so campaign mail that nobody answered stays out of it.
+    """
     query = select(Conversation).where(func.coalesce(Conversation.channel, "sms") == "email")
     if status_filter and status_filter != "all":
         query = query.where(Conversation.status == status_filter)
     if unread_only:
         query = query.where(func.coalesce(Conversation.unread_count, 0) > 0)
+    if replied_only:
+        # An inbound message is the only honest definition of "they replied":
+        # opens and clicks are engagement, not a conversation.
+        replied = (
+            select(Message.conversation_id)
+            .where(Message.direction == "incoming")
+            .distinct()
+            .scalar_subquery()
+        )
+        query = query.where(Conversation.id.in_(replied))
+    if campaign_id:
+        query = query.where(
+            or_(Conversation.campaign_id == campaign_id,
+                Conversation.last_campaign_id == campaign_id)
+        )
+    if contact_id:
+        query = query.where(Conversation.contact_id == contact_id)
     if search:
         like = f"%{search.strip()}%"
         contact_ids = (
@@ -1140,6 +1172,29 @@ async def list_conversations(
 
     total = (
         await db.execute(select(func.count()).select_from(query.subquery()))
+    ).scalar() or 0
+    # Counted alongside the page so the Inbox / Conversations switch can label
+    # both tabs with a number without a second round trip.
+    replied_query = select(Conversation).where(
+        func.coalesce(Conversation.channel, "sms") == "email",
+        Conversation.id.in_(
+            select(Message.conversation_id)
+            .where(Message.direction == "incoming")
+            .distinct()
+            .scalar_subquery()
+        ),
+    )
+    replied_total = (
+        await db.execute(select(func.count()).select_from(replied_query.subquery()))
+    ).scalar() or 0
+    thread_total = (
+        await db.execute(
+            select(func.count()).select_from(
+                select(Conversation)
+                .where(func.coalesce(Conversation.channel, "sms") == "email")
+                .subquery()
+            )
+        )
     ).scalar() or 0
     conversations = (
         await db.execute(
@@ -1162,6 +1217,11 @@ async def list_conversations(
 
     return {
         "total": total,
+        # Both tab labels in the same response, so the Inbox / Conversations
+        # switch can show a real number on each side without another call.
+        "replied_total": replied_total,
+        "thread_total": thread_total,
+        "replied_only": replied_only,
         "page": page,
         "per_page": per_page,
         "items": [

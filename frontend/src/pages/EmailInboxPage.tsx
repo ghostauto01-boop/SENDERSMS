@@ -55,6 +55,16 @@ import type { Meeting } from "../types";
  *
  * Status, search and the open thread all live in the URL, so a notification
  * can deep-link straight to a conversation and a refresh keeps your place.
+ *
+ * TWO PAGES IN ONE
+ * ----------------
+ * `?view=replied` is the **Conversations** page: only the people who actually
+ * wrote back, i.e. the threads you are in a conversation with. Everything the
+ * campaign sent and nobody answered stays on the default page, so "who am I
+ * talking to?" is one click and never a scroll through fifty one-way sends.
+ * The same URL takes `campaign_id` and `contact_id`, which is where a campaign's
+ * reply list sends you — the list arrives pre-filtered and that person's thread
+ * opens itself.
  */
 
 const STATUS_FILTERS = [
@@ -358,10 +368,36 @@ export default function EmailInboxPage() {
   const [showBooking, setShowBooking] = useState(false);
   const [editingMeetingId, setEditingMeetingId] = useState<number | null>(null);
   const [contactMeetings, setContactMeetings] = useState<Meeting[]>([]);
+  /** Threads the contact replied to — the number on the Conversations tab. */
+  const [repliedTotal, setRepliedTotal] = useState<number | null>(null);
+  /** Every thread, unfiltered — the number on the All mail tab. */
+  const [threadTotal, setThreadTotal] = useState<number | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  /** Which deep link already opened its thread, so it only happens once. */
+  const autoOpened = useRef<string | null>(null);
 
   const deepLinkedId = params.get("conversation_id");
+  /** "all" = every thread, "replied" = the Conversations page. */
+  const view: "all" | "replied" = params.get("view") === "replied" ? "replied" : "all";
+  const campaignFilter = params.get("campaign_id");
+  const contactFilter = params.get("contact_id");
+
+  /** Switch page without losing the rest of the URL (search lives in state). */
+  const setView = (next: "all" | "replied") => {
+    const updated = new URLSearchParams(params);
+    if (next === "replied") updated.set("view", "replied");
+    else updated.delete("view");
+    setParams(updated);
+  };
+
+  /** Drop the campaign/person a deep link arrived with. */
+  const clearScope = () => {
+    const updated = new URLSearchParams(params);
+    updated.delete("campaign_id");
+    updated.delete("contact_id");
+    setParams(updated);
+  };
 
   const load = useCallback(
     async (opts: { quiet?: boolean } = {}) => {
@@ -370,16 +406,21 @@ export default function EmailInboxPage() {
         const data = await emailApi.conversations({
           status: status === "all" ? undefined : status,
           search: search || undefined,
+          replied_only: view === "replied" || undefined,
+          campaign_id: campaignFilter ? Number(campaignFilter) : undefined,
+          contact_id: contactFilter ? Number(contactFilter) : undefined,
           per_page: 50,
         });
         setConversations(data.items);
+        if (typeof data.replied_total === "number") setRepliedTotal(data.replied_total);
+        if (typeof data.thread_total === "number") setThreadTotal(data.thread_total);
       } catch {
         if (!opts.quiet) toast.error("Could not load the email inbox");
       } finally {
         setLoading(false);
       }
     },
-    [status, search]
+    [status, search, view, campaignFilter, contactFilter]
   );
 
   useEffect(() => {
@@ -427,6 +468,21 @@ export default function EmailInboxPage() {
     open(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deepLinkedId]);
+
+  // Deep link by *person*: a campaign's reply list knows the contact, not the
+  // thread id, so open their conversation as soon as the filtered list lands.
+  useEffect(() => {
+    if (openId || loading || deepLinkedId) return;
+    if (!contactFilter && !campaignFilter) return;
+    const key = `${contactFilter || ""}|${campaignFilter || ""}`;
+    if (autoOpened.current === key) return;
+    const match = contactFilter
+      ? conversations.find((c) => String(c.contact_id) === contactFilter)
+      : conversations[0];
+    if (!match) return;
+    autoOpened.current = key;
+    void open(match.id);
+  }, [conversations, contactFilter, campaignFilter, loading, openId, deepLinkedId, open]);
 
   const closeThread = () => {
     setOpenId(null);
@@ -519,14 +575,16 @@ export default function EmailInboxPage() {
     <div className="max-w-7xl mx-auto">
       {/* ---------- Header: title, count, mailbox links ---------- */}
       <div className={`flex flex-wrap items-start justify-between gap-3 mb-4 ${openId ? "hidden lg:flex" : ""}`}>
-        <div>
+        <div className="min-w-0">
           <p className="text-xs font-semibold tracking-wide text-primary-600 dark:text-primary-400 flex items-center gap-1.5">
             <Mail size={14} /> EMAIL CHANNEL
           </p>
-          <h1 className="page-title mt-1">Inbox</h1>
+          <h1 className="page-title mt-1">{view === "replied" ? "Conversations" : "Inbox"}</h1>
           <p className="page-subtitle">
             {loading
               ? "Loading threads…"
+              : view === "replied"
+              ? `${conversations.length} of ${repliedTotal ?? conversations.length} people who wrote back — everyone here is a live conversation`
               : unreadTotal > 0
               ? `${unreadTotal} unread · ${conversations.length} thread${conversations.length === 1 ? "" : "s"}`
               : `You are all caught up · ${conversations.length} thread${conversations.length === 1 ? "" : "s"}`}
@@ -540,6 +598,82 @@ export default function EmailInboxPage() {
             SMS inbox
           </Link>
         </div>
+      </div>
+
+      {/* ---------- The two pages of the email inbox ----------
+          All mail is everything that happened; Conversations is only the people
+          who replied, which is the list you actually work from. Both are the
+          same screen with one filter, so a thread you open keeps its place. */}
+      <div className={`mb-4 ${openId ? "hidden lg:block" : ""}`}>
+        <div className="inline-flex gap-1 p-1 rounded-xl bg-gray-100 dark:bg-gray-700/70 w-full sm:w-auto">
+          {([
+            {
+              key: "all" as const,
+              label: "All mail",
+              count: threadTotal,
+              icon: Inbox,
+              title: "Every email thread, including the ones nobody answered",
+            },
+            {
+              key: "replied" as const,
+              label: "Conversations",
+              count: repliedTotal,
+              icon: MessageCircle,
+              title: "Only people who replied — the conversations you are in",
+            },
+          ]).map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setView(tab.key)}
+              title={tab.title}
+              aria-pressed={view === tab.key}
+              className={`flex-1 sm:flex-none px-3.5 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5 ${
+                view === tab.key
+                  ? "bg-white dark:bg-gray-800 shadow-sm text-primary-600"
+                  : "text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+              }`}
+            >
+              <tab.icon size={14} />
+              {tab.label}
+              {tab.count !== null && tab.count !== undefined && (
+                <span
+                  className={`text-[11px] px-1.5 rounded-full ${
+                    view === tab.key
+                      ? "bg-primary-100 text-primary-700 dark:bg-primary-950/70 dark:text-primary-300"
+                      : "bg-gray-200 text-gray-600 dark:bg-gray-600 dark:text-gray-200"
+                  }`}
+                >
+                  {tab.count}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+        {view === "replied" && (
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+            Only people who wrote back are on this page. Campaign mail nobody answered is still on
+            the All mail tab —{" "}
+            <button className="text-primary-600 hover:underline" onClick={() => setView("all")}>
+              see every thread
+            </button>
+            .
+          </p>
+        )}
+        {(campaignFilter || contactFilter) && (
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs rounded-xl border border-primary-200 dark:border-primary-900 bg-primary-50 dark:bg-primary-950/30 px-3 py-2">
+            <span className="text-primary-700 dark:text-primary-300 font-medium">
+              {contactFilter
+                ? "Showing one person's thread"
+                : `Showing the threads from campaign #${campaignFilter}`}
+            </span>
+            <span className="text-gray-500 dark:text-gray-400">
+              {conversations.length} shown{view === "replied" ? " · only the ones who replied" : ""}
+            </span>
+            <button onClick={clearScope} className="chip ml-auto">
+              <X size={12} /> Show every thread
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="grid lg:grid-cols-[22rem_1fr] gap-4">
@@ -641,12 +775,18 @@ export default function EmailInboxPage() {
                   <Inbox size={22} />
                 </span>
                 <p className="font-medium text-gray-800 dark:text-gray-200">
-                  {search ? "No thread matches that search" : "No email threads yet"}
+                  {search
+                    ? "No thread matches that search"
+                    : view === "replied"
+                    ? "No conversations yet"
+                    : "No email threads yet"}
                 </p>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                   {search
                     ? "Try a different name, subject or word."
-                    : "Replies to your campaigns land here. Send one from the Email Manager, or connect a Gmail mailbox under Email Manager → Replies."}
+                    : view === "replied"
+                    ? "This page only holds people who wrote back. As soon as a reply arrives it appears here — and if your prospects reply to a Gmail address, connect that inbox under Settings → Gmail replies so nothing is missed."
+                    : "Replies to your campaigns land here. Send one from the Email Manager, or connect a Gmail mailbox under Settings → Gmail replies."}
                 </p>
               </div>
             ) : (

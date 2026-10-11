@@ -253,6 +253,12 @@ export interface CampaignConversation {
   contact_id: number;
   contact_name: string;
   contact_phone: string;
+  //: The contact's address on an email campaign — what the row shows instead of
+  //: a number they may not have.
+  contact_email?: string | null;
+  //: "sms" or "email" — which inbox this thread lives in, so clicking the row
+  //: opens the right one.
+  channel?: string | null;
   lead_status: string;
   status: string;
   unread_count: number;
