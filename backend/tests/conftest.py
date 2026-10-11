@@ -122,7 +122,7 @@ def _open_sending_rules(request, monkeypatch):
 # The email-verification gate (P0-5)
 # --------------------------------------------------------------------------
 #
-# In production an address nobody has verified is not sent to by any outreach path.
+# Validation is optional in production; this legacy fixture preserves older test setup.
 # Most tests are about something else (templates, pacing, replies...) and build their
 # contacts without a verification history, so they run with the gate open; the tests
 # that ARE about it opt back in with ``@pytest.mark.real_verification_gate``.

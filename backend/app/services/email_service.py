@@ -489,7 +489,7 @@ SKIP_REASON_TEXT = {
     "email_bounced": "the address bounced before and is blocked",
     "inferred_unverified": "a guessed address that was never verified",
     "suppressed": "the address is on the suppression list",
-    "unverified": "the address has never been verified (an unknown address is not sent to as part of an audience)",
+    "unverified": "historical verification block (validation is now optional)",
     "contact_not_emailable": "the contact cannot be emailed",
 }
 
@@ -707,35 +707,6 @@ def _static_problem(contact: Contact, recipient: str | None) -> str | None:
         return "email_opted_out"
     if contact.is_email_undeliverable or contact.email_status == "bounced":
         return "email_bounced"
-    # A pattern-guessed address is unverified by construction. It is stored on
-    # the contact (so it is visible and reviewable) but held back from every
-    # send path unless the operator opts in — see EMAIL_SEND_INFERRED. The gate
-    # is skipped when the caller passes some other address (a reply alias, a
-    # thread address): if the person wrote to us from it, it is not a guess.
-    primary = normalize_email(contact.email)
-    if (
-        recipient == primary
-        and (contact.email_source or "") == "inferred"
-        and not settings.EMAIL_SEND_INFERRED
-    ):
-        return "inferred_unverified"
-    return None
-
-
-def _verification_problem(contact: Contact, recipient: str | None) -> str | None:
-    """``unverified`` when outreach must not go to this address because nothing proves it.
-
-    The last check on purpose: "unverified" is what is left once nothing else rules the
-    contact out, so it counts exactly the contacts that verifying could unlock. Only the
-    contact's own primary address is gated -- a reply alias is an address the person
-    wrote to us from.
-    """
-    if not settings.EMAIL_REQUIRE_VERIFIED:
-        return None
-    if recipient != normalize_email(contact.email):
-        return None
-    if verification_state(contact) == STATE_UNKNOWN:
-        return "unverified"
     return None
 
 
@@ -748,9 +719,8 @@ async def contact_email_problem(
 ) -> str | None:
     """Every reason this contact/recipient must not be emailed, or ``None``.
 
-    ``outreach`` is True for bulk and campaign mail (classic campaigns, the Ads Manager,
-    follow-ups, ``bulk`` sends): those are additionally refused an address nobody has
-    verified (``unverified``). A one-to-one message to someone is not outreach.
+    Validation is optional for every send path. ``outreach`` is retained for caller
+    compatibility; only delivery restrictions and explicit suppression block sending.
     """
     recipient = normalize_email(address) if address is not None else normalize_email(contact.email)
     problem = _static_problem(contact, recipient)
@@ -758,8 +728,6 @@ async def contact_email_problem(
         return problem
     if await get_suppression(db, recipient):
         return "suppressed"
-    if outreach:
-        return _verification_problem(contact, recipient)
     return None
 
 
@@ -782,7 +750,7 @@ async def screen_contacts_for_email(
     """Email eligibility filter used by audience screening, validation and previews.
 
     It applies exactly the rules :func:`contact_email_problem` applies at send time (they
-    share :func:`_static_problem` and :func:`_verification_problem`), so a validation
+    share :func:`_static_problem`), so a validation
     report promises numbers the send path will keep. It also removes duplicate addresses,
     which the per-contact send check cannot see.
     """
@@ -806,11 +774,6 @@ async def screen_contacts_for_email(
         if address in seen:
             bump("duplicate")
             continue
-        if outreach:
-            problem = _verification_problem(contact, address)
-            if problem:
-                bump(problem)
-                continue
         seen.add(address)
         eligible.append(contact)
     return eligible, counts

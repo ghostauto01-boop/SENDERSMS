@@ -77,7 +77,7 @@ async def test_it_is_idempotent_and_never_deletes(api_client, api_db):
 
 
 @pytest.mark.asyncio
-async def test_the_tagged_contacts_are_filterable_and_still_not_sendable(api_client, api_db):
+async def test_legacy_tags_are_filterable_but_do_not_block_sending(api_client, api_db):
     from app.config import settings
     from app.services import email_service
 
@@ -87,9 +87,9 @@ async def test_the_tagged_contacts_are_filterable_and_still_not_sendable(api_cli
     listing = (await api_client.get("/api/v1/contacts/", params={"tag": "pattern_generated", "per_page": 50})).json()
 
     assert {c["email"] for c in listing["items"]} == {"info@guessco.io", "sales@guessco.io", "hello@guessco.io"}
-    # tagging did not make anything sendable: the gate that holds guessed addresses back is unchanged
-    assert settings.EMAIL_SEND_INFERRED is False
-    assert await email_service.contact_email_problem(api_db, rows["guess_verified"], outreach=True) == "inferred_unverified"
+    # Legacy labels are informational, not suppression.
+    assert settings.EMAIL_SEND_INFERRED is True
+    assert await email_service.contact_email_problem(api_db, rows["guess_verified"], outreach=True) is None
 
 
 @pytest.mark.asyncio

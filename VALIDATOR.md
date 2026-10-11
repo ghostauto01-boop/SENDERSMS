@@ -1,5 +1,18 @@
 # Validator
 
+## Validation is optional
+
+Emails, campaigns, Ads Manager, bulk sends, and follow-ups do not require email
+verification. Never-checked, Unknown, Risky, and inferred addresses remain eligible.
+Legacy `EMAIL_REQUIRE_VERIFIED` and `EMAIL_SEND_INFERRED` values no longer gate sending.
+Validation is informational unless you explicitly choose to save results (which can
+quarantine confirmed-bad data). Existing opt-outs, complaints, hard bounces, malformed
+addresses, and suppressions remain blocked.
+
+Use **Manage email suppressions** on this page to add an address to the do-not-contact
+list or remove a suppression after review. Removing suppression is not consent and
+does not override other sending restrictions. No validation is needed to manage it.
+
 ## Where to go
 
 Open **Validator** in the sidebar, or **More → Validator** on a phone.

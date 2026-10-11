@@ -104,7 +104,7 @@ async def test_inactive_template_still_404s_on_postgres(pg_client, pg_db):
 
 @pytest.mark.asyncio
 async def test_reply_with_template_on_postgres(pg_client, pg_db, monkeypatch):
-    async def _fake_send(self, contact_id, body, campaign_id=None):
+    async def _fake_send(self, contact_id, body, campaign_id=None, conversation_id=None):
         from types import SimpleNamespace
         _fake_send.bodies.append(body)
         return SimpleNamespace(id=1, status="sending", provider_message_id="test-1")
@@ -129,7 +129,7 @@ async def test_meeting_reminder_sweep_on_postgres(pg_db, monkeypatch):
 
     sent: list[str] = []
 
-    async def _fake_send(self, contact_id, body, campaign_id=None):
+    async def _fake_send(self, contact_id, body, campaign_id=None, conversation_id=None):
         from types import SimpleNamespace
         sent.append(body)
         return SimpleNamespace(id=1, status="sending")

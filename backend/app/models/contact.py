@@ -84,9 +84,8 @@ class Contact(Base):
     #                   the mailbox was never proven to exist.
     # And ``email_verified`` is True only after a real verification call
     # (ZeroBounce / NeverBounce / Hunter) said the mailbox exists. Guesses are
-    # stored — with email_verified False — so they can be reviewed, while every
-    # send path can filter them out. Storing a guess as if it were as good as a
-    # typed-in address is what silently wrecks sender reputation.
+    # stored with email_verified False for optional review in Validator.
+    # Verification metadata does not control sending eligibility.
     email_source: Mapped[str | None] = mapped_column(String(30), nullable=True)
     email_verified: Mapped[bool] = mapped_column(
         Boolean, default=False, nullable=False, index=True

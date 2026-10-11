@@ -2484,19 +2484,7 @@ async def validate_campaign(db: AsyncSession, campaign: AdsCampaign) -> dict:
         "daily_limit": campaign.daily_limit,
         "projection": projection,
     }
-    # An email audience containing contacts nobody has verified FAILS validation, with the
-    # count (P0-5). Launch still assigns only the eligible contacts, so an unverified
-    # address is never mailed -- but the operator is told, instead of finding out later
-    # that the audience was smaller than they thought.
-    errors: list[str] = []
-    unverified = (sim.get("skipped") or {}).get("unverified", 0) if email_campaign else 0
-    if unverified:
-        errors.append(
-            f"{unverified} contact{'s have' if unverified != 1 else ' has'} an unknown email "
-            "verification status and will not be sent to. Verify them "
-            "(POST /api/v1/validator/jobs) or remove them from the audience, then validate again."
-        )
-    return {"ok": not errors, "errors": errors, "warnings": warnings, "summary": summary}
+    return {"ok": True, "errors": [], "warnings": warnings, "summary": summary}
 
 
 # ==========================================================================

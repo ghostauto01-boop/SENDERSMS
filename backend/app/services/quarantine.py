@@ -1,8 +1,7 @@
 """Quarantine the pattern-generated addresses: tag them, never delete them.
 
-An address the enrichment pipeline GUESSED (``first.last@domain``, ``info@domain``; ``email_source =
-"inferred"``) was never shown to exist. The send gate already holds such addresses back (``inferred_unverified``);
-this makes it visible and filterable by giving each one the tags ``pattern_generated`` and ``sendable:false``.
+Legacy labels for pattern-generated addresses remain available for review. These tags
+are informational only; use explicit email suppression to block delivery.
 A dry run (the default) counts and changes nothing; applying it is idempotent; no contact is ever removed.
 """
 
@@ -84,7 +83,7 @@ async def quarantine_generated(db: AsyncSession, *, dry_run: bool = True) -> dic
         "note": (
             "Dry run: nothing was changed. Repeat with dry_run=false to tag them."
             if dry_run else
-            "Tagged; no contact was deleted. They stay unsendable until a verifier confirms them AND the "
-            "guessed-address rule is lifted (EMAIL_SEND_INFERRED)."
+            "Tagged; no contact was deleted. Legacy tags do not block sending. "
+            "Review and suppress unwanted addresses on the Validator page."
         ),
     }

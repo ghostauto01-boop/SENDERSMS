@@ -20,10 +20,9 @@ Stage        What it does
 THE RULE THAT MATTERS
 ---------------------
 An address that was **guessed** is stored with ``email_verified = False`` and
-``email_source = "inferred"``. It is never sent to unless a human opts in,
-because a bounce is not a cosmetic problem: it costs sender reputation for
-every other email the deployment sends. Provider-verified addresses are the
-only ones marked verified.
+``email_source = "inferred"``. Validation is optional for sending; operators can
+review and suppress unwanted addresses in Validator. Only provider-verified
+addresses are marked verified.
 """
 
 from __future__ import annotations
@@ -792,7 +791,7 @@ async def enrich_contact(
             result.source = "inferred"
             result.verified = False
             result.confidence = 30
-            result.note = "guessed pattern address — excluded from sends until verified"
+            result.note = "guessed pattern address — review in Validator; validation is optional"
             return result
 
     contact.email_enriched_at = _now()
