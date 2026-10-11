@@ -563,6 +563,25 @@ async def list_tags(
     }
 
 
+@router.post("/quarantine/generated")
+async def quarantine_generated_addresses(
+    dry_run: bool = Query(
+        True, description="Count only (the default). Pass false to tag them."),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Tag every pattern-generated address ``pattern_generated`` + ``sendable:false`` (never deletes).
+
+    "Generated" = ``email_source == "inferred"``: the address was guessed, not given. A dry run
+    (the default) reports what would be tagged and changes nothing; applying it is idempotent."""
+    from app.services import quarantine
+
+    result = await quarantine.quarantine_generated(db, dry_run=dry_run)
+    if not dry_run:
+        await db.commit()
+    return result
+
+
 @router.get("/{contact_id}", response_model=ContactOut)
 async def get_contact(
     contact_id: int,

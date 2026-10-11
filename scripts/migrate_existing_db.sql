@@ -422,3 +422,21 @@ COMMIT;
 -- for a hand-run migration. Contacts with no email address are left alone.
 UPDATE contacts SET phone_number = NULL
  WHERE phone_number LIKE 'email:%' AND email IS NOT NULL AND TRIM(email) <> '';
+
+-- P0-6: sending domains (DNS plan, authentication state, warm-up clock). The table is created at startup by
+-- create_all; this is the same DDL for a hand-run migration.
+CREATE TABLE IF NOT EXISTS sending_domains (
+    id SERIAL PRIMARY KEY,
+    domain VARCHAR(255) NOT NULL UNIQUE,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    records_json TEXT NOT NULL DEFAULT '[]',
+    dmarc_rua VARCHAR(255),
+    email_account_id INTEGER,
+    last_error TEXT,
+    warmup_started_at TIMESTAMP WITH TIME ZONE,
+    authenticated_at TIMESTAMP WITH TIME ZONE,
+    last_checked_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS ix_sending_domains_status ON sending_domains (status);

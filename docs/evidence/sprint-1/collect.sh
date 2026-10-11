@@ -15,7 +15,7 @@ OUT="$REPO/docs/evidence/sprint-1"
 PY="${PYTHON:-python}"
 AFTER_SHA="$(git rev-parse --short HEAD)"
 
-SPRINT="${SPRINT:-1}"        # 1 = the P0 workstreams + C10, 2 = QA findings C1-C11 (+ the P0-3 follow-up)
+SPRINT="${SPRINT:-1}"        # 1 = the P0 workstreams + C10, 2 = QA findings C1-C11 (+ the P0-3 follow-up), 3 = P0-6 + §E
 
 # name | parent commit of the fix | test files | NEW modules the tests import (copied in so the
 # import succeeds and the BEHAVIOUR is what fails -- they are not used by the old code)
@@ -40,7 +40,17 @@ WORKSTREAMS_S2=(
   "s2_metrics|981320d|backend/tests/test_sprint2_metrics.py|"
   "p0_3_startup_step|981320d|backend/tests/test_p0_3_send_throttles.py|"
 )
-if [ "$SPRINT" = "2" ]; then WORKSTREAMS=("${WORKSTREAMS_S2[@]}"); else WORKSTREAMS=("${WORKSTREAMS_S1[@]}"); fi
+# Sprint 3: the "before" is the end of Sprint 2 (2d1deea). The pure helper module is copied in so the test file
+# can be collected and the BEHAVIOUR is what fails.
+WORKSTREAMS_S3=(
+  "p0_6|2d1deea|backend/tests/test_p0_6_sending_domain.py|backend/app/utils/email_domains.py"
+  "e_quarantine|2d1deea|backend/tests/test_e_quarantine.py|"
+)
+case "$SPRINT" in
+  2) WORKSTREAMS=("${WORKSTREAMS_S2[@]}") ;;
+  3) WORKSTREAMS=("${WORKSTREAMS_S3[@]}") ;;
+  *) WORKSTREAMS=("${WORKSTREAMS_S1[@]}") ;;
+esac
 ONLY="${ONLY:-}"   # e.g. ONLY="p0_3 p0_4" re-runs just those
 want() { [ -z "$ONLY" ] || [[ " $ONLY " == *" $1 "* ]]; }
 
@@ -79,8 +89,12 @@ done
 
 # Reproduction scripts: same script, old code vs new code.
 declare -A REPRO_PARENT=( [p0_3]=b9eedb5 [p0_4]=38d3b87 [p0_5]=60c0f4f [c10]=abeb293 [c6]=981320d )
-if [ "$SPRINT" = "2" ]; then REPROS=(c6); else REPROS=(p0_3 p0_4 p0_5 c10); fi
-for name in "${REPROS[@]}"; do
+case "$SPRINT" in
+  2) REPROS=(c6) ;;
+  3) REPROS=() ;;
+  *) REPROS=(p0_3 p0_4 p0_5 c10) ;;
+esac
+for name in ${REPROS[@]+"${REPROS[@]}"}; do
   want "$name" || continue
   wt="$(worktree "repro_$name" "${REPRO_PARENT[$name]}")"
   {

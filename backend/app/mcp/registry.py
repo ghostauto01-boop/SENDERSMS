@@ -349,6 +349,17 @@ TOOLS: list[Tool] = [
         params=[Param("job_id", required=True, where="path")],
     ),
     Tool(
+        name="quarantine_generated_addresses",
+        description=(
+            "Tag every pattern-generated (guessed, never verified) email address `pattern_generated` and "
+            "`sendable:false` so they are visible and filterable. Never deletes anything. It is a DRY RUN "
+            "unless you pass dry_run=false: look at the counts first."
+        ),
+        method="POST", path="/api/v1/contacts/quarantine/generated", scope="write", group="contacts",
+        params=[Param("dry_run", type="boolean", default=True, where="query",
+                      description="true (default) only counts; false applies the tags.")],
+    ),
+    Tool(
         name="export_contacts_csv",
         description=(
             "Export contacts as CSV, ONE PAGE AT A TIME. Every page reports 'returned', 'total', "
