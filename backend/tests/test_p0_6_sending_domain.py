@@ -1,19 +1,12 @@
-"""P0-6 — a sender the internet will actually deliver for.
+"""Regression tests for optional sending-domain guidance and email sender compatibility.
 
-The QA sweep found nothing between "add any From address" and "send": a free-mail sender
-(``you@gmail.com``) can never be authenticated by Brevo (the app does not control gmail.com's DNS, so
-DMARC fails and the mail is junked or rejected); there was no object for the SENDING DOMAIN and the DNS
-records it needs; DMARC advice that told people to publish a second ``_dmarc`` record would invalidate
-the first (two DMARC records are treated as none); and a brand-new mailbox could send at full volume on
-day one.
+Sender-domain authentication is no longer an application-side campaign launch gate: the app preserves
+its existing email send route and lets the configured provider decide whether it accepts a message.
+These tests pin that policy while retaining coverage for optional SendingDomain DNS planning, DMARC
+merging, and warm-up guidance.
 
-What is pinned here: free-mail senders are refused (422, and a campaign from one cannot start); a
-``SendingDomain`` plans the records and publishes EXACTLY ONE DMARC record, merging the ``rua`` address
-into whatever already exists instead of adding a second; a new domain follows the warm-up ramp; and a
-campaign cannot start from a domain that is registered but not authenticated.
-
-DNS and Brevo are always mocked: nothing here touches the network. (Brevo's real response shape and the
-DKIM=pass integration test could NOT be exercised without credentials -- see docs/SPRINT-3-REPORT.md.)
+DNS and Brevo are always mocked: nothing here touches the network. A real Brevo response and DKIM=pass
+integration test still require live credentials (see docs/SPRINT-3-REPORT.md).
 """
 
 from __future__ import annotations
@@ -61,14 +54,12 @@ def test_domain_of_handles_odd_input():
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("address", ["boss@gmail.com", "boss@Yahoo.com", "boss@outlook.com"])
-async def test_a_free_mail_sender_is_a_422(api_client, address):
+async def test_free_mail_senders_can_be_saved_for_the_existing_brevo_route(api_client, address):
     response = await api_client.post("/api/v1/email/accounts", json={
         "name": "Mine", "from_email": address, "from_name": "Boss", "api_key": "xkeysib-test"})
 
-    assert response.status_code == 422, response.text
-    message = response.json()["message"]
-    assert "free-mail" in message and domain_of(address) in message
-    assert "domain you own" in message, "it says what to do instead"
+    assert response.status_code == 201, response.text
+    assert response.json()["from_email"].lower() == address.strip().lower()
 
 
 @pytest.mark.asyncio
@@ -80,17 +71,18 @@ async def test_a_company_sender_is_still_accepted(api_client):
 
 
 @pytest.mark.asyncio
-async def test_changing_a_sender_to_free_mail_is_a_422_too(api_client, api_db):
+async def test_changing_a_sender_to_free_mail_is_allowed(api_client, api_db):
     account = await make_account(api_db, default=True)
 
     response = await api_client.patch(f"/api/v1/email/accounts/{account.id}", json={"from_email": "me@gmail.com"})
 
-    assert response.status_code == 422, response.text
+    assert response.status_code == 200, response.text
+    assert response.json()["from_email"] == "me@gmail.com"
 
 
 @pytest.mark.asyncio
-async def test_a_campaign_from_a_free_mail_sender_cannot_start(api_client, api_db, stub_queue):
-    """An account that was added before this rule must not be able to send either."""
+async def test_a_campaign_from_a_free_mail_sender_validates_and_starts(api_client, api_db, stub_queue):
+    """A legacy Gmail From uses the configured campaign route without an app-side domain gate."""
     from app.models.email import EmailAccount
 
     account = await make_account(api_db, default=True)
@@ -101,9 +93,37 @@ async def test_a_campaign_from_a_free_mail_sender_cannot_start(api_client, api_d
     report = (await api_client.post(f"/api/v1/campaigns/{campaign.id}/validate")).json()
     started = await api_client.post(f"/api/v1/campaigns/{campaign.id}/start")
 
-    assert report["valid"] is False
-    assert any("free-mail" in e for e in report["errors"]), report["errors"]
-    assert started.status_code == 400 and "free-mail" in started.text
+    assert report["valid"] is True, report
+    assert not any("free-mail" in item.lower() or "dmarc" in item.lower()
+                   for item in report["errors"] + report["warnings"])
+    assert started.status_code == 200, started.text
+    assert started.json()["status"] == "running"
+    # A successful start dispatches the existing campaign worker; no auth gate
+    # or alternate provider route intercepted the legacy sender.
+    assert stub_queue and stub_queue[0][1] == (campaign.id,)
+
+
+@pytest.mark.asyncio
+async def test_ads_email_campaign_launch_keeps_the_existing_sender_route(api_client, api_db):
+    from app.models.ads import AdsCampaign
+
+    account = await make_account(api_db, default=True)
+    account.from_email = "legacy@gmail.com"
+    campaign = AdsCampaign(
+        name="Email outreach", objective="replies", channel="email", status="draft",
+        test_mode=False, email_account_id=account.id,
+    )
+    api_db.add(campaign)
+    await api_db.flush()
+
+    report = (await api_client.post(f"/api/v1/ads/campaigns/{campaign.id}/validate")).json()
+    launched = await api_client.post(f"/api/v1/ads/campaigns/{campaign.id}/launch")
+
+    assert report["ok"] is True, report
+    assert not any("sender_not_ready" in item.lower() or "dmarc" in item.lower()
+                   for item in report["errors"] + report["warnings"])
+    assert launched.status_code == 200, launched.text
+    assert launched.json()["status"] == "active"
 
 
 # --------------------------------------------------------------------------
@@ -415,12 +435,12 @@ async def test_validate_says_where_the_warm_up_is_and_projects_with_it(api_clien
 
 
 # --------------------------------------------------------------------------
-# a campaign cannot start from a sender that is not ready
+# sender-domain authentication is optional guidance, never a launch gate
 # --------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_a_registered_but_unauthenticated_domain_blocks_start(api_client, api_db, stub_queue):
+async def test_a_registered_but_unauthenticated_domain_does_not_block_start(api_client, api_db, stub_queue):
     account = await make_account(api_db, default=True)
     await _domain(api_db, account.from_email, status="pending")
     campaign = await make_campaign(api_db, status="draft", channel="email", email_account_id=account.id)
@@ -428,11 +448,12 @@ async def test_a_registered_but_unauthenticated_domain_blocks_start(api_client, 
     report = (await api_client.post(f"/api/v1/campaigns/{campaign.id}/validate")).json()
     started = await api_client.post(f"/api/v1/campaigns/{campaign.id}/start")
 
-    assert report["valid"] is False
-    assert any("not authenticated" in e for e in report["errors"]), report["errors"]
-    assert started.status_code == 400
+    assert report["valid"] is True, report
+    assert not any("not authenticated" in item.lower() or "dmarc" in item.lower()
+                   for item in report["errors"] + report["warnings"])
+    assert started.status_code == 200, started.text
     await api_db.refresh(campaign)
-    assert campaign.status == "draft"
+    assert campaign.status == "running"
 
 
 @pytest.mark.asyncio
@@ -447,15 +468,15 @@ async def test_an_authenticated_domain_lets_the_campaign_start(api_client, api_d
 
 
 @pytest.mark.asyncio
-async def test_a_domain_nobody_registered_is_a_warning_not_a_block(api_client, api_db):
-    """Existing installs have no SendingDomain rows; they must keep working, with a nudge."""
+async def test_an_unregistered_sender_domain_does_not_affect_campaign_validation(api_client, api_db):
     account = await make_account(api_db, default=True)
     campaign = await make_campaign(api_db, status="draft", channel="email", email_account_id=account.id)
 
     report = (await api_client.post(f"/api/v1/campaigns/{campaign.id}/validate")).json()
 
-    assert report["valid"] is True, report["errors"]
-    assert any("no sending domain" in w.lower() for w in report["warnings"]), report["warnings"]
+    assert report["valid"] is True, report
+    assert not any("sending domain" in item.lower() or "dmarc" in item.lower()
+                   for item in report["errors"] + report["warnings"])
 
 
 @pytest.mark.asyncio

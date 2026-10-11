@@ -752,7 +752,14 @@ async def project_send(
         if daily_cap is None:
             source = "no daily cap"
         elif mailboxes:
-            source = f"{mailboxes} mailbox(es), at most {capacity['per_mailbox']}/day each"
+            source = f"{daily_cap}/day across {mailboxes} mailbox(es)"
+            warmup_applies = any(
+                account["warmup_cap"] is not None
+                and account["daily_cap"] == account["warmup_cap"]
+                for account in capacity["accounts"]
+            )
+            if warmup_applies:
+                source += " (warm-up cap applies)"
         else:
             source = "no usable mailbox"
     else:

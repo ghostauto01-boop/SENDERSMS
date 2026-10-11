@@ -2373,6 +2373,11 @@ async def validate_campaign(db: AsyncSession, campaign: AdsCampaign) -> dict:
     preflight depend on provider credentials or DNS state.
     """
     warnings: list[str] = []
+    if is_email_campaign(campaign):
+        warnings.append(
+            "Email provider acceptance is reported at send time; sender-domain authentication "
+            "does not block launch."
+        )
     try:
         sim = await simulate(db, campaign)
     except Exception as exc:  # noqa: BLE001 — validate must remain informational
@@ -2479,20 +2484,11 @@ async def validate_campaign(db: AsyncSession, campaign: AdsCampaign) -> dict:
         "daily_limit": campaign.daily_limit,
         "projection": projection,
     }
-    if campaign.channel == "email":
-        warnings.append("Email sender/provider checks do not block launch; failures remain visible at send time.")
-
     # An email audience containing contacts nobody has verified FAILS validation, with the
     # count (P0-5). Launch still assigns only the eligible contacts, so an unverified
     # address is never mailed -- but the operator is told, instead of finding out later
     # that the audience was smaller than they thought.
     errors: list[str] = []
-    if email_campaign and not campaign.test_mode:
-        from app.services import sending_domains
-
-        sender_errors, sender_notes = await sending_domains.campaign_sender_checks(db, campaign.email_account_id)
-        errors.extend(sender_errors)
-        warnings.extend(sender_notes)
     unverified = (sim.get("skipped") or {}).get("unverified", 0) if email_campaign else 0
     if unverified:
         errors.append(

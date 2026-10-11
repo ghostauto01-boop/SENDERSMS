@@ -155,6 +155,121 @@ async def test_unified_metrics_matches_the_inbox(client):
 
 
 @pytest.mark.asyncio
+async def test_overview_metrics_and_campaigns_are_separated_by_channel(client):
+    ac, session = client
+    await seed(session, replies=1, sent=3)  # SMS campaign and audience.
+
+    email_campaign = Campaign(
+        name="Email Newsletter", channel="email", status="running", total_contacts=2
+    )
+    session.add(email_campaign)
+    await session.flush()
+    for i in range(2):
+        contact = Contact(email=f"email{i}@example.net", email_verified=True)
+        session.add(contact)
+        await session.flush()
+        conv = Conversation(
+            contact_id=contact.id,
+            channel="email",
+            status="interested" if i == 0 else "active",
+            unread_count=1 if i == 0 else 0,
+            campaign_id=email_campaign.id,
+            last_campaign_id=email_campaign.id,
+        )
+        session.add(conv)
+        await session.flush()
+        session.add(Message(
+            conversation_id=conv.id,
+            contact_id=contact.id,
+            campaign_id=email_campaign.id,
+            direction="outgoing",
+            channel="email",
+            body="Newsletter",
+            status="delivered",
+            idempotency_key=f"email-out-{i}",
+        ))
+        if i == 0:
+            session.add(Message(
+                conversation_id=conv.id,
+                contact_id=contact.id,
+                campaign_id=email_campaign.id,
+                direction="incoming",
+                channel="email",
+                body="Thanks",
+                status="delivered",
+                ai_sentiment="positive",
+                idempotency_key="email-in-0",
+            ))
+    await session.flush()
+
+    sms = (await ac.get(
+        "/api/v1/overview/metrics", params={"days": 30, "channel": "sms"}
+    )).json()
+    email = (await ac.get(
+        "/api/v1/overview/metrics", params={"days": 30, "channel": "email"}
+    )).json()
+    combined = (await ac.get(
+        "/api/v1/overview/metrics", params={"days": 30, "channel": "all"}
+    )).json()
+
+    assert sms["channel"] == "sms"
+    assert sms["messaging"]["sent"] == 3 and sms["messaging"]["replies"] == 1
+    assert sms["inbox"]["conversations"] == 3 and sms["inbox"]["replied"] == 1
+    assert sms["audience"]["contacts"] == 3
+    assert sms["campaigns"]["campaigns"] == 1
+    assert [row["name"] for row in sms["top_campaigns"]] == ["Lagos Promo"]
+
+    assert email["channel"] == "email"
+    assert email["messaging"]["sent"] == 2 and email["messaging"]["replies"] == 1
+    assert email["inbox"]["conversations"] == 2 and email["inbox"]["replied"] == 1
+    assert email["audience"]["contacts"] == 2
+    assert email["campaigns"]["campaigns"] == 1
+    assert [row["name"] for row in email["top_campaigns"]] == ["Email Newsletter"]
+
+    assert combined["channel"] == "all"
+    assert combined["messaging"]["sent"] == 5 and combined["messaging"]["replies"] == 2
+    assert combined["inbox"]["conversations"] == 5
+
+    email_directory = (await ac.get(
+        "/api/v1/overview/campaigns", params={"channel": "email"}
+    )).json()
+    assert email_directory["totals"]["campaigns"] == 1
+    assert [row["name"] for row in email_directory["items"]] == ["Email Newsletter"]
+
+
+@pytest.mark.asyncio
+async def test_email_ads_campaign_is_listed_and_links_to_the_email_inbox(client):
+    ac, session = client
+    from app.models.ads import AdsCampaign
+
+    campaign = AdsCampaign(
+        name="Email Retargeting", objective="replies", status="active", channel="email"
+    )
+    session.add(campaign)
+    await session.flush()
+
+    email = (await ac.get("/api/v1/overview/campaigns", params={"channel": "email"})).json()
+    sms = (await ac.get("/api/v1/overview/campaigns", params={"channel": "sms"})).json()
+
+    assert email["totals"]["campaigns"] == 1
+    assert len(email["items"]) == 1
+    assert email["items"][0]["channel"] == "email"
+    assert email["items"][0]["inbox_url"] == f"/email-inbox?ads_campaign_id={campaign.id}"
+    assert email["items"][0]["replies_url"] == (
+        f"/email-inbox?ads_campaign_id={campaign.id}&view=replied"
+    )
+    assert sms["totals"]["campaigns"] == 0
+    assert sms["items"] == []
+
+
+@pytest.mark.asyncio
+async def test_overview_metrics_rejects_an_unknown_channel(client):
+    ac, _session = client
+    response = await ac.get("/api/v1/overview/metrics", params={"channel": "whatsapp"})
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test_campaign_conversations_drill_down(client):
     ac, session = client
     camp = await seed(session, replies=1, sent=3)

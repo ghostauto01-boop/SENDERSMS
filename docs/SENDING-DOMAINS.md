@@ -1,41 +1,35 @@
-# Sending domains: a sender the internet will deliver for
+# Sending domains: optional DNS guidance
 
-## The rules
+Domain authentication is useful for deliverability, but it is **not an app-side campaign launch requirement**. Campaigns continue to use the existing configured email sending route. The app does not reject a sender or prevent a launch just because its From address is a free-mail address, or because a sending domain is missing or not authenticated. The provider's normal response at send time determines whether the message is accepted.
 
-1. **No free-mail senders.** A From address on gmail.com, yahoo.com, outlook.com, icloud.com … cannot be
-   authenticated through Brevo (the app does not control that domain's DNS), so the mail fails DMARC and is
-   junked or bounced. Creating or changing a sender to one is a **422**, `POST /email/domains` for one is a 422,
-   and a campaign from an account that predates the rule cannot start.
-2. **A sending domain is an object.** `POST /api/v1/email/domains {"domain": "acme-leads.io", "rua": "dmarc@acme-leads.io"}`
-   registers it with Brevo and returns the DNS records to publish: the Brevo verification code, DKIM, and **one** DMARC
-   record. `GET /email/domains[/{id}]` reads it back; `POST /email/domains/{id}/verify` asks Brevo to check, re-reads
-   your DNS, and the first time the domain is authenticated starts the warm-up clock.
-3. **Exactly one DMARC record.** A domain may publish one DMARC TXT record at `_dmarc.<domain>`; with two, receivers
-   treat DMARC as absent. So the app *reads* what is already there and merges your `rua` into it (every other tag is
-   kept, a policy is never weakened); the plan's note says **REPLACE the existing record**, never add a second. If a
-   domain already has several, they are merged into one and `verify` warns you to delete the extras. If DNS cannot be read from
-   here the plan says so instead of assuming nothing is published.
-4. **Warm up.** Once a domain is authenticated each of its mailboxes may send about 5 a day in week one, 10 in week two,
-   18 in week three and 25 from week four (`services/warmup.py`). This is enforced in the sending gate below the per-mailbox
-   default in Sending Rules, and `validate` projects the campaign's duration with it.
-5. **A campaign needs a ready sender.** `validate`/`start` (classic) and `launch` (Ads Manager) refuse a free-mail sender,
-   and a domain that is registered but not authenticated. A domain nobody registered is a *warning* (existing installs
-   keep working), with a pointer to register it.
+A Brevo sender still needs a usable account/API key and a syntactically valid From address. Recipient eligibility, opt-outs, and other existing campaign checks are unchanged.
+
+## Optional domain setup
+
+`POST /api/v1/email/domains {"domain": "acme-leads.io", "rua": "dmarc@acme-leads.io"}` registers a domain you control with Brevo and returns the DNS records to publish: the Brevo verification code, DKIM, and **one** DMARC record. This helper only accepts a domain you control; it does not restrict which configured From address the campaign can use. `GET /email/domains[/{id}]` reads the plan back; `POST /email/domains/{id}/verify` asks Brevo to check it and starts the optional warm-up clock when first authenticated.
+
+A free-mail domain such as `gmail.com` cannot be registered for DNS setup because its DNS is not controlled by the sender. That restriction applies only to the domain-registration helper; it does not prevent saving or launching with a valid From address through the configured email sender.
+
+## Exactly one DMARC record
+
+A domain may publish one DMARC TXT record at `_dmarc.<domain>`; with two, receivers treat DMARC as absent. The app reads what is already there and merges the requested `rua` into it (every other tag is kept and a policy is never weakened). The plan's note says **REPLACE the existing record**, never add a second. If a domain already has several, they are merged into one and `verify` warns you to delete the extras. If DNS cannot be read, the plan says so instead of assuming nothing is published.
+
+## Optional warm-up
+
+For a domain registered and authenticated through this helper, the app can display a warm-up schedule: about 5 messages a day in week one, 10 in week two, 18 in week three and 25 from week four (`services/warmup.py`). Domain-authentication status itself does not prevent campaign launch. Sending capacity and the account's configured sending rules continue to apply as usual.
 
 MCP tools: `register_sending_domain`, `list_sending_domains`, `verify_sending_domain`.
 
-## Checking DKIM yourself (this was NOT automated)
+## Checking DKIM yourself
 
-Whether a receiver actually reports `dkim=pass` can only be seen by sending real mail to a real mailbox, which needs Brevo
-credentials and a published domain. After `verify` says `authenticated`:
+Whether a receiver actually reports `dkim=pass` can only be seen by sending real mail to a real mailbox, which requires Brevo credentials and a published domain. After `verify` says `authenticated`:
 
-1. Send a test email from the sender (`POST /email/accounts/{id}/test-send`) to a Gmail address you control.
-2. In Gmail open the message → ⋮ → **Show original**.
-3. You want `SPF: PASS`, `DKIM: PASS` with `d=<your domain>` (not brevo's), and `DMARC: PASS`.
+1. Send a test email from the sender (`POST /email/accounts/{id}/test-send`) to an address you control.
+2. In Gmail, open the message → ⋮ → **Show original**.
+3. Check the reported SPF, DKIM, and DMARC results.
 
 ## Not done
 
 * **Custom tracking domain** — not implemented. It needs a CNAME target that only Brevo's account settings show, which the API does not expose.
-* **The DKIM=pass integration test** — see above.
-* The Brevo calls (`POST /senders/domains`, `PUT …/authenticate`) are written from Brevo's documented shape with lenient parsing and are
-  covered by mocks; **they have not been run against a live Brevo account.**
+* **Live DKIM integration test** — needs a real send through Brevo to a real mailbox.
+* The Brevo calls (`POST /senders/domains`, `PUT …/authenticate`) are covered by mocks; **they have not been run against a live Brevo account.**

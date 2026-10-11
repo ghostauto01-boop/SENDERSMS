@@ -90,18 +90,19 @@ def _iso(value) -> Optional[str]:
     return value.isoformat()
 
 
-async def _replied_conversation_ids(db: AsyncSession) -> set[int]:
-    """Conversation ids that contain at least one inbound message."""
-    return set(
-        (
-            await db.execute(
-                select(Message.conversation_id).where(Message.direction == "incoming").distinct()
-            )
-        ).scalars().all()
-    )
+async def _replied_conversation_ids(
+    db: AsyncSession, channel: Optional[str] = None
+) -> set[int]:
+    """Conversation ids that contain at least one inbound message, optionally channel-scoped."""
+    query = select(Message.conversation_id).where(Message.direction == "incoming")
+    if channel:
+        query = query.where(func.coalesce(Message.channel, "sms") == channel)
+    return set((await db.execute(query.distinct())).scalars().all())
 
 
-async def _attributed_totals(db: AsyncSession, replied_ids: set[int]) -> dict[str, int]:
+async def _attributed_totals(
+    db: AsyncSession, replied_ids: set[int], channel: Optional[str] = None
+) -> dict[str, int]:
     """People-level totals, counting each conversation exactly once.
 
     Per-campaign rows deliberately count a lead under every campaign that
@@ -114,20 +115,17 @@ async def _attributed_totals(db: AsyncSession, replied_ids: set[int]) -> dict[st
     These totals answer the different question the header is really asking:
     how many distinct people are we talking to?
     """
-    convs = list(
-        (
-            await db.execute(
-                select(Conversation).where(
-                    or_(
-                        Conversation.campaign_id.is_not(None),
-                        Conversation.last_campaign_id.is_not(None),
-                        Conversation.ads_campaign_id.is_not(None),
-                        Conversation.last_ads_campaign_id.is_not(None),
-                    )
-                )
-            )
-        ).scalars().all()
+    query = select(Conversation).where(
+        or_(
+            Conversation.campaign_id.is_not(None),
+            Conversation.last_campaign_id.is_not(None),
+            Conversation.ads_campaign_id.is_not(None),
+            Conversation.last_ads_campaign_id.is_not(None),
+        )
     )
+    if channel:
+        query = query.where(func.coalesce(Conversation.channel, "sms") == channel)
+    convs = list((await db.execute(query)).scalars().all())
     totals = {"leads": 0, "replied": 0, "unread": 0, "interested": 0}
     for conv in convs:
         totals["leads"] += 1
@@ -247,7 +245,7 @@ async def _classic_rows(db: AsyncSession, replied_ids: set[int]) -> list[dict]:
 
 
 async def _ads_rows(db: AsyncSession, replied_ids: set[int]) -> list[dict]:
-    """Every SMS Ads Manager campaign, in the same shape as the classic ones."""
+    """Every Ads Manager campaign, in the same shape as the classic ones."""
     try:
         from app.models.ads import AdsAssignment, AdsCampaign
     except Exception as exc:  # pragma: no cover - defensive
@@ -343,10 +341,9 @@ async def _ads_rows(db: AsyncSession, replied_ids: set[int]) -> list[dict]:
                 "started_at": _iso(camp.start_date),
                 "completed_at": _iso(camp.end_date),
                 "updated_at": _iso(camp.updated_at),
-                # The Ads Manager sends SMS, so these are the SMS inbox links —
-                # built by the same helper so the two cannot drift apart.
-                "inbox_url": _inbox_links("sms", camp.id, param="ads_campaign_id")[0],
-                "replies_url": _inbox_links("sms", camp.id, param="ads_campaign_id")[1],
+                # Route into the inbox for the channel this Ads campaign used.
+                "inbox_url": _inbox_links(camp.channel, camp.id, param="ads_campaign_id")[0],
+                "replies_url": _inbox_links(camp.channel, camp.id, param="ads_campaign_id")[1],
             }
         )
     return out
@@ -385,8 +382,8 @@ async def campaign_overview(
     (``legacy`` | ``ads``) because the two id spaces overlap: an id is only
     meaningful together with its kind. ``total`` is how many rows match the
     filters; ``next_page`` is null on the last page, so a client always knows
-    whether it has seen everything. ``totals`` always describes the whole
-    account and ignores the filters.
+    whether it has seen everything. ``totals`` ignores kind/status/search/live
+    filters but respects a requested channel, so SMS and email remain separate.
     """
     return await campaign_directory(
         db, kind=kind, channel=channel, status=status, live=live, search=search,
@@ -440,15 +437,19 @@ async def campaign_directory(
         rows = rows[start:start + per_page]
         next_page = page + 1 if start + per_page < total else None
 
+    # Roll-up totals ignore kind/status/search/live filters, but honor the
+    # channel selection so SMS and email are never mixed together.
+    scope_rows = [r for r in everything if not wanted_channel or r["channel"] == wanted_channel]
+
     def sum_of(key: str) -> int:
-        return sum(r.get(key) or 0 for r in everything)
+        return sum(r.get(key) or 0 for r in scope_rows)
 
     sent = sum_of("sent")
     delivered = sum_of("delivered")
     # Message counts are per-send and safe to add up. People counts are not:
     # one contact can be a lead for several campaigns, so they are recounted
     # from conversations to keep the header consistent with the list below it.
-    people = await _attributed_totals(db, replied_ids)
+    people = await _attributed_totals(db, replied_ids, channel=wanted_channel)
     return {
         "items": rows,
         "total": total,
@@ -456,8 +457,8 @@ async def campaign_directory(
         "per_page": per_page,
         "next_page": next_page,
         "totals": {
-            "campaigns": len(everything),
-            "live": sum(1 for r in everything if r["is_live"]),
+            "campaigns": len(scope_rows),
+            "live": sum(1 for r in scope_rows if r["is_live"]),
             "audience": sum_of("audience"),
             "sent": sent,
             "delivered": delivered,
@@ -572,18 +573,20 @@ async def campaign_detail(
 @router.get("/metrics")
 async def unified_metrics(
     days: int = Query(default=30, ge=1, le=365),
+    channel: Optional[str] = Query(default=None, description="sms | email. Omit or use 'all' for both."),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Everything the application-wide overview screen needs, in one call.
+    """Everything the channel-aware application overview needs, in one call.
 
-    Deliberately one endpoint rather than five: the dashboard used to fire
-    several requests that each recomputed overlapping numbers from different
-    tables, which is how the Dashboard and the SMS Manager ended up quoting
-    different reply rates for the same day.
+    Pass ``channel=sms`` or ``channel=email`` for separated totals; omit it (or
+    pass ``all``) to retain the combined application-wide view. The endpoint
+    returns messages, inbox threads, contacts, campaigns and chart data in the
+    same channel scope.
     """
+    wanted_channel = normalize_channel(channel)
     since = datetime.now(timezone.utc) - timedelta(days=days)
-    replied_ids = await _replied_conversation_ids(db)
+    replied_ids = await _replied_conversation_ids(db, wanted_channel)
 
     async def count_messages(*where) -> int:
         return (
@@ -592,7 +595,10 @@ async def unified_metrics(
             )
         ).scalar() or 0
 
-    window = (Message.created_at >= since,)
+    window = [Message.created_at >= since]
+    if wanted_channel:
+        window.append(func.coalesce(Message.channel, "sms") == wanted_channel)
+    window = tuple(window)
     outgoing = (Message.direction == "outgoing", *window)
     sent = await count_messages(*outgoing, Message.status.in_(("sent", "delivered")))
     delivered = await count_messages(*outgoing, Message.status == "delivered")
@@ -600,22 +606,26 @@ async def unified_metrics(
     queued = await count_messages(*outgoing, Message.status.in_(("queued", "sending")))
     inbound = await count_messages(Message.direction == "incoming", *window)
 
+    conversation_scope = []
+    if wanted_channel:
+        conversation_scope.append(func.coalesce(Conversation.channel, "sms") == wanted_channel)
     total_conversations = (
-        await db.execute(select(func.count()).select_from(Conversation))
+        await db.execute(
+            select(func.count(Conversation.id)).where(*conversation_scope)
+        )
     ).scalar() or 0
     unread_threads = (
         await db.execute(
-            select(func.count()).select_from(
-                select(Conversation)
-                .where(or_(Conversation.unread_count > 0, Conversation.status == "unread"))
-                .subquery()
+            select(func.count(Conversation.id)).where(
+                *conversation_scope,
+                or_(Conversation.unread_count > 0, Conversation.status == "unread"),
             )
         )
     ).scalar() or 0
     interested_threads = (
         await db.execute(
-            select(func.count()).select_from(
-                select(Conversation).where(Conversation.status == "interested").subquery()
+            select(func.count(Conversation.id)).where(
+                *conversation_scope, Conversation.status == "interested"
             )
         )
     ).scalar() or 0
@@ -634,12 +644,19 @@ async def unified_metrics(
         if key in sentiment:
             sentiment[key] += n
 
-    total_contacts = (await db.execute(select(func.count()).select_from(Contact))).scalar() or 0
+    contact_scope = []
+    opt_out_column = Contact.is_opted_out
+    if wanted_channel == "sms":
+        contact_scope.append(func.trim(func.coalesce(Contact.phone_number, "")) != "")
+    elif wanted_channel == "email":
+        contact_scope.append(func.trim(func.coalesce(Contact.email, "")) != "")
+        opt_out_column = Contact.is_email_opted_out
+    total_contacts = (
+        await db.execute(select(func.count(Contact.id)).where(*contact_scope))
+    ).scalar() or 0
     opted_out = (
         await db.execute(
-            select(func.count()).select_from(
-                select(Contact).where(Contact.is_opted_out.is_(True)).subquery()
-            )
+            select(func.count(Contact.id)).where(*contact_scope, opt_out_column.is_(True))
         )
     ).scalar() or 0
 
@@ -675,9 +692,10 @@ async def unified_metrics(
             if status in ("failed", "cancelled"):
                 bucket["failed"] += n
 
-    campaign_data = await campaign_directory(db)
+    campaign_data = await campaign_directory(db, channel=wanted_channel)
 
     return {
+        "channel": wanted_channel or "all",
         "period_days": days,
         "messaging": {
             "sent": sent,

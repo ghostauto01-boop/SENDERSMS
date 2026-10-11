@@ -222,6 +222,38 @@ async def test_send_uses_the_selected_account_not_the_default(db, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_gmail_from_keeps_the_existing_brevo_campaign_delivery_path(db, monkeypatch):
+    calls: list = []
+    _fake_brevo(monkeypatch, calls)
+
+    (account,) = await _add_accounts(
+        db, ("legacy Gmail sender", "legacy@gmail.com", "key-gmail", True),
+    )
+    campaign = Campaign(
+        name="Existing email campaign", channel="email", status="running",
+        email_account_id=account.id,
+    )
+    contact = Contact(phone_number="+15550000012", email="lead@acme-leads.io")
+    db.add_all([campaign, contact])
+    await db.commit()
+    await db.refresh(campaign)
+    await db.refresh(contact)
+
+    message = await email_service.queue_email(
+        db, contact, subject="Existing route", text_body="Campaign message",
+        account=account, campaign_id=campaign.id, bulk=True,
+    )
+    assert message is not None
+    result = await email_service.deliver(db, message)
+
+    assert result["success"] is True, result
+    assert calls == [("key-gmail", "legacy@gmail.com")]
+    assert message.provider == "brevo"
+    assert message.from_address == "legacy@gmail.com"
+    assert message.status == "sent"
+
+
+@pytest.mark.asyncio
 async def test_burnt_key_falls_back_to_the_campaign_fallback_account(db, monkeypatch):
     calls: list = []
     _fake_brevo(monkeypatch, calls, fail_keys={
