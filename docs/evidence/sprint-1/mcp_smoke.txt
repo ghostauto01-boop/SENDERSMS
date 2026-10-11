@@ -1,4 +1,4 @@
-MCP smoke test against http://127.0.0.1:8000 (run 1791703983)
+MCP smoke test against http://127.0.0.1:8000 (run 1791705703)
 
 [1] Token + handshake
   [PASS] app login

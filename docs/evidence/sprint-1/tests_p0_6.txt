@@ -1,0 +1,29 @@
+# p0_6 -- tests: backend/tests/test_p0_6_sending_domain.py
+# BEFORE = code at 2d1deea (parent of the fix) with today's tests;  AFTER = 5a69bfb
+
+## BEFORE the fix
+21 failed, 31 passed, 1 warning, 9 errors in 8.13s
+FAILED backend/tests/test_p0_6_sending_domain.py::test_a_campaign_from_a_free_mail_sender_cannot_start
+FAILED backend/tests/test_p0_6_sending_domain.py::test_a_clock_that_has_not_started_means_no_ramp
+FAILED backend/tests/test_p0_6_sending_domain.py::test_a_domain_nobody_registered_is_a_warning_not_a_block
+FAILED backend/tests/test_p0_6_sending_domain.py::test_a_free_mail_sender_is_a_422[boss@Yahoo.com]
+FAILED backend/tests/test_p0_6_sending_domain.py::test_a_free_mail_sender_is_a_422[boss@gmail.com]
+FAILED backend/tests/test_p0_6_sending_domain.py::test_a_free_mail_sender_is_a_422[boss@outlook.com]
+FAILED backend/tests/test_p0_6_sending_domain.py::test_a_registered_but_unauthenticated_domain_blocks_start
+FAILED backend/tests/test_p0_6_sending_domain.py::test_a_warming_mailbox_is_capped_below_the_normal_per_mailbox_default
+FAILED backend/tests/test_p0_6_sending_domain.py::test_an_authenticated_domain_lets_the_campaign_start
+FAILED backend/tests/test_p0_6_sending_domain.py::test_changing_a_sender_to_free_mail_is_a_422_too
+FAILED backend/tests/test_p0_6_sending_domain.py::test_the_gate_enforces_the_warm_up_cap_for_a_mailbox
+FAILED backend/tests/test_p0_6_sending_domain.py::test_the_ramp_goes_from_5_a_day_to_25_in_week_four[0-5]
+FAILED backend/tests/test_p0_6_sending_domain.py::test_the_ramp_goes_from_5_a_day_to_25_in_week_four[13-10]
+FAILED backend/tests/test_p0_6_sending_domain.py::test_the_ramp_goes_from_5_a_day_to_25_in_week_four[14-18]
+FAILED backend/tests/test_p0_6_sending_domain.py::test_the_ramp_goes_from_5_a_day_to_25_in_week_four[20-18]
+FAILED backend/tests/test_p0_6_sending_domain.py::test_the_ramp_goes_from_5_a_day_to_25_in_week_four[200-25]
+FAILED backend/tests/test_p0_6_sending_domain.py::test_the_ramp_goes_from_5_a_day_to_25_in_week_four[21-25]
+FAILED backend/tests/test_p0_6_sending_domain.py::test_the_ramp_goes_from_5_a_day_to_25_in_week_four[6-5]
+FAILED backend/tests/test_p0_6_sending_domain.py::test_the_ramp_goes_from_5_a_day_to_25_in_week_four[7-10]
+FAILED backend/tests/test_p0_6_sending_domain.py::test_validate_says_where_the_warm_up_is_and_projects_with_it
+FAILED backend/tests/test_p0_6_sending_domain.py::test_week_four_and_beyond_is_25_and_an_unregistered_domain_is_not_ramped
+
+## AFTER the fix
+61 passed, 1 warning in 9.42s
