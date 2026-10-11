@@ -462,6 +462,83 @@ class AdsAssignment(Base):
 # Follow-up automation
 # --------------------------------------------------------------------------
 
+#: Every action a follow-up step may carry. ``send_sms`` / ``send_email`` are
+#: the two that put a message on the wire; the rest reuse the existing CRM
+#: helpers (tags, lead status, suppression). The API validates against this
+#: tuple, so a typo is a 422 instead of a step that silently does nothing.
+FOLLOWUP_ACTIONS: tuple[str, ...] = (
+    "send_sms",
+    "send_email",
+    "add_tag",
+    "remove_tag",
+    "change_status",
+    "create_task",
+    "stop",
+    "suppress",
+    "notify",
+)
+
+#: Every condition a follow-up step may carry -- checked at send time by the
+#: engine. ``no_reply`` is the default; ``always`` sends unconditionally.
+FOLLOWUP_CONDITIONS: tuple[str, ...] = (
+    "no_reply",
+    "replied",
+    "positive",
+    "negative",
+    "positive_reply",
+    "negative_reply",
+    "interested",
+    "not_interested",
+    "converted",
+    "opened",
+    "not_opened",
+    "opened_no_click",
+    "link_clicked",
+    "link_not_clicked",
+    "clicked_no_reply",
+    "meeting_scheduled",
+    "always",
+)
+
+#: Default wait before the first follow-up, in hours (2 days).
+DEFAULT_FOLLOWUP_WAIT_HOURS = 48
+#: Anything longer than a year is a typo, not a schedule.
+MAX_FOLLOWUP_WAIT_HOURS = 24 * 365
+
+
+class AdsFollowUpTemplate(Base):
+    """A reusable follow-up step, so a chain is written once and reused.
+
+    A step may point at a template (``AdsFollowUpStep.template_id``); the
+    subject/body/condition/action/delay are copied onto the step when it is
+    created, so editing a template later never rewrites live campaigns.
+    """
+
+    __tablename__ = "ads_followup_templates"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
+    description: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    #: sms | email | any -- which channel this template is written for.
+    channel: Mapped[str] = mapped_column(String(10), default="any", nullable=False)
+    subject: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    condition: Mapped[str] = mapped_column(String(30), default="no_reply", nullable=False)
+    action: Mapped[str] = mapped_column(String(30), default="send_sms", nullable=False)
+    delay_hours: Mapped[int] = mapped_column(
+        Integer, default=DEFAULT_FOLLOWUP_WAIT_HOURS, nullable=False
+    )
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    #: How many steps have been created from this template (usage signal).
+    usage_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, onupdate=_now, nullable=False
+    )
+
+    def __repr__(self):  # pragma: no cover - debug helper
+        return f"<AdsFollowUpTemplate(id={self.id}, name={self.name})>"
+
 
 class AdsFollowUpStep(Base):
     """One step of a campaign's follow-up workflow."""
@@ -474,20 +551,39 @@ class AdsFollowUpStep(Base):
     )
     step_order: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     name: Mapped[str | None] = mapped_column(String(200), nullable=True)
-    wait_hours: Mapped[int] = mapped_column(Integer, default=48, nullable=False)
-    #: no_reply | replied | positive | negative | interested | not_interested |
-    #: link_clicked | link_not_clicked | meeting_scheduled | converted | always
+    #: Wait before this step, measured from the previous message (the campaign
+    #: send for step 1, otherwise the step before it). The API accepts this as
+    #: ``delay_hours`` and echoes it back under both names.
+    wait_hours: Mapped[int] = mapped_column(
+        Integer, default=DEFAULT_FOLLOWUP_WAIT_HOURS, nullable=False
+    )
+    #: See FOLLOWUP_CONDITIONS. Default no_reply.
     condition: Mapped[str] = mapped_column(String(30), default="no_reply", nullable=False)
-    #: send_sms | send_email | add_tag | remove_tag | change_status |
-    #: create_task | stop | suppress | notify
+    #: See FOLLOWUP_ACTIONS. Default send_sms (send_email on an email campaign).
     action: Mapped[str] = mapped_column(String(30), default="send_sms", nullable=False)
     body: Mapped[str | None] = mapped_column(Text, nullable=True)
     #: Email only: subject line for a send_email step (falls back to the
-    #: campaign subject when empty).
+    #: campaign subject when empty). Supports {{shortcode}} personalization.
     subject: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    #: The reusable template this step was created from (optional).
+    template_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("ads_followup_templates.id", ondelete="SET NULL"), nullable=True
+    )
     action_value: Mapped[str | None] = mapped_column(String(255), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    #: Soft delete: a removed step stays in the audit trail but never sends.
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, onupdate=_now, nullable=False
+    )
+
+    def is_live(self) -> bool:
+        """True when this step may still send: active and not soft-deleted."""
+        return bool(self.is_active) and self.deleted_at is None
+
+    def __repr__(self):  # pragma: no cover - debug helper
+        return f"<AdsFollowUpStep(campaign={self.campaign_id}, step={self.step_order})>"
 
 
 class AdsFollowUpTask(Base):

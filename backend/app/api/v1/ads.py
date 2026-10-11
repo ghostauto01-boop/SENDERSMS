@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.ads import (
+    DEFAULT_FOLLOWUP_WAIT_HOURS,
     AdsActivityLog,
     AdsAssignment,
     AdsAudience,
@@ -28,6 +29,7 @@ from app.models.ads import (
     AdsEvent,
     AdsFollowUpStep,
     AdsFollowUpTask,
+    AdsFollowUpTemplate,
     AdsSet,
 )
 from app.models.contact import Contact, ContactTag, Tag
@@ -51,7 +53,10 @@ from app.schemas.ads import (
     CreativeOut,
     CreativePatch,
     FollowUpStepIn,
+    FollowUpStepPatch,
     FollowUpTaskIn,
+    FollowUpTemplateIn,
+    FollowUpTemplatePatch,
     OptimizeIn,
     SetIn,
     SetOut,
@@ -59,6 +64,8 @@ from app.schemas.ads import (
     SuppressionIn,
     TargetingPreviewIn,
     TrackClickIn,
+    followup_step_out,
+    followup_template_out,
 )
 from app.security.auth import get_current_user
 from app.services import ads_service as svc
@@ -363,8 +370,11 @@ async def get_campaign(
         (
             await db.execute(
                 select(AdsFollowUpStep)
-                .where(AdsFollowUpStep.campaign_id == campaign_id)
-                .order_by(AdsFollowUpStep.step_order)
+                .where(
+                    AdsFollowUpStep.campaign_id == campaign_id,
+                    AdsFollowUpStep.deleted_at.is_(None),
+                )
+                .order_by(AdsFollowUpStep.step_order, AdsFollowUpStep.id)
             )
         ).scalars().all()
     )
@@ -373,20 +383,7 @@ async def get_campaign(
         "state": await svc.campaign_state(db, campaign),
         "sets": [SetOut.model_validate(s).model_dump() for s in sets],
         "creatives": [CreativeOut.model_validate(c).model_dump() for c in creatives],
-        "followup_steps": [
-            {
-                "id": s.id,
-                "step_order": s.step_order,
-                "name": s.name,
-                "wait_hours": s.wait_hours,
-                "condition": s.condition,
-                "action": s.action,
-                "body": s.body,
-                "action_value": s.action_value,
-                "is_active": s.is_active,
-            }
-            for s in steps
-        ],
+        "followup_steps": [followup_step_out(s) for s in steps],
     }
 
 
@@ -1613,56 +1610,437 @@ async def click_redirect(assignment_id: int, db: AsyncSession = Depends(get_db))
 # ==========================================================================
 
 
-@router.post("/campaigns/{campaign_id}/followup-steps", status_code=201)
+def _clean_text(value: Optional[str]) -> Optional[str]:
+    """Trim and drop blanks so a cleared field stores NULL, not ""."""
+    if value is None:
+        return None
+    value = value.strip()
+    return value or None
+
+
+async def _step_order_for(db: AsyncSession, campaign_id: int) -> int:
+    """The next free position at the end of a campaign's chain."""
+    last = (
+        await db.execute(
+            select(func.max(AdsFollowUpStep.step_order)).where(
+                AdsFollowUpStep.campaign_id == campaign_id
+            )
+        )
+    ).scalar()
+    return int(last or 0) + 1
+
+
+async def _template_values(db: AsyncSession, template_id: int) -> dict:
+    """Resolve a follow-up template into step values (and count the use)."""
+    template = (
+        await db.execute(
+            select(AdsFollowUpTemplate).where(AdsFollowUpTemplate.id == template_id)
+        )
+    ).scalar_one_or_none()
+    if template is None or not template.is_active:
+        raise HTTPException(422, f"template_id {template_id} does not exist")
+    template.usage_count = (template.usage_count or 0) + 1
+    return {
+        "template_id": template.id,
+        "subject": template.subject,
+        "body": template.body,
+        "condition": template.condition,
+        "action": template.action,
+        "wait_hours": template.delay_hours,
+    }
+
+
+def _step_values(data: FollowUpStepIn | FollowUpStepPatch, *, base: Optional[dict] = None) -> dict:
+    """Column values from a request, honouring every field the client sent.
+
+    ``base`` is what a template already supplied; an explicit request field
+    always wins over the template, and a field the client omitted is left
+    exactly as ``base`` (or the existing row, for PATCH) had it.
+    """
+    values = dict(base or {})
+    wait = data.resolved_wait_hours
+    if wait is not None:
+        values["wait_hours"] = wait
+    for field in (
+        "name",
+        "condition",
+        "action",
+        "body",
+        "subject",
+        "action_value",
+        "is_active",
+        "step_order",
+    ):
+        if field in data.model_fields_set:
+            values[field] = getattr(data, field)
+    # Blank text is stored as NULL: an empty body is "no message", not "".
+    for field in ("name", "body", "subject", "action_value"):
+        if field in values:
+            values[field] = _clean_text(values[field])
+    return values
+
+
+@router.get("/campaigns/{campaign_id}/followup-steps")
+async def list_steps(
+    campaign_id: int,
+    include_inactive: bool = Query(
+        True, description="Include steps the operator parked (is_active=false)."
+    ),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Every follow-up step on a campaign, in chain order."""
+    await _get_campaign(db, campaign_id)
+    query = select(AdsFollowUpStep).where(
+        AdsFollowUpStep.campaign_id == campaign_id,
+        AdsFollowUpStep.deleted_at.is_(None),
+    )
+    if not include_inactive:
+        query = query.where(AdsFollowUpStep.is_active.is_(True))
+    steps = list(
+        (await db.execute(query.order_by(AdsFollowUpStep.step_order, AdsFollowUpStep.id)))
+        .scalars()
+        .all()
+    )
+    items = [followup_step_out(s) for s in steps]
+    return {"items": items, "steps": items, "total": len(items)}
+
+
+@router.post("/campaigns/{campaign_id}/followup-steps")
 async def create_step(
     campaign_id: int,
     data: FollowUpStepIn,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    await _get_campaign(db, campaign_id)
-    step = AdsFollowUpStep(campaign_id=campaign_id, **data.model_dump())
+    """Add a follow-up step.
+
+    Every parameter is honoured -- the wait comes from ``delay_hours``,
+    ``action`` picks the channel (defaulting to the campaign's own channel, so
+    an email campaign defaults to ``send_email``), and ``subject``/``body`` are
+    stored with their ``{{shortcode}}`` tokens intact for send-time rendering.
+    """
+    campaign = await _get_campaign(db, campaign_id)
+
+    base: dict = {}
+    if data.template_id is not None:
+        base = await _template_values(db, data.template_id)
+    values = _step_values(data, base=base)
+
+    if not values.get("action"):
+        # An email campaign's follow-up goes out by email unless told otherwise.
+        values["action"] = "send_email" if svc.is_email_campaign(campaign) else "send_sms"
+    values.setdefault("condition", "no_reply")
+    if values.get("wait_hours") is None:
+        values["wait_hours"] = DEFAULT_FOLLOWUP_WAIT_HOURS
+    if values.get("step_order") is None:
+        values["step_order"] = await _step_order_for(db, campaign_id)
+    values.setdefault("is_active", True)
+
+    step = AdsFollowUpStep(campaign_id=campaign_id, **values)
     db.add(step)
-    svc.log_activity(db, "followup_step_created", campaign_id=campaign_id, actor=user.username)
+    svc.log_activity(
+        db,
+        "followup_step_created",
+        campaign_id=campaign_id,
+        actor=user.username,
+        detail=f"Step {step.step_order}: wait {values['wait_hours']}h, {values['action']}",
+    )
     await db.commit()
     await db.refresh(step)
-    return {"id": step.id}
+    return followup_step_out(step)
 
 
-@router.patch("/followup-steps/{step_id}")
-async def update_step(
+@router.get("/followup-steps/{step_id}")
+async def get_step(
+    step_id: int, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)
+):
+    """Full details for one follow-up step, plus what it has done so far."""
+    step = (
+        await db.execute(select(AdsFollowUpStep).where(AdsFollowUpStep.id == step_id))
+    ).scalar_one_or_none()
+    if step is None:
+        raise HTTPException(404, "Step not found")
+    pending = (
+        await db.execute(
+            select(func.count())
+            .select_from(AdsFollowUpTask)
+            .where(AdsFollowUpTask.step_id == step_id, AdsFollowUpTask.status == "pending")
+        )
+    ).scalar() or 0
+    sent = (
+        await db.execute(
+            select(func.count())
+            .select_from(AdsFollowUpTask)
+            .where(AdsFollowUpTask.step_id == step_id, AdsFollowUpTask.status == "completed")
+        )
+    ).scalar() or 0
+    campaign = (
+        await db.execute(select(AdsCampaign).where(AdsCampaign.id == step.campaign_id))
+    ).scalar_one_or_none()
+    return {
+        **followup_step_out(step),
+        "campaign_name": campaign.name if campaign else None,
+        "campaign_channel": campaign.channel if campaign else None,
+        "pending_tasks": pending,
+        "sent_tasks": sent,
+    }
+
+
+@router.patch("/campaigns/{campaign_id}/followup-steps/{step_id}")
+async def update_campaign_step(
+    campaign_id: int,
     step_id: int,
-    data: FollowUpStepIn,
+    data: FollowUpStepPatch,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    step = (
-        await db.execute(select(AdsFollowUpStep).where(AdsFollowUpStep.id == step_id))
-    ).scalar_one_or_none()
-    if step is None:
-        raise HTTPException(404, "Step not found")
-    for key, value in data.model_dump(exclude_unset=True).items():
-        setattr(step, key, value)
-    await db.commit()
-    return {"ok": True}
+    """Edit a follow-up step after it was created (any subset of its fields)."""
+    await _get_campaign(db, campaign_id)
+    return await _apply_step_patch(db, step_id, data, campaign_id=campaign_id, actor=user.username)
 
 
-@router.delete("/followup-steps/{step_id}", status_code=204)
-async def delete_step(
-    step_id: int, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)
+@router.patch("/followup-steps/{step_id}")
+async def update_step_legacy(
+    step_id: int,
+    data: FollowUpStepPatch,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
-    step = (
-        await db.execute(select(AdsFollowUpStep).where(AdsFollowUpStep.id == step_id))
-    ).scalar_one_or_none()
+    """Backwards-compatible alias of the campaign-scoped PATCH."""
+    return await _apply_step_patch(db, step_id, data, campaign_id=None, actor=user.username)
+
+
+async def _apply_step_patch(
+    db: AsyncSession,
+    step_id: int,
+    data: FollowUpStepPatch,
+    *,
+    campaign_id: Optional[int],
+    actor: str,
+) -> dict:
+    query = select(AdsFollowUpStep).where(AdsFollowUpStep.id == step_id)
+    if campaign_id is not None:
+        query = query.where(AdsFollowUpStep.campaign_id == campaign_id)
+    step = (await db.execute(query)).scalar_one_or_none()
+    restoring = "is_active" in data.model_fields_set and data.is_active is True
+    # A removed (soft-deleted) step is not editable -- but asking for it back is
+    # exactly how an accidental delete is undone.
+    if step is None or (step.deleted_at is not None and not restoring):
+        raise HTTPException(404, "Step not found")
+
+    base: dict = {}
+    if data.template_id is not None:
+        base = await _template_values(db, data.template_id)
+    values = _step_values(data, base=base)
+
+    for key, value in values.items():
+        setattr(step, key, value)
+    if restoring:
+        step.deleted_at = None
+    if "wait_hours" in values:
+        # A changed wait has to move the follow-ups already queued for this
+        # step, otherwise editing "wait 24h" to "wait 48h" would not take
+        # effect for anyone already in the chain.
+        await db.execute(
+            update(AdsFollowUpTask)
+            .where(
+                AdsFollowUpTask.step_id == step.id,
+                AdsFollowUpTask.status == "pending",
+            )
+            .values(
+                due_at=svc.now_utc()
+                + timedelta(hours=max(int(values["wait_hours"] or 0), 0))
+            )
+        )
+    svc.log_activity(
+        db,
+        "followup_step_updated",
+        campaign_id=step.campaign_id,
+        actor=actor,
+        detail=", ".join(sorted(values)) or None,
+    )
+    await db.commit()
+    await db.refresh(step)
+    return followup_step_out(step)
+
+
+@router.delete("/campaigns/{campaign_id}/followup-steps/{step_id}")
+async def delete_campaign_step(
+    campaign_id: int,
+    step_id: int,
+    hard: bool = Query(False, description="Permanently delete instead of soft-deleting."),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Remove a follow-up step.
+
+    Soft delete by default: the step is deactivated and marked deleted, so it
+    stops sending (pending tasks are cancelled) while its history survives.
+    """
+    await _get_campaign(db, campaign_id)
+    return await _delete_step(db, step_id, campaign_id=campaign_id, hard=hard, actor=user.username)
+
+
+@router.delete("/followup-steps/{step_id}")
+async def delete_step_legacy(
+    step_id: int,
+    hard: bool = Query(False, description="Permanently delete instead of soft-deleting."),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Backwards-compatible alias of the campaign-scoped DELETE."""
+    return await _delete_step(db, step_id, campaign_id=None, hard=hard, actor=user.username)
+
+
+async def _delete_step(
+    db: AsyncSession,
+    step_id: int,
+    *,
+    campaign_id: Optional[int],
+    hard: bool,
+    actor: str,
+) -> dict:
+    query = select(AdsFollowUpStep).where(AdsFollowUpStep.id == step_id)
+    if campaign_id is not None:
+        query = query.where(AdsFollowUpStep.campaign_id == campaign_id)
+    step = (await db.execute(query)).scalar_one_or_none()
     if step is None:
         raise HTTPException(404, "Step not found")
-    await db.execute(
-        update(AdsFollowUpTask)
-        .where(AdsFollowUpTask.step_id == step_id, AdsFollowUpTask.status == "pending")
-        .values(status="cancelled", note="Step removed")
+
+    # Nothing queued for this step may go out after the operator removed it.
+    cancelled = (
+        await db.execute(
+            update(AdsFollowUpTask)
+            .where(AdsFollowUpTask.step_id == step_id, AdsFollowUpTask.status == "pending")
+            .values(status="cancelled", note="Step removed")
+        )
+    ).rowcount
+
+    if hard:
+        await db.delete(step)
+    else:
+        step.is_active = False
+        step.deleted_at = svc.now_utc()
+    svc.log_activity(
+        db,
+        "followup_step_deleted",
+        campaign_id=step.campaign_id,
+        actor=actor,
+        detail="hard delete" if hard else "soft delete",
     )
-    await db.delete(step)
     await db.commit()
+    return {
+        "ok": True,
+        "deleted": True,
+        "step_id": step_id,
+        "campaign_id": step.campaign_id,
+        "soft_deleted": not hard,
+        "is_active": False,
+        "pending_tasks_cancelled": cancelled or 0,
+    }
+
+
+# ==========================================================================
+# Follow-up template library
+# ==========================================================================
+
+
+def _template_filters(channel: Optional[str]):
+    if not channel or channel == "all":
+        return []
+    _validate_channel(channel)
+    # A template saved for either channel is usable on both, so it shows up
+    # next to the channel-specific ones.
+    return [AdsFollowUpTemplate.channel.in_((channel, "any"))]
+
+
+@router.get("/followup-templates")
+async def list_followup_templates(
+    channel: Optional[str] = Query(None, description="sms | email | all"),
+    include_inactive: bool = Query(False),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Reusable follow-up templates, newest first."""
+    query = select(AdsFollowUpTemplate)
+    for clause in _template_filters(channel):
+        query = query.where(clause)
+    if not include_inactive:
+        query = query.where(AdsFollowUpTemplate.is_active.is_(True))
+    rows = list(
+        (await db.execute(query.order_by(AdsFollowUpTemplate.name, AdsFollowUpTemplate.id)))
+        .scalars()
+        .all()
+    )
+    items = [followup_template_out(t) for t in rows]
+    return {"items": items, "templates": items, "total": len(items)}
+
+
+@router.post("/followup-templates", status_code=201)
+async def create_followup_template(
+    data: FollowUpTemplateIn,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Save a reusable follow-up template."""
+    template = AdsFollowUpTemplate(**data.model_dump())
+    db.add(template)
+    await db.commit()
+    await db.refresh(template)
+    return followup_template_out(template)
+
+
+@router.get("/followup-templates/{template_id}")
+async def get_followup_template(
+    template_id: int, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)
+):
+    template = (
+        await db.execute(
+            select(AdsFollowUpTemplate).where(AdsFollowUpTemplate.id == template_id)
+        )
+    ).scalar_one_or_none()
+    if template is None:
+        raise HTTPException(404, "Template not found")
+    return followup_template_out(template)
+
+
+@router.patch("/followup-templates/{template_id}")
+async def update_followup_template(
+    template_id: int,
+    data: FollowUpTemplatePatch,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    template = (
+        await db.execute(
+            select(AdsFollowUpTemplate).where(AdsFollowUpTemplate.id == template_id)
+        )
+    ).scalar_one_or_none()
+    if template is None:
+        raise HTTPException(404, "Template not found")
+    for key, value in data.model_dump(exclude_unset=True).items():
+        setattr(template, key, value)
+    await db.commit()
+    await db.refresh(template)
+    return followup_template_out(template)
+
+
+@router.delete("/followup-templates/{template_id}")
+async def delete_followup_template(
+    template_id: int, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)
+):
+    """Retire a template. Steps already created from it are untouched."""
+    template = (
+        await db.execute(
+            select(AdsFollowUpTemplate).where(AdsFollowUpTemplate.id == template_id)
+        )
+    ).scalar_one_or_none()
+    if template is None:
+        raise HTTPException(404, "Template not found")
+    template.is_active = False
+    await db.commit()
+    return {"ok": True, "deleted": True, "template_id": template_id, "soft_deleted": True}
 
 
 @router.get("/followups")

@@ -157,16 +157,69 @@ export type AdsCreative = {
 
 export type FollowUpStep = {
   id: number;
+  campaign_id?: number;
   step_order: number;
   name?: string | null;
+  /** Hours to wait before this step (from the previous message). */
   wait_hours: number;
+  /** The same wait under the documented API name. */
+  delay_hours?: number;
   condition: string;
   action: string;
   body?: string | null;
   subject?: string | null;
+  template_id?: number | null;
   action_value?: string | null;
   is_active: boolean;
+  created_at?: string | null;
+  updated_at?: string | null;
 };
+
+export type FollowUpTemplate = {
+  id: number;
+  name: string;
+  description?: string | null;
+  channel: string;
+  subject?: string | null;
+  body: string;
+  condition: string;
+  action: string;
+  delay_hours: number;
+  is_active: boolean;
+  usage_count: number;
+};
+
+/** Every condition the follow-up engine understands (mirrors the backend). */
+export const FOLLOWUP_CONDITIONS: { value: string; label: string; emailOnly?: boolean }[] = [
+  { value: "no_reply", label: "No reply" },
+  { value: "opened_no_click", label: "Opened but no click", emailOnly: true },
+  { value: "clicked_no_reply", label: "Clicked but no reply" },
+  { value: "negative_reply", label: "Replied negatively" },
+  { value: "positive_reply", label: "Replied positively" },
+  { value: "replied", label: "Replied (any)" },
+  { value: "positive", label: "Reply sentiment: positive" },
+  { value: "negative", label: "Reply sentiment: negative" },
+  { value: "interested", label: "Lead status: interested" },
+  { value: "not_interested", label: "Lead status: not interested" },
+  { value: "converted", label: "Lead status: converted" },
+  { value: "opened", label: "Opened (email)", emailOnly: true },
+  { value: "not_opened", label: "Never opened", emailOnly: true },
+  { value: "link_clicked", label: "Link clicked" },
+  { value: "link_not_clicked", label: "Link not clicked" },
+  { value: "meeting_scheduled", label: "Meeting booked" },
+  { value: "always", label: "Always (no condition)" },
+];
+
+/** Every action a follow-up step may carry (mirrors the backend). */
+export const FOLLOWUP_ACTIONS: { value: string; label: string }[] = [
+  { value: "send_email", label: "Send email" },
+  { value: "send_sms", label: "Send SMS" },
+  { value: "add_tag", label: "Add tag" },
+  { value: "remove_tag", label: "Remove tag" },
+  { value: "change_status", label: "Change lead status" },
+  { value: "suppress", label: "Suppress contact" },
+  { value: "stop", label: "Stop the workflow" },
+];
 
 export type CampaignDetail = AdsCampaign & {
   sets: AdsSet[];
@@ -255,9 +308,27 @@ export const adsApi = {
   attachAudience: (id: number, body: { campaign_id: number; set_id?: number | null; new_set_name?: string }) =>
     unwrap<any>(api.post(`/ads/audiences/${id}/attach`, body)),
 
-  createStep: (campaignId: number, body: any) => unwrap<any>(api.post(`/ads/campaigns/${campaignId}/followup-steps`, body)),
-  updateStep: (id: number, body: any) => unwrap<any>(api.patch(`/ads/followup-steps/${id}`, body)),
-  deleteStep: (id: number) => unwrap<void>(api.delete(`/ads/followup-steps/${id}`)),
+  createStep: (campaignId: number, body: any) => unwrap<FollowUpStep>(api.post(`/ads/campaigns/${campaignId}/followup-steps`, body)),
+  /** Every step on a campaign, in chain order. */
+  listSteps: (campaignId: number, includeInactive = true) =>
+    unwrap<{ items: FollowUpStep[]; total: number }>(
+      api.get(`/ads/campaigns/${campaignId}/followup-steps`, { params: { include_inactive: includeInactive } }),
+    ),
+  getStep: (id: number) => unwrap<any>(api.get(`/ads/followup-steps/${id}`)),
+  /** Edit any subset of a step after creation. */
+  updateStep: (campaignId: number, id: number, body: any) =>
+    unwrap<FollowUpStep>(api.patch(`/ads/campaigns/${campaignId}/followup-steps/${id}`, body)),
+  /** Soft-delete: the step stops sending, its history survives. */
+  deleteStep: (campaignId: number, id: number) =>
+    unwrap<{ ok: boolean; step_id: number }>(api.delete(`/ads/campaigns/${campaignId}/followup-steps/${id}`)),
+
+  followupTemplates: (params: any = {}) =>
+    unwrap<{ items: FollowUpTemplate[]; total: number }>(api.get("/ads/followup-templates", { params })),
+  createFollowupTemplate: (body: any) =>
+    unwrap<FollowUpTemplate>(api.post("/ads/followup-templates", body)),
+  updateFollowupTemplate: (id: number, body: any) =>
+    unwrap<FollowUpTemplate>(api.patch(`/ads/followup-templates/${id}`, body)),
+  deleteFollowupTemplate: (id: number) => unwrap<void>(api.delete(`/ads/followup-templates/${id}`)),
 
   followups: (bucket: string, channel?: string) =>
     unwrap<any>(api.get("/ads/followups", { params: { bucket, ...(channel ? { channel } : {}) } })),
