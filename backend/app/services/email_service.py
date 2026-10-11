@@ -381,16 +381,20 @@ async def reset_daily_counter(account: EmailAccount, today: date | None = None) 
 
 
 def effective_daily_limit(account: EmailAccount, default_limit: int | None = None) -> int | None:
-    """The daily ceiling for this mailbox, or None for unlimited.
+    """Return the account's chosen cap (NULL means unlimited), or a legacy fallback.
 
-    ``default_limit`` is the protective per-mailbox default from Sending Rules. An
-    account's own ``daily_limit`` can only *lower* it: Brevo's quota says what the
-    provider will accept, not what a mailbox with no reputation can safely send.
+    Explicit account configuration always wins. ``daily_limit_unlimited`` makes
+    a saved NULL distinguishable from older rows that inherited a Sending Rules
+    default; it is set when a user sends ``daily_limit: null`` and defaults to
+    unlimited for new accounts. The argument remains for compatibility with old
+    callers, but cannot override an explicit account choice.
     """
-    explicit = int(account.daily_limit) if account.daily_limit else None
-    if default_limit is None:
+    explicit = int(account.daily_limit) if account.daily_limit is not None and int(account.daily_limit) > 0 else None
+    if explicit is not None:
         return explicit
-    return default_limit if explicit is None else min(explicit, default_limit)
+    if getattr(account, "daily_limit_unlimited", True):
+        return None
+    return int(default_limit) if default_limit and int(default_limit) > 0 else None
 
 
 async def account_room(account: EmailAccount, default_limit: int | None = None) -> int | None:
@@ -452,12 +456,14 @@ def serialize_account(
         "has_api_key": bool(account.api_key_encrypted),
         "api_key_masked": mask_api_key(account.api_key_encrypted) if api_key else "",
         "daily_limit": account.daily_limit,
-        # What the app will actually allow: the lower of this account's own limit
-        # and the per-mailbox default in Sending Rules (None = unlimited).
+        "daily_limit_unlimited": bool(getattr(account, "daily_limit_unlimited", True)),
+        # NULL remains unlimited unless this legacy row explicitly inherits a
+        # configured Sending Rules default.
         "effective_daily_limit": effective,
         "daily_limit_source": (
-            "account" if account.daily_limit and (default_limit is None or account.daily_limit <= default_limit)
-            else "sending_rules" if default_limit is not None else "none"
+            "account" if account.daily_limit is not None and int(account.daily_limit) > 0
+            else "none" if getattr(account, "daily_limit_unlimited", True) or effective is None
+            else "sending_rules"
         ),
         "sent_today": account.sent_today or 0,
         "total_sent": account.total_sent or 0,
@@ -559,8 +565,21 @@ async def test_account(db: AsyncSession, account: EmailAccount, *, persist: bool
     """Verify the API key against Brevo and remember the outcome."""
     from app.providers.brevo import test_api_key
 
-    api_key = decrypt_value(account.api_key_encrypted or "")
-    result = await test_api_key(api_key)
+    try:
+        api_key = decrypt_value(account.api_key_encrypted or "")
+        if not api_key:
+            result = {"success": False, "error": "No readable Brevo API key is saved. Re-save it in Email Manager."}
+        else:
+            result = await test_api_key(api_key)
+    except Exception as exc:  # noqa: BLE001 - account health is a user-facing diagnosis
+        logger.warning("Brevo health check failed for account %s: %s", account.id, exc)
+        result = {"success": False, "error": "Could not connect to Brevo. Check network access and the saved API key."}
+    if not result.get("success"):
+        error = str(result.get("error") or "Brevo connection failed.")
+        if "timeout" in error.lower() or "connect" in error.lower() or "network" in error.lower():
+            result["error"] = "Could not reach Brevo. Check network access, then test the connection again."
+        elif result.get("status_code") in (401, 403):
+            result["error"] = "Brevo rejected this API key. Re-save a valid key in Email Manager."
     if persist:
         account.connection_status = "connected" if result.get("success") else "error"
         account.last_tested_at = _now()

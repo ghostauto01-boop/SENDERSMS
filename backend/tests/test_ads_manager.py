@@ -401,7 +401,9 @@ async def test_batch_drip_five_each_minute_never_bursts(db):
     # After the minute rolls over, exactly one more batch — not the backlog.
     back = datetime.now(timezone.utc) - timedelta(minutes=2)
     await db.execute(
-        update(AdsAssignment).where(AdsAssignment.campaign_id == campaign.id).values(sent_at=back)
+        update(AdsAssignment).where(AdsAssignment.campaign_id == campaign.id).values(
+            sent_at=back, last_action_at=back
+        )
     )
     await db.flush()
     total += (await svc.dispatch_campaign(db, campaign, limit=100))["sent"]
@@ -617,26 +619,28 @@ async def test_simulation_changes_nothing(db):
 
 
 @pytest.mark.asyncio
-async def test_validation_reports_bad_campaigns_without_blocking(db):
+async def test_validation_blocks_campaigns_missing_required_configuration(db):
     campaign = await make_campaign(db, status="draft", name="")
     report = await svc.validate_campaign(db, campaign)
-    assert report["ok"]
-    assert report["errors"] == []
-    assert any("name" in warning.lower() for warning in report["warnings"])
-    assert any("active audience set" in warning.lower() for warning in report["warnings"])
+    assert report["ok"] is False
+    assert report["valid"] is False
+    assert any("name is required" in error.lower() for error in report["errors"])
+    assert any("audience is empty" in error.lower() for error in report["errors"])
+    assert any("active audience set" in error.lower() for error in report["errors"])
 
 
 @pytest.mark.asyncio
-async def test_percentage_split_is_an_informational_warning(db):
+async def test_invalid_percentage_split_blocks_launch_preflight(db):
     contacts = await make_contacts(db, 5)
     lst = await make_list(db, contacts)
     campaign = await make_campaign(db, status="draft")
     ads_set = await make_set(db, campaign, lst, split_mode="percentage")
     await make_creatives(db, ads_set, ["A", "B"], [70, 20])
     report = await svc.validate_campaign(db, campaign)
-    assert report["ok"]
-    assert report["errors"] == []
-    assert any("100%" in warning for warning in report["warnings"])
+    assert report["ok"] is False
+    assert report["valid"] is False
+    assert any("100%" in error for error in report["errors"])
+    assert report["checks"]["creatives"]["pass"] is False
 
 
 @pytest.mark.asyncio

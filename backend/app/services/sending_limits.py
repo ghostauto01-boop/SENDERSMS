@@ -93,10 +93,10 @@ DEFAULTS = {
     "allow_holidays": True,
     ENABLE_PACING: True,
     MIN_DELAY_SECONDS: 30,
-    # 20-50 a day per mailbox is the usual guidance for a mailbox with no
-    # reputation yet; 30 sits in the middle. The deployment default comes from
-    # EMAIL_DEFAULT_DAILY_LIMIT.
-    EMAIL_DAILY_PER_MAILBOX: int(getattr(settings, "EMAIL_DEFAULT_DAILY_LIMIT", 30) or 0),
+    # Kept for compatibility with the Sending Rules API. An account's NULL
+    # daily_limit is now an explicit unlimited setting; this deprecated key is
+    # not auto-populated and cannot replace that choice.
+    EMAIL_DAILY_PER_MAILBOX: int(getattr(settings, "EMAIL_DEFAULT_DAILY_LIMIT", 0) or 0),
     BREAKER_ENABLED: True,
     # Pause a campaign when more than this share of its recent sends bounce or
     # are refused, or when spam complaints exceed the (much lower) second limit.
@@ -301,17 +301,23 @@ async def _last_sent_at(
 
 
 def account_daily_cap(account, rules: dict) -> Optional[int]:
-    """How many a single mailbox may send per day, or None for unlimited.
+    """Daily cap for one mailbox, respecting an explicit unlimited setting.
 
-    The account's own ``daily_limit`` can only *lower* the protective default: a
-    generous provider quota (Brevo's free plan allows 300 a day) says what the
-    provider will accept, not what a brand-new mailbox can safely send.
+    ``daily_limit`` is user-owned: a positive value is the exact app cap, while
+    an intentional NULL (``daily_limit_unlimited``) is unlimited. Only legacy
+    rows explicitly marked as inheriting may use a configured Sending Rules
+    fallback. New and migrated accounts default to unlimited.
     """
-    explicit = int(account.daily_limit) if account.daily_limit else None
-    default = default_mailbox_limit(rules)
-    if default is None:
+    explicit = (
+        int(account.daily_limit)
+        if account.daily_limit is not None and int(account.daily_limit) > 0
+        else None
+    )
+    if explicit is not None:
         return explicit
-    return default if explicit is None else min(explicit, default)
+    if getattr(account, "daily_limit_unlimited", True):
+        return None
+    return default_mailbox_limit(rules)
 
 
 async def _usable_accounts(db: AsyncSession, account_ids: Optional[list[int]] = None) -> list:

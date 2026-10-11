@@ -168,6 +168,8 @@ class Message(Base):
 
     retry_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    #: Durable retry schedule for provider 429s and transient email network errors.
+    retry_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
 
     # Delivered/failed timestamps
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

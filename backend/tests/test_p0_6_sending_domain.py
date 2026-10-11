@@ -104,16 +104,33 @@ async def test_a_campaign_from_a_free_mail_sender_validates_and_starts(api_clien
 
 
 @pytest.mark.asyncio
-async def test_ads_email_campaign_launch_keeps_the_existing_sender_route(api_client, api_db):
+async def test_ads_email_campaign_launch_keeps_the_existing_sender_route(
+    api_client, api_db, monkeypatch
+):
     from app.models.ads import AdsCampaign
+    from app.models.contact import Contact
+    from app.models.contact_list import ContactList, ContactListMember
+    from tests.test_ads_manager import make_creatives, make_set
 
+    async def brevo_ok(_api_key):
+        return {"success": True, "status_code": 200}
+
+    monkeypatch.setattr("app.providers.brevo.test_api_key", brevo_ok)
     account = await make_account(api_db, default=True)
     account.from_email = "legacy@gmail.com"
     campaign = AdsCampaign(
         name="Email outreach", objective="replies", channel="email", status="draft",
-        test_mode=False, email_account_id=account.id,
+        test_mode=False, email_account_id=account.id, subject="Hello",
     )
-    api_db.add(campaign)
+    contact = Contact(
+        phone_number="+2348031234567", email="lead@brandmail.io", first_name="Lead"
+    )
+    listing = ContactList(name="Email outreach audience")
+    api_db.add_all([campaign, contact, listing])
+    await api_db.flush()
+    api_db.add(ContactListMember(list_id=listing.id, contact_id=contact.id))
+    ads_set = await make_set(api_db, campaign, listing)
+    await make_creatives(api_db, ads_set, ["Welcome"])
     await api_db.flush()
 
     report = (await api_client.post(f"/api/v1/ads/campaigns/{campaign.id}/validate")).json()
@@ -370,11 +387,11 @@ async def _domain(db, address, *, status="authenticated", days_ago=None):
 
 
 @pytest.mark.asyncio
-async def test_a_warming_mailbox_is_capped_below_the_normal_per_mailbox_default(api_db):
-    """The per-mailbox default is 30; on day 3 of its warm-up this mailbox may send 5."""
+async def test_a_warming_mailbox_is_capped_below_its_explicit_daily_limit(api_db):
+    """The mailbox is configured for 30/day; on day 3 of warm-up it may send 5."""
     from app.services import sending_limits
 
-    account = await make_account(api_db, default=True)
+    account = await make_account(api_db, default=True, daily_limit=30)
     await _domain(api_db, account.from_email, days_ago=3)
     rules = {**await sending_limits.get_sending_rules(api_db), "email_daily_per_mailbox": 30,
              "enable_daily_limit": True}
@@ -390,7 +407,7 @@ async def test_week_four_and_beyond_is_25_and_an_unregistered_domain_is_not_ramp
     from app.services import sending_limits
 
     warmed = await make_account(api_db, default=True)
-    plain = await make_account(api_db)
+    plain = await make_account(api_db, daily_limit=30)
     await _domain(api_db, warmed.from_email, days_ago=30)
     rules = {**await sending_limits.get_sending_rules(api_db), "email_daily_per_mailbox": 30,
              "enable_daily_limit": True}

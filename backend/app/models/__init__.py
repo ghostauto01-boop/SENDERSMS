@@ -29,7 +29,7 @@ from app.models.campaign_followup import CampaignFollowUp, CampaignFollowUpLog
 from app.models.meeting import Meeting, MeetingAttendee
 from app.models.call import CallLog
 from app.models.push import PushSubscription
-from app.models.email import EmailAccount, EmailEvent, EmailSuppression
+from app.models.email import EmailAccount, EmailEvent, EmailSendLog, EmailSuppression
 from app.models.email_inbox import EmailContactAddress, EmailMailbox
 from app.models.mcp import McpCall, McpToken
 from app.models.mcp_oauth import (
@@ -51,6 +51,8 @@ from app.models.ads import (
     AdsCalendarEvent,
     AdsEvent,
     AdsActivityLog,
+    AdsCampaignJob,
+    AdsCampaignStateTransition,
 )
 
 from app.database import Base
@@ -96,6 +98,7 @@ __all__ = [
     "PushSubscription",
     "EmailAccount",
     "EmailEvent",
+    "EmailSendLog",
     "EmailSuppression",
     "AdsAudience",
     "AdsCampaign",
@@ -109,6 +112,8 @@ __all__ = [
     "AdsCalendarEvent",
     "AdsEvent",
     "AdsActivityLog",
+    "AdsCampaignJob",
+    "AdsCampaignStateTransition",
     "EmailMailbox",
     "EmailContactAddress",
     "McpCall",

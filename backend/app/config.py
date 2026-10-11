@@ -186,13 +186,10 @@ class Settings(BaseSettings):
     # Old deployment values are accepted but ignored by all email send paths.
     EMAIL_SEND_INFERRED: bool = True
     EMAIL_REQUIRE_VERIFIED: bool = False
-    # Daily sends allowed PER MAILBOX when an account has no daily limit of its own.
-    # A new sending mailbox has no reputation; the usual guidance is 20-50 a day
-    # per mailbox, rising slowly. This is the deployment default for the
-    # ``email_daily_per_mailbox`` sending rule (Settings -> Sending Rules can
-    # override it); an account's own daily_limit can only lower it. 0 = no
-    # per-mailbox default.
-    EMAIL_DEFAULT_DAILY_LIMIT: int = 30
+    # Deprecated compatibility setting. NULL account limits are unlimited and
+    # are never replaced by this setting. Keep the default at zero so an old
+    # deployment cannot silently restore the former 30/day cap.
+    EMAIL_DEFAULT_DAILY_LIMIT: int = 0
     # Per-domain DNS cache TTL, in seconds. MX answers change rarely; caching
     # them keeps a 5,000-row import from making 5,000 DNS round-trips.
     EMAIL_ENRICHMENT_DNS_TTL: int = 3600

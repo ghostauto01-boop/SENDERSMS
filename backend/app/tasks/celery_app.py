@@ -124,4 +124,8 @@ celery_app.conf.beat_schedule = {
         "task": "app.tasks.sms_tasks.process_scheduled_messages",
         "schedule": timedelta(seconds=30),
     },
+    "process-due-message-retries": {
+        "task": "app.tasks.sms_tasks.process_due_message_retries",
+        "schedule": timedelta(seconds=30),
+    },
 }
