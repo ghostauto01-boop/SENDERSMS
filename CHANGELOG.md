@@ -1,4 +1,47 @@
+## Unreleased — SMS Inbox, Conversations and Opportunity; no sending window for email
+
+- **Email has no sending window.** Mail goes out at night and on weekends, limited
+  only by the daily, hourly and per-mailbox caps. SMS keeps its window and weekend
+  rule unchanged (`SendingGate._window_state`).
+- **Inbox renamed to SMS Inbox** (nav label; `/inbox` still works, `/sms-inbox` is
+  the new name). The Email Inbox stays "Email Inbox" in the nav.
+- **SMS Inbox redesign.** Channel tabs (SMS Inbox / Email Inbox) like the Email
+  Inbox, a clearable search, labelled filter tabs (All, Unread, Interested,
+  Opportunity, Closed, Failed), a header with the unread total, contact-info and
+  Opportunity buttons in the chat header. Unread display (bold name, count pill,
+  primary-coloured time) is unchanged. The chat itself is unchanged.
+- **Conversations** (`/conversations`) lists only the people who wrote back, for
+  SMS or email (pick one at the top). Opening a row goes to that thread.
+- **Opportunity** (`/opportunities`) holds the prospects you marked interested
+  enough to chase, from both channels. Move a chat there from its inbox
+  (Opportunity button or chat menu) and take it out from the page or the chat.
+  - Backed by a new conversation label `status="opportunity"`. No migration.
+  - New endpoints: `POST /inbox/conversations/{id}/mark-opportunity` and
+    `POST /inbox/conversations/{id}/status` (SMS). The email status endpoint also
+    accepts `opportunity`.
+  - Inbound SMS, inbound email and email replies keep the label; the chat still
+    gets its unread count.
+  - `GET /inbox/conversations` returns `counts` per label for the channel and each
+    item carries its `channel`.
+
 # Changelog
+
+## Unreleased — Ads campaigns stuck "waiting" never resumed sending
+
+An Ads Manager campaign that had to wait for its sending window, its daily cap or
+its next drip batch was woken again and again by the poller. Every one of those
+wake-ups counted as an attempt, and the job allows five. After five ordinary
+wake-ups, one transient error (a database blip, a provider exception) marked the
+job `failed` for good; `create_missing_jobs` never revives a failed job, so the
+campaign stayed `active` with pending contacts and nothing was ever sent again.
+
+- **The retry budget counts failures only.** A claim no longer increments
+  `AdsCampaignJob.attempts`. A failed slice adds one; any slice that completes
+  clears the count. `max_retries` now means what the docs say: five consecutive
+  failed attempts before the job is marked `failed` and needs an operator retry.
+- Regression coverage in `backend/tests/test_ads_job_retry_budget.py` (waiting
+  wake-ups, a transient error after many wake-ups, five real failures still fail
+  the job, and a success clears the count). Three of the five fail on the old code.
 
 ## Unreleased — follow-up steps: every parameter honoured, editable, chainable
 

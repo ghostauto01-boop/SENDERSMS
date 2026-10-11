@@ -583,7 +583,13 @@ class SendingGate:
     def _window_state(
         self, rules: dict, now_local: datetime, now_utc: Optional[datetime] = None
     ) -> dict:
-        """Apply start/end time and the weekend toggle."""
+        """Apply start/end time and the weekend toggle (SMS only).
+
+        Email has no sending window: mail goes out whenever the caps allow. The
+        window stays for SMS, where carriers and phone quiet hours matter.
+        """
+        if self.channel == "email":
+            return {"allowed": True, "wait_seconds": 0, "reason": None, "next_window": None}
         start = _parse_time(rules.get("sending_start_time"))
         end = _parse_time(rules.get("sending_end_time"))
 

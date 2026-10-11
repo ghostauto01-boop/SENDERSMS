@@ -8,7 +8,7 @@ import {
   Send, Star, ThumbsDown, ThumbsUp, Archive, ChevronLeft, CheckCheck, MessageCircle,
   Bug, Search as SearchIcon, MoreVertical, Phone, Video, Paperclip, Smile,
   Mic, LogOut, Settings as SettingsIcon, Users, Megaphone, Home, FileText, CalendarPlus,
-  Filter, X as XIcon, BarChart3, Globe, Mail,
+  Filter, X as XIcon, BarChart3, Globe, Mail, Briefcase, Info,
 } from "lucide-react";
 import emailApi from "../api/email";
 import { startCall, openWhatsappChat, openWhatsappForCall, openWebsite, websiteUrl } from "../utils/call";
@@ -16,28 +16,11 @@ import type { Meeting, Template } from "../types";
 import ShortcodePicker from "../components/ShortcodePicker";
 import MeetingModal from "../components/MeetingModal";
 import CampaignChip from "../components/CampaignChip";
+import { avatarColor, initials, formatListTime } from "../utils/inboxFormat";
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
 /* ------------------------------------------------------------------ */
-
-const avatarColor = (name: string) => {
-  const colors = [
-    "bg-primary-600", "bg-primary-700", "bg-primary-800", "bg-[#34B7F1]",
-    "bg-warning-400", "bg-accent-500", "bg-primary-400", "bg-warning-400",
-  ];
-  let h = 0; for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % colors.length;
-  return colors[h];
-};
-
-const initials = (name: string, phone: string) => {
-  if (name && name.trim()) {
-    const parts = name.trim().split(/\s+/);
-    if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-    return name.slice(0, 2).toUpperCase();
-  }
-  return (phone || "??").slice(-2);
-};
 
 const formatTime = (iso?: string) => {
   if (!iso) return "";
@@ -45,16 +28,6 @@ const formatTime = (iso?: string) => {
     const d = new Date(iso);
     return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   } catch { return ""; }
-};
-
-const formatListTime = (iso?: string) => {
-  if (!iso) return "";
-  const d = new Date(iso);
-  const now = new Date();
-  const diff = (now.getTime() - d.getTime()) / 1000 / 3600;
-  if (diff < 24) return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  if (diff < 24 * 7) return d.toLocaleDateString([], { weekday: "short" });
-  return d.toLocaleDateString([], { day: "2-digit", month: "short" });
 };
 
 const dayLabel = (iso?: string) => {
@@ -98,6 +71,8 @@ export default function InboxPage() {
   // the SMS side shows for chats.
   const [emailUnread, setEmailUnread] = useState(0);
   const [convs, setConvs] = useState<any[]>([]);
+  // Per-label totals for the channel (not just the rows on screen), for the tabs.
+  const [counts, setCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<any>(null);
   const [messages, setMessages] = useState<any[]>([]);
@@ -279,6 +254,7 @@ export default function InboxPage() {
       if (c.repliedOnly) params.replied_only = true;
       const { data } = await api.get("/inbox/conversations", { params });
       setConvs(data.items || []);
+      if (data.counts) setCounts(data.counts);
     } catch {} finally { setLoading(false); }
   }, []);
 
@@ -381,6 +357,19 @@ export default function InboxPage() {
     } catch { toast.error("Failed"); }
   };
 
+  /** Move the open chat onto (or off) the Opportunity page. */
+  const setOpportunity = async (on: boolean) => {
+    if (!selected) return;
+    try {
+      const { data } = on
+        ? await api.post(`/inbox/conversations/${selected.id}/mark-opportunity`)
+        : await api.post(`/inbox/conversations/${selected.id}/status`, { status: "active" });
+      setSelected((s: any) => s ? { ...s, status: data.status ?? s.status } : s);
+      toast.success(on ? "Moved to Opportunity" : "Removed from Opportunity");
+      loadConvs();
+    } catch { toast.error("Could not change that chat"); }
+  };
+
   const doPoll = async () => {
     setPolling(true); setPollDebug(null); setDebugData(null);
     try {
@@ -417,11 +406,21 @@ export default function InboxPage() {
     { v: "all", l: "All" },
     { v: "unread", l: "Unread" },
     { v: "interested", l: "Interested" },
+    { v: "opportunity", l: "Opportunity" },
     { v: "closed", l: "Closed" },
     { v: "failed", l: "Failed" },
   ];
 
-  const unreadCount = convs.filter(c => (c.unread_count > 0) || c.status === "unread").length;
+  // Server counts cover the whole channel; until they arrive (or if an older
+  // server omits them) fall back to counting the rows on screen.
+  const countOf = (v: string): number => {
+    const key = v === "all" ? "all" : v === "unread" ? "unread" : v;
+    if (counts[key] !== undefined) return counts[key];
+    if (v === "all") return convs.length;
+    if (v === "unread") return convs.filter(c => (c.unread_count > 0) || c.status === "unread").length;
+    return convs.filter(c => c.status === v).length;
+  };
+  const unreadCount = countOf("unread");
 
   /* Per-message group boundaries (for tails / timestamps / spacing). */
   const groupInfo = useMemo(() => {
@@ -460,9 +459,12 @@ export default function InboxPage() {
               <div className="w-10 h-10 rounded-full bg-primary-600 flex items-center justify-center text-white font-semibold text-[15px] flex-shrink-0">
                 {initials(displayName, "")}
               </div>
-              <span className="font-semibold text-[15px] text-gray-900 dark:text-gray-200 truncate hidden sm:block">
-                {displayName}
-              </span>
+              <div className="hidden sm:block min-w-0">
+                <p className="font-semibold text-[15px] leading-5 text-gray-900 dark:text-gray-200 truncate">SMS Inbox</p>
+                <p className="text-[11px] leading-4 text-gray-500 dark:text-gray-400 truncate">
+                  {displayName}{counts.unread ? ` · ${counts.unread} unread` : ""}
+                </p>
+              </div>
             </div>
             <div className="flex items-center gap-0.5">
               {/* The email inbox is its own screen; this jumps straight to it. */}
@@ -516,10 +518,47 @@ export default function InboxPage() {
               <SearchIcon size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600 dark:text-gray-400" />
               <input
                 className="w-full pl-9 pr-3 py-[7px] bg-gray-100 dark:bg-gray-800 rounded-lg text-[14px] placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:outline-none text-gray-900 dark:text-gray-200"
-                placeholder="Search or start new chat"
+                placeholder="Search people, numbers, messages…"
+                aria-label="Search SMS conversations"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
               />
+              {search && (
+                <button
+                  onClick={() => setSearch("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center rounded-full text-gray-500 hover:bg-black/5 dark:hover:bg-white/10"
+                  aria-label="Clear search"
+                >
+                  <XIcon size={14} />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Channel tabs — the same pattern as the Email Inbox's All mail / Conversations. */}
+          <div className="px-2 md:px-3 pt-2 bg-white dark:bg-gray-900 flex-shrink-0">
+            <div className="flex gap-1 p-1 rounded-xl bg-gray-100 dark:bg-gray-800" role="tablist" aria-label="Channel">
+              <button
+                role="tab"
+                aria-selected={true}
+                className="flex-1 px-3 py-1.5 rounded-lg text-[13px] font-medium flex items-center justify-center gap-1.5 bg-white dark:bg-gray-700 shadow-sm text-primary-600"
+              >
+                <MessageCircle size={14} /> SMS Inbox
+              </button>
+              <Link
+                to="/email-inbox"
+                role="tab"
+                aria-selected={false}
+                title="Open the Email inbox"
+                className="flex-1 px-3 py-1.5 rounded-lg text-[13px] font-medium flex items-center justify-center gap-1.5 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+              >
+                <Mail size={14} /> Email Inbox
+                {emailUnread > 0 && (
+                  <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-primary-600 text-white text-[11px] flex items-center justify-center">
+                    {emailUnread}
+                  </span>
+                )}
+              </Link>
             </div>
           </div>
 
@@ -530,11 +569,12 @@ export default function InboxPage() {
               return (
                 <button
                   key={f.v}
+                  title={`${countOf(f.v)} ${countOf(f.v) === 1 ? "chat" : "chats"}`}
                   onClick={() => { setFilter(f.v); setSelected(null); }}
                   className={`whitespace-nowrap px-3 py-1.5 rounded-full text-[13px] font-medium transition-colors flex-shrink-0
                     ${active ? "bg-primary-600 text-white shadow-sm" : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800"}`}
                 >
-                  {f.l} {f.v === "unread" && unreadCount > 0 ? ` · ${unreadCount}` : ""}
+                  {f.l}{f.v === "unread" && countOf(f.v) > 0 ? ` · ${countOf(f.v)}` : ""}
                 </button>
               );
             })}
@@ -618,7 +658,7 @@ export default function InboxPage() {
             <button onClick={doPoll} className="text-[13px] text-primary-600 font-medium hover:underline flex items-center gap-1.5">
               <span className="text-[14px]">📥</span> Sync from phone
             </button>
-            <span className="text-[11px] text-gray-500 dark:text-gray-400">{convs.length} chats</span>
+            <span className="text-[11px] text-gray-500 dark:text-gray-400">{convs.length} {convs.length === 1 ? "chat" : "chats"}</span>
           </div>
 
           {/* Conversation list */}
@@ -668,7 +708,8 @@ export default function InboxPage() {
                     <div className="flex items-center justify-between gap-2 mt-0.5">
                       <p className={`truncate text-[13px] leading-4 flex items-center gap-1 min-w-0 flex-1 ${isUnread ? "text-gray-900 dark:text-gray-200 font-medium" : "text-gray-500 dark:text-gray-400"}`}>
                         {c.status === "interested" && <Star size={12} className="text-warning-400 flex-shrink-0" />}
-                        {!isUnread && c.status !== "interested" && <span className="text-gray-600 dark:text-gray-400 flex-shrink-0">✓✓</span>}
+                        {c.status === "opportunity" && <Briefcase size={12} className="text-warning-600 dark:text-warning-400 flex-shrink-0" />}
+                        {!isUnread && c.status !== "interested" && c.status !== "opportunity" && <span className="text-gray-600 dark:text-gray-400 flex-shrink-0">✓✓</span>}
                         <span className="truncate">{preview}</span>
                       </p>
                       <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -806,6 +847,11 @@ export default function InboxPage() {
                       {selected.contact_phone}
                       {selected.unread_count > 0 && <span className="bg-primary-600 text-white text-[10px] px-1.5 py-px rounded-full ml-1">{selected.unread_count} new</span>}
                       {selected.status === "interested" && <span className="text-warning-400">★ interested</span>}
+                      {selected.status === "opportunity" && (
+                        <span className="inline-flex items-center gap-1 text-warning-600 dark:text-warning-400 font-medium">
+                          <Briefcase size={11} /> Opportunity
+                        </span>
+                      )}
                       {/* Where this lead came from, right in the chat header. */}
                       {selected.campaign && (
                         <CampaignChip
@@ -855,6 +901,26 @@ export default function InboxPage() {
                   >
                     <CalendarPlus size={19} />
                   </button>
+                  <button
+                    onClick={() => setOpportunity(selected.status !== "opportunity")}
+                    title={selected.status === "opportunity" ? "Remove from Opportunity" : "Move to Opportunity"}
+                    className={`h-10 flex items-center gap-1.5 px-2.5 rounded-full text-[13px] font-medium transition-colors ${
+                      selected.status === "opportunity"
+                        ? "bg-warning-100 text-warning-700 dark:bg-warning-900/30 dark:text-warning-400"
+                        : "text-gray-600 dark:text-gray-400 hover:bg-black/5 dark:hover:bg-white/10"
+                    }`}
+                  >
+                    <Briefcase size={17} />
+                    <span className="hidden lg:inline">{selected.status === "opportunity" ? "In Opportunity" : "Opportunity"}</span>
+                  </button>
+                  <button
+                    onClick={() => setShowInfo(!showInfo)}
+                    title="Contact info"
+                    aria-pressed={showInfo}
+                    className={`w-10 h-10 flex items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 ${showInfo ? "text-primary-600" : "text-gray-600 dark:text-gray-400"}`}
+                  >
+                    <Info size={19} />
+                  </button>
                   <div className="relative">
                     <button onClick={() => setShowActions(!showActions)} className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-gray-600 dark:text-gray-400">
                       <MoreVertical size={19} />
@@ -866,6 +932,7 @@ export default function InboxPage() {
                           <button onClick={() => { setShowBooking(true); setShowActions(false); }} className="w-full text-left px-3 py-2.5 text-[14px] text-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-2.5"><CalendarPlus size={16} className="text-primary-600" /> Book a meeting</button>
                           <button onClick={() => { markAs("interested"); setShowActions(false); }} className="w-full text-left px-3 py-2.5 text-[14px] text-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-2.5"><Star size={16} className="text-warning-400" /> Mark interested</button>
                           <button onClick={() => { markAs("not-interested"); setShowActions(false); }} className="w-full text-left px-3 py-2.5 text-[14px] text-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-2.5"><ThumbsDown size={16} className="text-gray-500" /> Not interested</button>
+                          <button onClick={() => { setOpportunity(selected.status !== "opportunity"); setShowActions(false); }} className="w-full text-left px-3 py-2.5 text-[14px] text-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-2.5"><Briefcase size={16} className="text-warning-600" /> {selected.status === "opportunity" ? "Remove from Opportunity" : "Move to Opportunity"}</button>
                           <button onClick={() => { markAs("close"); setShowActions(false); }} className="w-full text-left px-3 py-2.5 text-[14px] text-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-2.5"><Archive size={16} className="text-gray-500" /> Close chat</button>
                           <div className="border-t border-gray-100 dark:border-gray-800 my-1" />
                           <button onClick={() => { setShowInfo(!showInfo); setShowActions(false); }} className="w-full text-left px-3 py-2.5 text-[14px] text-gray-900 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800">Contact info</button>

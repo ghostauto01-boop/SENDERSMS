@@ -68,8 +68,9 @@ async def test_defaults_are_on(api_db):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("channel", ["email", "sms"])
+@pytest.mark.parametrize("channel", ["sms"])
 async def test_gate_blocks_nights_and_weekends_by_default(api_db, channel):
+    """SMS keeps the sending window. Email has none (see the email test below)."""
     gate = SendingGate(api_db, channel=channel)
 
     assert (await gate.check(now=WED_NOON.astimezone(timezone.utc)))["allowed"] is True
@@ -85,6 +86,16 @@ async def test_gate_blocks_nights_and_weekends_by_default(api_db, channel):
     weekend = await gate.check(now=SAT_NOON.astimezone(timezone.utc))
     assert weekend["allowed"] is False
     assert "weekend" in weekend["reason"]
+
+
+@pytest.mark.asyncio
+async def test_email_has_no_sending_window(api_db):
+    """Email goes out at night and on weekends; the caps still apply."""
+    gate = SendingGate(api_db, channel="email")
+    for moment in (WED_NIGHT, WED_EARLY, SAT_NOON):
+        check = await gate.check(now=moment.astimezone(timezone.utc))
+        assert check["allowed"] is True, check["reason"]
+        assert check["next_window"] is None
 
 
 @pytest.mark.asyncio
@@ -183,7 +194,8 @@ async def test_room_is_the_allowance_left_after_sent_and_in_flight(api_db, sendi
 async def test_room_is_zero_outside_the_window(api_db, sending_clock):
     sending_clock(WED_NIGHT)
     await make_account(api_db, default=True, daily_limit=30)
-    assert await SendingGate(api_db, channel="email").room() == 0
+    assert await SendingGate(api_db, channel="sms").room() == 0
+    assert await SendingGate(api_db, channel="email").room() > 0
 
 
 # --------------------------------------------------------------------------
@@ -277,7 +289,7 @@ async def test_the_rest_goes_out_on_the_next_sending_day(api_db, batch, sending_
 
 
 @pytest.mark.asyncio
-async def test_an_email_campaign_started_after_hours_creates_nothing_and_stays_running(
+async def test_an_email_campaign_runs_after_hours(
     api_db, batch, sending_clock
 ):
     sending_clock(WED_NIGHT)
@@ -286,20 +298,18 @@ async def test_an_email_campaign_started_after_hours_creates_nothing_and_stays_r
 
     processed = await batch(campaign.id)
 
-    assert processed == 0
-    assert await _message_count(api_db, campaign.id) == 0
-    await api_db.refresh(campaign)
-    assert campaign.status == "running", "waiting for the window is not completion"
+    assert processed == 5
+    assert await _message_count(api_db, campaign.id) == 5
 
 
 @pytest.mark.asyncio
-async def test_a_weekend_start_waits_for_monday(api_db, batch, sending_clock):
+async def test_an_email_campaign_runs_on_a_weekend(api_db, batch, sending_clock):
     sending_clock(SAT_NOON)
     account = await make_account(api_db, default=True, daily_limit=30)
     campaign = await _running_email_campaign(api_db, account, 5)
 
-    assert await batch(campaign.id) == 0
-    assert await _message_count(api_db, campaign.id) == 0
+    assert await batch(campaign.id) == 5
+    assert await _message_count(api_db, campaign.id) == 5
 
 
 @pytest.mark.asyncio
@@ -382,7 +392,7 @@ async def test_an_ads_email_campaign_stops_at_the_daily_cap(api_db, monkeypatch,
 
 
 @pytest.mark.asyncio
-async def test_an_ads_email_campaign_waits_for_the_window(api_db, monkeypatch, sending_clock):
+async def test_an_ads_email_campaign_is_not_held_by_the_window(api_db, monkeypatch, sending_clock):
     from app.services import ads_service as svc
 
     monkeypatch.setattr("app.tasks.queue.try_enqueue", lambda *a, **k: True)
@@ -392,7 +402,7 @@ async def test_an_ads_email_campaign_waits_for_the_window(api_db, monkeypatch, s
 
     result = await svc.dispatch_campaign(api_db, campaign, limit=25)
 
-    assert result["sent"] == 0
+    assert result["sent"] > 0, result
 
 
 @pytest.mark.asyncio
@@ -708,12 +718,17 @@ async def test_a_fresh_install_needs_no_migration(api_db):
 
 
 @pytest.mark.asyncio
-async def test_starting_after_hours_says_nothing_will_send_yet(
-    api_client, api_db, sending_clock, stub_queue
+async def test_starting_sms_after_hours_says_nothing_will_send_yet(
+    api_client, api_db, sending_clock, stub_queue, monkeypatch
 ):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "SMSGATE_BASE_URL", "https://api.sms-gate.app/3rdparty/v1")
+    monkeypatch.setattr(settings, "SMSGATE_USERNAME", "user")
+    monkeypatch.setattr(settings, "SMSGATE_PASSWORD", "pass")
     sending_clock(WED_NIGHT)
     await make_account(api_db, default=True, daily_limit=30)
-    campaign = await make_campaign(api_db, channel="email", n=5)
+    campaign = await make_campaign(api_db, channel="sms", n=5)
 
     response = await api_client.post(f"/api/v1/campaigns/{campaign.id}/start")
 
@@ -722,6 +737,20 @@ async def test_starting_after_hours_says_nothing_will_send_yet(
     assert body["status"] == "running"
     assert "outside sending hours" in body["message"]
     assert body["waiting"]["next_window"], "and when it will"
+
+
+@pytest.mark.asyncio
+async def test_starting_email_after_hours_has_no_waiting_note(
+    api_client, api_db, sending_clock, stub_queue
+):
+    sending_clock(WED_NIGHT)
+    await make_account(api_db, default=True, daily_limit=30)
+    campaign = await make_campaign(api_db, channel="email", n=5)
+
+    body = (await api_client.post(f"/api/v1/campaigns/{campaign.id}/start")).json()
+
+    assert "outside sending hours" not in (body.get("message") or "")
+    assert not body.get("waiting")
 
 
 @pytest.mark.asyncio

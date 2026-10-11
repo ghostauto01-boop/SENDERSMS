@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Users, List, Megaphone, GitBranch, Sparkles,
   Inbox, Send, Clock, FileText, BarChart3, Settings, MessageSquareReply,
   Zap, Moon, Sun, Menu, X, LogOut, Search, Braces, Repeat, Calendar, Target,
-  Activity, Phone, Mail, MailOpen, GraduationCap, MoreHorizontal, ShieldCheck,
+  Activity, Phone, Mail, MailOpen, GraduationCap, MoreHorizontal, ShieldCheck, Briefcase,
 } from "lucide-react";
 import BrandMark from "../components/BrandMark";
 import ChannelSwitch from "../components/ChannelSwitch";
@@ -52,10 +52,11 @@ const CHANNELS: NavItem[] = [
   { to: "/sms-manager", label: "SMS Manager", icon: Sparkles },
   { to: "/email-manager", label: "Email Manager", icon: Mail },
   { to: "/email-inbox", label: "Email Inbox", icon: MailOpen },
-  // The same screen with one filter, and a destination of its own: only the
-  // people who wrote back, i.e. the threads you are actually talking in.
-  { to: "/email-inbox?view=replied", label: "Conversations", icon: MessageSquareReply },
-  { to: "/inbox", label: "Inbox", icon: Inbox },
+  { to: "/sms-inbox", label: "SMS Inbox", icon: Inbox },
+  // Only the people who wrote back, for SMS or email (pick one on the page).
+  { to: "/conversations", label: "Conversations", icon: MessageSquareReply },
+  // Prospects you marked as interested, from either channel.
+  { to: "/opportunities", label: "Opportunity", icon: Briefcase },
   { to: "/calendar", label: "Calendar", icon: Calendar },
 ];
 
