@@ -1470,53 +1470,95 @@ async def dispatch_campaign(
 # ==========================================================================
 
 
-async def _schedule_followups(db: AsyncSession, campaign: AdsCampaign, assignment: AdsAssignment) -> None:
-    """Create the pending follow-up tasks for a contact we just messaged."""
-    steps = list(
-        (
-            await db.execute(
-                select(AdsFollowUpStep)
-                .where(
-                    AdsFollowUpStep.campaign_id == campaign.id,
-                    AdsFollowUpStep.is_active.is_(True),
-                )
-                .order_by(AdsFollowUpStep.step_order)
-            )
-        ).scalars().all()
+def _live_step_filter(campaign_id: int):
+    """Filters shared by every query that asks "which steps are in the chain"."""
+    return (
+        AdsFollowUpStep.campaign_id == campaign_id,
+        AdsFollowUpStep.is_active.is_(True),
+        AdsFollowUpStep.deleted_at.is_(None),
     )
-    if not steps:
+
+
+async def next_followup_step(
+    db: AsyncSession, campaign_id: int, *, after_order: int | None = None
+) -> AdsFollowUpStep | None:
+    """The next live step in a campaign's chain.
+
+    ``after_order=None`` returns the first step; otherwise the first active
+    step ordered after the one that just ran. Steps are chained one at a time,
+    so step N is only ever queued once step N-1 has actually gone out.
+    """
+    query = select(AdsFollowUpStep).where(*_live_step_filter(campaign_id))
+    if after_order is not None:
+        query = query.where(AdsFollowUpStep.step_order > after_order)
+    query = query.order_by(AdsFollowUpStep.step_order, AdsFollowUpStep.id).limit(1)
+    return (await db.execute(query)).scalars().first()
+
+
+async def _queue_followup_task(
+    db: AsyncSession,
+    campaign: AdsCampaign,
+    step: AdsFollowUpStep,
+    *,
+    contact_id: int,
+    assignment_id: int | None,
+    due_at: datetime,
+) -> AdsFollowUpTask | None:
+    """Queue one (step, contact) follow-up. Never queues the same pair twice.
+
+    The unique ``(step_id, contact_id)`` log row is the durable guard: a sweep
+    that runs twice (or a retry after a crash) cannot create a second task.
+    """
+    exists = (
+        await db.execute(
+            select(AdsFollowUpTask.id).where(
+                AdsFollowUpTask.step_id == step.id,
+                AdsFollowUpTask.contact_id == contact_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if exists:
+        return None
+    task = AdsFollowUpTask(
+        campaign_id=campaign.id,
+        step_id=step.id,
+        assignment_id=assignment_id,
+        contact_id=contact_id,
+        due_at=due_at,
+        status="pending",
+        body=step.body,
+    )
+    db.add(task)
+    record_event(
+        db,
+        "FOLLOW_UP_CREATED",
+        campaign_id=campaign.id,
+        contact_id=contact_id,
+        assignment_id=assignment_id,
+    )
+    return task
+
+
+async def _schedule_followups(db: AsyncSession, campaign: AdsCampaign, assignment: AdsAssignment) -> None:
+    """Queue the FIRST follow-up step for a contact we just messaged.
+
+    Only one step is queued at a time: each step's wait is measured from the
+    message before it, and the next one is queued when this one sends (see
+    ``process_followups``). Queuing the whole chain up front is what made step
+    2 fire off the campaign's own send time (or fire even when step 1 was
+    skipped), so it is deliberately gone.
+    """
+    step = await next_followup_step(db, campaign.id)
+    if step is None:
         return
-    cumulative = 0
-    for step in steps:
-        cumulative += max(int(step.wait_hours or 0), 0)
-        exists = (
-            await db.execute(
-                select(AdsFollowUpTask.id).where(
-                    AdsFollowUpTask.step_id == step.id,
-                    AdsFollowUpTask.contact_id == assignment.contact_id,
-                )
-            )
-        ).scalar_one_or_none()
-        if exists:
-            continue
-        db.add(
-            AdsFollowUpTask(
-                campaign_id=campaign.id,
-                step_id=step.id,
-                assignment_id=assignment.id,
-                contact_id=assignment.contact_id,
-                due_at=now_utc() + timedelta(hours=cumulative),
-                status="pending",
-                body=step.body,
-            )
-        )
-        record_event(
-            db,
-            "FOLLOW_UP_CREATED",
-            campaign_id=campaign.id,
-            contact_id=assignment.contact_id,
-            assignment_id=assignment.id,
-        )
+    await _queue_followup_task(
+        db,
+        campaign,
+        step,
+        contact_id=assignment.contact_id,
+        assignment_id=assignment.id,
+        due_at=now_utc() + timedelta(hours=max(int(step.wait_hours or 0), 0)),
+    )
     assignment.followup_status = "scheduled"
 
 
@@ -1529,16 +1571,128 @@ async def _has_reply_since(db: AsyncSession, contact_id: int, since: datetime | 
     return ((await db.execute(query)).scalar() or 0) > 0
 
 
-async def _condition_met(db: AsyncSession, step: AdsFollowUpStep, assignment: AdsAssignment | None, contact: Contact) -> bool:
+async def _last_outgoing_message(
+    db: AsyncSession, campaign_id: int, contact_id: int
+) -> Message | None:
+    """The newest message this campaign sent to this contact.
+
+    For a chained follow-up that is the previous step's message, which is what
+    every condition (reply, open, click) must be measured against -- not the
+    original campaign send.
+    """
+    return (
+        await db.execute(
+            select(Message)
+            .where(
+                Message.contact_id == contact_id,
+                Message.ads_campaign_id == campaign_id,
+                Message.direction == "outgoing",
+            )
+            .order_by(Message.created_at.desc(), Message.id.desc())
+            .limit(1)
+        )
+    ).scalars().first()
+
+
+async def _reply_sentiment(
+    db: AsyncSession, contact_id: int, since: datetime | None
+) -> str | None:
+    """How the contact's latest reply reads: positive / negative / neutral.
+
+    Uses the existing keyless AI classification stored on the inbound message
+    (``Message.ai_sentiment``) and falls back to the ads reply classifier, so
+    a reply that arrived through any channel (SMS gateway, Brevo webhook,
+    mailbox poll) can drive a follow-up condition.
+    """
+    query = select(Message).where(
+        Message.contact_id == contact_id, Message.direction == "incoming"
+    )
+    if since:
+        query = query.where(Message.created_at >= as_utc(since))
+    message = (
+        await db.execute(query.order_by(Message.created_at.desc(), Message.id.desc()).limit(1))
+    ).scalars().first()
+    if message is None:
+        return None
+    sentiment = (message.ai_sentiment or "").strip().lower()
+    if sentiment in ("positive", "negative", "neutral"):
+        return sentiment
+    try:
+        from app.services.ai_classifier import classify
+
+        sentiment = (classify(message.body or "").get("sentiment") or "").strip().lower()
+        if sentiment in ("positive", "negative", "neutral"):
+            return sentiment
+    except Exception as exc:  # noqa: BLE001 - classification must never block a sweep
+        logger.warning("Follow-up reply classification failed: %s", exc)
+    return (classify_reply(message.body or "") or "").strip().lower() or None
+
+
+async def _message_engagement(
+    db: AsyncSession, message: Message | None
+) -> tuple[bool, bool]:
+    """``(opened, clicked)`` for the message before the step.
+
+    Email opens/clicks come from the Brevo webhook, SMS clicks from the
+    tracked-link redirect; both are stored on the Message row, so one lookup
+    answers either channel.
+    """
+    if message is None:
+        return False, False
+    opened = bool(message.opened_at) or (message.open_count or 0) > 0
+    clicked = bool(message.clicked_at) or (message.click_count or 0) > 0
+    return opened, clicked
+
+
+async def _condition_met(
+    db: AsyncSession,
+    step: AdsFollowUpStep,
+    assignment: AdsAssignment | None,
+    contact: Contact,
+    *,
+    campaign_id: int | None = None,
+) -> bool:
+    """Should this step send for this contact?
+
+    Conditions are evaluated against the message BEFORE the step (the previous
+    follow-up, or the campaign's own send for step 1) and its reply, so a
+    chain can branch: no_reply / opened_no_click / clicked_no_reply /
+    negative_reply / always, plus the older sentiment and lead-status tests.
+    """
     cond = (step.condition or "no_reply").lower()
-    since = assignment.sent_at if assignment else None
+    previous = (
+        await _last_outgoing_message(db, campaign_id, contact.id)
+        if campaign_id is not None
+        else None
+    )
+    if previous is None and assignment is not None and assignment.message_id:
+        previous = (
+            await db.execute(select(Message).where(Message.id == assignment.message_id))
+        ).scalar_one_or_none()
+    since = (previous.sent_at or previous.created_at) if previous is not None else (
+        assignment.sent_at if assignment else None
+    )
+
     if cond == "always":
         return True
+
     replied = await _has_reply_since(db, contact.id, since)
     if cond == "no_reply":
         return not replied
     if cond == "replied":
         return replied
+
+    if cond in ("positive_reply", "negative_reply"):
+        if not replied:
+            return False
+        sentiment = await _reply_sentiment(db, contact.id, since)
+        if sentiment is None:
+            # Fall back to the sentiment the reply association stored.
+            sentiment = (assignment.reply_status if assignment else None) or ""
+        if cond == "positive_reply":
+            return sentiment == "positive"
+        return sentiment == "negative"
+
     if cond == "positive":
         return (assignment.reply_status if assignment else None) == "positive"
     if cond == "negative":
@@ -1546,28 +1700,32 @@ async def _condition_met(db: AsyncSession, step: AdsFollowUpStep, assignment: Ad
     if cond == "interested":
         return (contact.lead_status or "").lower() == "interested"
     if cond == "not_interested":
-        return (contact.lead_status or "").lower() == "not_interested"
+        return (contact.lead_status or "").lower() in ("not_interested", "not interested")
     if cond == "converted":
         return (contact.lead_status or "").lower() in ("converted", "customer")
-    if cond in ("link_clicked", "link_not_clicked", "opened", "not_opened"):
-        # Email campaigns get real open/click data from Brevo; SMS campaigns
-        # get clicks from the tracked-link redirect. Both land on the Message
-        # row, so one lookup answers either channel's condition.
-        clicked = opened = False
-        if assignment is not None and assignment.message_id:
-            message = (
-                await db.execute(select(Message).where(Message.id == assignment.message_id))
-            ).scalar_one_or_none()
-            if message is not None:
-                clicked = (message.click_count or 0) > 0 or bool(message.clicked_at)
-                opened = (message.open_count or 0) > 0 or bool(message.opened_at)
+
+    if cond in (
+        "link_clicked",
+        "link_not_clicked",
+        "opened",
+        "not_opened",
+        "opened_no_click",
+        "clicked_no_reply",
+    ):
+        opened, clicked = await _message_engagement(db, previous)
         if cond == "link_clicked":
             return clicked
         if cond == "link_not_clicked":
             return not clicked
         if cond == "opened":
             return opened
-        return not opened
+        if cond == "not_opened":
+            return not opened
+        if cond == "opened_no_click":
+            return opened and not clicked
+        # clicked_no_reply: they showed interest, they just have not written back.
+        return clicked and not replied
+
     if cond == "meeting_scheduled":
         count = (
             await db.execute(
@@ -1579,7 +1737,42 @@ async def _condition_met(db: AsyncSession, step: AdsFollowUpStep, assignment: Ad
             )
         ).scalar() or 0
         return count > 0
+
+    # An unknown condition (a row written before this list existed) must not
+    # silently gate the send: `always` is what the old fall-through did.
+    logger.warning("Follow-up step %s has unknown condition %r; sending anyway", step.id, cond)
     return True
+
+
+async def _schedule_next_step(
+    db: AsyncSession,
+    campaign: AdsCampaign,
+    step: AdsFollowUpStep,
+    *,
+    contact_id: int,
+    assignment_id: int | None,
+) -> AdsFollowUpStep | None:
+    """Queue the step after ``step`` once it has actually gone out."""
+    following = await next_followup_step(db, campaign.id, after_order=step.step_order)
+    if following is None:
+        return None
+    await _queue_followup_task(
+        db,
+        campaign,
+        following,
+        contact_id=contact_id,
+        assignment_id=assignment_id,
+        due_at=now_utc() + timedelta(hours=max(int(following.wait_hours or 0), 0)),
+    )
+    record_event(
+        db,
+        "FOLLOW_UP_QUEUED",
+        campaign_id=campaign.id,
+        contact_id=contact_id,
+        assignment_id=assignment_id,
+        detail=f"step {following.step_order}",
+    )
+    return following
 
 
 async def process_followups(db: AsyncSession, *, limit: int = 50, send_inline: bool = False) -> dict:
@@ -1611,10 +1804,37 @@ async def process_followups(db: AsyncSession, *, limit: int = 50, send_inline: b
             totals["cancelled"] += 1
             continue
 
-        # Automatic stop conditions. Email follow-ups stop on an EMAIL opt-out
-        # / bounce; SMS follow-ups stop on the phone suppression list. The two
+        step = (
+            await db.execute(select(AdsFollowUpStep).where(AdsFollowUpStep.id == task.step_id))
+        ).scalar_one_or_none()
+        assignment = (
+            await db.execute(select(AdsAssignment).where(AdsAssignment.id == task.assignment_id))
+        ).scalar_one_or_none() if task.assignment_id else None
+
+        if step is None:
+            # Manual task: leave for the human, just mark it overdue-visible.
+            continue
+        if not step.is_live():
+            task.status = "cancelled"
+            task.note = "Step removed" if step.deleted_at is not None else "Step disabled"
+            totals["cancelled"] += 1
+            continue
+
+        # Which channel does THIS step send on? The action decides, and an
+        # email campaign treats a send_sms step as email so a step written
+        # before the channel changed still goes out.
+        action = (step.action or "send_sms").lower()
+        if action == "send_email":
+            channel = "email"
+        elif action == "send_sms":
+            channel = "email" if is_email_campaign(campaign) else "sms"
+        else:
+            channel = campaign.channel or "sms"
+
+        # Automatic stop conditions. Email sends stop on an EMAIL opt-out /
+        # bounce; SMS sends stop on the phone suppression list. The two
         # consents are independent by design.
-        if is_email_campaign(campaign):
+        if channel == "email":
             blocked = await email_blocked_reason(db, contact)
             if blocked:
                 task.status = "cancelled"
@@ -1627,49 +1847,43 @@ async def process_followups(db: AsyncSession, *, limit: int = 50, send_inline: b
             totals["cancelled"] += 1
             continue
 
-        step = (
-            await db.execute(select(AdsFollowUpStep).where(AdsFollowUpStep.id == task.step_id))
-        ).scalar_one_or_none()
-        assignment = (
-            await db.execute(select(AdsAssignment).where(AdsAssignment.id == task.assignment_id))
-        ).scalar_one_or_none() if task.assignment_id else None
-
-        if step is None:
-            # Manual task: leave for the human, just mark it overdue-visible.
-            continue
-        if not step.is_active:
-            task.status = "cancelled"
-            task.note = "Step disabled"
-            totals["cancelled"] += 1
-            continue
-        if not await _condition_met(db, step, assignment, contact):
+        if not await _condition_met(
+            db, step, assignment, contact, campaign_id=campaign.id
+        ):
             task.status = "cancelled"
             task.note = f"Condition '{step.condition}' not met"
             totals["cancelled"] += 1
             continue
 
-        action = (step.action or "send_sms").lower()
-        if email_campaign:
-            # On an email campaign "send_sms" steps are sent as email: a step
-            # written against the SMS action must not be silently dropped just
-            # because the campaign's channel changed.
-            wants_send = action in ("send_sms", "send_email")
-        else:
-            wants_send = action == "send_sms"
-        if wants_send and (step.body or task.body):
-            body = step.body or task.body or ""
+        if action in ("send_sms", "send_email"):
+            body = (step.body or task.body or "").strip()
+            if not body:
+                task.status = "cancelled"
+                task.note = "Step has no message body"
+                totals["cancelled"] += 1
+                continue
             mid = await send_adhoc_sms(
                 db, contact, body,
                 test_mode=campaign.test_mode,
                 campaign_id=campaign.id,
                 subject=step.subject,
-                channel=campaign.channel or "sms",
+                channel=channel,
             )
             if mid:
                 outbox.append(mid)
             task.status = "completed"
             task.completed_at = now_utc()
             totals["sent"] += 1
+            # Chain: step N+1 is queued only now that step N's message is out,
+            # so its wait starts from this message and its condition is
+            # evaluated against this message's reply / opens / clicks.
+            await _schedule_next_step(
+                db,
+                campaign,
+                step,
+                contact_id=contact.id,
+                assignment_id=task.assignment_id,
+            )
         elif action == "add_tag" and step.action_value:
             await add_tag(db, contact.id, step.action_value)
             task.status = "completed"
@@ -2335,7 +2549,9 @@ async def simulate(db: AsyncSession, campaign: AdsCampaign) -> dict:
     steps = (
         await db.execute(
             select(func.count()).select_from(AdsFollowUpStep).where(
-                AdsFollowUpStep.campaign_id == campaign.id, AdsFollowUpStep.is_active.is_(True)
+                AdsFollowUpStep.campaign_id == campaign.id,
+                AdsFollowUpStep.is_active.is_(True),
+                AdsFollowUpStep.deleted_at.is_(None),
             )
         )
     ).scalar() or 0
@@ -2464,6 +2680,7 @@ async def validate_campaign(db: AsyncSession, campaign: AdsCampaign) -> dict:
         select(func.count()).select_from(AdsFollowUpStep).where(
             AdsFollowUpStep.campaign_id == campaign.id,
             AdsFollowUpStep.is_active.is_(True),
+            AdsFollowUpStep.deleted_at.is_(None),
         )
     )).scalar() or 0
     send_start = campaign.send_start_hour if campaign.send_start_hour is not None else 9
@@ -2648,7 +2865,12 @@ async def duplicate_campaign(
             await ensure_version(db, new_creative)
 
     for step in (
-        await db.execute(select(AdsFollowUpStep).where(AdsFollowUpStep.campaign_id == campaign.id))
+        await db.execute(
+            select(AdsFollowUpStep).where(
+                AdsFollowUpStep.campaign_id == campaign.id,
+                AdsFollowUpStep.deleted_at.is_(None),
+            )
+        )
     ).scalars().all():
         db.add(
             AdsFollowUpStep(
@@ -2660,6 +2882,7 @@ async def duplicate_campaign(
                 action=step.action,
                 body=step.body,
                 subject=step.subject,
+                template_id=step.template_id,
                 action_value=step.action_value,
                 is_active=step.is_active,
             )

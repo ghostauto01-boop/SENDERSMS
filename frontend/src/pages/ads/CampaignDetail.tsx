@@ -22,7 +22,14 @@ import {
   Zap,
 } from "lucide-react";
 import api from "../../api/client";
-import adsApi, { AdsCreative, AdsSet, CampaignDetail as Detail } from "../../api/ads";
+import adsApi, {
+  AdsCreative,
+  AdsSet,
+  CampaignDetail as Detail,
+  FOLLOWUP_ACTIONS,
+  FOLLOWUP_CONDITIONS,
+  FollowUpTemplate,
+} from "../../api/ads";
 import ShortcodePicker from "../../components/ShortcodePicker";
 import TemplatePicker from "../../components/TemplatePicker";
 import ContactPicker from "../../components/ContactPicker";
@@ -2278,6 +2285,19 @@ function SendingTab({ detail, stats, isEmail }: { detail: Detail; stats: any; is
 function AutomationTab({ detail, reload, isEmail }: { detail: Detail; reload: () => void; isEmail: boolean }) {
   const [editing, setEditing] = useState<any>(null);
   const [creating, setCreating] = useState(false);
+  const [templates, setTemplates] = useState<FollowUpTemplate[]>([]);
+
+  const loadTemplates = useCallback(() => {
+    // The reusable template library, so a chain can be built from saved steps.
+    adsApi
+      .followupTemplates({ channel: isEmail ? "email" : "sms" })
+      .then((r) => setTemplates(r.items || []))
+      .catch(() => setTemplates([]));
+  }, [isEmail]);
+
+  useEffect(() => {
+    loadTemplates();
+  }, [loadTemplates]);
 
   return (
     <div className="space-y-3">
@@ -2334,7 +2354,7 @@ function AutomationTab({ detail, reload, isEmail }: { detail: Detail; reload: ()
                   className="btn-ghost btn-sm text-danger-600"
                   onClick={async () => {
                     if (!confirm("Remove this follow-up step?")) return;
-                    await adsApi.deleteStep(s.id);
+                    await adsApi.deleteStep(detail.id, s.id);
                     toast.success("Step removed");
                     reload();
                   }}
@@ -2352,6 +2372,8 @@ function AutomationTab({ detail, reload, isEmail }: { detail: Detail; reload: ()
           step={editing}
           nextOrder={detail.followup_steps.length + 1}
           isEmail={isEmail}
+          templates={templates}
+          templateSaved={loadTemplates}
           campaignSubject={detail.subject}
           close={() => {
             setCreating(false);
@@ -2373,6 +2395,8 @@ function StepEditor({
   step,
   nextOrder,
   isEmail,
+  templates,
+  templateSaved,
   campaignSubject,
   close,
   saved,
@@ -2381,6 +2405,8 @@ function StepEditor({
   step: any;
   nextOrder: number;
   isEmail: boolean;
+  templates: FollowUpTemplate[];
+  templateSaved?: () => void;
   campaignSubject?: string | null;
   close: () => void;
   saved: () => void;
@@ -2388,16 +2414,44 @@ function StepEditor({
   const [form, setForm] = useState<any>({
     step_order: step?.step_order ?? nextOrder,
     name: step?.name || "",
-    wait_hours: step?.wait_hours ?? 48,
+    delay_hours: step?.delay_hours ?? step?.wait_hours ?? 48,
     condition: step?.condition || "no_reply",
     action: step?.action || (isEmail ? "send_email" : "send_sms"),
     body: step?.body || "",
     subject: step?.subject || "",
     action_value: step?.action_value || "",
+    template_id: step?.template_id ?? null,
     is_active: step?.is_active ?? true,
   });
   const set = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }));
   const isSend = form.action === "send_sms" || form.action === "send_email";
+  // A send_email step carries a subject (and email-only conditions) even on an
+  // SMS campaign: the engine posts it through the email provider.
+  const emailStep = isEmail || form.action === "send_email";
+  const conditions = FOLLOWUP_CONDITIONS.filter((c) => !c.emailOnly || emailStep);
+  // Both send actions are offered on either campaign: a follow-up may pick a
+  // different channel from the campaign it belongs to.
+  const actions = FOLLOWUP_ACTIONS;
+
+  const loadTemplate = (id: string) => {
+    const template = templates.find((t) => String(t.id) === id);
+    if (!template) {
+      set("template_id", null);
+      return;
+    }
+    // Selecting a template fills the form; the fields stay editable and the
+    // save sends the edited values (the template id is only a provenance link).
+    setForm((f: any) => ({
+      ...f,
+      template_id: template.id,
+      name: f.name || template.name,
+      delay_hours: template.delay_hours,
+      condition: template.condition,
+      action: template.action,
+      subject: template.subject || "",
+      body: template.body,
+    }));
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -2405,19 +2459,45 @@ function StepEditor({
     const payload = {
       ...form,
       step_order: Number(form.step_order),
-      wait_hours: Number(form.wait_hours),
+      delay_hours: Number(form.delay_hours),
       name: form.name || null,
       body: form.body || null,
-      subject: isEmail ? form.subject?.trim() || null : step?.subject ?? null,
+      subject: isEmail || form.action === "send_email" ? form.subject?.trim() || null : null,
       action_value: form.action_value || null,
+      template_id: form.template_id || null,
     };
+    delete payload.wait_hours; // one spelling only: delay_hours
     try {
-      if (step) await adsApi.updateStep(step.id, payload);
+      if (step) await adsApi.updateStep(campaignId, step.id, payload);
       else await adsApi.createStep(campaignId, payload);
       toast.success("Follow-up saved");
       saved();
     } catch (err: any) {
       toast.error(err.response?.data?.detail || "Could not save step");
+    }
+  };
+
+  const saveAsTemplate = async () => {
+    if (!form.body.trim()) return toast.error("Write the follow-up message first");
+    const name = window.prompt(
+      "Template name",
+      form.name || `Follow-up after ${form.delay_hours || 0}h`,
+    );
+    if (!name) return;
+    try {
+      await adsApi.createFollowupTemplate({
+        name,
+        channel: emailStep ? "email" : "sms",
+        subject: emailStep ? form.subject?.trim() || null : null,
+        body: form.body,
+        condition: form.condition,
+        action: form.action,
+        delay_hours: Number(form.delay_hours) || 0,
+      });
+      toast.success("Template saved — reuse it on any campaign");
+      templateSaved?.();
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || "Could not save the template");
     }
   };
 
@@ -2442,42 +2522,44 @@ function StepEditor({
               type="number"
               min={0}
               className="input"
-              value={form.wait_hours}
-              onChange={(e) => set("wait_hours", e.target.value)}
+              value={form.delay_hours}
+              onChange={(e) => set("delay_hours", e.target.value)}
             />
           </Field>
           <Field label="Condition">
             <select className="input" value={form.condition} onChange={(e) => set("condition", e.target.value)}>
-              {[
-                "no_reply",
-                "replied",
-                "positive",
-                "negative",
-                "interested",
-                "not_interested",
-                ...(isEmail ? ["opened", "not_opened", "link_clicked", "link_not_clicked"] : ["link_clicked", "link_not_clicked"]),
-                "meeting_scheduled",
-                "converted",
-                "always",
-              ].map((c) => (
-                <option key={c} value={c}>
-                  {c.replace(/_/g, " ")}
+              {conditions.map((c) => (
+                <option key={c.value} value={c.value}>
+                  {c.label}
                 </option>
               ))}
             </select>
           </Field>
           <Field label="Action">
             <select className="input" value={form.action} onChange={(e) => set("action", e.target.value)}>
-              {(isEmail
-                ? ["send_email", "add_tag", "remove_tag", "change_status", "suppress", "stop"]
-                : ["send_sms", "add_tag", "remove_tag", "change_status", "suppress", "stop"]
-              ).map((a) => (
-                <option key={a} value={a}>
-                  {a.replace(/_/g, " ")}
+              {actions.map((a) => (
+                <option key={a.value} value={a.value}>
+                  {a.label}
                 </option>
               ))}
             </select>
           </Field>
+          {!step && templates.length > 0 && (
+            <Field label="Start from a saved template">
+              <select
+                className="input"
+                value={form.template_id ? String(form.template_id) : ""}
+                onChange={(e) => loadTemplate(e.target.value)}
+              >
+                <option value="">— none —</option>
+                {templates.map((t) => (
+                  <option key={t.id} value={String(t.id)}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
           {["add_tag", "remove_tag", "change_status"].includes(form.action) && (
             <Field label="Value">
               <input
@@ -2488,7 +2570,7 @@ function StepEditor({
             </Field>
           )}
         </div>
-        {isSend && isEmail && (
+        {isSend && emailStep && (
           <Field
             label="Subject"
             hint={campaignSubject ? `Blank = the campaign subject (“${campaignSubject}”).` : undefined}
@@ -2511,6 +2593,11 @@ function StepEditor({
           Active
         </label>
         <div className="flex gap-2">
+          {isSend && (
+            <button type="button" className="btn-ghost" onClick={saveAsTemplate}>
+              Save as template
+            </button>
+          )}
           <button type="button" className="btn-secondary flex-1" onClick={close}>
             Cancel
           </button>

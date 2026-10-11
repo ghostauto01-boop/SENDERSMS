@@ -81,7 +81,15 @@ GENERIC_NAME = "there"
 
 #: Names the renderer itself resolves for any contact (columns plus the convenience aliases
 #: ``build_context`` adds). Always "known", whether or not a registry row exists.
-BUILTIN_KEYS = frozenset(_CONTACT_FIELDS) | {"full_name", "name", "brand_name", "brand"}
+#: ``contact`` is the greeting spelling the follow-up editor and the MCP tool
+#: descriptions use ("Hi {{contact}}") -- it resolves exactly like ``name``.
+BUILTIN_KEYS = frozenset(_CONTACT_FIELDS) | {
+    "full_name",
+    "name",
+    "contact",
+    "brand_name",
+    "brand",
+}
 
 #: What a preview shows in place of a placeholder that names no variable at all.
 UNKNOWN_MARK = "[UNKNOWN VARIABLE: {name}]"
@@ -150,6 +158,8 @@ def build_context(contact: Optional[object]) -> dict[str, str]:
     # business_name column but both spellings should work in a template.
     context["brand_name"] = context.get("business_name", "")
     context["brand"] = context.get("business_name", "")
+    # "Hi {{contact}}" -- the follow-up composer's default greeting.
+    context["contact"] = context["name"]
 
     return context
 
@@ -186,7 +196,7 @@ def _resolve(
 
     # A greeting is the one place an empty value reads as broken rather than
     # merely terse, so give the name fields a sensible human default.
-    if key in ("first_name", "name", "full_name"):
+    if key in ("first_name", "name", "full_name", "contact"):
         return context.get("business_name", "") or GENERIC_NAME
 
     # Unknown or empty: the placeholder is dropped entirely. Shipping
@@ -274,7 +284,7 @@ def render_template(
     def _sub_single(match: re.Match) -> str:
         field = normalize_key(match.group(1))
         known = field in context or (aliases is not None and field in aliases)
-        if not known and field not in ("first_name", "name", "full_name"):
+        if not known and field not in ("first_name", "name", "full_name", "contact"):
             return match.group(0)
         return _resolve(field, match.group(2), context, aliases, fallbacks)
 

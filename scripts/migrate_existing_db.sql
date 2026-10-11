@@ -440,3 +440,28 @@ CREATE TABLE IF NOT EXISTS sending_domains (
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS ix_sending_domains_status ON sending_domains (status);
+
+-- Follow-up steps: the reusable template library, the soft-delete marker and the
+-- edit timestamp. The app adds the columns at startup (schema_repair) and creates
+-- the table with create_all; this is the same DDL for a hand-run migration.
+CREATE TABLE IF NOT EXISTS ads_followup_templates (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(200) NOT NULL,
+    description VARCHAR(500),
+    channel VARCHAR(10) NOT NULL DEFAULT 'any',
+    subject VARCHAR(500),
+    body TEXT NOT NULL,
+    condition VARCHAR(30) NOT NULL DEFAULT 'no_reply',
+    action VARCHAR(30) NOT NULL DEFAULT 'send_sms',
+    delay_hours INTEGER NOT NULL DEFAULT 48,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    usage_count INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS ix_ads_followup_templates_name ON ads_followup_templates (name);
+
+ALTER TABLE ads_followup_steps ADD COLUMN IF NOT EXISTS template_id INTEGER;
+ALTER TABLE ads_followup_steps ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE ads_followup_steps ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP WITH TIME ZONE;
+CREATE INDEX IF NOT EXISTS ix_ads_followup_steps_campaign_id ON ads_followup_steps (campaign_id);

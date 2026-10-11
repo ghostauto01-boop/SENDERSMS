@@ -1,9 +1,20 @@
 """Pydantic schemas for the SMS Ads Manager."""
 
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Literal, Optional
 
-from pydantic import BaseModel, Field, ValidationInfo, field_validator
+from pydantic import (
+    BaseModel,
+    Field,
+    ValidationInfo,
+    field_validator,
+    model_validator,
+)
+
+from app.models.ads import (
+    DEFAULT_FOLLOWUP_WAIT_HOURS,
+    MAX_FOLLOWUP_WAIT_HOURS,
+)
 
 
 def _utc(v: Optional[datetime]) -> Optional[datetime]:
@@ -394,18 +405,266 @@ class CreativeOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+# --------------------------------------------------------------------------
+# Follow-up steps
+# --------------------------------------------------------------------------
+#
+# The API's documented spelling for the wait is ``delay_hours`` (what the
+# product spec, the UI and every other follow-up surface use). ``wait_hours``
+# is the column name and stays accepted as an alias so older clients keep
+# working. Both are validated against the same bounds, and the response echoes
+# BOTH names so neither client has to guess.
+
+FollowUpAction = Literal[
+    "send_sms",
+    "send_email",
+    "add_tag",
+    "remove_tag",
+    "change_status",
+    "create_task",
+    "stop",
+    "suppress",
+    "notify",
+]
+
+FollowUpCondition = Literal[
+    "no_reply",
+    "replied",
+    "positive",
+    "negative",
+    "positive_reply",
+    "negative_reply",
+    "interested",
+    "not_interested",
+    "converted",
+    "opened",
+    "not_opened",
+    "opened_no_click",
+    "link_clicked",
+    "link_not_clicked",
+    "clicked_no_reply",
+    "meeting_scheduled",
+    "always",
+]
+
+
 class FollowUpStepIn(BaseModel):
-    step_order: int = 1
-    name: Optional[str] = None
-    wait_hours: int = 48
-    condition: str = "no_reply"
+    """Create payload for a campaign follow-up step.
+
+    Every field here is honoured: ``delay_hours`` sets the wait, ``action``
+    picks the channel (``send_email`` -> Brevo, ``send_sms`` -> the gateway),
+    ``subject``/``body`` carry the message (with ``{{shortcode}}``
+    personalization) and ``condition`` decides whether it sends at all.
+    """
+
+    #: 1-based position in the chain. Omitted -> appended after the last step.
+    step_order: Optional[int] = Field(default=None, ge=1, le=50)
+    name: Optional[str] = Field(default=None, max_length=200)
+    #: Hours to wait before this step (from the previous message). The
+    #: documented spelling.
+    delay_hours: Optional[int] = Field(
+        default=None, ge=0, le=MAX_FOLLOWUP_WAIT_HOURS
+    )
+    #: Legacy alias of ``delay_hours``. Sending both with different values is a
+    #: 422 rather than a silent coin toss.
+    wait_hours: Optional[int] = Field(default=None, ge=0, le=MAX_FOLLOWUP_WAIT_HOURS)
+    condition: FollowUpCondition = "no_reply"
     #: send_sms | send_email | add_tag | remove_tag | change_status |
-    #: create_task | stop | suppress | notify
-    action: str = "send_sms"
-    body: Optional[str] = None
+    #: create_task | stop | suppress | notify. Omitted on an email campaign ->
+    #: send_email, otherwise send_sms.
+    action: Optional[FollowUpAction] = None
+    body: Optional[str] = Field(default=None, max_length=20000)
+    #: Email only (falls back to the campaign subject when empty).
     subject: Optional[str] = Field(default=None, max_length=500)
-    action_value: Optional[str] = None
+    action_value: Optional[str] = Field(default=None, max_length=255)
+    #: Create this step from a saved follow-up template.
+    template_id: Optional[int] = None
     is_active: bool = True
+
+    @model_validator(mode="after")
+    def _one_wait_value(self) -> "FollowUpStepIn":
+        if (
+            self.delay_hours is not None
+            and self.wait_hours is not None
+            and self.delay_hours != self.wait_hours
+        ):
+            raise ValueError(
+                "delay_hours and wait_hours disagree "
+                f"({self.delay_hours} vs {self.wait_hours}); send only one of them"
+            )
+        return self
+
+    @property
+    def resolved_wait_hours(self) -> Optional[int]:
+        """The wait the client asked for, whichever spelling it used."""
+        if self.delay_hours is not None:
+            return self.delay_hours
+        return self.wait_hours
+
+
+class FollowUpStepPatch(BaseModel):
+    """Any subset of a follow-up step, for PATCH."""
+
+    step_order: Optional[int] = Field(default=None, ge=1, le=50)
+    name: Optional[str] = Field(default=None, max_length=200)
+    delay_hours: Optional[int] = Field(default=None, ge=0, le=MAX_FOLLOWUP_WAIT_HOURS)
+    wait_hours: Optional[int] = Field(default=None, ge=0, le=MAX_FOLLOWUP_WAIT_HOURS)
+    condition: Optional[FollowUpCondition] = None
+    action: Optional[FollowUpAction] = None
+    body: Optional[str] = Field(default=None, max_length=20000)
+    subject: Optional[str] = Field(default=None, max_length=500)
+    action_value: Optional[str] = Field(default=None, max_length=255)
+    template_id: Optional[int] = None
+    is_active: Optional[bool] = None
+
+    @model_validator(mode="after")
+    def _one_wait_value(self) -> "FollowUpStepPatch":
+        if (
+            self.delay_hours is not None
+            and self.wait_hours is not None
+            and self.delay_hours != self.wait_hours
+        ):
+            raise ValueError(
+                "delay_hours and wait_hours disagree "
+                f"({self.delay_hours} vs {self.wait_hours}); send only one of them"
+            )
+        return self
+
+    @property
+    def resolved_wait_hours(self) -> Optional[int]:
+        if self.delay_hours is not None:
+            return self.delay_hours
+        return self.wait_hours
+
+
+class FollowUpStepOut(BaseModel):
+    """A follow-up step as returned by every endpoint that touches one.
+
+    Carries the wait under both names: ``wait_hours`` (the column, what the
+    existing UI reads) and ``delay_hours`` (the documented API field).
+    """
+
+    id: int
+    campaign_id: int
+    step_order: int
+    name: Optional[str] = None
+    wait_hours: int
+    delay_hours: int
+    condition: str
+    action: str
+    subject: Optional[str] = None
+    body: Optional[str] = None
+    template_id: Optional[int] = None
+    action_value: Optional[str] = None
+    is_active: bool
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
+
+
+def followup_step_out(step) -> dict:
+    """Serialise an ``AdsFollowUpStep`` row for the API.
+
+    One helper so create / update / list / campaign-detail can never disagree
+    about the shape (that disagreement is exactly how the delay silently
+    changed under the client before).
+    """
+    return {
+        "id": step.id,
+        "campaign_id": step.campaign_id,
+        "step_order": step.step_order,
+        "name": step.name,
+        "wait_hours": step.wait_hours,
+        "delay_hours": step.wait_hours,
+        "condition": step.condition,
+        "action": step.action,
+        "subject": step.subject,
+        "body": step.body,
+        "template_id": getattr(step, "template_id", None),
+        "action_value": step.action_value,
+        "is_active": bool(step.is_active) and getattr(step, "deleted_at", None) is None,
+        "created_at": step.created_at,
+        "updated_at": getattr(step, "updated_at", None),
+        "deleted_at": getattr(step, "deleted_at", None),
+    }
+
+
+# --------------------------------------------------------------------------
+# Follow-up template library
+# --------------------------------------------------------------------------
+
+
+class FollowUpTemplateIn(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    description: Optional[str] = Field(default=None, max_length=500)
+    #: sms | email | any
+    channel: Literal["sms", "email", "any"] = "any"
+    subject: Optional[str] = Field(default=None, max_length=500)
+    body: str = Field(min_length=1, max_length=20000)
+    condition: FollowUpCondition = "no_reply"
+    action: FollowUpAction = "send_sms"
+    delay_hours: int = Field(
+        default=DEFAULT_FOLLOWUP_WAIT_HOURS, ge=0, le=MAX_FOLLOWUP_WAIT_HOURS
+    )
+
+    @field_validator("name", "body")
+    @classmethod
+    def _not_blank(cls, value: str) -> str:
+        value = (value or "").strip()
+        if not value:
+            raise ValueError("must not be empty")
+        return value
+
+
+class FollowUpTemplatePatch(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1, max_length=200)
+    description: Optional[str] = Field(default=None, max_length=500)
+    channel: Optional[Literal["sms", "email", "any"]] = None
+    subject: Optional[str] = Field(default=None, max_length=500)
+    body: Optional[str] = Field(default=None, min_length=1, max_length=20000)
+    condition: Optional[FollowUpCondition] = None
+    action: Optional[FollowUpAction] = None
+    delay_hours: Optional[int] = Field(
+        default=None, ge=0, le=MAX_FOLLOWUP_WAIT_HOURS
+    )
+    is_active: Optional[bool] = None
+
+
+class FollowUpTemplateOut(BaseModel):
+    id: int
+    name: str
+    description: Optional[str] = None
+    channel: str
+    subject: Optional[str] = None
+    body: str
+    condition: str
+    action: str
+    delay_hours: int
+    is_active: bool
+    usage_count: int
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
+
+
+def followup_template_out(template) -> dict:
+    return {
+        "id": template.id,
+        "name": template.name,
+        "description": template.description,
+        "channel": template.channel,
+        "subject": template.subject,
+        "body": template.body,
+        "condition": template.condition,
+        "action": template.action,
+        "delay_hours": template.delay_hours,
+        "is_active": bool(template.is_active),
+        "usage_count": template.usage_count or 0,
+        "created_at": template.created_at,
+        "updated_at": getattr(template, "updated_at", None),
+    }
 
 
 class AddContactsIn(BaseModel):

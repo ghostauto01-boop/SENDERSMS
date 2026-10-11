@@ -1,5 +1,75 @@
 # Changelog
 
+## Unreleased — follow-up steps: every parameter honoured, editable, chainable
+
+A campaign's follow-up chain was write-only: the POST ignored most of what it was
+sent, the row defaulted to a 48-hour SMS that nobody asked for, and once created a
+step could not be edited or removed at all. The sending engine, meanwhile, raised
+`NameError` on the first due task, so **no follow-up ever went out**. This release
+fixes the engine and makes the whole chain a first-class API. Full contract:
+`docs/FOLLOWUP-STEPS.md`.
+
+- **`POST /ads/campaigns/{id}/followup-steps` honours the request.** `delay_hours`
+  used to be discarded (Pydantic ignored the unknown field) and the step was stored
+  with the hardcoded `wait_hours: 48`; `action`, `subject` and `body` were only
+  stored when the client happened to use the column names. The endpoint now takes
+  the documented `delay_hours` (kept in step with the legacy `wait_hours`, and a 422
+  if the two disagree), stores the time, action, subject and body it was given,
+  defaults `action` to `send_email` on an email campaign (and `send_sms` otherwise)
+  and returns the whole step instead of `{"id": …}` — with both `wait_hours` and
+  `delay_hours` in the payload so neither client has to guess.
+- **Steps can be edited and deleted.**
+  `PATCH /ads/campaigns/{id}/followup-steps/{step_id}` updates any subset (delay,
+  action, condition, subject, body, active flag, order, template) and
+  `DELETE …/{step_id}` soft-deletes: the step stops sending, its pending follow-ups
+  are cancelled, and its history survives (`?hard=true` removes the row). Editing
+  the wait moves the follow-ups already queued for that step, so a corrected delay
+  takes effect immediately instead of only for the next contact. The old
+  `/ads/followup-steps/{id}` routes stay as aliases, and the campaign-scoped ones
+  404 on a step belonging to a different campaign. At last
+  `GET /ads/campaigns/{id}/followup-steps` lists a chain in order and
+  `GET /ads/followup-steps/{step_id}` returns one step with its pending/sent counts.
+- **Bad input is a 422, not a silent default.** `action` and `condition` are
+  validated against the values the engine actually supports, `delay_hours` is
+  bounded (0–8760), and the app's standard error envelope names the offending field
+  (`delay_hours: Input should be greater than or equal to 0`).
+- **The engine actually sends.** `process_followups` referenced an undefined
+  `email_campaign`, so the first due task raised `NameError` and every follow-up on
+  every campaign died there — the "follow-ups never arrive / arrive blank" report.
+  The channel is now decided per step (`send_email` sends email even on an SMS
+  campaign; a `send_sms` step on an email campaign still goes out as email so an
+  older step is never dropped), consent checks follow that channel, and a step with
+  no body is cancelled with a reason instead of being counted as sent.
+- **More than one step works.** The chain used to queue every step up front off the
+  campaign's own send time and then ignore order. Steps are now chained: step 1 is
+  queued when the campaign sends, step N+1 is queued when step N's message actually
+  goes out, due `delay_hours(N+1)` later, and each step re-checks its own condition
+  against the message before it. A reply, opt-out, bounce or suppression therefore
+  ends the chain exactly where it is detected, and the `(step_id, contact_id)`
+  unique row still guarantees one send per contact per step.
+- **Conditions beyond `no_reply`.** `opened_no_click`, `clicked_no_reply`,
+  `negative_reply` and `positive_reply` are supported alongside the existing
+  sentiment, lead-status, open/click and meeting tests. Replies are classified with
+  the existing keyless AI classifier (`Message.ai_sentiment`, the ads reply
+  classifier as fallback); opens and clicks come off the previous message, so the
+  same condition works on both channels.
+- **Personalization works in follow-ups.** `subject` and `body` are rendered for the
+  contact at send time through the same renderer creatives use — on email inside
+  `queue_email`, on SMS through `render_for_contact` — so `{{contact}}`,
+  `{{business_name}}` and every imported custom field resolve. `{{contact}}` is now
+  a first-class greeting alias (full name → business name → "there") everywhere in
+  the app, not just in follow-ups.
+- **Follow-up template library.** `POST/GET /ads/followup-templates` (plus GET /
+  PATCH / DELETE by id) save a reusable step; a follow-up step created with
+  `template_id` inherits its subject, body, action, condition and delay (explicit
+  request fields still win), and the template's `usage_count` records the reuse. The
+  campaign's Automation tab can start a step from a saved template and save the one
+  being written as a new template.
+- **New columns stay additive.** `ads_followup_steps` gains `template_id`,
+  `updated_at` and the `deleted_at` soft-delete marker; `ads_followup_templates` is
+  new. Both arrive via `create_all` on a fresh database and the startup schema
+  repair on an existing one.
+
 ## Unreleased — the right inbox for the channel, an email Conversations page, and Gmail Google sign-in
 
 Three complaints from one screen, fixed together because they share a cause: the
