@@ -182,6 +182,7 @@ export interface Conversation {
 export interface OverviewCampaign {
   id: number;
   kind: "campaign" | "ads";
+  channel: "sms" | "email";
   name: string;
   description: string | null;
   status: string;
@@ -223,6 +224,7 @@ export interface OverviewTotals {
 }
 
 export interface UnifiedMetrics {
+  channel: "sms" | "email" | "all";
   period_days: number;
   messaging: {
     sent: number;

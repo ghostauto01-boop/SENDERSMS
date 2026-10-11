@@ -124,16 +124,6 @@ async def _accounts_by_id(db: AsyncSession) -> dict[int, EmailAccount]:
 # ===========================================================================
 
 
-def _refuse_free_mail_sender(address: str) -> None:
-    """A From address on gmail.com, yahoo.com, outlook.com ... can never be authenticated through
-    Brevo (the app does not control that domain's DNS): the mail fails DMARC and is junked or bounced."""
-    from app.services import sending_domains
-    from app.utils.email_domains import is_free_mail
-
-    if is_free_mail(address):
-        raise HTTPException(422, sending_domains.free_mail_error(address))
-
-
 @router.get("/accounts")
 async def list_accounts(
     db: AsyncSession = Depends(get_db),
@@ -166,7 +156,6 @@ async def create_account(
         raise HTTPException(422, "Paste the Brevo API key")
     if not email_service.normalize_email(data.from_email):
         raise HTTPException(422, "Enter a valid From email address")
-    _refuse_free_mail_sender(data.from_email)
 
     account = await email_service.create_account(
         db,
@@ -215,7 +204,6 @@ async def update_account(
     if "from_email" in updates and updates["from_email"]:
         if not email_service.normalize_email(updates["from_email"]):
             raise HTTPException(422, "Enter a valid From email address")
-        _refuse_free_mail_sender(updates["from_email"])
     for key, value in updates.items():
         if key == "reply_to":
             value = email_service.normalize_email(value) or None
@@ -531,7 +519,7 @@ async def senders_preview(
             ),
             "spf": bool(info.get("spf")),
             "dkim": bool(info.get("dkim")),
-            # A verified address on an authenticated domain is the one to use.
+            # A sender on an authenticated domain is recommended for deliverability.
             "recommended": bool(
                 (info.get("verified") or info.get("authenticated")) and info.get("dkim")
             ),

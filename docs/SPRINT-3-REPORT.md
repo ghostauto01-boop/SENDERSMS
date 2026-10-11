@@ -1,5 +1,7 @@
 # Sprint 3 report (P0-6 and §E)
 
+> **Follow-up (2026-10-11):** The free-mail and sender-domain-authentication launch gates described below were subsequently removed. Existing valid email senders can be saved and campaigns continue through the configured email route; provider acceptance is decided at delivery. Usable account/API-key, recipient verification, consent/opt-out, and sending-rule checks remain. See [`CHANGELOG.md`](../CHANGELOG.md) and [`SENDING-DOMAINS.md`](SENDING-DOMAINS.md) for the current behavior. The P0-6 results below are a historical record of the earlier implementation, not the current launch policy.
+
 Branch `arena/191f89ff-sendersms`. Raw output: [`docs/evidence/sprint-1/`](evidence/sprint-1/) (`tests_p0_6.txt`, `tests_e_quarantine.txt`);
 regenerate with `SPRINT=3 docs/evidence/sprint-1/collect.sh` and `docs/evidence/sprint-1/integration.sh`.
 

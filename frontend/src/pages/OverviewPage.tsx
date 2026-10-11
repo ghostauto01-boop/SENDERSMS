@@ -2,9 +2,8 @@ import { useVisiblePolling } from "../hooks/useVisiblePolling";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import api from "../api/client";
-import toast from "react-hot-toast";
 import {
-  Activity, AlertTriangle, ArrowRight, BarChart3, CheckCircle2, Inbox as InboxIcon,
+  Activity, AlertTriangle, CheckCircle2, Inbox as InboxIcon,
   MessageCircle, Megaphone, RefreshCw, Send, Sparkles, Star, ThumbsDown, TrendingUp,
   Users, XCircle, Clock,
 } from "lucide-react";
@@ -13,6 +12,7 @@ import {
 } from "recharts";
 import type { OverviewCampaign, UnifiedMetrics } from "../types";
 import { campaignColor } from "../components/CampaignChip";
+import ChannelSwitch from "../components/ChannelSwitch";
 import { useChannel } from "../hooks/useChannel";
 import { inboxLink, inboxPathFor } from "../utils/inboxRoute";
 
@@ -30,8 +30,8 @@ import { inboxLink, inboxPathFor } from "../utils/inboxRoute";
  *   3. Where did these leads come from? -> every campaign row deep-links into
  *                                         the inbox, filtered to its leads
  *
- * The classic Campaigns page and the SMS Ads Manager are unchanged; this
- * joins them for reading.
+ * The selected SMS or Email channel scopes every headline, chart and campaign
+ * row; the app-wide channel switch lets the operator compare the two views.
  */
 
 const RANGES = [
@@ -71,13 +71,9 @@ function StatCard({
 }
 
 export default function OverviewPage() {
-  /**
-   * The numbers on this page count both channels on purpose — it is the
-   * application overview. The *links* still follow the app-wide SMS | Email
-   * switch, because a card that always opened the SMS inbox sent anybody
-   * working in email to a page with none of their threads on it.
-   */
-  const { channel } = useChannel();
+  const { channel, isEmail } = useChannel();
+  const channelLabel = isEmail ? "Email" : "SMS";
+  const messageLabel = isEmail ? "Emails" : "SMS";
   const [metrics, setMetrics] = useState<UnifiedMetrics | null>(null);
   const [campaigns, setCampaigns] = useState<OverviewCampaign[]>([]);
   const [loading, setLoading] = useState(true);
@@ -93,8 +89,8 @@ export default function OverviewPage() {
       setRefreshing(true);
       setError(null);
       const [m, c] = await Promise.all([
-        api.get("/overview/metrics", { params: { days } }),
-        api.get("/overview/campaigns"),
+        api.get("/overview/metrics", { params: { days, channel } }),
+        api.get("/overview/campaigns", { params: { channel } }),
       ]);
       setMetrics(m.data);
       setCampaigns(c.data.items || []);
@@ -107,7 +103,7 @@ export default function OverviewPage() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [days]);
+  }, [days, channel]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -123,10 +119,10 @@ export default function OverviewPage() {
   const msg = metrics?.messaging;
   const inbox = metrics?.inbox;
 
-  if (loading) {
+  if (loading || (metrics !== null && metrics.channel !== channel)) {
     return (
       <div className="space-y-6">
-        <h1 className="text-xl sm:text-2xl font-bold">Overview</h1>
+        <h1 className="text-xl sm:text-2xl font-bold">{channelLabel} Overview</h1>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[...Array(8)].map((_, i) => (
             <div key={i} className="card p-4">
@@ -160,15 +156,18 @@ export default function OverviewPage() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-sm font-medium text-primary-600 mb-1 flex items-center gap-1">
-            <Activity size={15} /> EVERYTHING, IN SYNC
+            <Activity size={15} /> {channelLabel.toUpperCase()} OVERVIEW
           </p>
-          <h1 className="text-2xl sm:text-3xl font-bold">Overview</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold">{channelLabel} Overview</h1>
           <p className="text-gray-500 mt-1 text-sm max-w-2xl">
-            Campaigns, delivery and inbox activity in one place. Every number here is
-            computed from the same messages your inbox shows, so they always agree.
+            {isEmail
+              ? "Email campaigns, delivery and inbox activity only — SMS activity has its own overview."
+              : "SMS campaigns, delivery and inbox activity only — email activity has its own overview."}
+            {" "}Numbers use the same messages your inbox shows.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <ChannelSwitch size="sm" />
           <select
             className="input py-1.5 !w-auto text-sm"
             value={days}
@@ -195,18 +194,18 @@ export default function OverviewPage() {
           icon={Megaphone} tone="text-success-600 bg-success-50 dark:bg-success-900/40"
         />
         <StatCard
-          label="Messages sent" value={msg?.sent ?? 0}
+          label={`${messageLabel} sent`} value={msg?.sent ?? 0}
           sub={`${msg?.queued ?? 0} still queued`}
           icon={Send} tone="text-primary-600 bg-primary-50 dark:bg-primary-900/40"
         />
         <StatCard
-          label="Delivered" value={`${msg?.delivery_rate ?? 0}%`}
+          label={`${messageLabel} delivered`} value={`${msg?.delivery_rate ?? 0}%`}
           sub={`${msg?.delivered ?? 0} confirmed`}
           icon={CheckCircle2} tone="text-success-600 bg-success-50 dark:bg-success-900/40"
         />
         <StatCard
-          label="Replies" value={msg?.replies ?? 0}
-          sub={`${msg?.reply_rate ?? 0}% reply rate · both channels`}
+          label={`${channelLabel} replies`} value={msg?.replies ?? 0}
+          sub={`${msg?.reply_rate ?? 0}% reply rate · ${channelLabel.toLowerCase()} only`}
           icon={MessageCircle} tone="text-primary-600 bg-primary-50 dark:bg-primary-900/40"
           to={inboxPathFor(channel)}
         />
@@ -217,19 +216,19 @@ export default function OverviewPage() {
           to={inboxPathFor(channel)}
         />
         <StatCard
-          label="Interested leads" value={inbox?.interested ?? 0}
+          label={`Interested ${channelLabel.toLowerCase()} leads`} value={inbox?.interested ?? 0}
           sub="marked in the inbox"
           icon={Star} tone="text-warning-600 bg-warning-50 dark:bg-warning-900/40"
           to={inboxLink(channel, { status: "interested" })}
         />
         <StatCard
-          label="Failed" value={msg?.failed ?? 0}
+          label={`${messageLabel} failed`} value={msg?.failed ?? 0}
           sub={`${msg?.failure_rate ?? 0}% of attempts`}
           icon={XCircle} tone="text-danger-600 bg-danger-50 dark:bg-danger-900/40"
         />
         <StatCard
-          label="Contacts" value={metrics?.audience.contacts ?? 0}
-          sub={`${metrics?.audience.opted_out ?? 0} opted out`}
+          label={`${channelLabel} contacts`} value={metrics?.audience.contacts ?? 0}
+          sub={`${metrics?.audience.opted_out ?? 0} ${isEmail ? "email" : "SMS"} opted out`}
           icon={Users} tone="text-primary-600 bg-primary-50 dark:bg-primary-900/40"
           to="/contacts"
         />
@@ -239,7 +238,7 @@ export default function OverviewPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="card p-4 lg:col-span-2">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold">Sending &amp; replies</h3>
+            <h3 className="font-semibold">{channelLabel} sending &amp; replies</h3>
             <span className="text-xs text-gray-400">last {days} days</span>
           </div>
           <ResponsiveContainer width="100%" height={260}>
@@ -262,8 +261,8 @@ export default function OverviewPage() {
                 labelFormatter={(d) => new Date(String(d)).toDateString()}
               />
               <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Area type="monotone" dataKey="sent" name="Sent" stroke="#4163f6" fill="url(#ovSent)" strokeWidth={2} />
-              <Area type="monotone" dataKey="replies" name="Replies" stroke="#4f46e5" fill="url(#ovReplies)" strokeWidth={2} />
+              <Area type="monotone" dataKey="sent" name={`${messageLabel} sent`} stroke="#4163f6" fill="url(#ovSent)" strokeWidth={2} />
+              <Area type="monotone" dataKey="replies" name={`${channelLabel} replies`} stroke="#4f46e5" fill="url(#ovReplies)" strokeWidth={2} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -309,7 +308,7 @@ export default function OverviewPage() {
       <div>
         <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
           <h2 className="text-lg font-semibold flex items-center gap-2">
-            <Megaphone size={18} className="text-primary-600" /> Campaigns
+            <Megaphone size={18} className="text-primary-600" /> {channelLabel} campaigns
           </h2>
           <div className="flex items-center gap-2">
             <div className="flex gap-1 p-1 rounded-lg bg-gray-100 dark:bg-gray-700">
@@ -328,8 +327,8 @@ export default function OverviewPage() {
               ))}
             </div>
             <Link to="/campaigns" className="btn-secondary btn-sm">Campaigns</Link>
-            <Link to="/sms-manager" className="btn-secondary btn-sm hidden sm:inline-flex">
-              <Sparkles size={13} className="mr-1" /> Ads Manager
+            <Link to={isEmail ? "/email-manager" : "/sms-manager"} className="btn-secondary btn-sm hidden sm:inline-flex">
+              <Sparkles size={13} className="mr-1" /> {channelLabel} Manager
             </Link>
           </div>
         </div>
@@ -338,12 +337,12 @@ export default function OverviewPage() {
           <div className="card p-10 text-center">
             <Megaphone size={40} className="mx-auto mb-3 text-gray-300" />
             <h3 className="font-semibold">
-              {scope === "live" ? "Nothing is sending right now" : "No campaigns yet"}
+              {scope === "live" ? `Nothing is sending by ${channelLabel.toLowerCase()} right now` : `No ${channelLabel.toLowerCase()} campaigns yet`}
             </h3>
             <p className="text-sm text-gray-500 mt-1 mb-4">
               {scope === "live"
                 ? "Switch to \"All\" to see drafts and finished campaigns."
-                : "Create your first campaign to start reaching contacts."}
+                : `Create your first ${channelLabel.toLowerCase()} campaign to start reaching contacts.`}
             </p>
             <Link to="/campaigns" className="btn-primary btn-sm">Go to Campaigns</Link>
           </div>

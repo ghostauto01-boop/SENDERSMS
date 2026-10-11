@@ -309,7 +309,7 @@ export default function MainLayout() {
           <div className="flex items-center gap-1 sm:gap-2 shrink-0">
             {/* One switch for the whole app: SMS or Email. */}
             <div className="hidden md:block mr-1">
-              <ChannelSwitch navigateManagers />
+              <ChannelSwitch navigateManagers={location.pathname !== "/overview"} />
             </div>
             <Link
               to="/email-inbox"

@@ -7,7 +7,8 @@
   both invalid).
 * ``refresh`` -- asks Brevo to re-check, re-reads DNS, and starts the warm-up clock the first time the domain
   is authenticated.
-* ``campaign_sender_checks`` / ``sender_problems`` -- what a campaign must pass before it starts.
+* ``campaign_sender_checks`` / ``sender_problems`` -- non-blocking domain guidance; the app does not
+  refuse a campaign based on sender-domain authentication.
 """
 
 from __future__ import annotations
@@ -217,44 +218,35 @@ async def refresh(db: AsyncSession, row: SendingDomain) -> dict:
 
 
 # --------------------------------------------------------------------------
-# may this sender send?
+# sender guidance (never a launch gate)
 # --------------------------------------------------------------------------
 
 
 async def sender_problems(db: AsyncSession, account) -> tuple[list[str], list[str]]:
-    """``(errors, warnings)`` for a campaign about to send from ``account``."""
-    errors: list[str] = []
+    """Return only optional warm-up guidance for a configured sender.
+
+    Sender-domain authentication is left to the provider's existing send route.
+    In particular, a free-mail From address or a pending/missing domain record
+    must never block campaign validation or launch.
+    """
     warnings: list[str] = []
     address = account.from_email
     domain = domain_of(address)
-    if is_free_mail(address):
-        errors.append(
-            f"The sender {address} is a free-mail address. " + free_mail_error(address)
-        )
-        return errors, warnings
+    if not domain or is_free_mail(address):
+        return [], warnings
     row = await get_by_domain(db, domain)
-    if row is None:
-        warnings.append(
-            f"No sending domain on file for {domain}: register it (POST /api/v1/email/domains) to get its DNS "
-            "records, authentication checks and the warm-up ramp."
-        )
-    elif row.status != "authenticated":
-        errors.append(
-            f"The sending domain {domain} is not authenticated yet (status: {row.status}). Publish the DNS "
-            f"records (GET /api/v1/email/domains/{row.id}) and verify the domain "
-            f"(POST /api/v1/email/domains/{row.id}/verify) before sending."
-        )
-    else:
+    if row is not None and row.status == "authenticated":
         state = warmup_state(row.warmup_started_at)
         if state and not state["complete"]:
             warnings.append(
                 f"Warm-up: {domain} is on day {state['day']} of its ramp, so each mailbox may send "
                 f"{state['cap']} a day until {state['full_cap_from']}."
             )
-    return errors, warnings
+    return [], warnings
 
 
 async def campaign_sender_checks(db: AsyncSession, account_id: Optional[int]) -> tuple[list[str], list[str]]:
+    """Non-blocking sender guidance retained for callers; auth never yields an error."""
     account = await email_service.get_account(db, account_id) or await email_service.get_default_account(db)
     if account is None:
         return [], []   # "no sender configured" is reported by the gateway check

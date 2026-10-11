@@ -272,11 +272,11 @@ TOOLS: list[Tool] = [
     Tool(
         name="register_sending_domain",
         description=(
-            "Register the domain your email is sent FROM (acme-leads.io, not gmail.com: a free-mail "
-            "domain is refused) with Brevo and get the DNS records to publish: the verification code, "
-            "DKIM, and exactly ONE DMARC record. If the domain already publishes DMARC, your report "
-            "address is merged into that record and you are told to REPLACE it -- never to add a second. "
-            "Campaigns cannot start from a domain that is registered but not authenticated."
+            "Optionally register a domain you control (not a free-mail domain) with Brevo and get the "
+            "DNS records to publish: the verification code, DKIM, and exactly ONE DMARC record. If the "
+            "domain already publishes DMARC, your report address is merged into that record and you are "
+            "told to REPLACE it -- never to add a second. This domain setup is for deliverability guidance; "
+            "it does not block campaign launch or change the configured send route."
         ),
         method="POST", path="/api/v1/email/domains", scope="write", group="email",
         params=[
