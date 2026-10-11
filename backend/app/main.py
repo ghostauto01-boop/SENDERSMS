@@ -196,8 +196,11 @@ async def _poll() -> int:
                 await db.commit()
         except Exception as exc:
             if db_health.is_db_error(exc):
-                db_health.status.note_error(exc)
-                raise _DatabaseDown() from exc
+                kind, _ = db_health.status.note_error(exc)
+                if db_health.is_db_down_kind(kind):
+                    raise _DatabaseDown() from exc
+                # The database answered; the poller's own SQL was refused. That
+                # is a bug to fix, not an outage to back off from.
             raise
         db_health.status.note_ok()
 
@@ -966,8 +969,10 @@ async def _poll_loop():
                     has_pending, next_due = await _pending_work_snapshot()
                 except Exception as exc:
                     if db_health.is_db_error(exc):
-                        db_health.status.note_error(exc)
-                        db_ok = False
+                        kind, _ = db_health.status.note_error(exc)
+                        # Only a database that is actually unavailable should
+                        # slow the poller down; a refused query must not.
+                        db_ok = db_health.is_db_down_kind(kind)
                     else:
                         logger.warning("Poll snapshot: %s", exc)
             except _DatabaseDown:
@@ -1193,6 +1198,36 @@ async def _error_response(request: Request, exc: Exception) -> JSONResponse:
     request.state.request_id = request_id
     headers = {"Cache-Control": "no-store", "X-Request-ID": request_id}
     if db_health.is_db_error(exc):
+        kind, message = db_health.classify_db_error(exc)
+        if not db_health.is_db_down_kind(kind):
+            # The database answered and refused the statement: our SQL is
+            # wrong, the database is fine. Reporting this as "Database
+            # unavailable" sent operators to look at Neon/Render for what was
+            # an application bug — say what actually happened instead.
+            logger.error(
+                "Query rejected by the database request_id=%s %s %s: %s",
+                request_id, request.method, request.url.path, message,
+                exc_info=(type(exc), exc, exc.__traceback__),
+            )
+            await _store_error_record(request, exc, request_id, "DATABASE_QUERY_REJECTED")
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "code": "DATABASE_QUERY_REJECTED",
+                    "message": f"The database rejected a query from the application: {message}",
+                    "detail": (
+                        f"The database rejected a query from the application: {message} "
+                        "The database itself is running; this is an application bug."
+                    ),
+                    "field": None,
+                    "hint": db_health.hint_for(kind),
+                    "request_id": request_id,
+                    "error_kind": "database_query",
+                    "db": {"ok": True, "kind": kind, "message": message, "hint": db_health.hint_for(kind)},
+                },
+                headers=headers,
+            )
+
         payload = db_health.error_payload(exc)
         code = "DATABASE_UNAVAILABLE"
         message = payload["db"]["message"]
@@ -1406,4 +1441,12 @@ if os.path.isdir(FRONTEND_DIR):
         return HTMLResponse(content=open(i).read()) if os.path.isfile(i) else JSONResponse({"detail":"No frontend"},404)
 else:
     @app.get("/{fp:path}", response_class=HTMLResponse)
-    async def spa(fp:str=""): return HTMLResponse("<h1>SMS SENDER API</h1>")
+    async def spa(fp:str=""):
+        # A backend-only run (no built frontend) used to answer *every* unknown
+        # path with this HTML page and a 200 — including a mistyped
+        # /api/v1/... URL, which then looked like a working endpoint that
+        # returned nonsense. API paths get an honest JSON 404; the placeholder
+        # page is only for someone opening the root by hand.
+        if fp.startswith(("api/", "docs", "manifest", "sw.js", "icon-", "favicon")):
+            return JSONResponse({"detail": "Not Found"}, 404)
+        return HTMLResponse("<h1>SMS SENDER API</h1>")

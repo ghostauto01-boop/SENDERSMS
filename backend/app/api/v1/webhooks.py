@@ -1,6 +1,6 @@
 """Webhook handler — receives SMS-Gate.app events. Parses nested payload format."""
 import hmac, json, logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -84,6 +84,12 @@ def _verify_signature(request: Request, raw_body: bytes) -> None:
 
     Without this any anonymous caller can inject fake inbound messages,
     poison lead statuses and trigger push notifications.
+
+    Rejections carry a ``webhook_reject_reason`` marker so the route can record
+    *that a delivery arrived and why it was refused*. Without that, a
+    deployment whose SMSGATE_WEBHOOK_SECRET is unset answers 503 to every
+    delivery and the inbox simply stays empty with nothing in the app to
+    explain it.
     """
     secret = settings.SMSGATE_WEBHOOK_SECRET
 
@@ -98,7 +104,9 @@ def _verify_signature(request: Request, raw_body: bytes) -> None:
             "Webhook rejected: SMSGATE_WEBHOOK_SECRET is not configured. "
             "Set it to the signing key from SMS-Gate Settings -> Webhooks."
         )
-        raise HTTPException(status_code=503, detail="Webhook signing not configured")
+        exc = HTTPException(status_code=503, detail="Webhook signing not configured")
+        exc.webhook_reject_reason = "signing_not_configured"  # type: ignore[attr-defined]
+        raise exc
 
     from app.providers.smsgate import SMSGateProvider
 
@@ -112,7 +120,77 @@ def _verify_signature(request: Request, raw_body: bytes) -> None:
             "Webhook rejected: invalid signature from %s",
             request.client.host if request.client else "unknown",
         )
-        raise HTTPException(status_code=401, detail="Invalid webhook signature")
+        exc = HTTPException(status_code=401, detail="Invalid webhook signature")
+        exc.webhook_reject_reason = "invalid_signature"  # type: ignore[attr-defined]
+        raise exc
+
+
+#: Rejections are recorded at most once per window, so a device that keeps
+#: retrying (or an attacker hammering the endpoint) cannot fill the table.
+_REJECT_LOG_WINDOW_SECONDS = 900
+
+_REJECT_MESSAGES = {
+    "signing_not_configured": (
+        "Rejected: SMSGATE_WEBHOOK_SECRET is not set on the server, so the "
+        "signature cannot be checked. Sending is unaffected, but NO inbound "
+        "SMS can be accepted until the signing key from SMS-Gate "
+        "(Settings -> Webhooks -> Signing Key) is set as SMSGATE_WEBHOOK_SECRET."
+    ),
+    "invalid_signature": (
+        "Rejected: the delivery was not signed with the configured signing key. "
+        "If inbound SMS have stopped, check that the SMSGATE_WEBHOOK_SECRET "
+        "matches the Signing Key shown in SMS-Gate (Settings -> Webhooks)."
+    ),
+}
+
+
+async def _record_rejected_delivery(db: AsyncSession, raw_body: bytes, reason: str) -> None:
+    """Note a refused delivery (bounded, no content) so the cause is visible.
+
+    Deliberately stores no message text, sender or any other field from an
+    unverified body: the point is only "something arrived and the server
+    refused it, here is why".
+    """
+    try:
+        from sqlalchemy import select as _select
+
+        from app.models.webhook import WebhookEvent
+
+        window_start = datetime.now(timezone.utc) - timedelta(seconds=_REJECT_LOG_WINDOW_SECONDS)
+        recent = (await db.execute(
+            _select(WebhookEvent.id).where(
+                WebhookEvent.provider == "smsgate",
+                WebhookEvent.status == "rejected",
+                WebhookEvent.error.like(f"{reason}:%"),
+                WebhookEvent.created_at >= window_start,
+            ).limit(1)
+        )).first()
+        if recent:
+            return
+
+        event_type = "unknown"
+        try:
+            body = json.loads(raw_body.decode("utf-8", errors="replace"))
+            if isinstance(body, dict):
+                event_type = str(body.get("event") or "unknown")[:50]
+        except Exception:  # noqa: BLE001 — an unparseable body is still a delivery
+            pass
+
+        db.add(WebhookEvent(
+            event_type=event_type,
+            provider="smsgate",
+            provider_event_id=None,
+            # Bucketed so the unique key cannot collide and the window check
+            # above and this insert agree on "one row per window".
+            idempotency_key=f"rejected-{reason}-{int(datetime.now(timezone.utc).timestamp() // _REJECT_LOG_WINDOW_SECONDS)}"[:255],
+            payload=json.dumps({"redacted": True, "reason": reason, "bytes": len(raw_body)}),
+            status="rejected",
+            error=f"{reason}: {_REJECT_MESSAGES.get(reason, reason)}",
+            processed_at=datetime.now(timezone.utc),
+        ))
+        await db.flush()
+    except Exception as exc:  # noqa: BLE001 — never mask the real rejection
+        logger.warning("Could not record rejected webhook: %s", exc)
 
 async def _parse(req: Request) -> dict:
     ct = (req.headers.get("content-type","")or"").lower()
@@ -166,7 +244,13 @@ async def smsgateway_webhook(request: Request, db: AsyncSession = Depends(get_db
     # exactly as sent, before any JSON parsing. Starlette caches this so
     # the later _parse() call still works.
     raw_body = await request.body()
-    _verify_signature(request, raw_body)
+    try:
+        _verify_signature(request, raw_body)
+    except HTTPException as exc:
+        reason = getattr(exc, "webhook_reject_reason", None)
+        if reason:
+            await _record_rejected_delivery(db, raw_body, reason)
+        raise
 
     body = await _parse(request)
     if not body:

@@ -1,3 +1,48 @@
+## Unreleased — the SMS inbox works on PostgreSQL again (503 / empty chat list)
+
+The deployed SMS inbox answered every request with
+
+    Database unavailable: column "conversations.status" must appear in the
+    GROUP BY clause or be used in an aggregate function
+
+and the chat list came back empty — which also meant inbound SMS looked like
+they were never received. The database was healthy the whole time.
+
+- **Cause: a query SQLite accepts and PostgreSQL rejects.** `GET
+  /inbox/conversations` counted the filter tabs with
+  `GROUP BY coalesce(conversations.status, 'active')`. The select list and the
+  GROUP BY each carried their *own* bind parameter, PostgreSQL cannot match two
+  different parameters, and it fell back to checking the bare column — which
+  the clause does not mention. The `GROUP BY` now names the column and NULL is
+  folded into `active` in Python, so "active" still counts threads written
+  before the column existed (schema repair adds columns nullable). Fixed in
+  `api/v1/inbox.py`.
+- **A refused query is no longer reported as a database outage.** Every
+  database error used to become `503 DATABASE_UNAVAILABLE`, which is what sent
+  this investigation to Neon/Render instead of to the query. `db_health` now
+  classifies "the server answered and rejected the statement" (GROUP BY
+  errors, `operator does not exist`, type/syntax errors) as `query_invalid`:
+  the route answers `500 DATABASE_QUERY_REJECTED` saying the database is up and
+  this is an application bug, the process-wide status stays healthy (no outage
+  banner, no poller back-off), and the message is kept in
+  `GET /api/v1/health/db` under `last_query_error` for diagnosis.
+- **A refused inbound webhook is now visible.** With `SMSGATE_WEBHOOK_SECRET`
+  unset the server refuses every delivery with 503 — correct (fail closed), but
+  it left *nothing* in the app to explain an empty inbox. Refusals are now
+  recorded as a `webhook_events` row (`status="rejected"`, reason, no message
+  content) at most once per 15 minutes, so Webhooks → Logs and
+  `POST /api/v1/inbox/poll-debug` show that deliveries are arriving and why
+  they were turned away.
+- **Tests that would have caught it.** New `test_postgres_inbox.py` boots a
+  real PostgreSQL (pgserver) and covers the inbox list, the tab counters, the
+  legacy NULL channel/status rows, every filter the UI sends, and the whole
+  receive path (signed webhook → sender → thread → chat, plus the unsigned
+  rejection). All six fail against the old query. `test_db_health.py` pins the
+  outage-vs-bad-query distinction. `tools/pg_walk.py` drives every endpoint the
+  app exposes against PostgreSQL with data in it (122 requests, all clean).
+- `requirements-dev.txt` installs `pgserver` for those suites; the production
+  image still installs `requirements.txt` alone.
+
 ## Unreleased — SMS Inbox, Conversations and Opportunity; no sending window for email
 
 - **Email has no sending window.** Mail goes out at night and on weekends, limited

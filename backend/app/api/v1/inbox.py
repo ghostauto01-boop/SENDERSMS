@@ -110,14 +110,29 @@ async def list_conversations(
     total = (await db.execute(select(func.count()).select_from(query.subquery()))).scalar() or 0
     # Counts per label for the chosen channel, ignoring the status/search filters,
     # so every filter tab can show how many chats are behind it.
-    counts_q = select(func.coalesce(Conversation.status, "active"), func.count()).select_from(Conversation)
+    #
+    # The GROUP BY names the *column*, and NULL is folded into "active" in
+    # Python. Grouping by `coalesce(status, 'active')` is what this used to do,
+    # and PostgreSQL rejects it: the coalesce carries a bind parameter, the one
+    # in the select list and the one in the GROUP BY are different parameters,
+    # so the server cannot match them and answers
+    #   column "conversations.status" must appear in the GROUP BY clause
+    # -- a 503 on the whole inbox on the production database (SQLite accepts
+    # it, which is why the test suite never noticed). Grouping by the plain
+    # column is equivalent and valid on both.
+    counts_q = select(Conversation.status, func.count()).select_from(Conversation)
     unread_q = select(func.count()).select_from(Conversation).where(
         or_(Conversation.status == "unread", Conversation.unread_count > 0)
     )
     if wanted_channel != "all":
         counts_q = counts_q.where(func.coalesce(Conversation.channel, "sms") == wanted_channel)
         unread_q = unread_q.where(func.coalesce(Conversation.channel, "sms") == wanted_channel)
-    by_status = {str(k): int(v) for k, v in (await db.execute(counts_q.group_by(func.coalesce(Conversation.status, "active")))).all()}
+    by_status: dict[str, int] = {}
+    for value, n in (await db.execute(counts_q.group_by(Conversation.status))).all():
+        # A row written before `status` existed (or added by the schema repair,
+        # which never widens to NOT NULL) reads NULL and belongs to "active".
+        key = "active" if value is None else str(value)
+        by_status[key] = by_status.get(key, 0) + int(n)
     counts = {
         **by_status,
         "all": sum(by_status.values()),
