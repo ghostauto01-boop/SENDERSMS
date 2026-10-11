@@ -1,0 +1,33 @@
+# p0_1 -- tests: backend/tests/test_p0_1_campaign_lifecycle.py
+# BEFORE = code at 45c0937 (parent of the fix) with today's tests;  AFTER = 74db82f
+
+## BEFORE the fix
+25 failed, 21 passed, 1 warning in 13.20s
+FAILED backend/tests/test_p0_1_campaign_lifecycle.py::test_a_paused_schedule_is_not_launched_by_the_poller
+FAILED backend/tests/test_p0_1_campaign_lifecycle.py::test_actions_on_a_missing_campaign_are_404_not_400[delete-]
+FAILED backend/tests/test_p0_1_campaign_lifecycle.py::test_actions_on_a_missing_campaign_are_404_not_400[post-/pause]
+FAILED backend/tests/test_p0_1_campaign_lifecycle.py::test_actions_on_a_missing_campaign_are_404_not_400[post-/resume]
+FAILED backend/tests/test_p0_1_campaign_lifecycle.py::test_actions_on_a_missing_campaign_are_404_not_400[post-/start]
+FAILED backend/tests/test_p0_1_campaign_lifecycle.py::test_actions_on_a_missing_campaign_are_404_not_400[post-/stop]
+FAILED backend/tests/test_p0_1_campaign_lifecycle.py::test_actions_on_a_missing_campaign_are_404_not_400[post-/validate]
+FAILED backend/tests/test_p0_1_campaign_lifecycle.py::test_every_non_terminal_status_has_an_exit[failed]
+FAILED backend/tests/test_p0_1_campaign_lifecycle.py::test_no_endpoint_claims_success_while_changing_nothing[draft]
+FAILED backend/tests/test_p0_1_campaign_lifecycle.py::test_observed_transitions_match_the_declared_table[scheduled]
+FAILED backend/tests/test_p0_1_campaign_lifecycle.py::test_resume_after_the_launch_time_passed_does_not_auto_send
+FAILED backend/tests/test_p0_1_campaign_lifecycle.py::test_resume_of_a_paused_schedule_returns_to_scheduled_not_running
+FAILED backend/tests/test_p0_1_campaign_lifecycle.py::test_schedule_null_on_an_unscheduled_draft_admits_it_did_nothing
+FAILED backend/tests/test_p0_1_campaign_lifecycle.py::test_schedule_null_returns_campaign_to_draft
+FAILED backend/tests/test_p0_1_campaign_lifecycle.py::test_schedule_with_a_time_arms_the_campaign
+FAILED backend/tests/test_p0_1_campaign_lifecycle.py::test_scheduled_campaign_can_be_paused_and_remembers_where_from
+FAILED backend/tests/test_p0_1_campaign_lifecycle.py::test_scheduled_campaign_that_has_sent_cannot_be_deleted
+FAILED backend/tests/test_p0_1_campaign_lifecycle.py::test_scheduled_campaign_with_no_sends_can_be_deleted
+FAILED backend/tests/test_p0_1_campaign_lifecycle.py::test_scheduled_has_at_least_two_distinct_exits_including_pause_and_delete
+FAILED backend/tests/test_p0_1_campaign_lifecycle.py::test_start_refuses_an_invalid_draft_and_says_why
+FAILED backend/tests/test_p0_1_campaign_lifecycle.py::test_start_runs_a_draft_by_validating_inline
+FAILED backend/tests/test_p0_1_campaign_lifecycle.py::test_validate_does_not_arm_an_automatic_launch
+FAILED backend/tests/test_p0_1_campaign_lifecycle.py::test_validate_reports_problems_without_changing_anything
+FAILED backend/tests/test_p0_1_campaign_lifecycle.py::test_validate_twice_leaves_status_unchanged
+FAILED backend/tests/test_p0_1_campaign_lifecycle.py::test_validate_unknown_campaign_is_404
+
+## AFTER the fix
+46 passed, 1 warning in 14.03s

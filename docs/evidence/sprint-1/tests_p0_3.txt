@@ -1,0 +1,9 @@
+# p0_3 -- tests: backend/tests/test_p0_3_send_throttles.py backend/tests/test_p0_3_circuit_breaker.py
+# BEFORE = code at b9eedb5 (parent of the fix) with today's tests;  AFTER = 74db82f
+
+## BEFORE the fix
+!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+1 error in 0.82s
+
+## AFTER the fix
+59 passed, 1 warning in 19.77s

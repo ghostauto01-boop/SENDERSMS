@@ -1,0 +1,9 @@
+# p0_4 -- tests: backend/tests/test_p0_4_no_silent_truncation.py
+# BEFORE = code at 38d3b87 (parent of the fix) with today's tests;  AFTER = 74db82f
+
+## BEFORE the fix
+!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+1 error in 0.16s
+
+## AFTER the fix
+34 passed, 1 warning in 46.63s

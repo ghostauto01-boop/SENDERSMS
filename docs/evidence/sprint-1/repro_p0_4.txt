@@ -1,0 +1,15 @@
+# repro_p0_4.py
+## BEFORE (code at 38d3b87)
+export_contacts_csv  (5,000 contacts in the database)
+  first call: 4,107 characters, 0 complete data rows, tells the caller it is partial: False
+  following the continuation to its end: 0 rows over 1 page(s)
+search_contacts per_page=100
+  6,034 characters; valid JSON: False
+
+## AFTER (74db82f)
+export_contacts_csv  (5,000 contacts in the database)
+  first call: 20,783 characters, 134 complete data rows, tells the caller it is partial: True
+  following the continuation to its end: 5000 rows over 39 page(s)
+search_contacts per_page=100
+  24,304 characters; valid JSON: True
+  truncated=True returned=20 total=5000 next_cursor={'page': 2, 'per_page': 20}

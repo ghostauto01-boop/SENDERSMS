@@ -1,0 +1,21 @@
+# c10 -- tests: backend/tests/test_c10_secrets.py
+# BEFORE = code at abeb293 (parent of the fix) with today's tests;  AFTER = 74db82f
+
+## BEFORE the fix
+13 failed, 6 passed, 1 warning in 7.65s
+FAILED backend/tests/test_c10_secrets.py::test_a_new_account_response_does_not_leak_its_token_either
+FAILED backend/tests/test_c10_secrets.py::test_account_reads_never_contain_the_webhook_token
+FAILED backend/tests/test_c10_secrets.py::test_call_app_marks_its_requests_so_the_refusal_cannot_be_bypassed
+FAILED backend/tests/test_c10_secrets.py::test_reveal_of_an_unknown_account_is_404
+FAILED backend/tests/test_c10_secrets.py::test_reveal_returns_the_full_url_once_asked_and_is_not_cacheable
+FAILED backend/tests/test_c10_secrets.py::test_rotating_an_unknown_account_is_404
+FAILED backend/tests/test_c10_secrets.py::test_rotation_replaces_the_token_and_the_old_one_stops_working
+FAILED backend/tests/test_c10_secrets.py::test_the_assistant_bridge_cannot_reveal_or_rotate[reveal]
+FAILED backend/tests/test_c10_secrets.py::test_the_assistant_bridge_cannot_reveal_or_rotate[rotate]
+FAILED backend/tests/test_c10_secrets.py::test_the_setup_guide_does_not_embed_the_token
+FAILED backend/tests/test_c10_secrets.py::test_the_sms_device_id_is_masked_in_diagnostics
+FAILED backend/tests/test_c10_secrets.py::test_the_token_may_travel_in_a_header_instead_of_the_url
+FAILED backend/tests/test_c10_secrets.py::test_the_webhook_compares_tokens_in_constant_time
+
+## AFTER the fix
+19 passed, 1 warning in 7.38s

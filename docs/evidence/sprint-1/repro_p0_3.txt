@@ -1,0 +1,41 @@
+# repro_p0_3.py
+## BEFORE (code at b9eedb5)
+sending rules in force: {'enable_daily_limit': False, 'sending_start_time': '', 'sending_end_time': '', 'allow_weekends': True}
+-- Saturday 23:30 Lagos (the original reproduction): 2026-09-05T23:30:00+01:00
+Traceback (most recent call last):
+  File "/home/user/SENDERSMS/docs/evidence/sprint-1/repro/repro_p0_3.py", line 84, in <module>
+    c.run(main())
+  File "/home/user/SENDERSMS/docs/evidence/sprint-1/repro/_common.py", line 58, in run
+    asyncio.run(coro)
+  File "/usr/lib/python3.11/asyncio/runners.py", line 190, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.11/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.11/asyncio/base_events.py", line 653, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/home/user/SENDERSMS/docs/evidence/sprint-1/repro/repro_p0_3.py", line 78, in main
+    await scenario("Saturday 23:30 Lagos (the original reproduction)",
+  File "/home/user/SENDERSMS/docs/evidence/sprint-1/repro/repro_p0_3.py", line 58, in scenario
+    await ct.process_campaign_batch_async(camp.id, batch_size=200)
+  File "/tmp/sprint1_before_repro_p0_3/backend/app/tasks/campaign_tasks.py", line 193, in process_campaign_batch_async
+    await _process_campaign_contact(
+  File "/tmp/sprint1_before_repro_p0_3/backend/app/tasks/campaign_tasks.py", line 313, in _process_campaign_contact
+    await _send_template_message(db, campaign, cc, contact, outbox=outbox)
+  File "/tmp/sprint1_before_repro_p0_3/backend/app/tasks/campaign_tasks.py", line 620, in _send_template_message
+    or email_service.load_attachments(getattr(template, "attachments", None))
+                                              ^^^^^^^^
+UnboundLocalError: cannot access local variable 'template' where it is not associated with a value
+
+## AFTER (74db82f)
+sending rules in force: {'enable_daily_limit': True, 'sending_start_time': '09:00', 'sending_end_time': '17:00', 'allow_weekends': False}
+-- Saturday 23:30 Lagos (the original reproduction): 2026-09-05T23:30:00+01:00
+   batch pass 1: 0 email messages exist (audience 200, one mailbox)
+   batch pass 2: 0 email messages exist (audience 200, one mailbox)
+   handed to the provider in this harness: 0 (the 30 s send pacing is not waited out here); contacts still pending: 200
+-- Wednesday 12:00 Lagos (inside the window): 2026-09-02T12:00:00+01:00
+   batch pass 1: 30 email messages exist (audience 200, one mailbox)
+   batch pass 2: 30 email messages exist (audience 200, one mailbox)
+   handed to the provider in this harness: 1 (the 30 s send pacing is not waited out here); contacts still pending: 170

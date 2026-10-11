@@ -1,0 +1,16 @@
+# repro_p0_5.py
+## BEFORE (code at 60c0f4f)
+validate: valid=True errors=[]
+          audience={'list_members': 5, 'sendable': 5, 'skipped': {}}
+start: HTTP 200 
+messages created for the campaign: 5  (to verified contacts: 3, to UNVERIFIED contacts: 2)
+validator status: engine=builtin smtp_enabled=True smtp_reason=None batch_size=5
+validator /batch with 6 items: HTTP 422
+
+## AFTER (74db82f)
+validate: valid=False errors=['2 of 5 contacts have an unknown email verification status and will not be sent to. Verify them (POST /api/v1/validator/jobs with this list) or remove them from the list, then validate again.']
+          audience={'list_members': 5, 'sendable': 3, 'skipped': {'unverified': 2}, 'unverified': 2, 'risky': 0}
+start: HTTP 400 {"code":"BAD_REQUEST","message":"2 of 5 contacts have an unknown email verification status and will not be sent to. Verify them (POST /api/v1/validator/jobs wit
+messages created for the campaign: 0  (to verified contacts: 0, to UNVERIFIED contacts: 0)
+validator status: engine=builtin smtp_enabled=False smtp_reason="Outbound port 25 is blocked from this server (connected to gmail-smtp-in.l.google.com:25 but received no SMTP greeting (got 'nothing'); a firewall or proxy is probably intercepting port 25). Hosting providers commonly block it. Set REACHER_API_URL to a verifier that can reach port 25 (Reacher), or run the app where port 25 is open. Until then mailboxes cannot be confirmed: they stay 'unknown' and are not sendable." batch_size=25
+validator /batch with 6 items: HTTP 200
