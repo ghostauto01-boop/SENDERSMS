@@ -52,7 +52,9 @@ async def list_conversations(
     cu:User=Depends(get_current_user),
 ):
     query = select(Conversation)
-    wanted_channel = (channel or "sms").lower()
+    from app.utils.channels import validate_channel
+
+    wanted_channel = validate_channel(channel, default="sms")
     if wanted_channel != "all":
         # Rows written before the channel column existed read NULL. They are
         # all SMS, so coalesce instead of silently hiding the whole history.
@@ -155,7 +157,9 @@ async def campaign_filters(channel:Optional[str]="sms",db:AsyncSession=Depends(g
     """
     from app.services.attribution import campaign_label_map
 
-    wanted_channel = (channel or "sms").lower()
+    from app.utils.channels import validate_channel
+
+    wanted_channel = validate_channel(channel, default="sms")
     conv_query = select(Conversation)
     if wanted_channel != "all":
         conv_query = conv_query.where(func.coalesce(Conversation.channel, "sms") == wanted_channel)

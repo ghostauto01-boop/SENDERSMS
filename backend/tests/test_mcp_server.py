@@ -338,7 +338,9 @@ async def test_trailing_slash_paths_are_preserved(captured):
 
 @pytest.mark.asyncio
 async def test_preview_template_uses_the_apps_own_renderer(captured):
-    """Two reads then the real preview endpoint — never a second renderer."""
+    """One read then the real preview endpoint — never a second renderer. The contact is
+    handed over by id and loaded by the endpoint, so its imported columns and the registry's
+    fallbacks count (it used to be copied field by field here)."""
     calls: list[dict] = []
 
     async def fake_call_app(method, path, **kwargs):
@@ -364,13 +366,12 @@ async def test_preview_template_uses_the_apps_own_renderer(captured):
         mcp_server.call_app = original  # type: ignore[assignment]
 
     assert outcome.result["isError"] is False
-    assert [c["path"] for c in calls] == [
-        "/api/v1/templates/5", "/api/v1/contacts/2", "/api/v1/templates/preview",
-    ]
-    preview_query = calls[2]["query"]
+    assert [c["path"] for c in calls] == ["/api/v1/templates/5", "/api/v1/templates/preview"]
+    preview_query = calls[1]["query"]
     assert preview_query["body"] == "Hi {{first_name}}"
     assert preview_query["subject"] == "About {{business_name}}"
-    assert preview_query["first_name"] == "Ada" and preview_query["business_name"] == "Acme"
+    assert preview_query["contact_id"] == 2, "the contact travels by id; the endpoint renders for it"
+    assert "first_name" not in preview_query, "no copied-over values: that was a second renderer"
     assert outcome.result["structuredContent"]["preview"] == "Hi Ada"
 
 

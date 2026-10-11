@@ -44,8 +44,8 @@ async def make_campaign(db, *, status: str = "draft", n: int = 2, channel: str =
         status=status,
         channel=channel,
         list_id=lst.id,
-        message_body="Hello {{first_name}}",
-        subject="Hello" if channel == "email" else None,
+        message_body=extra.pop("message_body", "Hello {{first_name}}"),
+        subject=extra.pop("subject", "Hello" if channel == "email" else None),
         scheduled_start_at=scheduled_start_at,
         **extra,
     )

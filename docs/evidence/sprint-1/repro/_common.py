@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 
 async def new_db():
+    import app.models  # noqa: F401  -- registers every table before create_all
     from app.database import Base
 
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")

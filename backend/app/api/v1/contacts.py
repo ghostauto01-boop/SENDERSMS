@@ -1175,7 +1175,9 @@ async def _create_import_job(
         if target_list is None:
             raise HTTPException(status_code=404, detail="List not found")
     elif new_list_name and new_list_name.strip():
-        target_list = ContactList(name=new_list_name.strip()[:255])
+        from app.api.v1.lists import require_free_list_name
+
+        target_list = ContactList(name=(await require_free_list_name(db, new_list_name))[:255])
         db.add(target_list)
         await db.flush()
         list_id = target_list.id

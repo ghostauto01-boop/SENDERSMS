@@ -566,23 +566,17 @@ async def _run_escape_hatch(
     return _payload_outcome(method, target, status, payload, query)
 
 
-#: Contact fields the app's renderer fills in. Kept in step with the sample
-#: values the templates API accepts.
-_SAMPLE_FIELDS = (
-    "first_name", "last_name", "business_name", "phone_number", "email",
-    "city", "state", "website", "industry",
-)
-
-
 async def _run_preview_template(
     db: AsyncSession, token: TokenView, tool: Tool, args: dict
 ) -> ToolOutcome:
     """Render a saved template with real values.
 
-    Two calls, no second renderer: read the template, read the contact it should
-    be filled in for, then hand both to the app's own preview endpoint (the same
-    one the Templates page uses). Re-implementing the rendering here is exactly
-    how a preview stops matching what actually gets sent.
+    Two calls, no second renderer: read the template, then hand its text and the contact
+    id to the app's own preview endpoint (the same one the Templates page and
+    ``render_text_preview`` use). The endpoint loads the contact itself, so imported
+    columns and the operator's fallbacks count, and an unknown contact is its 404.
+    Re-implementing the rendering here is exactly how a preview stops matching what
+    actually gets sent.
     """
     started = time.time()
     template_id = args.get("template_id")
@@ -602,15 +596,7 @@ async def _run_preview_template(
     }
     contact_id = args.get("contact_id")
     if contact_id:
-        contact_status, contact = await call_app("GET", f"/api/v1/contacts/{contact_id}")
-        if contact_status >= 400:
-            failure = f"HTTP {contact_status} reading contact {contact_id}"
-            await _audit(db, token, tool.name, step, False, contact_status, failure, args,
-                         started)
-            return ToolOutcome(_tool_result(failure, is_error=True), token_error=failure)
-        for field in _SAMPLE_FIELDS:
-            if contact.get(field):
-                query[field] = contact[field]
+        query["contact_id"] = contact_id
 
     status, payload = await call_app("POST", "/api/v1/templates/preview", query=query)
     ok = status < 400

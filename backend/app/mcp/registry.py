@@ -466,8 +466,10 @@ TOOLS: list[Tool] = [
         name="render_text_preview",
         description=(
             "Render a message you have not saved yet: pass the SMS body, or the email subject "
-            "and HTML, and see exactly what goes out with the variables filled in. Use it to "
-            "check copy and character/segment counts before creating a template."
+            "and HTML, and see exactly what goes out with the variables filled in -- for one real "
+            "contact (contact_id) or with sample data. A variable that does not exist is shown as "
+            "[UNKNOWN VARIABLE: name] and listed in unknown_variables instead of being silently "
+            "deleted. Use it to check copy and character/segment counts before creating a template."
         ),
         method="POST", path="/api/v1/templates/preview", group="templates",
         params=[
@@ -476,11 +478,16 @@ TOOLS: list[Tool] = [
             Param("subject", where="query", description="Email only."),
             Param("html_body", where="query", description="Email only: the HTML version."),
             Param("channel", enum=["sms", "email"], default="sms", where="query"),
-            Param("first_name", where="query", default="John"),
-            Param("last_name", where="query", default="Doe"),
-            Param("business_name", where="query", default="Acme Ltd"),
-            Param("city", where="query", default="Lagos"),
-            Param("website", where="query", default="https://example.com"),
+            Param("contact_id", type="integer", where="query",
+                  description="Render for this contact: their values, imported columns and the "
+                              "operator's fallbacks, exactly as a send would. Omit for sample data."),
+            # Overrides only: with no default, a value is sent only when the caller gives one.
+            # (A default like first_name=John sent on every call would beat the contact's own.)
+            Param("first_name", where="query", description="Override (sample data when no contact)."),
+            Param("last_name", where="query"),
+            Param("business_name", where="query"),
+            Param("city", where="query"),
+            Param("website", where="query"),
         ],
     ),
     # -------------------------------------------------------------- campaigns

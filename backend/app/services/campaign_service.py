@@ -276,6 +276,11 @@ class CampaignService:
         if not campaign.sequence_id and not await self.resolve_body(campaign):
             errors.append("No message to send. Write a message or choose a template.")
 
+        # A variable that names nothing used to be deleted from the message at send time, so a
+        # typo ({{frist_name}}) shipped as a hole in the sentence. Saving a template with one is
+        # refused; a campaign written (or a template saved) before that is caught here.
+        errors.extend(await self._unknown_variable_errors(campaign))
+
         if campaign.sequence_id:
             sequence = (
                 await self.db.execute(
@@ -318,6 +323,27 @@ class CampaignService:
         if campaign.list_id and check.audience.get("list_members"):
             await self._analyse_audience(campaign, check)
         return check
+
+    async def _unknown_variable_errors(self, campaign: Campaign) -> list[str]:
+        """Errors for placeholders in the campaign's message (and an email's subject / HTML)
+        that name no variable at all."""
+        from app.services import variable_service
+
+        body = await self.resolve_body(campaign)
+        subject, html = campaign.subject, campaign.html_body
+        if campaign.template_id:
+            template = (
+                await self.db.execute(select(Template).where(Template.id == campaign.template_id))
+            ).scalar_one_or_none()
+            if template is not None and (campaign.channel or "sms") == "email":
+                subject = subject or template.subject
+                html = html or template.html_body
+        if (campaign.channel or "sms") != "email":
+            subject = html = None
+        unknown, known = await variable_service.unknown_in(self.db, body, subject, html)
+        if not unknown:
+            return []
+        return [variable_service.unknown_variables_error(unknown, known)["message"]]
 
     async def _members(self, campaign: Campaign) -> list[Contact]:
         """Every contact on the campaign's list."""
