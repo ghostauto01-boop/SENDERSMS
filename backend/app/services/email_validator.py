@@ -320,7 +320,7 @@ def _smtp_probe(address: str, domain: str) -> Verdict:
 #
 # Confirming a mailbox means an SMTP conversation on port 25, and most hosting
 # providers block outbound port 25. Without it every mailbox comes back "unknown" --
-# which is correct, and not sendable -- but the operator must be TOLD that is why, not
+# which is correct -- but the operator must be TOLD that is why, not
 # left to wonder why nothing ever verifies.
 
 EGRESS_PROBE_HOST = "gmail-smtp-in.l.google.com"
@@ -373,8 +373,8 @@ async def smtp_capability() -> dict:
             "reason": (
                 "Built-in SMTP probing is switched off (EMAIL_VALIDATOR_SMTP=false) and no "
                 "Reacher service is configured (REACHER_API_URL). Syntax and MX can be "
-                "checked, but mailboxes cannot be confirmed, so they stay 'unknown' and are "
-                "not sendable."
+                "checked, but mailboxes cannot be confirmed, so they stay 'unknown'. "
+                "Validation is optional for sending."
             ),
         }
     cached = _egress_cache.get("port25")
@@ -392,7 +392,7 @@ async def smtp_capability() -> dict:
             f"Outbound port 25 is blocked from this server ({why}). Hosting providers "
             "commonly block it. Set REACHER_API_URL to a verifier that can reach port 25 "
             "(Reacher), or run the app where port 25 is open. Until then mailboxes cannot "
-            "be confirmed: they stay 'unknown' and are not sendable."
+            "be confirmed: they stay 'unknown'. Validation is optional for sending."
         ),
     }
 

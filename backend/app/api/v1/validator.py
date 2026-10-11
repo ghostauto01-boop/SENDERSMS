@@ -91,13 +91,13 @@ async def status(current_user: User = Depends(get_current_user)):
         "dns_available": _dns_available(),
         # Whether a mailbox can actually be CONFIRMED from here -- not merely whether the
         # setting is on. When it is false, `smtp_reason` says why and what to do, and every
-        # mailbox stays "unknown" (not sendable).
+        # mailbox stays "unknown" (validation is optional).
         "smtp_enabled": smtp["enabled"],
         "smtp_reason": smtp["reason"],
         "can_confirm_mailboxes": smtp["enabled"],
         "batch_size": BATCH_SIZE,
         "phone_region": "NG",
-        "notice": "No key is needed for built-in checks. Reacher is optional; a hosted Reacher service may require its own key. SMTP/DNS failures stay Unknown, and Unknown addresses are not sent to by campaigns. Phone checks confirm Nigerian mobile format, not whether a SIM is active. No messages are sent.",
+        "notice": "No key is needed for built-in checks. Reacher is optional; a hosted Reacher service may require its own key. SMTP/DNS failures stay Unknown, and Unknown addresses can still receive emails and campaigns unless otherwise blocked. Phone checks confirm Nigerian mobile format, not whether a SIM is active. No messages are sent.",
     }
 
 
@@ -164,8 +164,8 @@ async def create_job(
     """Queue a verification of any number of contacts; poll ``GET /jobs/{id}``.
 
     Every verdict is written onto the contact as it is produced (``email_verified``,
-    ``email_verified_at``, ``email_confidence``, ``email_verdict``) -- that is what makes
-    a contact sendable in a campaign. Contacts with no address, and (unless ``recheck``)
+    ``email_verified_at``, ``email_confidence``, ``email_verdict``) for review. Validation is not required
+    to send a campaign. Contacts with no address, and (unless ``recheck``)
     those already proven deliverable, are left out of ``total``.
     """
     ids = await _selected_ids(db, data)

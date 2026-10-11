@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, Download, FileUp, FlaskConical, List, Loader2, Play, Search, ShieldCheck, Square, User, Users } from "lucide-react";
 import api from "../api/client";
+import EmailSuppressionPanel from "../components/EmailSuppressionPanel";
 import { validatorApi, type CheckKind, type ChannelResult, type ResultState, type SelfTest, type ValidationEntry, type ValidationRow, type ValidatorStatus } from "../api/validator";
 import { detectValidationMapping, downloadValidationCsv, MAX_CSV_BYTES, parseValidationCsv, validationEntries, type ValidationMapping } from "../utils/validationCsv";
 
@@ -76,6 +77,7 @@ export default function ValidatorPage() {
   const [check, setCheck] = useState<CheckKind>("both");
   const [deep, setDeep] = useState(true);
   const [save, setSave] = useState(false);
+  const [showSuppression, setShowSuppression] = useState(false);
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
@@ -266,6 +268,13 @@ export default function ValidatorPage() {
       <div><h1 className="text-2xl font-bold flex items-center gap-2"><ShieldCheck className="text-primary-600" />Validator</h1><p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Check your contact data. See what’s good, bad, and still unconfirmed.</p></div>
       <Link to="/contacts" className="btn-secondary btn-sm"><Users size={16} />Contacts</Link>
     </div>
+
+    <section className="card p-4 sm:p-5 space-y-3" aria-label="Optional validation and suppression">
+      <h2 className="font-semibold">Validation is optional</h2>
+      <p className="text-sm text-gray-600 dark:text-gray-400">Unvalidated, Unknown, and inferred addresses can receive emails, campaigns, bulk sends, and follow-ups. Review results here and choose whether to suppress an address. Unsubscribes, complaints, hard bounces, invalid addresses, and existing blocks still apply.</p>
+      <button className="btn-secondary btn-sm" aria-expanded={showSuppression} onClick={() => setShowSuppression(value => !value)}>{showSuppression ? "Hide email suppressions" : "Manage email suppressions"}</button>
+      {showSuppression && <EmailSuppressionPanel />}
+    </section>
 
     <section className="card p-4 sm:p-5 space-y-3" aria-label="Validator engine">
       <div className="flex flex-wrap items-center justify-between gap-3">

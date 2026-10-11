@@ -1,25 +1,8 @@
-"""P0-5 — an address nobody has verified is not sendable.
+"""Optional email validation across all sending paths.
 
-The QA sweep found 1,297 contacts, none verified, and every one of them sendable:
-``unknown`` (could not be proven either way) was treated like ``deliverable`` by every
-send path, and the validator wrote nothing down unless a caller remembered to pass
-``save=true``. The cost lands on the sender: ~70% of the addresses were generated role
-mailboxes, 184 had already bounced, and a new mailbox does not survive that.
-
-What these tests pin:
-
-* ``unknown`` (never verified, or the verifier could not decide) is NOT sendable by any
-  outreach path: classic campaigns, Ads Manager, follow-ups, bulk ``queue_email``.
-  ``deliverable`` is. ``risky`` (a catch-all, a role or disposable address) is sendable but
-  goes LAST. One-to-one sends and a reply address are not outreach and are not gated.
-* The send path and the audience screening apply the SAME rule (they used to differ).
-* ``validate`` fails an email campaign that contains unknown contacts and says how many.
-* The validator persists what it learned (verdict, confidence, verified flags), reports a
-  normalised ``status`` (valid | invalid | risky | unknown), says honestly whether it can
-  confirm mailboxes at all (``smtp_enabled`` + a reason), takes batches larger than 5, and
-  can run a whole list as a queued, resumable background job.
-
-DNS and SMTP are always mocked: nothing here touches the network.
+Unknown and inferred addresses are eligible; real delivery restrictions still block.
+Validator results and background jobs remain available for optional review.
+DNS and SMTP are mocked: nothing here sends real mail.
 """
 
 from __future__ import annotations
@@ -97,18 +80,18 @@ async def _email_campaign(db, contacts, **kw):
 
 
 @pytest.mark.asyncio
-async def test_an_address_nobody_verified_is_not_sendable_in_outreach(api_db):
+async def test_an_address_nobody_verified_is_sendable_in_outreach(api_db):
     contact = await _contact(api_db)  # imported from a CSV, never checked
 
-    assert await email_service.contact_email_problem(api_db, contact, outreach=True) == "unverified"
+    assert await email_service.contact_email_problem(api_db, contact, outreach=True) is None
 
 
 @pytest.mark.asyncio
-async def test_an_unknown_verdict_is_not_sendable(api_db):
+async def test_an_unknown_verdict_is_sendable(api_db):
     """The verifier ran and could not decide (blocked SMTP, timeout): that is not a yes."""
     contact = await _contact(api_db, verdict="unknown", confidence=0)
 
-    assert await email_service.contact_email_problem(api_db, contact, outreach=True) == "unverified"
+    assert await email_service.contact_email_problem(api_db, contact, outreach=True) is None
 
 
 @pytest.mark.asyncio
@@ -161,8 +144,8 @@ async def test_an_unverified_address_that_is_also_suppressed_is_reported_as_supp
 
 
 @pytest.mark.asyncio
-async def test_the_gate_has_an_explicit_off_switch(api_db, monkeypatch):
-    monkeypatch.setattr(settings, "EMAIL_REQUIRE_VERIFIED", False)
+async def test_legacy_gate_setting_cannot_block_sending(api_db, monkeypatch):
+    monkeypatch.setattr(settings, "EMAIL_REQUIRE_VERIFIED", True)
     contact = await _contact(api_db)
 
     assert await email_service.contact_email_problem(api_db, contact, outreach=True) is None
@@ -188,9 +171,8 @@ async def test_audience_screening_and_the_send_gate_apply_the_same_rule(api_db):
     for name, contact in contacts.items():
         gate[name] = await email_service.contact_email_problem(api_db, contact, outreach=True)
     assert {c.id for c in eligible} == {c.id for n, c in contacts.items() if gate[n] is None}
-    assert {c.id for c in eligible} == {contacts["verified"].id, contacts["risky"].id}
-    assert skipped["unverified"] == 1
-    assert skipped["inferred_unverified"] == 1
+    assert {c.id for c in eligible} == {contacts[name].id for name in ("verified", "risky", "unknown", "inferred")}
+    assert skipped == {"email_opted_out": 1, "email_bounced": 1, "placeholder_email": 1}
 
 
 # --------------------------------------------------------------------------
@@ -199,7 +181,7 @@ async def test_audience_screening_and_the_send_gate_apply_the_same_rule(api_db):
 
 
 @pytest.mark.asyncio
-async def test_validate_fails_a_campaign_that_contains_unknown_contacts_and_counts_them(
+async def test_validate_allows_unknown_contacts_and_counts_them(
         api_client, api_db):
     good = [await _contact(api_db, verified=True, verdict="deliverable") for _ in range(3)]
     unknown = [await _contact(api_db) for _ in range(2)]
@@ -209,10 +191,10 @@ async def test_validate_fails_a_campaign_that_contains_unknown_contacts_and_coun
 
     assert response.status_code == 200
     body = response.json()
-    assert body["valid"] is False and body["ok"] is False
+    assert body["valid"] is True and body["ok"] is True
     assert body["audience"]["unverified"] == 2
-    assert body["audience"]["sendable"] == 3
-    assert any("2 " in e and "unknown" in e.lower() for e in body["errors"]), body["errors"]
+    assert body["audience"]["sendable"] == 5
+    assert body["errors"] == []
     assert body["changed"] is False and body["status"] == "draft", "validate stays report-only"
 
 
@@ -241,7 +223,7 @@ async def test_risky_contacts_do_not_fail_validation_but_are_counted(api_client,
 
 
 @pytest.mark.asyncio
-async def test_start_refuses_a_campaign_with_unknown_contacts_and_sends_nothing(
+async def test_start_includes_unknown_contacts(
         api_client, api_db, stub_queue):
     contacts = [await _contact(api_db, verified=True, verdict="deliverable"),
                 await _contact(api_db)]
@@ -249,13 +231,12 @@ async def test_start_refuses_a_campaign_with_unknown_contacts_and_sends_nothing(
 
     response = await api_client.post(f"/api/v1/campaigns/{campaign.id}/start")
 
-    assert response.status_code == 400
-    assert "unknown" in response.text.lower()
+    assert response.status_code == 200
     rows = (await api_db.execute(select(CampaignContact))).scalars().all()
-    assert rows == [], "nothing was queued for anyone"
+    assert {r.contact_id for r in rows} == {c.id for c in contacts}
     assert (await api_db.execute(select(Message))).scalars().all() == []
     await api_db.refresh(campaign)
-    assert campaign.status == "draft"
+    assert campaign.status == "running"
 
 
 @pytest.mark.asyncio
@@ -263,7 +244,6 @@ async def test_verifying_the_contacts_lets_the_campaign_start(api_client, api_db
     contacts = [await _contact(api_db, verified=True, verdict="deliverable"),
                 await _contact(api_db)]
     campaign = await _email_campaign(api_db, contacts)
-    assert (await api_client.post(f"/api/v1/campaigns/{campaign.id}/start")).status_code == 400
 
     ev.apply_verdict(contacts[1], ev.Verdict(
         address=contacts[1].email, verdict="deliverable", is_reachable="safe"))
@@ -318,9 +298,8 @@ async def batch(api_db, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_the_send_path_refuses_an_unverified_contact_even_if_a_row_exists(api_db, batch):
-    """A contact edited after the audience was built (an edit resets verification) must not
-    be mailed just because a pending row for them already exists."""
+async def test_worker_sends_unverified_contacts(api_db, batch):
+    """Resetting verification must not strand already-queued recipients."""
     unknown = await _contact(api_db)
     good = await _contact(api_db, verified=True, verdict="deliverable")
     campaign = await _email_campaign(api_db, [unknown, good])
@@ -332,14 +311,14 @@ async def test_the_send_path_refuses_an_unverified_contact_even_if_a_row_exists(
     await batch(campaign.id)
 
     messages = (await api_db.execute(select(Message).where(Message.campaign_id == campaign.id))).scalars().all()
-    assert [m.contact_id for m in messages] == [good.id], "only the verified contact was mailed"
+    assert {m.contact_id for m in messages} == {good.id, unknown.id}
     row = (await api_db.execute(select(CampaignContact).where(
         CampaignContact.contact_id == unknown.id))).scalar_one()
-    assert row.status != "pending" and "unverified" in (row.last_error or "")
+    assert row.status != "pending" and not row.last_error
 
 
 @pytest.mark.asyncio
-async def test_outreach_queue_email_refuses_an_unverified_contact(api_db):
+async def test_outreach_queue_email_accepts_unverified_contacts(api_db):
     contact = await _contact(api_db)
     account = await make_account(api_db, default=True)
     kw = dict(subject="Hi", text_body="Hello", account=account)
@@ -349,8 +328,7 @@ async def test_outreach_queue_email_refuses_an_unverified_contact(api_db):
     followup = await email_service.queue_email(api_db, contact, followup=True, **kw)
     one_to_one = await email_service.queue_email(api_db, contact, **kw)
 
-    assert explicit is None and campaign is None and followup is None, \
-        "mail to an audience is refused an unverified address"
+    assert explicit is not None and campaign is not None and followup is not None
     assert one_to_one is not None, "a deliberate one-to-one message is not"
 
 
@@ -399,7 +377,7 @@ async def test_send_to_one_contact_with_a_marketing_template_is_not_held_back(
 
 
 @pytest.mark.asyncio
-async def test_a_list_send_skips_the_unverified_contacts(api_client, api_db, delivered):
+async def test_a_list_send_includes_unverified_contacts(api_client, api_db, delivered):
     good = await _contact(api_db, verified=True, verdict="deliverable")
     unknown = [await _contact(api_db) for _ in range(2)]
     lst = await _list_of(api_db, [good] + unknown)
@@ -409,9 +387,9 @@ async def test_a_list_send_skips_the_unverified_contacts(api_client, api_db, del
         "list_id": lst.id, "subject": "Hello", "body": "Hi there"})
 
     assert response.status_code == 200, response.text
-    assert response.json()["sent"] == 1 and response.json()["skipped"] == 2
+    assert response.json()["sent"] == 3 and response.json()["skipped"] == 0
     sent_to = (await api_db.execute(select(Message.contact_id))).scalars().all()
-    assert sent_to == [good.id]
+    assert set(sent_to) == {good.id, *(c.id for c in unknown)}
 
 
 @pytest.mark.asyncio
@@ -434,7 +412,7 @@ async def test_replies_and_test_sends_are_never_gated(api_db):
 
 
 @pytest.mark.asyncio
-async def test_ads_audience_screening_excludes_unknown_contacts_and_counts_them(api_db):
+async def test_ads_audience_screening_includes_unknown_contacts(api_db):
     from app.services import ads_service as svc
     from tests.test_ads_manager import make_campaign as ads_campaign
 
@@ -447,12 +425,12 @@ async def test_ads_audience_screening_excludes_unknown_contacts_and_counts_them(
 
     eligible, skipped = await svc.screen_contacts(api_db, campaign, [good, unknown, risky])
 
-    assert {c.id for c in eligible} == {good.id, risky.id}
-    assert skipped == {"unverified": 1}
+    assert {c.id for c in eligible} == {good.id, unknown.id, risky.id}
+    assert skipped == {}
 
 
 @pytest.mark.asyncio
-async def test_ads_validate_fails_with_the_count_of_unknown_contacts(api_db):
+async def test_ads_validate_allows_unknown_contacts(api_db):
     from app.services import ads_service as svc
     from tests.test_ads_manager import make_campaign as ads_campaign
     from tests.test_ads_manager import make_creatives, make_set
@@ -468,10 +446,10 @@ async def test_ads_validate_fails_with_the_count_of_unknown_contacts(api_db):
 
     report = await svc.validate_campaign(api_db, campaign)
 
-    assert report["ok"] is False
-    assert any("3 " in e and "unknown" in e.lower() for e in report["errors"]), report["errors"]
-    assert report["summary"]["skipped"]["unverified"] == 3
-    assert report["summary"]["eligible"] == 1
+    assert report["ok"] is True
+    assert report["errors"] == []
+    assert report["summary"]["skipped"] == {}
+    assert report["summary"]["eligible"] == 4
 
 
 # --------------------------------------------------------------------------
@@ -600,7 +578,7 @@ async def test_a_mailbox_the_server_accepts_on_a_normal_domain_is_valid(monkeypa
 
 @pytest.mark.asyncio
 async def test_without_smtp_a_mailbox_stays_unknown(monkeypatch, no_reacher):
-    """No probe means no proof. It must come back `unknown` -- and therefore not sendable."""
+    """No probe means no proof. It must come back `unknown` -- but sending remains optional."""
     _dns(monkeypatch, mx_found=True)
     monkeypatch.setattr(settings, "EMAIL_VALIDATOR_SMTP", False)
 
@@ -928,3 +906,25 @@ async def test_the_assistant_can_queue_and_follow_a_verification(api_client, api
 
     assert json.loads(followed.result["content"][0]["text"])["data"]["status"] == "done"
     assert "validator_status" in TOOLS_BY_NAME
+
+
+@pytest.mark.asyncio
+async def test_optional_validation_respects_manual_suppression(api_client, api_db, monkeypatch):
+    # Existing deployments may still have both old gate settings enabled.
+    monkeypatch.setattr(settings, "EMAIL_REQUIRE_VERIFIED", True)
+    monkeypatch.setattr(settings, "EMAIL_SEND_INFERRED", False)
+    contact = await _contact(api_db, source="inferred", verdict="unknown")
+    assert await email_service.contact_email_problem(api_db, contact, outreach=True) is None
+    response = await api_client.post("/api/v1/email/suppression", json={
+        "email_address": contact.email, "reason": "Operator review"})
+    assert response.status_code == 201
+    assert await email_service.contact_email_problem(api_db, contact, outreach=True) == "suppressed"
+    eligible, skipped = await email_service.screen_contacts_for_email(api_db, [contact])
+    assert eligible == [] and skipped == {"suppressed": 1}
+    entries = (await api_client.get("/api/v1/email/suppression")).json()["items"]
+    entry = next(e for e in entries if e["email_address"] == contact.email)
+    assert (await api_client.delete(f"/api/v1/email/suppression/{entry['id']}")).status_code == 204
+    assert await email_service.contact_email_problem(api_db, contact, outreach=True) is None
+    # Removing a suppression never clears consent or delivery blocks.
+    contact.is_email_opted_out = True
+    assert await email_service.contact_email_problem(api_db, contact, outreach=True) == "email_opted_out"

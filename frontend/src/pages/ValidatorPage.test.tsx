@@ -4,8 +4,8 @@ import { MemoryRouter } from "react-router-dom";
 import ValidatorPage from "./ValidatorPage";
 import type { ValidationRow } from "../api/validator";
 
-const { get, post } = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }));
-vi.mock("../api/client", () => ({ default: { get, post } }));
+const { get, post, del } = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), del: vi.fn() }));
+vi.mock("../api/client", () => ({ default: { get, post, delete: del } }));
 
 function row(email: string, status: ValidationRow["status"] = "bad", id: number | null = null): ValidationRow {
   return {
@@ -20,8 +20,8 @@ function show(url = "/validator") {
 }
 
 beforeEach(() => {
-  get.mockReset(); post.mockReset();
-  vi.spyOn(window, "confirm").mockReturnValue(true);
+  get.mockReset(); post.mockReset(); del.mockReset();
+  vi.spyOn(window, "confirm").mockReset().mockReturnValue(true);
   get.mockImplementation(async (url: string) => {
     if (url === "/validator/status") return { data: { engine: "builtin", dns_available: true, smtp_enabled: true, batch_size: 5, api_key_required: false, reacher_configured: false, reacher_key_configured: false } };
     if (url === "/lists/") return { data: { total: 1, items: [{ id: 7, name: "Lagos list", contact_count: 30 }] } };
@@ -36,6 +36,35 @@ beforeEach(() => {
 });
 
 describe("Validator workspace", () => {
+  it("manages suppression without requiring a validation run", async () => {
+    const originalGet = get.getMockImplementation()!;
+    let suppressed = false;
+    get.mockImplementation((url, config) => url === "/email/suppression"
+      ? Promise.resolve({ data: { total: suppressed ? 1 : 0, items: suppressed ? [{ id: 5, email_address: "unknown@company.io", source: "manual", created_at: "2026-10-11T12:00:00Z" }] : [] } })
+      : originalGet(url, config));
+    post.mockImplementation(async (url) => {
+      if (url !== "/email/suppression") throw new Error("Validation must not be required");
+      suppressed = true;
+      return { data: {} };
+    });
+    del.mockImplementation(async () => { suppressed = false; return { data: {} }; });
+    show();
+    expect(screen.getByText("Validation is optional")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Manage email suppressions" }));
+    await screen.findByText("Nothing suppressed");
+    fireEvent.change(screen.getByLabelText("Suppress email address"), { target: { value: "unknown@company.io" } });
+    fireEvent.click(screen.getByRole("button", { name: "Suppress" }));
+    await screen.findByText("unknown@company.io");
+    expect(post).toHaveBeenCalledWith("/email/suppression", { email_address: "unknown@company.io", reason: "Manual" });
+    vi.mocked(window.confirm).mockReturnValueOnce(false);
+    fireEvent.click(screen.getByRole("button", { name: "Remove suppression for unknown@company.io" }));
+    expect(del).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Remove suppression for unknown@company.io" }));
+    await screen.findByText("Nothing suppressed");
+    expect(del).toHaveBeenCalledWith("/email/suppression/5");
+    expect(post.mock.calls.every(([url]) => url === "/email/suppression")).toBe(true);
+  });
+
   it("explains keys and runs the real engine self-test endpoint", async () => {
     show();
     expect(screen.getByText("No API key required for built-in checks")).toBeInTheDocument();

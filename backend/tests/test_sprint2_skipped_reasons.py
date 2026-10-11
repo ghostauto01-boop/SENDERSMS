@@ -91,13 +91,12 @@ async def test_a_list_send_counts_each_reason(api_client, api_db, delivered, mon
     body = (await api_client.post("/api/v1/email/send", json={
         "list_id": lst.id, "subject": "Hi", "body": "Hello"})).json()
 
-    assert body["sent"] == 1 and body["skipped"] == 3
-    assert body["skipped_reasons"] == {"email_opted_out": 1, "unverified": 1, "email_bounced": 1}
+    assert body["sent"] == 2 and body["skipped"] == 2
+    assert body["skipped_reasons"] == {"email_opted_out": 1, "email_bounced": 1}
     assert {d["contact_id"]: d["reason"] for d in body["skipped_details"]} == {
-        opted_out.id: "email_opted_out", unverified.id: "unverified", bounced.id: "email_bounced"}
+        opted_out.id: "email_opted_out", bounced.id: "email_bounced"}
     assert body["skipped_reason"] in body["skipped_reasons"]
-    assert "never been verified" in next(
-        d["message"] for d in body["skipped_details"] if d["reason"] == "unverified")
+    assert all(d["contact_id"] != unverified.id for d in body["skipped_details"])
 
 
 @pytest.mark.asyncio

@@ -1536,10 +1536,8 @@ async def enrichment_status(
         "providers": sorted(enrichment.configured_providers().keys()),
         "providers_active": _settings.email_enrichment_active,
         "allow_inferred": _settings.EMAIL_ENRICHMENT_ALLOW_INFERRED,
-        # Whether a guessed address may actually be emailed. It is always
-        # *stored*; this is the send-time rule, reported so the UI can explain
-        # why a guessed address never appears in a campaign's recipients.
-        "send_inferred": _settings.EMAIL_SEND_INFERRED,
+        # Verification is informational; inferred addresses can be sent to.
+        "send_inferred": True,
         "dns_available": enrichment._dns_available(),
         "free_stages": ["clean", "diagnose"],
         "paid_stages": ["find", "verify"],

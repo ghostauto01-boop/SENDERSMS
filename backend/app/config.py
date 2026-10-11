@@ -171,8 +171,7 @@ class Settings(BaseSettings):
     #   4. verify     — prove the mailbox exists (ZeroBounce / NeverBounce / Hunter)
     #
     # A guessed (pattern-inferred) address is NEVER marked verified, and the
-    # send paths filter unverified addresses out, so a guess cannot quietly
-    # bounce and damage sender reputation.
+    # Validator lets operators review and explicitly suppress unwanted addresses.
     EMAIL_ENRICHMENT_ENABLED: bool = True
     # Master switch for the network calls. With it off, import still cleans and
     # diagnoses addresses, but nothing is looked up or verified over the wire.
@@ -183,18 +182,10 @@ class Settings(BaseSettings):
     # Add an address found during enrichment as an extra reply-capable alias on
     # the existing contact instead of overwriting the primary address.
     EMAIL_ENRICHMENT_KEEP_PRIMARY: bool = True
-    # Email a contact whose address was pattern-GUESSED (source "inferred").
-    # Off by default: a guess is unverified by construction, and one bounce is
-    # charged against the sender reputation of every address the app sends to.
-    # An operator who has reviewed the guesses can opt in for a campaign.
-    EMAIL_SEND_INFERRED: bool = False
-    # Outreach (campaigns, the Ads Manager, follow-ups, bulk mail) is sent only to
-    # addresses a verifier has said are deliverable (or risky, which goes last). An
-    # address nobody verified -- or one the verifier could not decide -- is "unknown",
-    # and unknown is not a yes: one bounce is charged to the sender's reputation for
-    # every address it mails afterwards. Turn this off only for a closed test
-    # environment; it is the P0-5 safety gate. One-to-one replies are never gated.
-    EMAIL_REQUIRE_VERIFIED: bool = True
+    # Deprecated compatibility settings: validation no longer controls sending.
+    # Old deployment values are accepted but ignored by all email send paths.
+    EMAIL_SEND_INFERRED: bool = True
+    EMAIL_REQUIRE_VERIFIED: bool = False
     # Daily sends allowed PER MAILBOX when an account has no daily limit of its own.
     # A new sending mailbox has no reputation; the usual guidance is 20-50 a day
     # per mailbox, rising slowly. This is the deployment default for the

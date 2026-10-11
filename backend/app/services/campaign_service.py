@@ -383,7 +383,10 @@ class CampaignService:
                 else:
                     eligible.append(contact)
 
-        unverified = skipped.get("unverified", 0) if channel == "email" else 0
+        unverified = (
+            sum(1 for c in eligible if email_service.verification_state(c) == "unknown")
+            if channel == "email" else 0
+        )
         risky = (
             sum(1 for c in eligible if email_service.verification_state(c) == "risky")
             if channel == "email" else 0
@@ -392,19 +395,12 @@ class CampaignService:
             list_members=len(contacts), sendable=len(eligible), skipped=skipped,
             unverified=unverified, risky=risky,
         )
-        # "Unverified" is reported as its own error below, not buried in the skip warning.
-        other_skips = {r: n for r, n in skipped.items() if r != "unverified"}
+        other_skips = skipped
         skipped_total = sum(other_skips.values())
         if skipped_total:
             detail = ", ".join(f"{n} {reason}" for reason, n in sorted(other_skips.items()))
             check.warnings.append(
                 f"{skipped_total} of {len(contacts)} contacts will be skipped ({detail})."
-            )
-        if unverified:
-            check.errors.append(
-                f"{unverified} of {len(contacts)} contacts have an unknown email verification "
-                "status and will not be sent to. Verify them (POST /api/v1/validator/jobs with "
-                "this list) or remove them from the list, then validate again."
             )
         if risky:
             check.warnings.append(

@@ -808,16 +808,11 @@ class TestEmailCampaignReachesEmailOnlyContacts:
         assert campaign.total_contacts == 1, "only the good address"
 
 
-class TestGuessedAddressesAreHeldBackFromSends:
-    """A guessed address is stored, badged, and NOT sent to by default.
-
-    The standing rule for this feature: an inferred address is never silently
-    treated as confirmed. Storing it is useful; emailing it by default is not —
-    one bounce is charged against the reputation of every address the app sends.
-    """
+class TestGuessedAddressesCanSend:
+    """Inferred addresses remain labelled, but verification is optional for sending."""
 
     @pytest.mark.asyncio
-    async def test_a_guessed_address_is_not_emailable(self, db):
+    async def test_a_guessed_address_is_emailable(self, db):
         from app.services import email_service
 
         contact = Contact(phone_number=None, email="ada@acmefoods.ng",
@@ -825,7 +820,7 @@ class TestGuessedAddressesAreHeldBackFromSends:
         db.add(contact)
         await db.flush()
 
-        assert await email_service.contact_email_problem(db, contact) == "inferred_unverified"
+        assert await email_service.contact_email_problem(db, contact) is None
 
     @pytest.mark.asyncio
     async def test_a_guessed_address_can_be_opted_in(self, db, monkeypatch):
@@ -865,7 +860,7 @@ class TestGuessedAddressesAreHeldBackFromSends:
 
     @pytest.mark.usefixtures("senders")
     @pytest.mark.asyncio
-    async def test_a_guessed_address_is_held_back_from_an_email_campaign(self, db):
+    async def test_a_guessed_address_is_included_in_an_email_campaign(self, db):
         from app.models.campaign import Campaign
         from app.models.contact_list import ContactList, ContactListMember
         from app.services.campaign_service import CampaignService
@@ -887,7 +882,7 @@ class TestGuessedAddressesAreHeldBackFromSends:
         await db.flush()
         await CampaignService(db).start_campaign(campaign.id)
 
-        assert campaign.total_contacts == 1, "only the user-supplied address"
+        assert campaign.total_contacts == 2, "both inferred and user-supplied addresses"
 
     @pytest.mark.asyncio
     async def test_a_guessed_address_is_still_listed_by_the_inferred_filter(self, db, client):

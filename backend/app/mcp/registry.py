@@ -306,7 +306,7 @@ TOOLS: list[Tool] = [
             "Can this server actually CONFIRM a mailbox? Reports the engine (builtin | reacher), "
             "`smtp_enabled` and -- when it is false -- `smtp_reason` (for example outbound port 25 "
             "is blocked) and what to do about it. When mailboxes cannot be confirmed every address "
-            "stays 'unknown', and unknown addresses are not sent to by campaigns."
+            "stays 'unknown'. Validation is optional; unknown addresses can receive campaigns."
         ),
         method="GET", path="/api/v1/validator/status", group="contacts",
     ),
@@ -316,8 +316,8 @@ TOOLS: list[Tool] = [
             "Queue verification of contacts (a list, a filtered set, or explicit ids) as a "
             "background job and return its id: follow it with `verification_job`. Every verdict is "
             "written onto the contact (email_verified, email_verified_at, email_confidence, "
-            "email_verdict). Campaigns only send to deliverable (and, last, risky) addresses, so "
-            "this is what unlocks a list for sending. Contacts with no address, and ones already "
+            "email_verdict). Validation is optional for campaigns. Saved confirmed-bad results "
+            "quarantine addresses; unknown results do not block sending. Contacts with no address, and ones already "
             "proven deliverable, are left out of the total."
         ),
         method="POST", path="/api/v1/validator/jobs", group="contacts", scope="write",
@@ -352,7 +352,8 @@ TOOLS: list[Tool] = [
         name="quarantine_generated_addresses",
         description=(
             "Tag every pattern-generated (guessed, never verified) email address `pattern_generated` and "
-            "`sendable:false` so they are visible and filterable. Never deletes anything. It is a DRY RUN "
+            "`sendable:false` so they are visible and filterable. These legacy labels do not block sending; "
+            "use email suppression to block an address. Never deletes anything. It is a DRY RUN "
             "unless you pass dry_run=false: look at the counts first."
         ),
         method="POST", path="/api/v1/contacts/quarantine/generated", scope="write", group="contacts",

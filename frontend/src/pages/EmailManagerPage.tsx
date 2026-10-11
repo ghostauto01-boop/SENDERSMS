@@ -46,6 +46,7 @@ import emailApi, { EmailAccount, EmailMessage } from "../api/email";
 import adsApi, { AdsCampaign } from "../api/ads";
 import CampaignBuilder from "./ads/CampaignBuilder";
 import CampaignDetail from "./ads/CampaignDetail";
+import EmailSuppressionPanel from "../components/EmailSuppressionPanel";
 import EmailSendPanel from "../components/EmailSendPanel";
 import MailboxRepliesTab from "../components/MailboxRepliesTab";
 import RichEmailEditor from "../components/RichEmailEditor";
@@ -299,7 +300,7 @@ export default function EmailManagerPage() {
       {section === "Templates" && <TemplatesTab reference={emailReference} />}
       {section === "Replies" && <MailboxRepliesTab banner={replyBanner} />}
       {section === "Deliverability" && <DeliverabilityTab accounts={accounts} />}
-      {section === "Suppression" && <SuppressionTab />}
+      {section === "Suppression" && <EmailSuppressionPanel />}
       {section === "Activity" && <ActivityTab accounts={accounts} />}
 
       {creating && (
@@ -1951,114 +1952,6 @@ function DeliverabilityTab({ accounts }: { accounts: EmailAccount[] }) {
 /* Suppression                                                                */
 /* ========================================================================== */
 
-function SuppressionTab() {
-  const [items, setItems] = useState<any[]>([]);
-  const [total, setTotal] = useState(0);
-  const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [address, setAddress] = useState("");
-  const [reason, setReason] = useState("");
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await emailApi.suppression({ search: search || undefined, per_page: 100 });
-      setItems(data.items);
-      setTotal(data.total);
-    } catch {
-      toast.error("Could not load the suppression list");
-    } finally {
-      setLoading(false);
-    }
-  }, [search]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const add = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!address.includes("@")) return toast.error("Enter a valid email address");
-    try {
-      await emailApi.addSuppression({ email_address: address, reason: reason || "Manual" });
-      toast.success("Address suppressed");
-      setAddress("");
-      setReason("");
-      load();
-    } catch (err: any) {
-      toast.error(err.response?.data?.detail || "Could not suppress this address");
-    }
-  };
-
-  const remove = async (entry: any) => {
-    try {
-      await emailApi.removeSuppression(entry.id);
-      toast.success("Address can be emailed again");
-      load();
-    } catch {
-      toast.error("Could not remove this entry");
-    }
-  };
-
-  return (
-    <div className="space-y-4">
-      <form onSubmit={add} className="card flex flex-wrap items-end gap-3">
-        <Field label="Email address">
-          <input
-            className="input"
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
-            placeholder="do-not-contact@company.com"
-          />
-        </Field>
-        <Field label="Reason (optional)">
-          <input className="input" value={reason} onChange={(e) => setReason(e.target.value)} />
-        </Field>
-        <button className="btn-primary" type="submit">
-          <ShieldOff size={16} className="mr-1" /> Suppress
-        </button>
-      </form>
-
-      <div className="flex items-center justify-between gap-3">
-        <input
-          className="input max-w-xs"
-          placeholder="Search suppressed addresses…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <span className="text-sm text-gray-500">{total} suppressed</span>
-      </div>
-
-      {loading ? (
-        <div className="py-10 text-center text-gray-500">Loading…</div>
-      ) : items.length === 0 ? (
-        <Empty
-          title="Nothing suppressed"
-          body="Unsubscribes, hard bounces and manual blocks all land here — and none of them are ever emailed again."
-        />
-      ) : (
-        <div className="card divide-y divide-gray-100 dark:divide-gray-800">
-          {items.map((entry) => (
-            <div key={entry.id} className="py-2 flex items-center justify-between gap-3 text-sm">
-              <div className="min-w-0">
-                <p className="font-medium truncate flex items-center gap-2">
-                  <Mail size={13} className="text-gray-400" /> {entry.email_address}
-                  {entry.hard_bounce && <span className="badge-red">hard bounce</span>}
-                </p>
-                <p className="text-xs text-gray-500 truncate">
-                  {entry.reason || "—"} · {entry.source || "manual"} · {fmtDate(entry.created_at)}
-                </p>
-              </div>
-              <button className="text-gray-400 hover:text-danger-500 px-2" onClick={() => remove(entry)}>
-                <Trash2 size={15} />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
 
 /* ========================================================================== */
 /* Activity                                                                   */
