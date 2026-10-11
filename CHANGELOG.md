@@ -1,3 +1,29 @@
+## Unreleased — SMS Inbox, Conversations and Opportunity; no sending window for email
+
+- **Email has no sending window.** Mail goes out at night and on weekends, limited
+  only by the daily, hourly and per-mailbox caps. SMS keeps its window and weekend
+  rule unchanged (`SendingGate._window_state`).
+- **Inbox renamed to SMS Inbox** (nav label; `/inbox` still works, `/sms-inbox` is
+  the new name). The Email Inbox stays "Email Inbox" in the nav.
+- **SMS Inbox redesign.** Channel tabs (SMS Inbox / Email Inbox) like the Email
+  Inbox, a clearable search, labelled filter tabs (All, Unread, Interested,
+  Opportunity, Closed, Failed), a header with the unread total, contact-info and
+  Opportunity buttons in the chat header. Unread display (bold name, count pill,
+  primary-coloured time) is unchanged. The chat itself is unchanged.
+- **Conversations** (`/conversations`) lists only the people who wrote back, for
+  SMS or email (pick one at the top). Opening a row goes to that thread.
+- **Opportunity** (`/opportunities`) holds the prospects you marked interested
+  enough to chase, from both channels. Move a chat there from its inbox
+  (Opportunity button or chat menu) and take it out from the page or the chat.
+  - Backed by a new conversation label `status="opportunity"`. No migration.
+  - New endpoints: `POST /inbox/conversations/{id}/mark-opportunity` and
+    `POST /inbox/conversations/{id}/status` (SMS). The email status endpoint also
+    accepts `opportunity`.
+  - Inbound SMS, inbound email and email replies keep the label; the chat still
+    gets its unread count.
+  - `GET /inbox/conversations` returns `counts` per label for the channel and each
+    item carries its `channel`.
+
 # Changelog
 
 ## Unreleased — Ads campaigns stuck "waiting" never resumed sending

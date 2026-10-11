@@ -19,6 +19,8 @@ const EmailManagerPage = lazy(() => import("./pages/EmailManagerPage"));
 const EmailInboxPage = lazy(() => import("./pages/EmailInboxPage"));
 const SequencesPage = lazy(() => import("./pages/SequencesPage"));
 const InboxPage = lazy(() => import("./pages/InboxPage"));
+const ConversationsPage = lazy(() => import("./pages/ConversationsPage"));
+const OpportunityPage = lazy(() => import("./pages/OpportunityPage"));
 const FollowUpsPage = lazy(() => import("./pages/FollowUpsPage"));
 const TemplatesPage = lazy(() => import("./pages/TemplatesPage"));
 const AnalyticsPage = lazy(() => import("./pages/AnalyticsPage"));
@@ -76,6 +78,15 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+      {/* The same screen under its new name. /inbox stays so old links keep working. */}
+      <Route
+        path="/sms-inbox"
+        element={
+          <ProtectedRoute>
+            <InboxPage />
+          </ProtectedRoute>
+        }
+      />
       <Route
         element={
           <ProtectedRoute>
@@ -94,6 +105,8 @@ function AppRoutes() {
         <Route path="/sms-manager" element={<SMSManagerPage />} />
         <Route path="/email-manager" element={<EmailManagerPage />} />
         <Route path="/email-inbox" element={<EmailInboxPage />} />
+        <Route path="/conversations" element={<ConversationsPage />} />
+        <Route path="/opportunities" element={<OpportunityPage />} />
         <Route path="/sequences" element={<SequencesPage />} />
         <Route path="/follow-ups" element={<FollowUpsPage />} />
         <Route path="/templates" element={<TemplatesPage />} />

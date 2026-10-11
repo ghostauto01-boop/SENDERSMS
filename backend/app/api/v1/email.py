@@ -1462,7 +1462,8 @@ async def reply(
     )
     if message is None:
         raise HTTPException(400, "This contact cannot be emailed (opted out or suppressed)")
-    conversation.status = "active"
+    if conversation.status != "opportunity":
+        conversation.status = "active"
     conversation.unread_count = 0
     await db.commit()
     return {
@@ -1513,7 +1514,7 @@ async def set_status(
     if conversation is None:
         raise HTTPException(404, "Email conversation not found")
     new_status = str(payload.get("status") or "").strip().lower()
-    allowed = {"active", "unread", "interested", "not_interested", "closed"}
+    allowed = {"active", "unread", "interested", "not_interested", "closed", "opportunity"}
     if new_status not in allowed:
         raise HTTPException(422, f"status must be one of {sorted(allowed)}")
     conversation.status = new_status

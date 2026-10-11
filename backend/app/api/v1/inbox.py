@@ -108,6 +108,21 @@ async def list_conversations(
         _clauses += [Contact.phone_number.ilike(f"%{v}%") for v in phone_search_variants(search)]
         query = query.join(Contact, Conversation.contact_id == Contact.id).where(or_(*_clauses))
     total = (await db.execute(select(func.count()).select_from(query.subquery()))).scalar() or 0
+    # Counts per label for the chosen channel, ignoring the status/search filters,
+    # so every filter tab can show how many chats are behind it.
+    counts_q = select(func.coalesce(Conversation.status, "active"), func.count()).select_from(Conversation)
+    unread_q = select(func.count()).select_from(Conversation).where(
+        or_(Conversation.status == "unread", Conversation.unread_count > 0)
+    )
+    if wanted_channel != "all":
+        counts_q = counts_q.where(func.coalesce(Conversation.channel, "sms") == wanted_channel)
+        unread_q = unread_q.where(func.coalesce(Conversation.channel, "sms") == wanted_channel)
+    by_status = {str(k): int(v) for k, v in (await db.execute(counts_q.group_by(func.coalesce(Conversation.status, "active")))).all()}
+    counts = {
+        **by_status,
+        "all": sum(by_status.values()),
+        "unread": int((await db.execute(unread_q)).scalar() or 0),
+    }
     query = query.order_by(Conversation.last_message_at.desc().nullslast()).offset((page-1)*per_page).limit(per_page)
     convs = list((await db.execute(query)).scalars().all())
 
@@ -138,14 +153,14 @@ async def list_conversations(
     for conv in convs:
         contact = contacts.get(conv.contact_id)
         name = contact_display_name(contact)
-        items.append({"id":conv.id,"contact_id":conv.contact_id,"contact_name":name,"contact_phone":contact.phone_number if contact else"","contact_lead_status":contact.lead_status if contact else"","status":conv.status,"message_count":conv.message_count,"unread_count":conv.unread_count,"last_message_preview":conv.last_message_preview,"last_message_at":conv.last_message_at.isoformat()if conv.last_message_at else None,"created_at":conv.created_at.isoformat(),
+        items.append({"id":conv.id,"channel":conv.channel or "sms","contact_id":conv.contact_id,"contact_name":name,"contact_phone":contact.phone_number if contact else"","contact_lead_status":contact.lead_status if contact else"","status":conv.status,"message_count":conv.message_count,"unread_count":conv.unread_count,"last_message_preview":conv.last_message_preview,"last_message_at":conv.last_message_at.isoformat()if conv.last_message_at else None,"created_at":conv.created_at.isoformat(),
             # Which campaign this lead came from (first touch), plus the most
             # recent campaign to message them. The inbox renders the first as
             # a coloured chip on the row.
             "campaign":conversation_campaign(conv, labels),
             "last_campaign":conversation_last_campaign(conv, labels),
             "contact":{"phone_number":contact.phone_number if contact else"","lead_status":contact.lead_status if contact else"","business_name":contact.business_name if contact else"","first_name":contact.first_name if contact else"","last_name":contact.last_name if contact else"","city":contact.city if contact else"","state":contact.state if contact else"","custom_fields":_custom_fields(contact)}if contact else None})
-    return {"total":total,"items":items}
+    return {"total":total,"items":items,"counts":counts}
 
 
 @router.get("/campaign-filters")
@@ -370,6 +385,27 @@ async def mark_not_interested(conversation_id:int,db:AsyncSession=Depends(get_db
 @router.post("/conversations/{conversation_id}/mark-close")
 async def close_conversation(conversation_id:int,db:AsyncSession=Depends(get_db),cu:User=Depends(get_current_user)):
     return await _set_status(db, conversation_id, "closed", "closed")
+
+@router.post("/conversations/{conversation_id}/mark-opportunity")
+async def mark_opportunity(conversation_id:int,db:AsyncSession=Depends(get_db),cu:User=Depends(get_current_user)):
+    return await _set_status(db, conversation_id, "opportunity", "interested")
+
+# Moves a chat in or out of Opportunity (and any other label). Moving out
+# ("active") lands on "unread" when messages are still unread, so the chat
+# keeps its unread badge.
+OPPORTUNITY_STATUSES = ("active", "unread", "interested", "not_interested", "closed", "opportunity")
+
+@router.post("/conversations/{conversation_id}/status")
+async def set_conversation_status(conversation_id:int,payload:dict,db:AsyncSession=Depends(get_db),cu:User=Depends(get_current_user)):
+    new_status = str((payload or {}).get("status") or "").strip().lower()
+    if new_status not in OPPORTUNITY_STATUSES:
+        raise HTTPException(422, f"status must be one of {list(OPPORTUNITY_STATUSES)}")
+    conv = await _get_conv(db, conversation_id)
+    if new_status == "active" and conv.unread_count > 0:
+        new_status = "unread"
+    conv.status = new_status
+    await db.flush()
+    return {"success": True, "status": conv.status}
 
 @router.post("/conversations/{conversation_id}/mark-unread")
 async def mark_unread(conversation_id:int,db:AsyncSession=Depends(get_db),cu:User=Depends(get_current_user)):
@@ -789,7 +825,7 @@ async def message_feedback(message_id: int, data: _ReplyFeedback,
 
 
 #: The actions a conversation can be marked with (each is its own route above).
-CONVERSATION_MARKS = ("mark-interested", "mark-not-interested", "mark-close", "mark-unread")
+CONVERSATION_MARKS = ("mark-interested", "mark-not-interested", "mark-close", "mark-unread", "mark-opportunity")
 
 
 # Registered LAST on purpose: it only catches what no real route above matched. An unknown action

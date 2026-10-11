@@ -148,7 +148,11 @@ class SMSService:
         if not cr:
             # A brand-new conversation still has one unread message in it.
             cr=Conversation(contact_id=c.id,status="unread",unread_count=1,channel="sms");self.db.add(cr);await self.db.flush()
-        else:cr.status="unread";cr.unread_count=(cr.unread_count or 0)+1
+        else:
+            # An Opportunity is a deliberate label: a new reply counts as unread
+            # but must not move the chat out of the Opportunity page.
+            if cr.status!="opportunity":cr.status="unread"
+            cr.unread_count=(cr.unread_count or 0)+1
         ch,sg=count_sms_segments(body)
         # Preserve the real receive time. Inbox export replays historical SMS, and
         # stamping them all with now() shuffles the chat into the wrong order.

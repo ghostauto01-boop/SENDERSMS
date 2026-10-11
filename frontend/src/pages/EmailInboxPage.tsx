@@ -25,6 +25,7 @@ import {
   Send,
   Sparkles,
   Star,
+  Briefcase,
   Video,
   X,
   XCircle,
@@ -72,12 +73,14 @@ const STATUS_FILTERS = [
   { key: "unread", label: "Unread" },
   { key: "active", label: "Open" },
   { key: "interested", label: "Interested" },
+  { key: "opportunity", label: "Opportunity" },
   { key: "not_interested", label: "Not interested" },
   { key: "closed", label: "Closed" },
 ];
 
 const STATUS_TONE: Record<string, string> = {
   interested: "badge-green",
+  opportunity: "badge-green",
   active: "badge-blue",
   unread: "badge-blue",
   not_interested: "badge-gray",
@@ -595,7 +598,7 @@ export default function EmailInboxPage() {
             <Sparkles size={14} /> Senders &amp; tracking
           </Link>
           <Link to="/inbox" className="btn-secondary btn-sm">
-            SMS inbox
+            SMS Inbox
           </Link>
         </div>
       </div>
@@ -931,6 +934,16 @@ export default function EmailInboxPage() {
                     title="Mark as interested"
                   >
                     <Star size={12} /> Interested
+                  </button>
+                  <button
+                    className={detail.conversation.status === "opportunity" ? "chip-active" : "chip"}
+                    onClick={() =>
+                      setConversationStatus(detail.conversation.status === "opportunity" ? "active" : "opportunity")
+                    }
+                    title={detail.conversation.status === "opportunity" ? "Remove from Opportunity" : "Move to Opportunity"}
+                  >
+                    <Briefcase size={12} />
+                    {detail.conversation.status === "opportunity" ? "In Opportunity" : "Opportunity"}
                   </button>
                   <button
                     className="chip"
