@@ -88,6 +88,18 @@ def stub_queue(monkeypatch):
 # ``@pytest.mark.real_sending_defaults`` and pin the clock with ``sending_clock``.
 
 
+
+def _set_setting(monkeypatch, settings, name, value):
+    """Set a setting if this checkout defines it.
+
+    The settings object is a pydantic model, which refuses an unknown attribute even
+    with ``raising=False``. Skipping the ones that do not exist lets today's tests run
+    against an older checkout (the "before the fix" evidence runs them that way).
+    """
+    if hasattr(settings, name):
+        monkeypatch.setattr(settings, name, value)
+
+
 @pytest.fixture(autouse=True)
 def _open_sending_rules(request, monkeypatch):
     if request.node.get_closest_marker("real_sending_defaults"):
@@ -103,7 +115,7 @@ def _open_sending_rules(request, monkeypatch):
     }.items():
         monkeypatch.setitem(sending_limits.DEFAULTS, key, value)
     monkeypatch.setitem(sending_limits.DEFAULTS, "email_daily_per_mailbox", 0)
-    monkeypatch.setattr(settings, "EMAIL_DEFAULT_DAILY_LIMIT", 0, raising=False)
+    _set_setting(monkeypatch, settings, "EMAIL_DEFAULT_DAILY_LIMIT", 0)
 
 
 # --------------------------------------------------------------------------
@@ -122,7 +134,7 @@ def _open_verification_gate(request, monkeypatch):
         return
     from app.config import settings
 
-    monkeypatch.setattr(settings, "EMAIL_REQUIRE_VERIFIED", False, raising=False)
+    _set_setting(monkeypatch, settings, "EMAIL_REQUIRE_VERIFIED", False)
 
 
 @pytest.fixture
