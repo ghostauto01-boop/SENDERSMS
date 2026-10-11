@@ -26,6 +26,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import secrets
 import uuid
 from datetime import date, datetime, time, timedelta, timezone
 from typing import Iterable, Optional
@@ -379,14 +380,30 @@ async def reset_daily_counter(account: EmailAccount, today: date | None = None) 
         account.last_reset_date = today
 
 
-async def account_room(account: EmailAccount) -> int | None:
+def effective_daily_limit(account: EmailAccount, default_limit: int | None = None) -> int | None:
+    """The daily ceiling for this mailbox, or None for unlimited.
+
+    ``default_limit`` is the protective per-mailbox default from Sending Rules. An
+    account's own ``daily_limit`` can only *lower* it: Brevo's quota says what the
+    provider will accept, not what a mailbox with no reputation can safely send.
+    """
+    explicit = int(account.daily_limit) if account.daily_limit else None
+    if default_limit is None:
+        return explicit
+    return default_limit if explicit is None else min(explicit, default_limit)
+
+
+async def account_room(account: EmailAccount, default_limit: int | None = None) -> int | None:
     """Remaining sends today for this account, or None when unlimited."""
-    if not account.daily_limit:
+    limit = effective_daily_limit(account, default_limit)
+    if not limit:
         return None
-    return max(account.daily_limit - (account.sent_today or 0), 0)
+    return max(limit - (account.sent_today or 0), 0)
 
 
-async def account_is_usable(account: EmailAccount) -> tuple[bool, str | None]:
+async def account_is_usable(
+    account: EmailAccount, *, default_limit: int | None = None, check_room: bool = True
+) -> tuple[bool, str | None]:
     if not account.is_active:
         return False, "account_disabled"
     if not account.api_key_encrypted:
@@ -400,16 +417,28 @@ async def account_is_usable(account: EmailAccount) -> tuple[bool, str | None]:
         return False, "api_key_unreadable"
     if not account.from_email:
         return False, "no_from_address"
+    if not check_room:
+        # Validation asks "can this mailbox send at all?", not "has it already
+        # used today's allowance?" -- with a per-mailbox default cap, every
+        # mailbox is routinely at its limit by the afternoon.
+        return True, None
     await reset_daily_counter(account)
-    room = await account_room(account)
+    room = await account_room(account, default_limit)
     if room == 0:
         return False, "daily_limit_reached"
     return True, None
 
 
-def serialize_account(account: EmailAccount, *, stats: dict | None = None) -> dict:
-    """Account shape for the API. The API key itself is never returned."""
+def serialize_account(
+    account: EmailAccount, *, stats: dict | None = None, default_limit: int | None = None
+) -> dict:
+    """Account shape for the API. The API key itself is never returned.
+
+    ``default_limit`` is the per-mailbox default from Sending Rules; pass it to get
+    ``effective_daily_limit`` (what the app will really let this mailbox send).
+    """
     api_key = decrypt_value(account.api_key_encrypted or "")
+    effective = effective_daily_limit(account, default_limit)
     return {
         "id": account.id,
         "name": account.name,
@@ -423,6 +452,13 @@ def serialize_account(account: EmailAccount, *, stats: dict | None = None) -> di
         "has_api_key": bool(account.api_key_encrypted),
         "api_key_masked": mask_api_key(account.api_key_encrypted) if api_key else "",
         "daily_limit": account.daily_limit,
+        # What the app will actually allow: the lower of this account's own limit
+        # and the per-mailbox default in Sending Rules (None = unlimited).
+        "effective_daily_limit": effective,
+        "daily_limit_source": (
+            "account" if account.daily_limit and (default_limit is None or account.daily_limit <= default_limit)
+            else "sending_rules" if default_limit is not None else "none"
+        ),
         "sent_today": account.sent_today or 0,
         "total_sent": account.total_sent or 0,
         "track_opens": bool(account.track_opens),
@@ -430,12 +466,14 @@ def serialize_account(account: EmailAccount, *, stats: dict | None = None) -> di
         "connection_status": account.connection_status,
         "last_tested_at": account.last_tested_at.isoformat() if account.last_tested_at else None,
         "last_error": account.last_error,
+        # The token is a credential: reads carry a hint only (C10). The full URL comes
+        # from POST .../webhook/reveal, which the assistant bridge cannot call.
         "webhook_url": email_webhook_url(account),
         # Path-only form so the UI can build an absolute URL from the browser's
         # own origin when PUBLIC_BASE_URL has not been configured yet.
-        "webhook_path": (
-            f"/api/v1/webhooks/brevo/{account.id}?token={account.webhook_token or ''}"
-        ),
+        "webhook_path": email_webhook_path(account),
+        "webhook_token_masked": mask_secret(account.webhook_token),
+        "webhook_reveal_path": f"/api/v1/email/accounts/{account.id}/webhook/reveal",
         "public_base_url": public_base_url(),
         "created_at": account.created_at.isoformat() if account.created_at else None,
         "updated_at": account.updated_at.isoformat() if account.updated_at else None,
@@ -443,19 +481,77 @@ def serialize_account(account: EmailAccount, *, stats: dict | None = None) -> di
     }
 
 
-def email_webhook_url(account: EmailAccount) -> str | None:
-    """The inbound/events webhook URL to paste into Brevo for this account."""
+#: Plain-language text for each reason an email is refused (the codes are what a program reads).
+SKIP_REASON_TEXT = {
+    "no_email": "the contact has no email address",
+    "placeholder_email": "the address is a placeholder (example.com, noreply, test ...)",
+    "email_opted_out": "the contact opted out of email",
+    "email_bounced": "the address bounced before and is blocked",
+    "inferred_unverified": "a guessed address that was never verified",
+    "suppressed": "the address is on the suppression list",
+    "unverified": "the address has never been verified (an unknown address is not sent to as part of an audience)",
+    "contact_not_emailable": "the contact cannot be emailed",
+}
+
+
+def skip_reason_text(code: str | None) -> str:
+    return SKIP_REASON_TEXT.get(code or "", (code or "not sent").replace("_", " "))
+
+
+def mask_secret(value: str | None, *, keep: int = 4) -> str:
+    """``****a1b2`` -- enough to tell two secrets apart, useless to anyone who needs the value."""
+    if not value:
+        return ""
+    tail = value[-keep:] if len(value) >= keep * 2 else ""
+    return f"****{tail}"
+
+
+def email_webhook_path(account: EmailAccount, *, reveal: bool = False) -> str:
+    token = account.webhook_token or ""
+    shown = token if reveal else mask_secret(token)
+    return f"/api/v1/webhooks/brevo/{account.id}?token={shown}"
+
+
+def email_webhook_url(account: EmailAccount, *, reveal: bool = False) -> str | None:
+    """The inbound/events webhook URL to paste into Brevo for this account.
+
+    The token in it IS the credential for the endpoint (whoever holds it can inject inbound
+    mail and fake bounces), so it is masked unless ``reveal`` is set. Only the deliberate
+    reveal / rotate actions pass ``reveal=True``; every read shows a hint instead.
+    """
     base = (public_base_url() or "").rstrip("/")
     if not base:
         return None
-    return f"{base}/api/v1/webhooks/brevo/{account.id}?token={account.webhook_token or ''}"
+    return f"{base}{email_webhook_path(account, reveal=reveal)}"
+
+
+def _new_webhook_token() -> str:
+    return secrets.token_urlsafe(32)
+
+
+def new_email_only_contact(address: str, *, source: str, **fields) -> Contact:
+    """A contact that exists only as an email address.
+
+    ``phone_number`` is None and the country is left unknown. Older code stored the address,
+    prefixed ``email:`` and cut to 20 characters, in ``phone_number`` (the column used to be NOT
+    NULL) -- an invented number that an assistant then read back, and updated, as if it were real --
+    and filled in ``country="Nigeria"`` for a stranger. Neither is known, so neither is stored.
+    """
+    return Contact(email=address, email_lower=address, phone_number=None, source=source, **fields)
 
 
 async def ensure_webhook_token(db: AsyncSession, account: EmailAccount) -> str:
     """Give an account its inbound webhook token (idempotent)."""
     if not account.webhook_token:
-        account.webhook_token = uuid.uuid4().hex
+        account.webhook_token = _new_webhook_token()
         await db.flush()
+    return account.webhook_token
+
+
+async def rotate_webhook_token(db: AsyncSession, account: EmailAccount) -> str:
+    """Replace the webhook token. The old one stops working immediately."""
+    account.webhook_token = _new_webhook_token()
+    await db.flush()
     return account.webhook_token
 
 
@@ -502,7 +598,7 @@ async def create_account(
         daily_limit=daily_limit,
         track_opens=track_opens,
         track_clicks=track_clicks,
-        webhook_token=uuid.uuid4().hex,
+        webhook_token=_new_webhook_token(),
         last_reset_date=_now().date(),
     )
     db.add(account)
@@ -564,11 +660,44 @@ async def unsuppress_email(db: AsyncSession, entry: EmailSuppression) -> None:
     await db.flush()
 
 
-async def contact_email_problem(
-    db: AsyncSession, contact: Contact, address: str | None = None
-) -> str | None:
-    """Every reason this contact/recipient must not be emailed, or ``None``."""
-    recipient = normalize_email(address) if address is not None else normalize_email(contact.email)
+# What a verifier can conclude about an address (also stored as ``email_verdict``).
+STATE_DELIVERABLE = "deliverable"
+STATE_RISKY = "risky"
+STATE_UNDELIVERABLE = "undeliverable"
+STATE_UNKNOWN = "unknown"
+
+
+def verification_state(contact: Contact) -> str:
+    """deliverable | risky | undeliverable | unknown -- what we KNOW about this address.
+
+    ``unknown`` covers both "nobody ever checked it" and "the verifier could not decide"
+    (blocked SMTP, a timeout). Neither is a yes.
+    """
+    if (
+        contact.is_email_undeliverable
+        or contact.email_status in ("bounced", "invalid")
+        or (contact.email_verdict or "").lower() == STATE_UNDELIVERABLE
+    ):
+        return STATE_UNDELIVERABLE
+    if contact.email_verified:
+        return STATE_DELIVERABLE
+    if (contact.email_verdict or "").lower() == STATE_RISKY:
+        return STATE_RISKY
+    return STATE_UNKNOWN
+
+
+def send_order(contacts: Iterable[Contact]) -> list[Contact]:
+    """Deliverable addresses first, risky ones (a catch-all, a role/disposable mailbox) last.
+
+    The daily cap is then spent on the addresses most likely to land, and a bounce from a
+    risky one comes after the sender has already delivered what it could. Stable: the
+    caller's order is kept within each group.
+    """
+    return sorted(contacts, key=lambda c: 0 if verification_state(c) == STATE_DELIVERABLE else 1)
+
+
+def _static_problem(contact: Contact, recipient: str | None) -> str | None:
+    """Every reason decided from the contact row alone (no database access)."""
     problem = email_problem(recipient)
     if problem:
         return problem
@@ -590,8 +719,47 @@ async def contact_email_problem(
         and not settings.EMAIL_SEND_INFERRED
     ):
         return "inferred_unverified"
+    return None
+
+
+def _verification_problem(contact: Contact, recipient: str | None) -> str | None:
+    """``unverified`` when outreach must not go to this address because nothing proves it.
+
+    The last check on purpose: "unverified" is what is left once nothing else rules the
+    contact out, so it counts exactly the contacts that verifying could unlock. Only the
+    contact's own primary address is gated -- a reply alias is an address the person
+    wrote to us from.
+    """
+    if not settings.EMAIL_REQUIRE_VERIFIED:
+        return None
+    if recipient != normalize_email(contact.email):
+        return None
+    if verification_state(contact) == STATE_UNKNOWN:
+        return "unverified"
+    return None
+
+
+async def contact_email_problem(
+    db: AsyncSession,
+    contact: Contact,
+    address: str | None = None,
+    *,
+    outreach: bool = False,
+) -> str | None:
+    """Every reason this contact/recipient must not be emailed, or ``None``.
+
+    ``outreach`` is True for bulk and campaign mail (classic campaigns, the Ads Manager,
+    follow-ups, ``bulk`` sends): those are additionally refused an address nobody has
+    verified (``unverified``). A one-to-one message to someone is not outreach.
+    """
+    recipient = normalize_email(address) if address is not None else normalize_email(contact.email)
+    problem = _static_problem(contact, recipient)
+    if problem:
+        return problem
     if await get_suppression(db, recipient):
         return "suppressed"
+    if outreach:
+        return _verification_problem(contact, recipient)
     return None
 
 
@@ -609,9 +777,15 @@ async def _suppressed_addresses(db: AsyncSession, addresses: Iterable[str]) -> s
 
 
 async def screen_contacts_for_email(
-    db: AsyncSession, contacts: list[Contact]
+    db: AsyncSession, contacts: list[Contact], *, outreach: bool = True
 ) -> tuple[list[Contact], dict[str, int]]:
-    """Email eligibility filter used by audience screening and previews."""
+    """Email eligibility filter used by audience screening, validation and previews.
+
+    It applies exactly the rules :func:`contact_email_problem` applies at send time (they
+    share :func:`_static_problem` and :func:`_verification_problem`), so a validation
+    report promises numbers the send path will keep. It also removes duplicate addresses,
+    which the per-contact send check cannot see.
+    """
     counts: dict[str, int] = {}
 
     def bump(reason: str) -> None:
@@ -622,15 +796,9 @@ async def screen_contacts_for_email(
     seen: set[str] = set()
     for contact in contacts:
         address = normalize_email(contact.email)
-        problem = email_problem(contact.email)
+        problem = _static_problem(contact, address)
         if problem:
             bump("missing_email" if problem == "no_email" else problem)
-            continue
-        if contact.is_email_opted_out or contact.email_status in ("unsubscribed", "complained"):
-            bump("email_opted_out")
-            continue
-        if contact.is_email_undeliverable or contact.email_status == "bounced":
-            bump("email_bounced")
             continue
         if address in suppressed:
             bump("suppressed")
@@ -638,6 +806,11 @@ async def screen_contacts_for_email(
         if address in seen:
             bump("duplicate")
             continue
+        if outreach:
+            problem = _verification_problem(contact, address)
+            if problem:
+                bump(problem)
+                continue
         seen.add(address)
         eligible.append(contact)
     return eligible, counts
@@ -1070,18 +1243,30 @@ async def queue_email(
     cc: list[str] | str | None = None,
     bcc: list[str] | str | None = None,
     recipient_address: str | None = None,
+    outreach: bool | None = None,
+    refused: dict | None = None,
 ) -> Message | None:
     """Create the outbound email ``Message`` row (delivery happens elsewhere).
 
     ``attachments`` are base64 entries from the composer/template; ``bulk``
-    marks campaign mail (adds the List-Unsubscribe headers a bulk sender needs).
+    marks mail that carries the List-Unsubscribe headers a bulk sender needs.
     Returns ``None`` when the contact cannot be emailed — callers treat that as
     "skipped", exactly like an opted-out SMS contact.
+
+    ``outreach`` says the recipient was picked from an AUDIENCE (a campaign, a follow-up,
+    a list) rather than by a person choosing one contact; outreach is refused an address
+    nobody has verified. It is deliberately NOT inferred from ``bulk``: a single contact
+    emailed with a marketing template carries unsubscribe headers (``bulk``) and is still a
+    one-to-one message. When left as ``None`` it is true for campaigns and follow-ups.
     """
     address = normalize_email(recipient_address) if recipient_address else normalize_email(contact.email)
-    problem = await contact_email_problem(db, contact, address)
+    if outreach is None:
+        outreach = bool(campaign_id is not None or ads_campaign_id is not None or followup)
+    problem = await contact_email_problem(db, contact, address, outreach=outreach)
     if problem:
         logger.info("EMAIL: skipping contact %s (%s)", contact.id, problem)
+        if refused is not None:
+            refused["reason"] = problem  # so the caller can say WHY nothing was queued
         return None
 
     account = account or await resolve_account(db, None)
@@ -1168,17 +1353,21 @@ async def send_now(
     cc: list[str] | str | None = None,
     bcc: list[str] | str | None = None,
     recipient_address: str | None = None,
+    outreach: bool | None = None,
 ) -> tuple[Message | None, dict]:
     """Queue + deliver in one call. Used by the API's "send now" paths."""
+    refused: dict = {}
     message = await queue_email(
         db, contact,
         subject=subject, text_body=text_body, html_body=html_body,
         account=account, campaign_id=campaign_id, ads_campaign_id=ads_campaign_id,
         is_auto_reply=is_auto_reply, attachments=attachments, bulk=bulk,
-        cc=cc, bcc=bcc, recipient_address=recipient_address,
+        cc=cc, bcc=bcc, recipient_address=recipient_address, outreach=outreach,
+        refused=refused,
     )
     if message is None:
-        return None, {"success": False, "error": "contact_not_emailable"}
+        return None, {"success": False, "error": "contact_not_emailable",
+                      "skipped_reason": refused.get("reason")}
     result = await deliver(db, message)
     return message, result
 
@@ -1292,9 +1481,19 @@ async def deliver(db: AsyncSession, message: Message) -> dict:
                 if fallback is not None:
                     candidates.append(fallback)
 
+    # The protective per-mailbox default governs outreach only. A reply to someone
+    # who wrote to us is never held back by a cap meant for cold sends; only an
+    # account's own explicit limit (as before) can stop it.
+    outreach = bool(message.bulk_send or message.campaign_id or message.ads_campaign_id)
+    default_limit = None
+    if outreach:
+        from app.services.sending_limits import default_mailbox_limit, get_sending_rules
+
+        default_limit = default_mailbox_limit(await get_sending_rules(db))
+
     unusable: list[str] = []
     for candidate in candidates:
-        usable, why = await account_is_usable(candidate)
+        usable, why = await account_is_usable(candidate, default_limit=default_limit)
         if not usable:
             logger.info("EMAIL: account %s unusable (%s)", candidate.id, why)
             unusable.append(why or "unknown")
@@ -1304,6 +1503,11 @@ async def deliver(db: AsyncSession, message: Message) -> dict:
         if result.get("success") or not result.get("_try_next"):
             return result
 
+    if unusable and all(reason == "daily_limit_reached" for reason in unusable):
+        # Nothing is wrong with the sender; today's allowance is simply used up.
+        # The caller must hold the message for tomorrow, not burn its retries and
+        # mark it failed.
+        return {"success": False, "deferred": True, "error": _no_sender_error(unusable)}
     return {"success": False, "error": _no_sender_error(unusable)}
 
 
@@ -1574,6 +1778,14 @@ async def _apply_bounce(db: AsyncSession, message: Message, event_type: str, dat
         ).scalar_one_or_none()
         if campaign is not None:
             campaign.messages_failed = (campaign.messages_failed or 0) + 1
+    # A bounce is what the circuit breaker watches for: this is where it learns of
+    # one, so a campaign that is hurting the sender stops as soon as the rate is over
+    # the limit instead of when somebody next looks.
+    from app.services import circuit_breaker
+
+    await circuit_breaker.check_after_event(
+        db, campaign_id=message.campaign_id, ads_campaign_id=message.ads_campaign_id
+    )
 
 
 async def send_composer_test(
@@ -1982,12 +2194,10 @@ async def process_inbound_email(db: AsyncSession, payload: dict) -> dict:
             display = ""
             if isinstance(name_hint, dict):
                 display = str(name_hint.get("Name") or "")
-            contact = Contact(
-                email=from_address,
+            contact = new_email_only_contact(
+                from_address,
                 first_name=(display.split(" ")[0] if display else None),
                 last_name=(" ".join(display.split(" ")[1:]) or None) if display else None,
-                phone_number=f"email:{from_address}"[:20],
-                country="Nigeria",
                 lead_status="replied",
                 source="inbound_email",
             )
@@ -2326,41 +2536,43 @@ async def send_test_email(
 
 
 async def email_totals(db: AsyncSession, *, days: int = 30, account_id: int | None = None) -> dict:
-    since = _now() - timedelta(days=days - 1)
-    query = select(Message).where(Message.channel == "email", Message.created_at >= since)
-    if account_id:
-        query = query.where(Message.email_account_id == account_id)
-    messages = list((await db.execute(query)).scalars().all())
+    """Email totals for the last ``days`` days (the numbers behind ``email/stats`` and ``email/overview``).
 
+    Every count comes from ``services/message_metrics`` -- the same definitions and the same window
+    the dashboard and the analytics use -- so the same database gives the same numbers on every screen.
+    Only the daily ``series`` needs the rows themselves.
+    """
+    from app.services import message_metrics as metrics
+
+    since = metrics.window_start(days)
+    counts = await metrics.message_counts(db, channel="email", days=days, account_id=account_id)
+    query = select(Message).where(*metrics.message_filters(channel="email", days=days, account_id=account_id))
+    messages = list((await db.execute(query)).scalars().all())
     outbound = [m for m in messages if m.direction == "outgoing"]
     inbound = [m for m in messages if m.direction == "incoming"]
-    delivered = [m for m in outbound if m.status == "delivered" or m.delivered_at or m.opened_at]
-    failed = [m for m in outbound if m.status == "failed"]
-    opened = [m for m in outbound if (m.open_count or 0) > 0 or m.opened_at]
-    clicked = [m for m in outbound if (m.click_count or 0) > 0 or m.clicked_at]
     suppressed = (await db.execute(select(func.count()).select_from(EmailSuppression))).scalar() or 0
 
-    def rate(part: int, whole: int) -> float:
-        return round(part / whole * 100, 2) if whole else 0.0
-
+    sent = counts["sent"]
     return {
         "period_days": days,
-        "sent": len(outbound),
-        "delivered": len(delivered),
-        "failed": len(failed),
-        "queued": len([m for m in outbound if m.status in ("queued", "sending", "retrying")]),
-        "replies": len(inbound),
-        "opened": len(opened),
-        "clicked": len(clicked),
-        "opens": sum((m.open_count or 0) for m in outbound),
-        "clicks": sum((m.click_count or 0) for m in outbound),
+        "sent": sent,
+        "delivered": counts["delivered"],
+        "failed": counts["failed"],
+        "queued": counts["queued"],
+        "replies": counts["replies"],
+        "opened": counts["opened"],
+        "clicked": counts["clicked"],
+        "opens": counts["opens"],
+        "clicks": counts["clicks"],
         "unsubscribed": suppressed,
-        "delivery_rate": rate(len(delivered), len(outbound)),
-        "open_rate": rate(len(opened), len(outbound)),
-        "click_rate": rate(len(clicked), len(outbound)),
-        "reply_rate": rate(len(inbound), len(outbound)),
-        "failure_rate": rate(len(failed), len(outbound)),
+        "delivery_rate": metrics.rate(counts["delivered"], sent),
+        "open_rate": metrics.rate(counts["opened"], sent),
+        "click_rate": metrics.rate(counts["clicked"], sent),
+        "reply_rate": metrics.rate(counts["replies"], sent),
+        "failure_rate": metrics.rate(counts["failed"], sent),
         "series": _series(outbound, inbound, since=since, days=days),
+        "scope": metrics.scope("email", days),
+        "definitions": metrics.DEFINITIONS,
     }
 
 

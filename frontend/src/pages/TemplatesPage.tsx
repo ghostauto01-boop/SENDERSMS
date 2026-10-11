@@ -19,7 +19,7 @@ export default function TemplatesPage() {
     open: false,
     template: null,
   });
-  const [previewData, setPreviewData] = useState<{ preview: string; char_count: number; segment_count: number } | null>(null);
+  const [previewData, setPreviewData] = useState<{ preview: string; char_count: number; segment_count: number; warnings?: string[] } | null>(null);
 
   useEffect(() => { loadTemplates(); }, [channel]);
 
@@ -162,6 +162,11 @@ export default function TemplatesPage() {
             <div className="bg-gray-100 dark:bg-gray-700 rounded-lg p-4 mb-3">
               <p className="whitespace-pre-wrap text-sm">{previewData.preview}</p>
             </div>
+            {!!previewData.warnings?.length && (
+              <ul role="alert" className="mb-3 space-y-1 rounded-lg border border-warning-300 bg-warning-50 p-3 text-xs text-warning-800 dark:bg-warning-900/20 dark:text-warning-200">
+                {previewData.warnings.map((w) => <li key={w}>{w}</li>)}
+              </ul>
+            )}
             <div className="flex gap-4 text-sm text-gray-500">
               <span>{previewData.char_count} characters</span>
               <span>{previewData.segment_count} segment{previewData.segment_count > 1 ? "s" : ""}</span>

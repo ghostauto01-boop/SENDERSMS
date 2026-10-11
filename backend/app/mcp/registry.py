@@ -29,6 +29,10 @@ class Param:
     enum: list[str] | None = None
     default: Any = None
     items: str | None = None  # element type when type == "array"
+    #: Documented bounds (JSON-schema ``minimum``/``maximum``). A page size above the
+    #: endpoint's ceiling is a 422, so the schema must say what the ceiling is.
+    minimum: int | None = None
+    maximum: int | None = None
     #: True when the endpoint takes this value AS the whole request body (a bare
     #: JSON array, e.g. POST /lists/{id}/contacts), instead of a named field.
     root: bool = False
@@ -43,6 +47,10 @@ class Param:
             out["items"] = {"type": self.items}
         if self.default is not None:
             out["default"] = self.default
+        if self.minimum is not None:
+            out["minimum"] = self.minimum
+        if self.maximum is not None:
+            out["maximum"] = self.maximum
         return out
 
 
@@ -59,6 +67,14 @@ class Tool:
     #: optional (FastAPI rejects a missing body with 422). An empty object is
     #: sent in that case.
     body_always: bool = False
+    #: True for tools that act on ONE campaign by id. The classic campaigns and the
+    #: Ads Manager number independently, so a bare id can name two campaigns; the
+    #: server resolves which one (or refuses, listing the candidates) before it
+    #: acts, rather than pausing/deleting whichever it happened to find first.
+    by_kind: bool = False
+    #: Where the action lives for an Ads Manager campaign: ``{"ads": (method,
+    #: path)}``. Absent = the action does not exist for Ads Manager campaigns.
+    kind_paths: dict = field(default_factory=dict)
 
     def input_schema(self) -> dict:
         properties = {p.name: p.schema() for p in self.params}
@@ -144,7 +160,9 @@ def _contact_fields(for_create: bool = False) -> list[Param]:
         Param("business_name", where="body"),
         Param("city", where="body"),
         Param("state", where="body"),
-        Param("country", where="body", default="Nigeria"),
+        # No default: an unknown country stays unknown (the API stopped defaulting it to Nigeria).
+        # A default advertised here is applied to every call, creates AND updates.
+        Param("country", where="body"),
         Param("website", where="body"),
         Param("industry", where="body"),
         Param("lead_status", where="body"),
@@ -193,7 +211,8 @@ TOOLS: list[Tool] = [
             Param("lead_status", where="query"),
             Param("list_id", type="integer", description="Only contacts in this list.", where="query"),
             Param("page", type="integer", default=1, where="query"),
-            Param("per_page", type="integer", default=50, where="query"),
+            Param("per_page", type="integer", default=25, minimum=1, maximum=100, where="query",
+                  description="Page size, 1-100 (above 100 is refused, not clamped)."),
         ],
     ),
     Tool(
@@ -251,9 +270,120 @@ TOOLS: list[Tool] = [
         ],
     ),
     Tool(
+        name="register_sending_domain",
+        description=(
+            "Register the domain your email is sent FROM (acme-leads.io, not gmail.com: a free-mail "
+            "domain is refused) with Brevo and get the DNS records to publish: the verification code, "
+            "DKIM, and exactly ONE DMARC record. If the domain already publishes DMARC, your report "
+            "address is merged into that record and you are told to REPLACE it -- never to add a second. "
+            "Campaigns cannot start from a domain that is registered but not authenticated."
+        ),
+        method="POST", path="/api/v1/email/domains", scope="write", group="email",
+        params=[
+            Param("domain", required=True, where="body", description="e.g. acme-leads.io"),
+            Param("rua", where="body", description="Address for DMARC aggregate reports."),
+            Param("email_account_id", type="integer", where="body",
+                  description="The Brevo sender to register it with (the default sender if omitted)."),
+        ],
+    ),
+    Tool(
+        name="list_sending_domains",
+        description="Every registered sending domain with its status, DNS records and warm-up progress.",
+        method="GET", path="/api/v1/email/domains", group="email",
+    ),
+    Tool(
+        name="verify_sending_domain",
+        description=(
+            "Ask Brevo to check the published DNS records now, re-read the domain's DMARC, and -- the first "
+            "time it authenticates -- start the warm-up ramp (about 5 a day in week one, 25 from week four)."
+        ),
+        method="POST", path="/api/v1/email/domains/{domain_id}/verify", scope="write", group="email",
+        params=[Param("domain_id", type="integer", required=True, where="path")],
+    ),
+    Tool(
+        name="validator_status",
+        description=(
+            "Can this server actually CONFIRM a mailbox? Reports the engine (builtin | reacher), "
+            "`smtp_enabled` and -- when it is false -- `smtp_reason` (for example outbound port 25 "
+            "is blocked) and what to do about it. When mailboxes cannot be confirmed every address "
+            "stays 'unknown', and unknown addresses are not sent to by campaigns."
+        ),
+        method="GET", path="/api/v1/validator/status", group="contacts",
+    ),
+    Tool(
+        name="verify_contacts",
+        description=(
+            "Queue verification of contacts (a list, a filtered set, or explicit ids) as a "
+            "background job and return its id: follow it with `verification_job`. Every verdict is "
+            "written onto the contact (email_verified, email_verified_at, email_confidence, "
+            "email_verdict). Campaigns only send to deliverable (and, last, risky) addresses, so "
+            "this is what unlocks a list for sending. Contacts with no address, and ones already "
+            "proven deliverable, are left out of the total."
+        ),
+        method="POST", path="/api/v1/validator/jobs", group="contacts", scope="write",
+        body_always=True,
+        params=[
+            Param("scope", enum=["all", "list", "ids"], default="all", where="body"),
+            Param("list_id", type="integer", where="body", description="Required when scope=list."),
+            Param("contact_ids", type="array", items="integer", where="body",
+                  description="Required when scope=ids (max 1000)."),
+            Param("search", where="body"),
+            Param("lead_status", where="body"),
+            Param("channel", enum=["sms", "email"], where="body"),
+            Param("email_state", where="body"),
+            Param("deep", type="boolean", default=True, where="body",
+                  description="Ask the mailbox (SMTP) as well as DNS. Falls back to DNS-only, and "
+                              "says why, when this server cannot reach port 25."),
+            Param("recheck", type="boolean", default=False, where="body",
+                  description="Re-check contacts already proven deliverable."),
+        ],
+    ),
+    Tool(
+        name="verification_job",
+        description=(
+            "Progress of a verification job: status (queued | running | done | failed | cancelled), "
+            "total, processed, valid / invalid / risky / unknown counts, and `smtp_enabled` / "
+            "`smtp_reason` when the run could not confirm mailboxes."
+        ),
+        method="GET", path="/api/v1/validator/jobs/{job_id}", group="contacts",
+        params=[Param("job_id", required=True, where="path")],
+    ),
+    Tool(
+        name="quarantine_generated_addresses",
+        description=(
+            "Tag every pattern-generated (guessed, never verified) email address `pattern_generated` and "
+            "`sendable:false` so they are visible and filterable. Never deletes anything. It is a DRY RUN "
+            "unless you pass dry_run=false: look at the counts first."
+        ),
+        method="POST", path="/api/v1/contacts/quarantine/generated", scope="write", group="contacts",
+        params=[Param("dry_run", type="boolean", default=True, where="query",
+                      description="true (default) only counts; false applies the tags.")],
+    ),
+    Tool(
         name="export_contacts_csv",
-        description="Download every contact as CSV text.",
-        method="GET", path="/api/v1/contacts/export/csv", group="contacts",
+        description=(
+            "Export contacts as CSV, ONE PAGE AT A TIME. Every page reports 'returned', 'total', "
+            "'truncated' and 'next_cursor'; repeat the call with that next_cursor (and the same "
+            "filters) until it is null, then concatenate the 'csv' of each page — only the first "
+            "carries the header row. Nothing is skipped or repeated even if contacts change "
+            "meanwhile. (The old one-shot download was cut to a few dozen rows by the response "
+            "limit; this is how to get all of them.) Use format='json' for rows as objects."
+        ),
+        method="GET", path="/api/v1/contacts/export", group="contacts",
+        params=[
+            Param("cursor", where="query",
+                  description="The next_cursor of the previous page, unchanged. Omit for page 1."),
+            Param("limit", type="integer", default=100, minimum=1, maximum=500, where="query",
+                  description="Rows per page, 1-500 (above 500 is refused, not clamped)."),
+            Param("format", enum=["csv", "json"], default="csv", where="query"),
+            Param("search", where="query"),
+            Param("lead_status", where="query"),
+            Param("tag", where="query"),
+            Param("email_state", where="query"),
+            Param("channel", enum=["sms", "email"], where="query"),
+            Param("list_id", type="integer", where="query",
+                  description="Only contacts on this list."),
+        ],
     ),
     Tool(
         name="set_email_opt_out",
@@ -380,8 +510,10 @@ TOOLS: list[Tool] = [
         name="render_text_preview",
         description=(
             "Render a message you have not saved yet: pass the SMS body, or the email subject "
-            "and HTML, and see exactly what goes out with the variables filled in. Use it to "
-            "check copy and character/segment counts before creating a template."
+            "and HTML, and see exactly what goes out with the variables filled in -- for one real "
+            "contact (contact_id) or with sample data. A variable that does not exist is shown as "
+            "[UNKNOWN VARIABLE: name] and listed in unknown_variables instead of being silently "
+            "deleted. Use it to check copy and character/segment counts before creating a template."
         ),
         method="POST", path="/api/v1/templates/preview", group="templates",
         params=[
@@ -390,31 +522,60 @@ TOOLS: list[Tool] = [
             Param("subject", where="query", description="Email only."),
             Param("html_body", where="query", description="Email only: the HTML version."),
             Param("channel", enum=["sms", "email"], default="sms", where="query"),
-            Param("first_name", where="query", default="John"),
-            Param("last_name", where="query", default="Doe"),
-            Param("business_name", where="query", default="Acme Ltd"),
-            Param("city", where="query", default="Lagos"),
-            Param("website", where="query", default="https://example.com"),
+            Param("contact_id", type="integer", where="query",
+                  description="Render for this contact: their values, imported columns and the "
+                              "operator's fallbacks, exactly as a send would. Omit for sample data."),
+            # Overrides only: with no default, a value is sent only when the caller gives one.
+            # (A default like first_name=John sent on every call would beat the contact's own.)
+            Param("first_name", where="query", description="Override (sample data when no contact)."),
+            Param("last_name", where="query"),
+            Param("business_name", where="query"),
+            Param("city", where="query"),
+            Param("website", where="query"),
         ],
     ),
     # -------------------------------------------------------------- campaigns
     Tool(
         name="list_campaigns",
-        description="Campaigns for one channel, with their status and counters.",
-        method="GET", path="/api/v1/campaigns/", group="campaigns",
+        description=(
+            "Every campaign in the account, from BOTH campaign systems: the classic campaigns "
+            "(kind 'campaign', also spelled 'legacy') and the Ads Manager campaigns (kind "
+            "'ads'). Ids are only unique within a kind — campaign 2 and ads campaign 2 are "
+            "different campaigns — so always keep an id together with its 'kind' and pass both "
+            "to get_campaign. Rows carry channel, status, is_live and sent/delivered/failed/"
+            "replied counts. 'total' is how many rows match; 'next_page' is null on the last "
+            "page. Filters: kind, channel, status (exact, per system: classic 'running' = Ads "
+            "'active'), live, search."
+        ),
+        method="GET", path="/api/v1/overview/campaigns", group="campaigns",
         params=[
-            Param("channel", enum=["sms", "email", "all"], default="sms", where="query"),
+            Param("kind", enum=["campaign", "legacy", "ads"], where="query",
+                  description="Restrict to one system. Omit for both."),
+            Param("channel", enum=["sms", "email", "all"], where="query",
+                  description="Omit (or 'all') for both channels."),
             Param("status", where="query"),
+            Param("live", type="boolean", where="query",
+                  description="true = only campaigns that are running/scheduled/paused."),
             Param("search", where="query"),
             Param("page", type="integer", default=1, where="query"),
-            Param("per_page", type="integer", default=25, where="query"),
+            Param("per_page", type="integer", default=25, minimum=1, maximum=200, where="query",
+                  description="Page size, 1-200 (above 200 is refused, not clamped)."),
         ],
     ),
     Tool(
         name="get_campaign",
-        description="One campaign's full definition and results.",
-        method="GET", path="/api/v1/campaigns/{campaign_id}", group="campaigns",
-        params=[Param("campaign_id", type="integer", required=True, where="path")],
+        description=(
+            "One campaign's full definition and results. Pass the 'kind' the id was listed "
+            "with (campaign | ads): the two systems number their campaigns independently, so "
+            "an id that exists in both is refused as ambiguous (the error lists the candidates) "
+            "instead of guessed. An id that exists in only one system resolves without 'kind'."
+        ),
+        method="GET", path="/api/v1/overview/campaigns/{campaign_id}", group="campaigns",
+        params=[
+            Param("campaign_id", type="integer", required=True, where="path"),
+            Param("kind", enum=["campaign", "legacy", "ads"], where="query",
+                  description="Which system the id belongs to (see list_campaigns)."),
+        ],
     ),
     Tool(
         name="create_campaign",
@@ -422,7 +583,9 @@ TOOLS: list[Tool] = [
             "Create a campaign (draft). Pick ONE channel: 'sms' or 'email'. Provide the audience "
             "(list_id) and the message — either message_body, or template_id to use a saved "
             "template. Email campaigns also take subject, html_body and email_account_id. "
-            "Nothing is sent until you validate and start it."
+            "Nothing is sent until you start it (or schedule it for a time). Pacing and daily "
+            "caps are NOT per campaign: they come from Settings -> Sending Rules (the classic "
+            "engine does not read a campaign's own daily_limit / min_delay), so they are not offered here."
         ),
         method="POST", path="/api/v1/campaigns/", scope="write", group="campaigns",
         params=[
@@ -441,17 +604,19 @@ TOOLS: list[Tool] = [
             Param("scheduled_start_at", description="ISO-8601 time to launch automatically.",
                   where="body"),
             Param("description", where="body"),
-            Param("daily_limit", type="integer", where="body"),
-            Param("min_delay", type="integer", description="Minimum seconds between messages.",
-                  where="body"),
         ],
     ),
     Tool(
         name="update_campaign",
         description="Edit a campaign that has not started sending yet.",
         method="PUT", path="/api/v1/campaigns/{campaign_id}", scope="write", group="campaigns",
+        by_kind=True,
         params=[
             Param("campaign_id", type="integer", required=True, where="path"),
+            Param("kind", enum=["campaign", "legacy", "ads"], where="meta",
+                  description="Which campaign system the id belongs to (see list_campaigns). "
+                              "Optional when the id exists in only one system; required when "
+                              "it exists in both (the call is refused, listing the candidates)."),
             Param("name", where="body"),
             Param("list_id", type="integer", where="body"),
             Param("message_body", where="body"),
@@ -465,13 +630,21 @@ TOOLS: list[Tool] = [
     Tool(
         name="delete_campaign",
         description=(
-            "Delete a DRAFT campaign (the operator usually wants this after a failed attempt). "
-            "A campaign that has already been validated or started cannot be deleted — the app "
-            "refuses, and duplicating it is the way forward."
+            "Delete a campaign that has not sent anything: a draft, a scheduled one (or one "
+            "paused while scheduled), or a failed one. Once a campaign has sent even one "
+            "message the app refuses (409) — stop it instead to keep the history. An unknown "
+            "id is a 404. Classic campaigns only: an Ads Manager campaign (kind 'ads') is "
+            "paused or archived, never deleted from here."
         ),
         method="DELETE", path="/api/v1/campaigns/{campaign_id}", scope="write",
-        group="campaigns",
-        params=[Param("campaign_id", type="integer", required=True, where="path")],
+        group="campaigns", by_kind=True,
+        params=[
+            Param("campaign_id", type="integer", required=True, where="path"),
+            Param("kind", enum=["campaign", "legacy", "ads"], where="meta",
+                  description="Which campaign system the id belongs to (see list_campaigns). "
+                              "Optional when the id exists in only one system; required when "
+                              "it exists in both (the call is refused, listing the candidates)."),
+        ],
     ),
     Tool(
         name="schedule_campaign",
@@ -480,12 +653,18 @@ TOOLS: list[Tool] = [
             "'send it tomorrow at 9' request. The app validates the campaign first, so a "
             "scheduled launch cannot fail later for a reason that exists now. Pass a future "
             "ISO 8601 timestamp with an offset (e.g. 2026-05-01T09:00:00+01:00); pass null to "
-            "clear the schedule and leave it for a manual start."
+            "CANCEL the schedule — the campaign goes back to draft. The reply carries "
+            "'changed': false when the call did nothing (e.g. cancelling an unscheduled draft)."
         ),
         method="POST", path="/api/v1/campaigns/{campaign_id}/schedule", scope="write",
-        group="campaigns", body_always=True,
+        group="campaigns", body_always=True, by_kind=True,
         params=[
             Param("campaign_id", type="integer", required=True, where="path"),
+            Param("kind", enum=["campaign", "legacy", "ads"], where="meta",
+                  description="Which campaign system the id belongs to (see list_campaigns). "
+                              "Optional when the id exists in only one system; required when "
+                              "it exists in both (the call is refused, listing the candidates)."),
+
             Param("scheduled_start_at", description="Future ISO 8601 time, or null to clear.",
                   where="body"),
         ],
@@ -493,43 +672,95 @@ TOOLS: list[Tool] = [
     Tool(
         name="validate_campaign",
         description=(
-            "Check a campaign before sending: audience, message, sender and consent. Call this "
-            "after creating or editing an email campaign — it is what catches a missing subject "
-            "or an unusable Brevo sender."
+            "Check a campaign before sending: audience, message, sender and consent. REPORT "
+            "ONLY — it changes nothing (status, schedule, contacts), so call it as often as you "
+            "like; the reply says 'valid', lists 'errors' and 'warnings', and always carries "
+            "'changed': false. It does not schedule or arm anything: to send use "
+            "start_campaign (now) or schedule_campaign (later). Call it after creating or "
+            "editing an email campaign — it catches a missing subject or an unusable Brevo "
+            "sender."
         ),
         method="POST", path="/api/v1/campaigns/{campaign_id}/validate", scope="write",
-        group="campaigns",
-        params=[Param("campaign_id", type="integer", required=True, where="path")],
+        group="campaigns", by_kind=True,
+        kind_paths={"ads": ("POST", "/api/v1/ads/campaigns/{campaign_id}/validate")},
+        params=[
+            Param("campaign_id", type="integer", required=True, where="path"),
+            Param("kind", enum=["campaign", "legacy", "ads"], where="meta",
+                  description="Which campaign system the id belongs to (see list_campaigns). "
+                              "Optional when the id exists in only one system; required when "
+                              "it exists in both (the call is refused, listing the candidates)."),
+        ],
     ),
     Tool(
         name="start_campaign",
         description=(
-            "START SENDING a campaign. This really sends messages to real people — confirm the "
-            "channel, audience and message with the operator first."
+            "START SENDING a campaign now. This really sends messages to real people — confirm "
+            "the channel, audience and message with the operator first. A draft is validated as "
+            "part of starting (a problem comes back as a 400 listing every error)."
         ),
         method="POST", path="/api/v1/campaigns/{campaign_id}/start", scope="write",
-        group="campaigns",
-        params=[Param("campaign_id", type="integer", required=True, where="path")],
+        group="campaigns", by_kind=True,
+        kind_paths={"ads": ("POST", "/api/v1/ads/campaigns/{campaign_id}/launch")},
+        params=[
+            Param("campaign_id", type="integer", required=True, where="path"),
+            Param("kind", enum=["campaign", "legacy", "ads"], where="meta",
+                  description="Which campaign system the id belongs to (see list_campaigns). "
+                              "Optional when the id exists in only one system; required when "
+                              "it exists in both (the call is refused, listing the candidates)."),
+            Param("acknowledge_breaker", type="boolean", where="query",
+                  description="Only to continue a campaign the bounce circuit breaker paused."),
+        ],
     ),
     Tool(
         name="pause_campaign",
-        description="Pause a running campaign.",
+        description=(
+            "Pause a RUNNING campaign, or hold a SCHEDULED one so it does not launch. "
+            "resume_campaign puts it back where it was."
+        ),
         method="POST", path="/api/v1/campaigns/{campaign_id}/pause", scope="write",
-        group="campaigns",
-        params=[Param("campaign_id", type="integer", required=True, where="path")],
+        group="campaigns", by_kind=True,
+        kind_paths={"ads": ("POST", "/api/v1/ads/campaigns/{campaign_id}/pause")},
+        params=[
+            Param("campaign_id", type="integer", required=True, where="path"),
+            Param("kind", enum=["campaign", "legacy", "ads"], where="meta",
+                  description="Which campaign system the id belongs to (see list_campaigns). "
+                              "Optional when the id exists in only one system; required when "
+                              "it exists in both (the call is refused, listing the candidates)."),
+        ],
     ),
     Tool(
         name="resume_campaign",
-        description="Resume a paused campaign.",
+        description=(
+            "Resume a paused campaign. One paused mid-send continues sending; one paused while "
+            "scheduled goes back to scheduled and does NOT start sending (use start_campaign "
+            "for that). A campaign paused by the circuit breaker says why in 'paused_reason'."
+        ),
         method="POST", path="/api/v1/campaigns/{campaign_id}/resume", scope="write",
-        group="campaigns",
-        params=[Param("campaign_id", type="integer", required=True, where="path")],
+        group="campaigns", by_kind=True,
+        kind_paths={"ads": ("POST", "/api/v1/ads/campaigns/{campaign_id}/resume")},
+        params=[
+            Param("campaign_id", type="integer", required=True, where="path"),
+            Param("kind", enum=["campaign", "legacy", "ads"], where="meta",
+                  description="Which campaign system the id belongs to (see list_campaigns). "
+                              "Optional when the id exists in only one system; required when "
+                              "it exists in both (the call is refused, listing the candidates)."),
+            Param("acknowledge_breaker", type="boolean", where="query",
+                  description="Required to resume a campaign the bounce circuit breaker paused "
+                              "(read 'paused_reason' first; fix the list)."),
+        ],
     ),
     Tool(
         name="campaign_analytics",
         description="Performance of one campaign: sent, delivered, failed, replies, interested.",
         method="GET", path="/api/v1/campaigns/{campaign_id}/analytics", group="campaigns",
-        params=[Param("campaign_id", type="integer", required=True, where="path")],
+        by_kind=True, kind_paths={"ads": ("GET", "/api/v1/ads/campaigns/{campaign_id}/analytics")},
+        params=[
+            Param("campaign_id", type="integer", required=True, where="path"),
+            Param("kind", enum=["campaign", "legacy", "ads"], where="meta",
+                  description="Which campaign system the id belongs to (see list_campaigns). "
+                              "Optional when the id exists in only one system; required when "
+                              "it exists in both (the call is refused, listing the candidates)."),
+        ],
     ),
     # -------------------------------------------------------------- one-offs
     Tool(
@@ -597,10 +828,15 @@ TOOLS: list[Tool] = [
     ),
     Tool(
         name="send_history",
-        description="Recent SMS sends with their status.",
+        description=(
+            "Recent sends with their status. SMS by default (email rows used to be mixed in); "
+            "channel=email or channel=all asks for the others."
+        ),
         method="GET", path="/api/v1/send/history", group="sending",
-        params=[Param("page", type="integer", default=1, where="query"),
-                Param("per_page", type="integer", default=25, where="query")],
+        params=[Param("channel", enum=["sms", "email", "all"], default="sms", where="query"),
+                Param("page", type="integer", default=1, where="query"),
+                Param("per_page", type="integer", default=25, minimum=1, maximum=100, where="query",
+                      description="Page size, 1-100 (above 100 is refused, not clamped).")],
     ),
     Tool(
         name="scheduled_messages",
@@ -612,7 +848,8 @@ TOOLS: list[Tool] = [
         description="Recent email sends with status, opens, clicks and attachments.",
         method="GET", path="/api/v1/email/history", group="sending",
         params=[Param("page", type="integer", default=1, where="query"),
-                Param("per_page", type="integer", default=25, where="query")],
+                Param("per_page", type="integer", default=25, minimum=1, maximum=200, where="query",
+                      description="Page size, 1-200 (above 200 is refused, not clamped).")],
     ),
     # ------------------------------------------------------------------ email
     Tool(
@@ -629,9 +866,12 @@ TOOLS: list[Tool] = [
         description="Email conversations in the shared inbox, newest activity first.",
         method="GET", path="/api/v1/email/inbox/conversations", group="email",
         params=[Param("status", where="query"),
-                Param("unread_only", type="boolean", where="query"),
+                Param("unread_only", type="boolean", where="query",
+                      description="Only threads with unread messages."),
+                Param("search", where="query", description="Match the contact's email or name."),
                 Param("page", type="integer", default=1, where="query"),
-                Param("per_page", type="integer", default=25, where="query")],
+                Param("per_page", type="integer", default=25, minimum=1, maximum=100, where="query",
+                      description="Page size, 1-100 (above 100 is refused, not clamped).")],
     ),
     Tool(
         name="get_email_conversation",
@@ -692,7 +932,8 @@ TOOLS: list[Tool] = [
         params=[Param("channel", enum=["all", "sms", "email"], default="all", where="query"),
                 Param("status", where="query"),
                 Param("page", type="integer", default=1, where="query"),
-                Param("per_page", type="integer", default=25, where="query")],
+                Param("per_page", type="integer", default=25, minimum=1, maximum=500, where="query",
+                      description="Page size, 1-500 (above 500 is refused, not clamped).")],
     ),
     Tool(
         name="get_inbox_conversation",
@@ -702,12 +943,21 @@ TOOLS: list[Tool] = [
     ),
     Tool(
         name="reply_to_conversation",
-        description="Reply in a conversation (the app routes it to SMS or email automatically).",
+        description=(
+            "Reply in a conversation. The app sends it on the conversation's own channel: a text "
+            "message for an SMS thread, an email from the sender the thread started on for an email "
+            "thread. Give `body`, or a `template_id` to have it written from a template (variables "
+            "filled in for this contact); the reply is refused if you give neither."
+        ),
         method="POST", path="/api/v1/inbox/conversations/{conversation_id}/reply", scope="write",
         group="inbox",
         params=[
             Param("conversation_id", type="integer", required=True, where="path"),
-            Param("body", required=True, where="body"),
+            Param("body", where="body", description="The message text. Optional when template_id is given."),
+            Param("template_id", type="integer", where="body",
+                  description="Reply from this saved template instead of writing the text."),
+            Param("subject", where="body",
+                  description="Email conversations only. Defaults to 'Re: <the thread's subject>'."),
         ],
     ),
     Tool(
@@ -724,8 +974,29 @@ TOOLS: list[Tool] = [
     # -------------------------------------------------------------- follow-ups
     Tool(
         name="list_followups",
-        description="Pending follow-ups (the ones scheduled for specific contacts).",
+        description=(
+            "Follow-ups scheduled for specific contacts, both channels. By default: every follow-up "
+            "that has not been sent yet, whatever day it is due. (The dashboard page opens on "
+            "'due today, SMS only' -- this tool does not, so a follow-up you scheduled for next week "
+            "or by email is here.) Use `view` for overdue / upcoming / completed / skipped."
+        ),
         method="GET", path="/api/v1/followups/", group="follow-ups",
+        params=[
+            Param("view", enum=["pending", "due_today", "overdue", "upcoming", "completed", "skipped", "all"],
+                  default="pending", where="query"),
+            Param("channel", enum=["sms", "email", "all"], default="all", where="query"),
+            Param("page", type="integer", default=1, minimum=1, where="query"),
+            Param("per_page", type="integer", default=25, minimum=1, maximum=100, where="query"),
+        ],
+    ),
+    Tool(
+        name="delete_followup",
+        description=(
+            "Remove a follow-up that has not gone out yet. One that was already sent stays in the "
+            "history. Removing a campaign's follow-up ends that contact's automation, like skipping it."
+        ),
+        method="DELETE", path="/api/v1/followups/{followup_id}", scope="write", group="follow-ups",
+        params=[Param("followup_id", type="integer", required=True, where="path")],
     ),
     Tool(
         name="create_followup",
@@ -780,8 +1051,19 @@ TOOLS: list[Tool] = [
     # -------------------------------------------------------------- analytics
     Tool(
         name="dashboard_stats",
-        description="Headline numbers: contacts, messages, replies, campaigns.",
+        description=(
+            "Headline numbers: contacts, messages, replies, campaigns. All channels and all time by "
+            "default; pass channel and/or days to scope it. The response says which scope and which "
+            "definitions its numbers use, and they are the same ones analytics_overview and the email "
+            "tools use -- the same database gives the same numbers in all of them."
+        ),
         method="GET", path="/api/v1/dashboard/stats", group="analytics",
+        params=[
+            Param("channel", enum=["sms", "email", "all"], where="query",
+                  description="One channel, or all (the default)."),
+            Param("days", type="integer", minimum=1, maximum=365, where="query",
+                  description="Only the last N days (UTC, today included). Omit for all time."),
+        ],
     ),
     Tool(
         name="email_overview",
@@ -790,8 +1072,17 @@ TOOLS: list[Tool] = [
     ),
     Tool(
         name="analytics_overview",
-        description="SMS analytics overview (volume, replies, funnel).",
+        description=(
+            "Analytics overview (volume, delivery, replies) for the last N days. SMS by default -- "
+            "pass channel=email or channel=all for the others. Same definitions and window as "
+            "dashboard_stats and the email tools."
+        ),
         method="GET", path="/api/v1/analytics/overview", group="analytics",
+        params=[
+            Param("days", type="integer", default=30, minimum=1, maximum=365, where="query"),
+            Param("channel", enum=["sms", "email", "all"], default="sms", where="query"),
+            Param("campaign_id", type="integer", where="query"),
+        ],
     ),
     Tool(
         name="list_variables",

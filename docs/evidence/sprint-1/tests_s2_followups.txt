@@ -1,0 +1,18 @@
+# s2_followups -- tests: backend/tests/test_sprint2_followups.py
+# BEFORE = code at 981320d (parent of the fix) with today's tests;  AFTER = 5ec15d2
+
+## BEFORE the fix
+10 failed, 1 passed, 1 warning in 4.44s
+FAILED backend/tests/test_sprint2_followups.py::test_a_bogus_view_or_channel_is_a_422
+FAILED backend/tests/test_sprint2_followups.py::test_a_follow_up_that_went_out_stays_in_the_history[delivered]
+FAILED backend/tests/test_sprint2_followups.py::test_a_follow_up_that_went_out_stays_in_the_history[sent]
+FAILED backend/tests/test_sprint2_followups.py::test_a_pending_follow_up_can_be_deleted
+FAILED backend/tests/test_sprint2_followups.py::test_deleting_a_campaign_follow_up_ends_that_contacts_automation
+FAILED backend/tests/test_sprint2_followups.py::test_pending_means_every_pending_follow_up_whatever_day_it_is_due
+FAILED backend/tests/test_sprint2_followups.py::test_the_assistant_can_delete_a_follow_up
+FAILED backend/tests/test_sprint2_followups.py::test_the_list_says_how_to_get_the_next_page
+FAILED backend/tests/test_sprint2_followups.py::test_the_list_tool_shows_a_follow_up_scheduled_for_next_week
+FAILED backend/tests/test_sprint2_followups.py::test_the_list_tool_shows_email_follow_ups_too
+
+## AFTER the fix
+11 passed, 1 warning in 4.31s

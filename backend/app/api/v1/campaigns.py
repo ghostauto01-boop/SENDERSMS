@@ -19,7 +19,12 @@ from app.schemas.campaign import (
     CampaignUpdate,
 )
 from app.security.auth import get_current_user
-from app.services.campaign_service import CampaignService
+from app.services.campaign_service import (
+    BreakerTripped,
+    CampaignNotFound,
+    CampaignService,
+    CampaignStateError,
+)
 
 # Statuses in which a campaign's definition may still be changed. Once it is
 # scheduled, contacts have not been populated yet but the campaign is queued for
@@ -28,6 +33,30 @@ from app.services.campaign_service import CampaignService
 EDITABLE_STATUSES = {"draft", "scheduled"}
 
 router = APIRouter()
+
+
+def _problem(exc: ValueError) -> HTTPException:
+    """Map a service error to the right HTTP status.
+
+    404 for a campaign that does not exist (a missing id used to come back as
+    400, indistinguishable from bad input), 409 when the campaign's state
+    forbids the action, 400 for anything wrong with the request itself.
+    """
+    if isinstance(exc, CampaignNotFound):
+        return HTTPException(status_code=404, detail=str(exc))
+    if isinstance(exc, BreakerTripped):
+        return HTTPException(
+            status_code=409,
+            detail={
+                "code": "BREAKER_TRIPPED",
+                "message": str(exc),
+                "hint": "Repeat the request with acknowledge_breaker=true to resume anyway.",
+                "paused_reason": exc.reason,
+            },
+        )
+    if isinstance(exc, CampaignStateError):
+        return HTTPException(status_code=409, detail=str(exc))
+    return HTTPException(status_code=400, detail=str(exc))
 
 
 @router.get("/")
@@ -148,13 +177,16 @@ async def create_campaign(
 
 
 @router.put("/{campaign_id}", response_model=CampaignOut)
+@router.patch("/{campaign_id}", response_model=CampaignOut)
 async def update_campaign(
     campaign_id: int,
     data: CampaignUpdate,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Update campaign settings."""
+    """Update campaign settings. Only the fields in the body change, so ``PATCH`` (what a REST
+    client reaches for to change one field) and ``PUT`` are the same operation -- ``PATCH`` used
+    to be a 405."""
     result = await db.execute(select(Campaign).where(Campaign.id == campaign_id))
     campaign = result.scalar_one_or_none()
     if not campaign:
@@ -210,8 +242,12 @@ async def update_campaign(
     # audience are unchanged, so re-validating adds nothing, and demoting it
     # would quietly cancel the scheduled send the user just set up.
     content_changes = set(update_data) - {"scheduled_start_at"}
-    if campaign.status == "scheduled" and content_changes:
-        campaign.status = "draft"
+    # Clearing the launch time of a scheduled campaign is "cancel the schedule",
+    # exactly like POST /schedule with null: it must not leave a campaign that
+    # looks armed but has nothing to fire on.
+    cleared_time = "scheduled_start_at" in update_data and update_data["scheduled_start_at"] is None
+    if campaign.status == "scheduled" and (content_changes or cleared_time):
+        CampaignService(db).transition(campaign, "draft")
         campaign.scheduled_at = None
 
     await db.flush()
@@ -225,13 +261,17 @@ async def validate_campaign(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Validate and schedule a campaign."""
-    service = CampaignService(db)
+    """Check a campaign and report what is wrong. **Changes nothing.**
+
+    Safe to call as often as you like. It does not schedule, arm or start the
+    campaign; to launch use ``/start`` (now) or ``/schedule`` (later). The answer
+    is always HTTP 200 with ``valid`` true/false and the list of ``errors`` --
+    an invalid campaign is a *finding*, not a failed request.
+    """
     try:
-        campaign = await service.validate_and_schedule(campaign_id)
-        return {"success": True, "status": campaign.status, "message": "Campaign validated and scheduled"}
+        return await CampaignService(db).validate_report(campaign_id)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise _problem(e)
 
 
 @router.post("/{campaign_id}/schedule")
@@ -241,47 +281,21 @@ async def schedule_campaign(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Set the time a campaign should launch by itself, or clear it.
+    """Set the time a campaign should launch by itself, or cancel the schedule.
 
-    Validates the campaign first (same checks as /validate) so a scheduled
-    launch cannot fail at 3am for a reason we could have caught now. Pass
-    scheduled_start_at=null to cancel the schedule and leave it validated for
-    a manual start.
+    With a time: validates the campaign (same checks as ``/validate``) so a
+    scheduled launch cannot fail at 3am for a reason we could have caught now,
+    then moves it to ``scheduled``. With ``scheduled_start_at: null``: cancels
+    the schedule and returns the campaign to ``draft``. ``changed`` says whether
+    the call altered anything.
     """
-    result = await db.execute(select(Campaign).where(Campaign.id == campaign_id))
-    campaign = result.scalar_one_or_none()
-    if not campaign:
-        raise HTTPException(status_code=404, detail="Campaign not found")
-
-    # Only a campaign that has not started can be given a start time.
-    if campaign.status not in EDITABLE_STATUSES:
-        raise HTTPException(
-            status_code=409,
-            detail=f"Cannot schedule a campaign that is {campaign.status}.",
-        )
-
-    if data.scheduled_start_at is None:
-        campaign.scheduled_start_at = None
-        await db.commit()
-        await db.refresh(campaign)
-        return {
-            "success": True,
-            "status": campaign.status,
-            "scheduled_start_at": None,
-            "message": "Schedule cleared. Campaign must be started manually.",
-        }
-
     service = CampaignService(db)
     try:
-        # Raises if there is no message, no audience, etc. A campaign that is
-        # already scheduled is being rescheduled, which is allowed.
-        await service.validate_and_schedule(
-            campaign_id, allowed_statuses=("draft", "scheduled")
-        )
+        outcome = await service.set_schedule(campaign_id, data.scheduled_start_at)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise _problem(e)
 
-    campaign.scheduled_start_at = data.scheduled_start_at
+    campaign = outcome["campaign"]
     await db.commit()
     await db.refresh(campaign)
     # Stamp UTC if the driver gave the value back naive, so the browser does
@@ -291,25 +305,44 @@ async def schedule_campaign(
         when = when.replace(tzinfo=timezone.utc)
     return {
         "success": True,
+        "changed": outcome["changed"],
         "status": campaign.status,
-        "scheduled_start_at": when.isoformat(),
-        "message": f"Campaign will send automatically at {when.isoformat()}",
+        "scheduled_start_at": when.isoformat() if when else None,
+        "message": outcome["message"],
     }
 
 
 @router.post("/{campaign_id}/start")
 async def start_campaign(
     campaign_id: int,
+    acknowledge_breaker: bool = Query(
+        default=False,
+        description="Only needed to continue a campaign the bounce circuit breaker paused.",
+    ),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Start a campaign (queue for processing)."""
+    """Start a campaign now (a draft is validated as part of starting)."""
     service = CampaignService(db)
+    existing = (
+        await db.execute(select(Campaign).where(Campaign.id == campaign_id))
+    ).scalar_one_or_none()
+    if existing is None:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    previous = {
+        "status": existing.status,
+        "paused_from": existing.paused_from,
+        "paused_at": existing.paused_at,
+        "paused_reason": existing.paused_reason,
+        "breaker_reset_at": existing.breaker_reset_at,
+        "started_at": existing.started_at,
+    }
     try:
-        campaign = await service.start_campaign(campaign_id)
-        previous_status = "scheduled"
+        campaign = await service.start_campaign(
+            campaign_id, acknowledge_breaker=acknowledge_breaker
+        )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise _problem(e)
 
     # Trigger campaign processing via Celery. If the broker is down we must
     # not leave the campaign stranded in "running" with nothing processing it.
@@ -327,12 +360,42 @@ async def start_campaign(
     try:
         enqueue(process_campaign, campaign_id)
     except QueueUnavailable as e:
-        campaign.status = previous_status
-        campaign.started_at = None
+        # Compensating undo, not a lifecycle move: put back exactly what the
+        # campaign was before this request touched it.
+        for name, value in previous.items():
+            setattr(campaign, name, value)
         await db.commit()
         raise HTTPException(status_code=503, detail=str(e))
 
-    return {"success": True, "status": campaign.status, "message": "Campaign started"}
+    message = "Campaign started"
+    waiting = None
+    try:
+        # Tell the operator when the rules mean nothing will go out yet (night,
+        # weekend, today's cap used) rather than leaving a "running" campaign that
+        # appears to do nothing.
+        from app.services.sending_limits import gate_for_campaign
+
+        check = await (await gate_for_campaign(db, campaign)).check()
+        reason = check.get("reason") or ""
+        if not check["allowed"] and not reason.startswith("pacing"):
+            waiting = {
+                "reason": reason,
+                "next_window": check.get("next_window"),
+                "wait_seconds": check.get("wait_seconds"),
+            }
+            message = (
+                f"Campaign started, but nothing will send yet: {reason}. "
+                + (f"The first messages go out at {check['next_window']}." if check.get("next_window") else "")
+            ).strip()
+    except Exception:  # noqa: BLE001 — the hint must never fail the start
+        pass
+    return {
+        "success": True,
+        "changed": True,
+        "status": campaign.status,
+        "message": message,
+        "waiting": waiting,
+    }
 
 
 @router.post("/{campaign_id}/pause")
@@ -341,40 +404,100 @@ async def pause_campaign(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Pause a running campaign."""
+    """Pause a running or scheduled campaign. Resume puts it back where it was."""
     service = CampaignService(db)
     try:
         campaign = await service.pause_campaign(campaign_id)
-        return {"success": True, "status": campaign.status}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise _problem(e)
+    message = (
+        "Scheduled launch held. Resume puts the schedule back; nothing will send until you start it."
+        if campaign.paused_from == "scheduled"
+        else "Campaign paused. Resume continues where it left off."
+    )
+    return {
+        "success": True,
+        "changed": True,
+        "status": campaign.status,
+        "paused_from": campaign.paused_from,
+        "message": message,
+    }
 
 
 @router.post("/{campaign_id}/resume")
 async def resume_campaign(
     campaign_id: int,
+    acknowledge_breaker: bool = Query(
+        default=False,
+        description="Required to resume a campaign the bounce circuit breaker paused.",
+    ),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Resume a paused campaign."""
-    service = CampaignService(db)
-    try:
-        campaign = await service.resume_campaign(campaign_id)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    """Resume a paused campaign.
 
-    from app.tasks.campaign_tasks import process_campaign
+    Paused mid-send it goes back to ``running``. Paused while scheduled it goes
+    back to ``scheduled`` and does **not** start sending. A campaign the bounce
+    circuit breaker paused is refused (409 ``BREAKER_TRIPPED``) until you repeat
+    the request with ``acknowledge_breaker=true``.
+    """
+    service = CampaignService(db)
+    existing = (
+        await db.execute(select(Campaign).where(Campaign.id == campaign_id))
+    ).scalar_one_or_none()
+    if existing is None:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    previous = {
+        "status": existing.status,
+        "paused_from": existing.paused_from,
+        "paused_at": existing.paused_at,
+        "paused_reason": existing.paused_reason,
+        "breaker_reset_at": existing.breaker_reset_at,
+        "scheduled_start_at": existing.scheduled_start_at,
+    }
+    try:
+        campaign = await service.resume_campaign(
+            campaign_id, acknowledge_breaker=acknowledge_breaker
+        )
+    except ValueError as e:
+        raise _problem(e)
+
+    if campaign.status != "running":
+        launch_passed = previous["scheduled_start_at"] is not None and campaign.scheduled_start_at is None
+        await db.commit()
+        return {
+            "success": True,
+            "changed": True,
+            "status": campaign.status,
+            "message": (
+                "Schedule restored, but its launch time passed while it was paused, so it "
+                "will NOT send by itself. Start it now or set a new launch time."
+                if launch_passed
+                else "Schedule restored. It will launch at its scheduled time."
+            ),
+        }
+
+    from app.tasks.campaign_tasks import process_campaign, republish_queued
     from app.tasks.queue import QueueUnavailable, enqueue
 
+    await db.commit()
     try:
         enqueue(process_campaign, campaign_id)
     except QueueUnavailable as e:
         # Put it back to paused so the UI reflects reality.
-        campaign.status = "paused"
-        await db.flush()
+        for name, value in previous.items():
+            setattr(campaign, name, value)
+        await db.commit()
         raise HTTPException(status_code=503, detail=str(e))
+    # Mail created before the pause was held back, not dropped: send it now.
+    await republish_queued(db, campaign_id=campaign_id)
 
-    return {"success": True, "status": campaign.status}
+    return {
+        "success": True,
+        "changed": True,
+        "status": campaign.status,
+        "message": "Campaign resumed",
+    }
 
 
 @router.post("/{campaign_id}/stop")
@@ -387,9 +510,14 @@ async def stop_campaign(
     service = CampaignService(db)
     try:
         campaign = await service.stop_campaign(campaign_id)
-        return {"success": True, "status": campaign.status}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise _problem(e)
+    return {
+        "success": True,
+        "changed": True,
+        "status": campaign.status,
+        "message": "Campaign stopped. Pending contacts were cancelled.",
+    }
 
 
 @router.delete("/{campaign_id}", status_code=204)
@@ -398,12 +526,12 @@ async def delete_campaign(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Delete a draft campaign."""
+    """Delete a campaign that has not sent anything (draft, scheduled or failed)."""
     service = CampaignService(db)
     try:
-        await service.delete_draft(campaign_id)
+        await service.delete_campaign(campaign_id)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise _problem(e)
 
 
 @router.get("/{campaign_id}/analytics")

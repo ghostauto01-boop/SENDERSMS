@@ -63,18 +63,28 @@ def _followup_item(followup: FollowUp, contact: Contact | None) -> dict:
 
 @router.get("/")
 async def list_followups(
-    view: str = Query(default="due_today"),  # due_today, overdue, upcoming, completed, skipped
+    view: str = Query(
+        default="due_today",
+        description="due_today (the page's default), overdue, upcoming, pending (every follow-up "
+                    "not yet sent, whatever day it is due), completed, skipped, all"),
     page: int = Query(default=1, ge=1),
     per_page: int = Query(default=25, ge=1, le=100),
     channel: Optional[str] = Query(default="sms", description="sms | email | all"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """List follow-ups based on view, for one channel (defaults to SMS)."""
+    """List follow-ups based on view, for one channel (defaults to SMS).
+
+    The defaults are the Follow-ups page's: today's SMS follow-ups. Anything that wants "my
+    follow-ups" -- the assistant tool does -- asks for ``view=pending&channel=all``; a
+    follow-up scheduled for next week, or an email one, is not in the default view.
+    """
+    from app.utils.channels import validate_channel
+
     today_start, today_end = local_day_utc_bounds()
 
     query = select(FollowUp)
-    wanted = (channel or "sms").lower()
+    wanted = validate_channel(channel, default="sms")
     if wanted != "all":
         # Pre-channel rows are SMS, so they stay visible on the SMS side.
         query = query.where(func.coalesce(FollowUp.channel, "sms") == wanted)
@@ -95,12 +105,17 @@ async def list_followups(
             FollowUp.status == "pending",
             FollowUp.scheduled_at >= today_end,
         )
+    elif view == "pending":
+        query = query.where(FollowUp.status == "pending")
     elif view == "completed":
         query = query.where(FollowUp.status.in_(["sent", "delivered"]))
     elif view == "skipped":
         query = query.where(FollowUp.status.in_(["skipped", "cancelled", "failed"]))
     elif view != "all":
-        raise HTTPException(status_code=400, detail="Invalid follow-up view")
+        raise HTTPException(
+            status_code=422,
+            detail="view must be one of due_today, overdue, upcoming, pending, completed, skipped, all",
+        )
 
     count_query = select(func.count()).select_from(query.subquery())
     total = (await db.execute(count_query)).scalar() or 0
@@ -115,7 +130,10 @@ async def list_followups(
         contact = contact_result.scalar_one_or_none()
         items.append(_followup_item(followup, contact))
 
-    return {"total": total, "items": items}
+    return {
+        "total": total, "items": items, "page": page, "per_page": per_page,
+        "next_page": page + 1 if page * per_page < total else None,
+    }
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
@@ -161,6 +179,41 @@ async def create_followup(
     await db.flush()
     await db.refresh(followup)
     return _followup_item(followup, contact)
+
+
+@router.delete("/{followup_id}", status_code=204)
+async def delete_followup(
+    followup_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Remove a follow-up that has not gone out.
+
+    A follow-up that was sent stays in the history (409). Removing one that belongs to a
+    campaign ends that contact's automation, exactly as skipping it does -- the campaign must not
+    keep waiting on a follow-up that no longer exists.
+    """
+    followup = (await db.execute(select(FollowUp).where(FollowUp.id == followup_id))).scalar_one_or_none()
+    if not followup:
+        raise HTTPException(status_code=404, detail="Follow-up not found")
+    if followup.status in ("sent", "delivered"):
+        raise HTTPException(
+            status_code=409,
+            detail=f"This follow-up was already {followup.status}; it stays in the history.",
+        )
+    if followup.status == "sending":
+        raise HTTPException(status_code=409, detail="This follow-up is being sent right now.")
+    if followup.campaign_contact_id:
+        campaign_contact = (
+            await db.execute(
+                select(CampaignContact).where(CampaignContact.id == followup.campaign_contact_id)
+            )
+        ).scalar_one_or_none()
+        if campaign_contact:
+            campaign_contact.status = "completed"
+            campaign_contact.next_action_at = None
+    await db.delete(followup)
+    await db.flush()
 
 
 @router.post("/{followup_id}/send-now")

@@ -413,21 +413,30 @@ function CompTab({ s, onUpdate }: { s: Record<string, string>; onUpdate: () => v
 function RulesTab({ s, onUpdate }: { s: Record<string, string>; onUpdate: () => void }) {
   const bool = (v: string | boolean | undefined, d = false) => v === "true" || v === true;
   const [f,setF]=useState({
-    dl: bool(s.enable_daily_limit), dm: parseInt(s.daily_maximum||"1000"),
+    // The server decides the defaults (they are ON: daily cap, 09:00-17:00, no weekends).
+    // Mirror what it returns instead of re-imposing old fallbacks, so a deliberately
+    // blank window stays blank when the form is saved.
+    dl: s.enable_daily_limit === undefined ? true : bool(s.enable_daily_limit),
+    dm: parseInt(String(s.daily_maximum ?? "1000")),
     hl: bool(s.enable_hourly_limit), hm: parseInt(s.hourly_maximum||"100"),
     ml: bool(s.enable_per_minute_limit), mm: parseInt(s.messages_per_minute||"10"),
     pc: s.enable_pacing === undefined ? true : bool(s.enable_pacing),
     md: parseInt(s.min_delay_seconds||"30"),
-    ss: s.sending_start_time||"08:00", se: s.sending_end_time||"20:00",
-    aw: s.allow_weekends === undefined ? "true" : String(s.allow_weekends),
+    ss: String(s.sending_start_time ?? "09:00"), se: String(s.sending_end_time ?? "17:00"),
+    aw: s.allow_weekends === undefined ? "false" : String(s.allow_weekends),
     ah: s.allow_holidays === undefined ? "true" : String(s.allow_holidays),
+    // Email: a per-mailbox daily cap and the bounce circuit breaker.
+    epm: parseInt(String(s.email_daily_per_mailbox ?? "30")),
+    be: s.breaker_enabled === undefined ? true : bool(s.breaker_enabled),
+    bp: parseFloat(String(s.breaker_bounce_pct ?? "2")),
+    bs: parseInt(String(s.breaker_min_sample ?? "20")),
   });
   const [sv,setSv]=useState(false);
   const [status,setStatus]=useState<any>(null);
   useEffect(()=>{ api.get("/settings/sending-rules/status").then(({data}:any)=>setStatus(data)).catch(()=>{}); },[sv]);
-  const save=async()=>{setSv(true);try{await api.put("/settings/sending-rules",null,{params:{dl:f.dl,dm:f.dm,hl:f.hl,hm:f.hm,ml:f.ml,mm:f.mm,ss:f.ss,se:f.se,aw:f.aw==="true",ah:f.ah==="true",pc:f.pc,md:f.md}});toast.success("Saved");onUpdate();}catch{toast.error("Failed")}finally{setSv(false)}};
+  const save=async()=>{setSv(true);try{await api.put("/settings/sending-rules",null,{params:{dl:f.dl,dm:f.dm,hl:f.hl,hm:f.hm,ml:f.ml,mm:f.mm,ss:f.ss,se:f.se,aw:f.aw==="true",ah:f.ah==="true",pc:f.pc,md:f.md,email_daily_per_mailbox:f.epm,breaker_enabled:f.be,breaker_bounce_pct:f.bp,breaker_min_sample:f.bs}});toast.success("Saved");onUpdate();}catch(e:any){toast.error(e?.response?.data?.detail||"Failed")}finally{setSv(false)}};
   return(<div className="card p-6 space-y-4"><h2 className="text-lg font-semibold">Sending Rules</h2>
-    <p className="text-xs text-gray-500 -mt-2">Limits apply to every outbound SMS — campaigns, follow-ups, direct sends and auto-replies — so your carrier does not flag the SIM.</p>
+    <p className="text-xs text-gray-500 -mt-2">Limits apply to every outbound message — campaigns, follow-ups, direct sends and auto-replies — so a carrier or mailbox provider does not flag your SIM or sending domain. They are on by default; switch a rule off only if you mean to.</p>
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       <div className="space-y-2"><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.hl} onChange={e=>setF({...f,hl:e.target.checked})}/>Hourly limit</label>{f.hl&&<div className="flex items-center gap-2"><input type="number" className="input" value={f.hm} onChange={e=>setF({...f,hm:parseInt(e.target.value)||0})}/><span className="text-sm text-gray-500">SMS / hour</span></div>}</div>
       <div className="space-y-2"><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.dl} onChange={e=>setF({...f,dl:e.target.checked})}/>Daily limit</label>{f.dl&&<div className="flex items-center gap-2"><input type="number" className="input" value={f.dm} onChange={e=>setF({...f,dm:parseInt(e.target.value)||0})}/><span className="text-sm text-gray-500">SMS / day</span></div>}</div>
@@ -435,7 +444,21 @@ function RulesTab({ s, onUpdate }: { s: Record<string, string>; onUpdate: () => 
       <div className="space-y-2"><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.pc} onChange={e=>setF({...f,pc:e.target.checked})}/>Even pacing (spread sends out)</label>{f.pc&&<div className="flex items-center gap-2"><input type="number" className="input" value={f.md} onChange={e=>setF({...f,md:parseInt(e.target.value)||0})}/><span className="text-sm text-gray-500">min. seconds between SMS</span></div>}</div></div>
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><div><label className="label">Send between</label><div className="flex items-center gap-2"><input type="time" className="input" value={f.ss} onChange={e=>setF({...f,ss:e.target.value})}/><span className="text-gray-400">→</span><input type="time" className="input" value={f.se} onChange={e=>setF({...f,se:e.target.value})}/></div></div></div>
     <div className="flex gap-4"><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.aw==="true"} onChange={e=>setF({...f,aw:String(e.target.checked)})}/>Weekends</label><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.ah==="true"} onChange={e=>setF({...f,ah:String(e.target.checked)})}/>Holidays</label></div>
+    <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-4 space-y-3">
+      <h3 className="text-sm font-semibold">Email</h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-1"><label className="label">Emails per mailbox per day</label><input type="number" min={1} max={500} className="input" value={f.epm} onChange={e=>setF({...f,epm:parseInt(e.target.value)||0})}/>
+          <p className="text-xs text-gray-500">20–50 a day is the usual guidance for a mailbox with no reputation yet.{status?.email ? ` You have ${status.email.mailboxes} mailbox${status.email.mailboxes===1?"":"es"}${status.email.daily_cap!=null?`, so up to ${status.email.daily_cap} a day in total`:""}.` : ""} Needs “Daily limit” on.</p></div>
+        <div className="space-y-2"><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.be} onChange={e=>setF({...f,be:e.target.checked})}/>Pause a campaign automatically when it bounces</label>
+          {f.be&&<div className="flex items-center gap-2 flex-wrap"><span className="text-sm text-gray-500">above</span><input type="number" step="0.1" min={0.1} max={50} className="input w-24" value={f.bp} onChange={e=>setF({...f,bp:parseFloat(e.target.value)||0})}/><span className="text-sm text-gray-500">% of the last</span><input type="number" min={1} className="input w-24" value={f.bs} onChange={e=>setF({...f,bs:parseInt(e.target.value)||0})}/><span className="text-sm text-gray-500">+ sends</span></div>}</div>
+      </div>
+    </div>
     <button onClick={save} disabled={sv} className="btn-primary">{sv?"Saving...":"Save"}</button>
+    {status?.email && (<div className="rounded-xl border border-gray-200 dark:border-gray-700 p-4 text-sm space-y-1">
+      <div className="flex items-center justify-between"><span className="font-medium">Email today</span><span className={`badge ${status.email.allowed_now?"badge-green":"badge-yellow"}`}>{status.email.allowed_now?"Sending allowed":"Holding"}</span></div>
+      <p className="text-xs text-gray-500">Sent today: <strong>{status.email.sent_today}</strong>{status.email.daily_cap!=null?<> of <strong>{status.email.daily_cap}</strong></>:null} · waiting to go: <strong>{status.email.in_flight}</strong>{status.email.room_today!=null?<> · room left: <strong>{status.email.room_today}</strong></>:null}</p>
+      {(status.breaker?.tripped||[]).map((t:any)=>(<p key={`${t.kind}-${t.id}`} className="text-xs text-warning-600">Paused automatically: <strong>{t.name}</strong> — {t.reason}</p>))}
+    </div>)}
     {status && (<div className="rounded-xl border border-gray-200 dark:border-gray-700 p-4 text-sm space-y-1">
       <div className="flex items-center justify-between"><span className="font-medium">Live throttle</span><span className={`badge ${status.allowed_now?"badge-green":"badge-yellow"}`}>{status.allowed_now?"Sending allowed":"Holding"}</span></div>
       <p className="text-xs text-gray-500">Sent — this minute: <strong>{status.counters?.minute ?? 0}</strong> · this hour: <strong>{status.counters?.hour ?? 0}</strong> · today: <strong>{status.counters?.day ?? 0}</strong></p>

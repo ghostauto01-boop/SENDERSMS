@@ -65,7 +65,7 @@ Supported scopes are `ids`, `all`, `no_email`, `unverified`, and `list`. Empty/a
 
 ## Campaign preflight and launch
 
-`POST /ads/campaigns/{campaign_id}/validate` is informational. It returns `ok: true`, an empty `errors` array, warnings, and a summary. Missing content, audience, creative splits, or provider configuration can be shown as warnings; they do not gate launch. Provider/DNS checks are not performed as a launch prerequisite.
+`POST /ads/campaigns/{campaign_id}/validate` is informational. It returns `ok: true`, an empty `errors` array, warnings, and a summary. `summary.projection` reports how long the audience will take under the sending rules in force (daily cap, mailboxes, sending days, projected finish date); see `docs/SENDING-RULES.md`. Missing content, audience, creative splits, or provider configuration can be shown as warnings; they do not gate launch. Provider/DNS checks are not performed as a launch prerequisite.
 
 `POST /ads/campaigns/{campaign_id}/launch` locks the campaign row where supported, creates the audience assignments, updates state, and writes activity/event records in one transaction. Repeated launch requests for an already-active or scheduled campaign are idempotent.
 

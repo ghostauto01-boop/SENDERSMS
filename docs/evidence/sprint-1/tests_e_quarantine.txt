@@ -1,0 +1,14 @@
+# e_quarantine -- tests: backend/tests/test_e_quarantine.py
+# BEFORE = code at 2d1deea (parent of the fix) with today's tests;  AFTER = 5a69bfb
+
+## BEFORE the fix
+6 failed, 1 warning in 3.18s
+FAILED backend/tests/test_e_quarantine.py::test_a_dry_run_counts_and_changes_nothing
+FAILED backend/tests/test_e_quarantine.py::test_applying_tags_every_guessed_address_and_only_those
+FAILED backend/tests/test_e_quarantine.py::test_it_is_idempotent_and_never_deletes
+FAILED backend/tests/test_e_quarantine.py::test_the_assistant_tool_defaults_to_a_dry_run
+FAILED backend/tests/test_e_quarantine.py::test_the_report_counts_unverified_role_mailboxes_without_tagging_them
+FAILED backend/tests/test_e_quarantine.py::test_the_tagged_contacts_are_filterable_and_still_not_sendable
+
+## AFTER the fix
+6 passed, 1 warning in 2.88s

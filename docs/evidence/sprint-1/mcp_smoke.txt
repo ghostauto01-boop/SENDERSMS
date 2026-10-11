@@ -1,0 +1,118 @@
+MCP smoke test against http://127.0.0.1:8000 (run 1791705703)
+
+[1] Token + handshake
+  [PASS] app login
+  [PASS] create token in the app
+  [PASS] token looks like a secret
+  [PASS] token is masked in the UI list
+  [PASS] initialize handshake
+  [PASS] protocol version echoed
+  [PASS] server identity
+  [PASS] tools capability advertised
+  [PASS] instructions warn about consent
+  [PASS] initialized notification accepted
+  [PASS] SSE framing works
+
+[2] Tools
+  [PASS] tools are advertised
+  [PASS] tool names are unique
+  [PASS] every tool has a JSON Schema input
+  [PASS] the app's whole surface is reachable
+  [PASS] guide explains both channels
+  [PASS] guide states the consent rules
+  [PASS] guide points at the escape hatch
+  [PASS] endpoint catalogue lists campaigns
+  [PASS] endpoint catalogue lists settings
+  [PASS] create_contact does not demand a phone number
+  [PASS] create_contact does not demand an email address
+  [PASS] create_contact accepts both channels
+  [PASS] update_contact does not advertise an unusable field
+  [PASS] unknown tool is a clear error
+  [PASS] unknown method is a JSON-RPC error
+
+[3] Resources and prompts
+  [PASS] guide resource exposed
+  [PASS] resource reads as markdown
+  [PASS] guided prompts available
+
+[4] Contacts, lists, imports
+  [PASS] contact created through MCP
+  [PASS] email-only contact created through MCP
+  [PASS] email-only contact really has no phone
+  [PASS] contact with neither channel is refused
+  [PASS] contact is searchable
+  [PASS] contact reads back
+  [PASS] contact updated
+  [PASS] list created (query-param endpoint)
+  [PASS] list appears in the app
+  [PASS] contact added to the list
+  [PASS] CSV import accepted
+  [PASS] CSV rows landed in the list
+  [PASS] CSV custom columns became variables
+  [PASS] contacts export as CSV
+
+[5] Templates
+  [PASS] email template created
+  [PASS] created template reports the email channel and its name
+  [PASS] template listed for the email channel
+  [PASS] template reads back in full
+  [PASS] template previews with the contact's real values
+  [PASS] unsaved copy can be rendered too
+
+[6] Campaigns
+  [PASS] email campaign created
+  [PASS] campaign starts as a draft
+  [PASS] campaign updated
+  [PASS] campaign validates
+  [PASS] validate changed nothing
+  [PASS] campaign analytics readable
+  [PASS] pausing a campaign that is not running is refused
+  [PASS] campaign can be scheduled for later
+  [PASS] the launch time is stored
+  [PASS] a draft campaign can be deleted
+
+[7] Email sending
+  [PASS] a Brevo sender is configured
+  [PASS] test email queued through Brevo
+  [PASS] real send accepted
+  [PASS] send shows up in email history
+  [PASS] email inbox readable
+  [PASS] email thread readable
+  [PASS] in-thread reply sent
+  [PASS] conversation can be marked
+  [PASS] per-contact engagement readable
+  [PASS] suppression list readable
+
+[8] Unified inbox, follow-ups, analytics
+  [PASS] unified inbox spans both channels
+  [PASS] unified inbox conversations readable
+  [PASS] follow-ups listed
+  [PASS] dashboard stats readable
+  [PASS] email overview readable
+  [PASS] analytics overview readable
+  [PASS] reference readable
+
+[9] Escape hatch
+  [PASS] escape hatch reads any endpoint
+  [PASS] escape hatch passes query strings
+  [PASS] escape hatch can write (template deleted)
+  [PASS] the deleted template is really gone
+
+[10] Guard rails
+  [PASS] read-only token cannot write
+  [PASS] read-only token cannot post through the escape hatch
+  [PASS] read-only token can still read
+  [PASS] every call is journalled
+  [PASS] journal names the tools used
+  [PASS] journal records failures too
+  [PASS] token revoked from the app
+  [PASS] revoked token is rejected
+  [PASS] unauthenticated calls are rejected
+  [PASS] GET /mcp explains itself (no server stream)
+  [PASS] the ?token= form is supported (and rejects a bad token)
+  [PASS] cleanup left nothing running
+
+==============================================================
+92/92 checks passed
+MCP SMOKE: ALL PASS
+==============================================================

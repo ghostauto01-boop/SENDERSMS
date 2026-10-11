@@ -564,6 +564,7 @@ def _apply(db_contact: Contact, *, address: str, source: str, verified: bool,
     if verified:
         db_contact.email_verified = True
         db_contact.email_verified_at = _now()
+        db_contact.email_verdict = VERDICT_DELIVERABLE
     if confidence is not None:
         db_contact.email_confidence = confidence
     # Never downgrade a human-supplied source ("csv"/"manual") to a machine one.
@@ -655,6 +656,9 @@ async def enrich_contact(
         if answer.confidence is not None:
             contact.email_confidence = answer.confidence
         result.confidence = contact.email_confidence
+        # Remember WHAT the provider concluded -- `email_verified` alone cannot tell
+        # "never checked" from "a catch-all" from "could not decide".
+        contact.email_verdict = answer.verdict or VERDICT_UNKNOWN
 
         if answer.verdict == VERDICT_DELIVERABLE:
             contact.email_verified = True
@@ -706,6 +710,7 @@ async def enrich_contact(
                             contact.email_lower = extra
                             contact.email_verified = True
                             contact.email_verified_at = _now()
+                            contact.email_verdict = VERDICT_DELIVERABLE
                             contact.email_confidence = answer.confidence
                             contact.email_source = contact.email_source or "csv"
                             current = extra

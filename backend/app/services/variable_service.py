@@ -249,3 +249,135 @@ async def analyze_message(db: AsyncSession, body: str, contact=None) -> dict:
         "unknown": unknown,
         "will_remove": [item["shortcode"] for item in empty] + unknown,
     }
+
+
+# --------------------------------------------------------------------------
+# Unknown variables (C2) and the one preview renderer (C1)
+# --------------------------------------------------------------------------
+
+#: What a preview uses when it is not rendering for a real contact.
+DEFAULT_SAMPLE = {
+    "first_name": "John", "last_name": "Doe", "business_name": "Acme Ltd",
+    "phone_number": "08012345678", "email": "john.doe@example.com", "city": "Lagos",
+    "state": "Lagos", "website": "https://example.com", "industry": "Technology",
+}
+
+
+async def known_variable_keys(db: AsyncSession) -> set[str]:
+    """Every normalized name a placeholder may use: the columns, the renderer's aliases and
+    everything in the registry (field keys, short codes and labels)."""
+    from app.utils.templating import BUILTIN_KEYS
+
+    aliases, _fallbacks = await variable_maps(db)
+    keys = {normalize_key(field_key) for field_key, _label, _desc in STANDARD_VARIABLES}
+    return keys | set(BUILTIN_KEYS) | set(aliases) | set(aliases.values())
+
+
+async def unknown_in(db: AsyncSession, *texts: str | None, extra_known=()) -> tuple[list[str], set[str]]:
+    """``(unknown names, known keys)`` across the given texts.
+
+    The registry is filled by a scan of the contacts, so before calling a name unknown the
+    scan is run once: a column imported since the last scan must not make a legitimate
+    template un-saveable.
+    """
+    from app.utils.templating import unknown_names
+
+    known = await known_variable_keys(db) | set(extra_known)
+
+    def _scan() -> list[str]:
+        found: list[str] = []
+        seen: set[str] = set()
+        for text in texts:
+            for name in unknown_names(text, known):
+                if normalize_key(name) not in seen:
+                    seen.add(normalize_key(name))
+                    found.append(name)
+        return found
+
+    unknown = _scan()
+    if unknown:
+        await sync_variables_from_contacts(db)
+        known = await known_variable_keys(db) | set(extra_known)
+        unknown = _scan()
+    return unknown, known
+
+
+def suggest(name: str, known: set[str]) -> str | None:
+    """The closest real variable to a misspelling (``frist_name`` -> ``first_name``)."""
+    import difflib
+
+    matches = difflib.get_close_matches(normalize_key(name), sorted(known), n=1, cutoff=0.7)
+    return matches[0] if matches else None
+
+
+def unknown_variables_error(unknown: list[str], known: set[str]) -> dict:
+    """The body of the 422 returned when a template or campaign uses a variable that does not exist."""
+    suggestions = {name: hit for name in unknown if (hit := suggest(name, known))}
+    parts = [
+        "{{" + name + "}}" + (f" (did you mean {{{{{suggestions[name]}}}}}?)" if name in suggestions else "")
+        for name in unknown
+    ]
+    return {
+        "code": "UNKNOWN_TEMPLATE_VARIABLES",
+        "message": (
+            "This message uses " + ("a variable that does not exist: " if len(parts) == 1
+                                    else "variables that do not exist: ") + ", ".join(parts)
+            + ". Fix the spelling, or add the variable on the Variables page."
+        ),
+        "unknown": unknown,
+        "suggestions": suggestions,
+    }
+
+
+async def render_preview(
+    db: AsyncSession,
+    *,
+    body: str | None,
+    subject: str | None = None,
+    html_body: str | None = None,
+    contact=None,
+    overrides: dict | None = None,
+) -> dict:
+    """Render a message the way a send would -- registry, aliases, fallbacks -- for one
+    contact, or for sample data when there is no contact.
+
+    This is the ONE preview renderer: the Templates page, ``render_text_preview`` and
+    ``preview_template`` all end here. Unlike a send it makes an unknown variable visible
+    (``[UNKNOWN VARIABLE: name]``) and lists it, instead of deleting it.
+    """
+    from app.utils.templating import build_context, render_template
+
+    aliases, fallbacks = await variable_maps(db)
+    values = dict(DEFAULT_SAMPLE) if contact is None else {}
+    values.update({key: value for key, value in (overrides or {}).items() if value is not None})
+    extra = {normalize_key(k) for k in values} | set(build_context(contact))
+    unknown, known = await unknown_in(db, body, subject, html_body, extra_known=extra)
+
+    def render(text: str | None) -> str | None:
+        if not text:
+            return None
+        return render_template(text, contact, aliases=aliases, fallbacks=fallbacks,
+                               unknown="mark", known=known, **values)
+
+    warnings = []
+    for name in unknown:
+        hint = suggest(name, known)
+        warnings.append(
+            f"{{{{{name}}}}} is not a known variable"
+            + (f" — did you mean {{{{{hint}}}}}?" if hint else "")
+            + " A real send would remove it, and saving a template with it is refused."
+        )
+    full_name = " ".join(p for p in (getattr(contact, "first_name", None),
+                                     getattr(contact, "last_name", None)) if p) if contact else ""
+    return {
+        "body": render(body) or "",
+        "subject": render(subject),
+        "html": render(html_body),
+        "unknown_variables": unknown,
+        "warnings": warnings,
+        "contact": (
+            {"id": contact.id, "name": full_name or getattr(contact, "business_name", None) or ""}
+            if contact is not None else None
+        ),
+        "sample": contact is None,
+    }

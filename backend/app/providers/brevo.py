@@ -275,6 +275,78 @@ async def list_domains(api_key: str) -> dict:
         return {"success": False, "error": str(exc)[:500]}
 
 
+def _qualify(host: str, domain: str) -> str:
+    """Brevo gives hosts relative to the domain ("@", "mail._domainkey"); DNS wants them whole."""
+    host = (host or "").strip().rstrip(".")
+    if host in ("", "@"):
+        return domain
+    return host if host.endswith(domain) else f"{host}.{domain}"
+
+
+def _domain_records(data: Any, domain: str) -> list[dict]:
+    """Normalise Brevo's ``dns_records`` into ``[{type, host, value, purpose, verified}]``.
+
+    NOTE: written from Brevo's documented shape and parsed leniently (key names and casing vary
+    between API versions); it has not been run against a live Brevo account.
+    """
+    raw = {}
+    if isinstance(data, dict):
+        raw = data.get("dns_records") or data.get("dnsRecords") or {}
+    records: list[dict] = []
+    if isinstance(raw, dict):
+        for key, record in raw.items():
+            if not isinstance(record, dict):
+                continue
+            name = str(key).lower()
+            purpose = (
+                "dkim" if "dkim" in name else
+                "dmarc" if "dmarc" in name else
+                "spf" if "spf" in name else
+                "brevo_code" if ("code" in name or "brevo" in name) else name
+            )
+            records.append({
+                "type": (record.get("type") or "TXT").upper(),
+                "host": _qualify(record.get("host_name") or record.get("hostName") or record.get("host") or "", domain),
+                "value": record.get("value") or "",
+                "purpose": purpose,
+                "verified": bool(record.get("status")),
+            })
+    return records
+
+
+async def create_domain(api_key: str, domain: str) -> dict:
+    """POST /v3/senders/domains — register a sending domain and get the DNS records Brevo needs."""
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(20.0)) as client:
+            r = await client.post(f"{_base()}/senders/domains", headers=_headers(api_key), json={"name": domain})
+            data = r.json() if r.text else {}
+            if r.status_code < 400:
+                return {"success": True, "domain": domain, "authenticated": bool(data.get("authenticated")),
+                        "records": _domain_records(data, domain)}
+            return {"success": False, "error": _clean_error(r, data), "status_code": r.status_code}
+    except Exception as exc:  # noqa: BLE001
+        return {"success": False, "error": str(exc)[:500]}
+
+
+async def authenticate_domain(api_key: str, domain: str) -> dict:
+    """PUT /v3/senders/domains/{domain}/authenticate — ask Brevo to check the published records now."""
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(30.0)) as client:
+            r = await client.put(f"{_base()}/senders/domains/{domain}/authenticate", headers=_headers(api_key))
+            data = r.json() if r.text else {}
+            if r.status_code < 400:
+                records = _domain_records(data, domain)
+                if not records:  # the authenticate reply is short; the details are on the domain itself
+                    detail = await client.get(f"{_base()}/senders/domains/{domain}", headers=_headers(api_key))
+                    records = _domain_records(detail.json() if detail.text else {}, domain)
+                return {"success": True, "domain": domain,
+                        "authenticated": bool(data.get("authenticated")), "records": records,
+                        "message": data.get("message")}
+            return {"success": False, "error": _clean_error(r, data), "status_code": r.status_code}
+    except Exception as exc:  # noqa: BLE001
+        return {"success": False, "error": str(exc)[:500]}
+
+
 async def create_list(api_key: str, name: str, folder_id: int | None = None) -> dict:
     """Create a Brevo contact list (used to mirror an app list into Brevo)."""
     payload: dict = {"name": name}

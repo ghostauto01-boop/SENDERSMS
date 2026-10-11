@@ -87,6 +87,11 @@ export interface Campaign {
   interested: number;
   // Future time the campaign launches by itself. null = manual start.
   scheduled_start_at: string | null;
+  // Set while paused: "scheduled" when it was held before ever starting.
+  paused_from?: string | null;
+  paused_at?: string | null;
+  // Why it is paused (an automatic pause always says why).
+  paused_reason?: string | null;
   //: "sms" or "email" — nullable rows predate the email channel.
   channel?: string | null;
   email_account_id?: number | null;
@@ -348,7 +353,9 @@ export interface DashboardStats {
   reply_rate: number;
   delivery_rate: number;
   interested_leads: number;
+  // Classic campaigns running + Ads Manager campaigns active.
   active_campaigns: number;
+  active_campaigns_by_kind?: { campaign: number; ads: number };
   followups_due_today: number;
   overdue_followups: number;
   completed_campaigns: number;

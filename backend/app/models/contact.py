@@ -96,6 +96,12 @@ class Contact(Base):
     )
     #: 0-100. Provider verdicts map to a score; guesses are capped low.
     email_confidence: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    #: What the last verification concluded: deliverable | risky | undeliverable |
+    #: unknown, or NULL when the address was never checked. ``email_verified`` alone
+    #: cannot say whether an unverified address is "never checked", "a catch-all" or
+    #: "the verifier could not decide" -- and those are sent differently (never /
+    #: last / never). Reset whenever the address is edited.
+    email_verdict: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)
     email_enriched_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

@@ -20,10 +20,12 @@ Credentials never leave the server: ``serialize_account`` returns a masked key.
 """
 
 import json
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from pydantic import BaseModel
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -51,6 +53,8 @@ from app.schemas.email import (
 )
 from app.security.auth import get_current_user
 from app.services import email_service
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -120,18 +124,33 @@ async def _accounts_by_id(db: AsyncSession) -> dict[int, EmailAccount]:
 # ===========================================================================
 
 
+def _refuse_free_mail_sender(address: str) -> None:
+    """A From address on gmail.com, yahoo.com, outlook.com ... can never be authenticated through
+    Brevo (the app does not control that domain's DNS): the mail fails DMARC and is junked or bounced."""
+    from app.services import sending_domains
+    from app.utils.email_domains import is_free_mail
+
+    if is_free_mail(address):
+        raise HTTPException(422, sending_domains.free_mail_error(address))
+
+
 @router.get("/accounts")
 async def list_accounts(
     db: AsyncSession = Depends(get_db),
     cu: User = Depends(get_current_user),
 ):
     """Every saved Brevo key, with its usage. The keys themselves are masked."""
+    from app.services.sending_limits import default_mailbox_limit, get_sending_rules
+
+    default_limit = default_mailbox_limit(await get_sending_rules(db))
     accounts = await email_service.list_accounts(db)
     items = []
     for account in accounts:
         await email_service.reset_daily_counter(account)
         stats = await email_service.account_stats(db, account.id)
-        items.append(email_service.serialize_account(account, stats=stats))
+        items.append(
+            email_service.serialize_account(account, stats=stats, default_limit=default_limit)
+        )
     await db.flush()
     return {"total": len(items), "items": items}
 
@@ -147,6 +166,7 @@ async def create_account(
         raise HTTPException(422, "Paste the Brevo API key")
     if not email_service.normalize_email(data.from_email):
         raise HTTPException(422, "Enter a valid From email address")
+    _refuse_free_mail_sender(data.from_email)
 
     account = await email_service.create_account(
         db,
@@ -195,6 +215,7 @@ async def update_account(
     if "from_email" in updates and updates["from_email"]:
         if not email_service.normalize_email(updates["from_email"]):
             raise HTTPException(422, "Enter a valid From email address")
+        _refuse_free_mail_sender(updates["from_email"])
     for key, value in updates.items():
         if key == "reply_to":
             value = email_service.normalize_email(value) or None
@@ -232,6 +253,190 @@ async def delete_account(
     if was_default:
         await email_service.ensure_default_account(db)
     await db.commit()
+
+
+# --------------------------------------------------------------------------
+# Sending domains: the DNS a sender needs, checked, and the warm-up that follows
+# --------------------------------------------------------------------------
+
+
+class SendingDomainIn(BaseModel):
+    domain: str
+    #: Where DMARC aggregate reports should go. Merged into the domain's single DMARC record.
+    rua: Optional[str] = None
+    email_account_id: Optional[int] = None
+
+
+def _domain_http_error(exc) -> HTTPException:
+    return HTTPException(exc.status, detail={"code": exc.code, "message": exc.message, **exc.extra})
+
+
+@router.post("/domains", status_code=201)
+async def register_sending_domain(
+    data: SendingDomainIn,
+    db: AsyncSession = Depends(get_db),
+    cu: User = Depends(get_current_user),
+):
+    """Register a sending domain with Brevo and get the DNS records it needs.
+
+    The plan holds exactly ONE DMARC record: whatever is already published at ``_dmarc.<domain>`` is read
+    and the ``rua`` address merged into it, and the plan says to REPLACE it -- never to add a second
+    (two DMARC records make both invalid). A free-mail domain is a 422."""
+    from app.services import sending_domains
+
+    try:
+        out = await sending_domains.register_domain(
+            db, domain=data.domain, rua=data.rua, account_id=data.email_account_id)
+    except sending_domains.DomainError as exc:
+        raise _domain_http_error(exc)
+    await db.commit()
+    return out
+
+
+@router.get("/domains")
+async def list_sending_domains(
+    db: AsyncSession = Depends(get_db),
+    cu: User = Depends(get_current_user),
+):
+    from app.models.sending_domain import SendingDomain
+    from app.services import sending_domains
+
+    rows = (await db.execute(select(SendingDomain).order_by(SendingDomain.id))).scalars().all()
+    return {"items": [sending_domains.serialize(r) for r in rows], "total": len(rows)}
+
+
+async def _domain_or_404(db: AsyncSession, domain_id: int):
+    from app.models.sending_domain import SendingDomain
+
+    row = (await db.execute(select(SendingDomain).where(SendingDomain.id == domain_id))).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(404, "Sending domain not found")
+    return row
+
+
+@router.get("/domains/{domain_id}")
+async def get_sending_domain(
+    domain_id: int,
+    db: AsyncSession = Depends(get_db),
+    cu: User = Depends(get_current_user),
+):
+    from app.services import sending_domains
+
+    return sending_domains.serialize(await _domain_or_404(db, domain_id))
+
+
+@router.post("/domains/{domain_id}/verify")
+async def verify_sending_domain(
+    domain_id: int,
+    db: AsyncSession = Depends(get_db),
+    cu: User = Depends(get_current_user),
+):
+    """Ask Brevo to check the published records now, re-read the domain's DMARC, and -- the first time
+    it authenticates -- start the warm-up ramp."""
+    from app.services import sending_domains
+
+    row = await _domain_or_404(db, domain_id)
+    try:
+        out = await sending_domains.refresh(db, row)
+    except sending_domains.DomainError as exc:
+        raise _domain_http_error(exc)
+    await db.commit()
+    return out
+
+
+@router.delete("/domains/{domain_id}", status_code=204)
+async def delete_sending_domain(
+    domain_id: int,
+    db: AsyncSession = Depends(get_db),
+    cu: User = Depends(get_current_user),
+):
+    row = await _domain_or_404(db, domain_id)
+    await db.delete(row)
+    await db.commit()
+
+
+def _refuse_assistants(request: Request) -> None:
+    """Secrets are handed to the operator's own session, never to the assistant bridge."""
+    if (request.headers.get("x-sendsms-via") or "").lower() == "mcp":
+        raise HTTPException(
+            403,
+            detail={
+                "code": "SECRET_NOT_AVAILABLE_TO_ASSISTANTS",
+                "message": (
+                    "This returns a credential, so it is only available from the dashboard "
+                    "(a signed-in operator session), not to an assistant."
+                ),
+            },
+        )
+
+
+def _secret_response(response: Response) -> None:
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Pragma"] = "no-cache"
+
+
+@router.post("/accounts/{account_id}/webhook/reveal")
+async def reveal_webhook(
+    account_id: int,
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+    cu: User = Depends(get_current_user),
+):
+    """The full Brevo webhook URL for this sender, for the dashboard's copy button.
+
+    Reads (``GET /accounts``, the setup guide, MCP tools) show a masked token; this is the
+    one deliberate action that returns it. Not cacheable, and refused to the MCP bridge.
+    """
+    _refuse_assistants(request)
+    account = await email_service.get_account(db, account_id)
+    if account is None:
+        raise HTTPException(404, "Email account not found")
+    await email_service.ensure_webhook_token(db, account)
+    await db.commit()
+    _secret_response(response)
+    logger.info("Brevo webhook URL revealed for email account %s by user %s", account.id, cu.id)
+    return {
+        "account_id": account.id,
+        "webhook_url": email_service.email_webhook_url(account, reveal=True),
+        "webhook_path": email_service.email_webhook_path(account, reveal=True),
+    }
+
+
+@router.post("/accounts/{account_id}/webhook/rotate")
+async def rotate_webhook(
+    account_id: int,
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+    cu: User = Depends(get_current_user),
+):
+    """Replace this sender's webhook token. The old token stops working immediately.
+
+    Do it when the URL may have been seen by someone who should not hold it (it used to be
+    returned by every account read). The new URL is in the response; paste it into Brevo
+    straight away -- until you do, Brevo's deliveries still carry the old token and are
+    refused with 403.
+    """
+    _refuse_assistants(request)
+    account = await email_service.get_account(db, account_id)
+    if account is None:
+        raise HTTPException(404, "Email account not found")
+    await email_service.rotate_webhook_token(db, account)
+    await db.commit()
+    _secret_response(response)
+    logger.warning("Brevo webhook token rotated for email account %s by user %s", account.id, cu.id)
+    return {
+        "account_id": account.id,
+        "previous_token_revoked": True,
+        "rotated_at": datetime.now(timezone.utc).isoformat(),
+        "webhook_url": email_service.email_webhook_url(account, reveal=True),
+        "webhook_path": email_service.email_webhook_path(account, reveal=True),
+        "message": (
+            "Token rotated. Paste the new webhook URL into Brevo now: deliveries that still "
+            "carry the old token are refused (403) until you do."
+        ),
+    }
 
 
 @router.post("/accounts/{account_id}/default")
@@ -433,10 +638,15 @@ async def overview(
     """Everything the Email Manager landing tab shows, in one round trip."""
     totals = await email_service.email_totals(db, days=days, account_id=account_id)
 
+    from app.services.sending_limits import default_mailbox_limit, get_sending_rules
+
+    default_limit = default_mailbox_limit(await get_sending_rules(db))
     accounts = []
     for account in await email_service.list_accounts(db):
         stats = await email_service.account_stats(db, account.id)
-        accounts.append(email_service.serialize_account(account, stats=stats))
+        accounts.append(
+            email_service.serialize_account(account, stats=stats, default_limit=default_limit)
+        )
 
     unread = (
         await db.execute(
@@ -735,11 +945,7 @@ async def send_email(
             await db.execute(select(Contact).where(func.lower(Contact.email) == address))
         ).scalars().first()
         if contact is None:
-            contact = Contact(
-                email=address,
-                phone_number=f"email:{address}"[:20],
-                source="email_send",
-            )
+            contact = email_service.new_email_only_contact(address, source="email_send")
             db.add(contact)
             await db.flush()
         targets = [contact]
@@ -758,21 +964,31 @@ async def send_email(
     else:
         raise HTTPException(422, "Choose a contact, an email address or a list")
 
-    sent, skipped, failed, message_ids = 0, 0, 0, []
+    sent, failed, message_ids = 0, 0, []
+    skipped_details: list[dict] = []
+
+    def _skip(contact_id, code):
+        skipped_details.append({"contact_id": contact_id, "reason": code or "contact_not_emailable",
+                                "message": email_service.skip_reason_text(code or "contact_not_emailable")})
+    # Outreach = recipients picked from an audience. One contact chosen by a person is
+    # one-to-one even when the template carries unsubscribe headers (``bulk``), so a
+    # marketing template sent to a single contact is not held back by the verification gate.
+    outreach = data.list_id is not None or len(targets) > 1
     for contact in targets:
-        problem = await email_service.contact_email_problem(db, contact)
+        problem = await email_service.contact_email_problem(db, contact, outreach=outreach)
         if problem:
-            skipped += 1
+            _skip(contact.id, problem)
             continue
         message, result = await email_service.send_now(
             db, contact, subject=subject, text_body=body, html_body=html, account=account,
             attachments=attachments,
             bulk=bulk,
+            outreach=outreach,
             cc=data.cc,
             bcc=data.bcc,
         )
         if message is None:
-            skipped += 1
+            _skip(contact.id, result.get("skipped_reason"))
             continue
         message_ids.append(message.id)
         if result.get("success"):
@@ -781,14 +997,17 @@ async def send_email(
             failed += 1
     await db.commit()
 
+    from app.utils.send_report import skip_summary, summary_sentence
+
     return {
         "success": sent > 0,
         "sent": sent,
-        "skipped": skipped,
         "failed": failed,
         "total": len(targets),
         "message_ids": message_ids,
         "email_account_id": account.id,
+        **skip_summary(skipped_details),
+        "message": summary_sentence(sent, skipped_details),
     }
 
 
@@ -893,6 +1112,7 @@ async def list_conversations(
     per_page: int = Query(default=30, ge=1, le=100),
     status_filter: Optional[str] = Query(default=None, alias="status"),
     search: Optional[str] = None,
+    unread_only: bool = Query(default=False, description="Only threads with unread messages"),
     db: AsyncSession = Depends(get_db),
     cu: User = Depends(get_current_user),
 ):
@@ -900,6 +1120,8 @@ async def list_conversations(
     query = select(Conversation).where(func.coalesce(Conversation.channel, "sms") == "email")
     if status_filter and status_filter != "all":
         query = query.where(Conversation.status == status_filter)
+    if unread_only:
+        query = query.where(func.coalesce(Conversation.unread_count, 0) > 0)
     if search:
         like = f"%{search.strip()}%"
         contact_ids = (

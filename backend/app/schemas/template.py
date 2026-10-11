@@ -3,7 +3,7 @@ Pydantic schemas for templates (SMS and email).
 """
 
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -12,8 +12,8 @@ class TemplateCreate(BaseModel):
     name: str = Field(..., max_length=255)
     category: Optional[str] = None
     body: str = ""
-    #: "sms" (default) or "email".
-    channel: str = "sms"
+    #: "sms" (default) or "email". Anything else is a 422 (it used to become "sms" silently).
+    channel: Literal["sms", "email"] = "sms"
     # Email-only fields.
     subject: Optional[str] = Field(default=None, max_length=500)
     html_body: Optional[str] = None

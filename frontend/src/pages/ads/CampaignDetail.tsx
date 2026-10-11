@@ -133,6 +133,9 @@ export default function CampaignDetail({
             {isEmail && detail.subject && (
               <p className="text-sm text-gray-500 mt-1 truncate">Subject: {detail.subject}</p>
             )}
+            {detail.status === "paused" && detail.paused_reason && (
+              <p className="text-sm text-warning-600 dark:text-warning-500 mt-1">{detail.paused_reason}</p>
+            )}
           </div>
           <div className="flex flex-wrap gap-2">
             {detail.status === "draft" && (
@@ -168,7 +171,16 @@ export default function CampaignDetail({
               </button>
             )}
             {detail.status === "paused" && (
-              <button className="btn-primary btn-sm" onClick={() => act(() => adsApi.resume(campaignId), "Resumed")}>
+              <button
+                className="btn-primary btn-sm"
+                onClick={() => {
+                  // A pause by the bounce circuit breaker is not undone by a reflex click:
+                  // read why it paused, then resume deliberately.
+                  const tripped = (detail.paused_reason || "").startsWith("Circuit breaker");
+                  if (tripped && !confirm(`${detail.paused_reason}\n\nResume anyway? Fix the list first (verify the addresses).`)) return;
+                  act(() => adsApi.resume(campaignId, tripped), "Resumed");
+                }}
+              >
                 <Play size={15} className="mr-1" /> Resume
               </button>
             )}

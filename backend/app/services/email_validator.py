@@ -25,9 +25,12 @@ VERDICT VOCABULARY (shared with ``email_enrichment``)
 THE RULE THAT MATTERS
 ---------------------
 Only ``deliverable`` marks a contact ``email_verified``. Only a confirmed
-``undeliverable`` quarantines an address. An ``unknown`` result changes
-nothing except the note — silence is not proof an address is dead, and a
-wrong "invalid" mark costs a real customer.
+``undeliverable`` quarantines an address. An ``unknown`` result is recorded
+(``email_verdict = "unknown"``) but never quarantines and never undoes what an
+earlier probe proved — silence is not proof an address is dead, and a wrong
+"invalid" mark costs a real customer. It is not a yes either: campaigns do not
+send to ``unknown`` addresses (P0-5), so the verdict is also what keeps an
+unprovable address out of a bulk send.
 """
 
 from __future__ import annotations
@@ -74,6 +77,23 @@ def valid_syntax(address: str) -> bool:
     )
 
 
+#: Client-facing status for each verdict.
+VERDICT_STATUS = {
+    VERDICT_DELIVERABLE: "valid",
+    VERDICT_UNDELIVERABLE: "invalid",
+    VERDICT_RISKY: "risky",
+    VERDICT_UNKNOWN: "unknown",
+}
+
+#: 0-100 stored in ``Contact.email_confidence``. ``unknown`` has no confidence: it is
+#: the absence of an answer, not a low-confidence one.
+VERDICT_CONFIDENCE = {
+    VERDICT_DELIVERABLE: 95,
+    VERDICT_RISKY: 60,
+    VERDICT_UNDELIVERABLE: 0,
+}
+
+
 @dataclass
 class Verdict:
     """One validation outcome, Reacher-shaped."""
@@ -97,6 +117,10 @@ class Verdict:
         return {
             "email": self.address,
             "verdict": self.verdict,
+            # The normalised, client-facing word for the verdict: valid | invalid |
+            # risky | unknown. Only "valid" means "confirmed deliverable".
+            "status": VERDICT_STATUS.get(self.verdict, "unknown"),
+            "confidence": VERDICT_CONFIDENCE.get(self.verdict),
             "is_reachable": self.is_reachable,
             "accepts_mail": self.accepts_mail,
             "is_catch_all": self.is_catch_all,
@@ -290,6 +314,89 @@ def _smtp_probe(address: str, domain: str) -> Verdict:
     return result
 
 
+# --------------------------------------------------------------------------
+# Can this server confirm a mailbox at all?
+# --------------------------------------------------------------------------
+#
+# Confirming a mailbox means an SMTP conversation on port 25, and most hosting
+# providers block outbound port 25. Without it every mailbox comes back "unknown" --
+# which is correct, and not sendable -- but the operator must be TOLD that is why, not
+# left to wonder why nothing ever verifies.
+
+EGRESS_PROBE_HOST = "gmail-smtp-in.l.google.com"
+_EGRESS_TTL_SECONDS = 600
+_egress_cache: dict[str, tuple[float, bool, Optional[str]]] = {}
+
+
+async def _probe_port_25() -> tuple[bool, Optional[str]]:
+    """Can this server hold an SMTP conversation? Connect AND wait for the ``220`` greeting.
+
+    A TCP connect alone proves nothing: some networks accept the connection on port 25
+    (a transparent proxy or NAT) and then close it without a word. Only a real server
+    greets with ``220``.
+    """
+    import socket
+
+    def connect() -> tuple[bool, Optional[str]]:
+        try:
+            with socket.create_connection((EGRESS_PROBE_HOST, 25), timeout=4) as sock:
+                sock.settimeout(4)
+                try:
+                    banner = sock.recv(200)
+                except OSError as exc:
+                    return False, (
+                        f"connected to {EGRESS_PROBE_HOST}:25 but no SMTP greeting arrived "
+                        f"({type(exc).__name__})"
+                    )
+                if banner.startswith(b"220"):
+                    return True, None
+                shown = banner[:60].decode("ascii", "replace") if banner else "nothing"
+                return False, (
+                    f"connected to {EGRESS_PROBE_HOST}:25 but received no SMTP greeting "
+                    f"(got {shown!r}); a firewall or proxy is probably intercepting port 25"
+                )
+        except OSError as exc:
+            return False, f"connection to {EGRESS_PROBE_HOST}:25 failed ({type(exc).__name__}: {exc})"[:240]
+
+    return await asyncio.to_thread(connect)
+
+
+async def smtp_capability() -> dict:
+    """``{"enabled", "reason", "via"}``: can mailboxes be confirmed from here?"""
+    if reacher_configured():
+        # The Reacher service makes the SMTP connection; this server's port 25 is moot.
+        return {"enabled": True, "reason": None, "via": "reacher"}
+    if not settings.EMAIL_VALIDATOR_SMTP:
+        return {
+            "enabled": False,
+            "via": None,
+            "reason": (
+                "Built-in SMTP probing is switched off (EMAIL_VALIDATOR_SMTP=false) and no "
+                "Reacher service is configured (REACHER_API_URL). Syntax and MX can be "
+                "checked, but mailboxes cannot be confirmed, so they stay 'unknown' and are "
+                "not sendable."
+            ),
+        }
+    cached = _egress_cache.get("port25")
+    if cached and time.time() - cached[0] < _EGRESS_TTL_SECONDS:
+        _, ok, why = cached
+    else:
+        ok, why = await _probe_port_25()
+        _egress_cache["port25"] = (time.time(), ok, why)
+    if ok:
+        return {"enabled": True, "reason": None, "via": "builtin"}
+    return {
+        "enabled": False,
+        "via": None,
+        "reason": (
+            f"Outbound port 25 is blocked from this server ({why}). Hosting providers "
+            "commonly block it. Set REACHER_API_URL to a verifier that can reach port 25 "
+            "(Reacher), or run the app where port 25 is open. Until then mailboxes cannot "
+            "be confirmed: they stay 'unknown' and are not sendable."
+        ),
+    }
+
+
 async def validate_email(address: Optional[str], *, deep: bool = True) -> Verdict:
     """Validate one address: Reacher if configured, else the built-in pipeline.
 
@@ -406,16 +513,24 @@ def apply_verdict(contact: Contact, verdict: Verdict) -> None:
     if verdict.verdict == VERDICT_DELIVERABLE:
         contact.email_verified = True
         contact.email_verified_at = now
-        if verdict.address != (contact.email or "").strip() and verdict.suggested_email == verdict.address:
-            pass  # spelling fix already applied by the caller, if any
+        contact.email_verdict = VERDICT_DELIVERABLE
+        contact.email_confidence = VERDICT_CONFIDENCE[VERDICT_DELIVERABLE]
     elif verdict.verdict == VERDICT_UNDELIVERABLE:
         contact.email_verified = False
         contact.email_verified_at = None
         contact.email_status = "invalid"
         contact.is_email_undeliverable = True
+        contact.email_verdict = VERDICT_UNDELIVERABLE
+        contact.email_confidence = VERDICT_CONFIDENCE[VERDICT_UNDELIVERABLE]
     elif verdict.verdict == VERDICT_RISKY:
         contact.email_verified = False
         contact.email_verified_at = None
+        contact.email_verdict = VERDICT_RISKY
+        contact.email_confidence = VERDICT_CONFIDENCE[VERDICT_RISKY]
+    elif (contact.email_verdict or VERDICT_UNKNOWN) == VERDICT_UNKNOWN and not contact.email_verified:
+        # The verifier could not decide. Say so -- but one timeout must never undo what a
+        # mailbox probe proved earlier (deliverable / risky are kept as they are).
+        contact.email_verdict = VERDICT_UNKNOWN
     # risky / unknown: no hard flags. A catch-all or a timeout must never
     # quarantine a real customer's address.
 

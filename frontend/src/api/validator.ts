@@ -45,6 +45,9 @@ export interface ValidatorStatus {
   reacher_key_configured: boolean;
   dns_available: boolean;
   smtp_enabled: boolean;
+  /** Why mailboxes cannot be confirmed from this server (null when they can). */
+  smtp_reason?: string | null;
+  can_confirm_mailboxes?: boolean;
   batch_size: number;
   phone_region: string;
   notice: string;

@@ -39,6 +39,15 @@ async def launcher(db, monkeypatch):
     import app.tasks.campaign_tasks as ct
     from contextlib import asynccontextmanager
 
+    from app.config import settings
+
+    # The launcher validates a campaign as it starts it (a list may have been
+    # emptied or a sender switched off since it was scheduled), so these
+    # campaigns need the SMS gateway a real deployment would have.
+    monkeypatch.setattr(settings, "SMSGATE_BASE_URL", "https://api.sms-gate.app/3rdparty/v1")
+    monkeypatch.setattr(settings, "SMSGATE_USERNAME", "user")
+    monkeypatch.setattr(settings, "SMSGATE_PASSWORD", "pass")
+
     enqueued: list[int] = []
 
     @asynccontextmanager
@@ -183,6 +192,12 @@ async def test_two_concurrent_launchers_start_it_only_once(tmp_path, monkeypatch
         )
         await setup.commit()
         campaign_id = campaign.id
+
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "SMSGATE_BASE_URL", "https://api.sms-gate.app/3rdparty/v1")
+    monkeypatch.setattr(settings, "SMSGATE_USERNAME", "user")
+    monkeypatch.setattr(settings, "SMSGATE_PASSWORD", "pass")
 
     enqueued: list[int] = []
     monkeypatch.setattr(ct, "async_session_factory", factory)

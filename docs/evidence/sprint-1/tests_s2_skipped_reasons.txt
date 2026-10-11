@@ -1,0 +1,14 @@
+# s2_skipped_reasons -- tests: backend/tests/test_sprint2_skipped_reasons.py
+# BEFORE = code at 981320d (parent of the fix) with today's tests;  AFTER = 5ec15d2
+
+## BEFORE the fix
+6 failed, 1 warning in 3.61s
+FAILED backend/tests/test_sprint2_skipped_reasons.py::test_a_list_send_counts_each_reason
+FAILED backend/tests/test_sprint2_skipped_reasons.py::test_a_refused_one_to_one_email_says_why
+FAILED backend/tests/test_sprint2_skipped_reasons.py::test_a_send_with_nothing_skipped_reports_no_reason
+FAILED backend/tests/test_sprint2_skipped_reasons.py::test_an_sms_list_send_reports_what_it_filtered_out_and_why
+FAILED backend/tests/test_sprint2_skipped_reasons.py::test_recipients_a_rate_limit_stopped_the_send_before_reaching_are_not_silently_dropped
+FAILED backend/tests/test_sprint2_skipped_reasons.py::test_send_now_reports_the_reason_it_would_not_queue
+
+## AFTER the fix
+6 passed, 1 warning in 3.45s

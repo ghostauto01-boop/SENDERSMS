@@ -1,0 +1,22 @@
+# repro_p0_3.py
+## BEFORE (code at b9eedb5)
+sending rules in force: {'enable_daily_limit': False, 'sending_start_time': '', 'sending_end_time': '', 'allow_weekends': True}
+-- Saturday 23:30 Lagos (the original reproduction): 2026-09-05T23:30:00+01:00
+   batch pass 1: 200 email messages exist (audience 200, one mailbox)
+   batch pass 2: 200 email messages exist (audience 200, one mailbox)
+   handed to the provider in this harness: 200 (the 30 s send pacing is not waited out here); contacts still pending: 0
+-- Wednesday 12:00 Lagos (inside the window): 2026-09-02T12:00:00+01:00
+   batch pass 1: 200 email messages exist (audience 200, one mailbox)
+   batch pass 2: 200 email messages exist (audience 200, one mailbox)
+   handed to the provider in this harness: 200 (the 30 s send pacing is not waited out here); contacts still pending: 0
+
+## AFTER (c2a99c5)
+sending rules in force: {'enable_daily_limit': True, 'sending_start_time': '09:00', 'sending_end_time': '17:00', 'allow_weekends': False}
+-- Saturday 23:30 Lagos (the original reproduction): 2026-09-05T23:30:00+01:00
+   batch pass 1: 0 email messages exist (audience 200, one mailbox)
+   batch pass 2: 0 email messages exist (audience 200, one mailbox)
+   handed to the provider in this harness: 0 (the 30 s send pacing is not waited out here); contacts still pending: 200
+-- Wednesday 12:00 Lagos (inside the window): 2026-09-02T12:00:00+01:00
+   batch pass 1: 30 email messages exist (audience 200, one mailbox)
+   batch pass 2: 30 email messages exist (audience 200, one mailbox)
+   handed to the provider in this harness: 1 (the 30 s send pacing is not waited out here); contacts still pending: 170

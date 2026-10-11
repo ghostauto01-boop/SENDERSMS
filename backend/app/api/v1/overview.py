@@ -21,7 +21,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -38,6 +38,44 @@ router = APIRouter()
 #: Statuses that mean "this campaign is working right now".
 LIVE_CLASSIC = ("running", "scheduled", "paused")
 LIVE_ADS = ("active", "scheduled", "paused")
+
+#: Statuses that mean "this campaign is sending right now" (as opposed to merely
+#: being on the books). The vocabularies differ: the classic engine says
+#: ``running`` where the Ads Manager says ``active``.
+SENDING_CLASSIC = ("running",)
+SENDING_ADS = ("active",)
+
+#: The two id spaces overlap (each table has its own id 1, 2, ...), so every
+#: campaign reference carries a ``kind``. ``campaign`` is the classic table, as
+#: the inbox labels it; ``legacy`` and ``classic`` are accepted spellings of it.
+KIND_ALIASES = {"campaign": "campaign", "legacy": "campaign", "classic": "campaign", "ads": "ads"}
+SYSTEM_OF_KIND = {"campaign": "legacy", "ads": "ads"}
+CHANNELS = ("sms", "email")
+
+
+def normalize_kind(value: Optional[str]) -> Optional[str]:
+    """``None`` for "either system", else ``"campaign"`` or ``"ads"``; 422 otherwise."""
+    if value is None or not str(value).strip() or str(value).strip().lower() == "all":
+        return None
+    kind = KIND_ALIASES.get(str(value).strip().lower())
+    if kind is None:
+        raise HTTPException(
+            status_code=422,
+            detail="kind must be 'campaign' (alias 'legacy') or 'ads' — "
+                   f"got {value!r}. Omit it to search both systems.",
+        )
+    return kind
+
+
+def normalize_channel(value: Optional[str]) -> Optional[str]:
+    if value is None or not str(value).strip() or str(value).strip().lower() == "all":
+        return None
+    channel = str(value).strip().lower()
+    if channel not in CHANNELS:
+        raise HTTPException(
+            status_code=422, detail=f"channel must be 'sms', 'email' or 'all' — got {value!r}."
+        )
+    return channel
 
 
 def _rate(part: int, whole: int) -> float:
@@ -159,6 +197,8 @@ async def _classic_rows(db: AsyncSession, replied_ids: set[int]) -> list[dict]:
             {
                 "id": camp.id,
                 "kind": "campaign",
+                "system": "legacy",
+                "channel": camp.channel or "sms",
                 "name": camp.name,
                 "description": camp.description,
                 "status": camp.status,
@@ -261,6 +301,8 @@ async def _ads_rows(db: AsyncSession, replied_ids: set[int]) -> list[dict]:
             {
                 "id": camp.id,
                 "kind": "ads",
+                "system": "ads",
+                "channel": camp.channel or "sms",
                 "name": camp.name,
                 "description": camp.description,
                 "status": camp.status,
@@ -288,35 +330,117 @@ async def _ads_rows(db: AsyncSession, replied_ids: set[int]) -> list[dict]:
     return out
 
 
+def _ref(row: dict) -> dict:
+    """The few fields that identify a campaign unambiguously."""
+    return {k: row.get(k) for k in ("kind", "system", "id", "name", "status", "channel")}
+
+
 @router.get("/campaigns")
 async def campaign_overview(
+    kind: Optional[str] = Query(
+        default=None,
+        description="campaign (alias: legacy) | ads. Omit for both systems.",
+    ),
+    channel: Optional[str] = Query(default=None, description="sms | email. Omit for both."),
+    status: Optional[str] = Query(
+        default=None,
+        description="Exact status in that system's own vocabulary "
+                    "(classic: running; Ads Manager: active).",
+    ),
+    search: Optional[str] = Query(default=None, description="Case-insensitive name match."),
+    live: Optional[bool] = Query(default=None, description="Only campaigns that are live (or not)."),
+    page: int = Query(default=1, ge=1),
+    per_page: Optional[int] = Query(
+        default=None, ge=1, le=200,
+        description="Page size (max 200). Omit to get every row in one response.",
+    ),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Both campaign systems in one list, sorted by what is live right now."""
+    """Both campaign systems in one list, sorted by what is live right now.
+
+    Every row carries ``kind`` (``campaign`` | ``ads``) and ``system``
+    (``legacy`` | ``ads``) because the two id spaces overlap: an id is only
+    meaningful together with its kind. ``total`` is how many rows match the
+    filters; ``next_page`` is null on the last page, so a client always knows
+    whether it has seen everything. ``totals`` always describes the whole
+    account and ignores the filters.
+    """
+    return await campaign_directory(
+        db, kind=kind, channel=channel, status=status, live=live, search=search,
+        page=page, per_page=per_page,
+    )
+
+
+async def campaign_directory(
+    db: AsyncSession,
+    *,
+    kind: Optional[str] = None,
+    channel: Optional[str] = None,
+    status: Optional[str] = None,
+    live: Optional[bool] = None,
+    search: Optional[str] = None,
+    page: int = 1,
+    per_page: Optional[int] = None,
+) -> dict:
+    """The directory behind ``GET /campaigns``, callable without HTTP.
+
+    Plain keyword arguments on purpose: other endpoints (``/metrics``) call this
+    directly, and a FastAPI route function called that way receives ``Query(...)``
+    marker objects instead of values.
+    """
+    wanted_kind = normalize_kind(kind)
+    wanted_channel = normalize_channel(channel)
+
     replied_ids = await _replied_conversation_ids(db)
-    rows = await _classic_rows(db, replied_ids) + await _ads_rows(db, replied_ids)
-    rows.sort(key=lambda r: (not r["is_live"], -(r["sent"] or 0), r["name"]))
+    everything = await _classic_rows(db, replied_ids) + await _ads_rows(db, replied_ids)
+    everything.sort(
+        key=lambda r: (not r["is_live"], -(r["sent"] or 0), r["name"], r["kind"], r["id"])
+    )
 
-    def total(key: str) -> int:
-        return sum(r.get(key) or 0 for r in rows)
+    rows = everything
+    if wanted_kind:
+        rows = [r for r in rows if r["kind"] == wanted_kind]
+    if wanted_channel:
+        rows = [r for r in rows if r["channel"] == wanted_channel]
+    if status:
+        rows = [r for r in rows if r["status"] == status]
+    if live is not None:
+        rows = [r for r in rows if bool(r["is_live"]) is live]
+    if search and search.strip():
+        needle = search.strip().lower()
+        rows = [r for r in rows if needle in (r["name"] or "").lower()]
 
-    sent = total("sent")
-    delivered = total("delivered")
+    total = len(rows)
+    next_page = None
+    if per_page is not None:
+        start = (page - 1) * per_page
+        rows = rows[start:start + per_page]
+        next_page = page + 1 if start + per_page < total else None
+
+    def sum_of(key: str) -> int:
+        return sum(r.get(key) or 0 for r in everything)
+
+    sent = sum_of("sent")
+    delivered = sum_of("delivered")
     # Message counts are per-send and safe to add up. People counts are not:
     # one contact can be a lead for several campaigns, so they are recounted
     # from conversations to keep the header consistent with the list below it.
     people = await _attributed_totals(db, replied_ids)
     return {
         "items": rows,
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "next_page": next_page,
         "totals": {
-            "campaigns": len(rows),
-            "live": sum(1 for r in rows if r["is_live"]),
-            "audience": total("audience"),
+            "campaigns": len(everything),
+            "live": sum(1 for r in everything if r["is_live"]),
+            "audience": sum_of("audience"),
             "sent": sent,
             "delivered": delivered,
-            "failed": total("failed"),
-            "queued": total("queued"),
+            "failed": sum_of("failed"),
+            "queued": sum_of("queued"),
             "leads": people["leads"],
             "replied": people["replied"],
             "unread": people["unread"],
@@ -324,6 +448,102 @@ async def campaign_overview(
             "delivery_rate": _rate(delivered, sent),
             "reply_rate": _rate(people["replied"], sent),
         },
+    }
+
+
+@router.get("/campaigns/{campaign_id}")
+async def campaign_detail(
+    campaign_id: int,
+    kind: Optional[str] = Query(
+        default=None,
+        description="campaign (alias: legacy) | ads. Required when the id exists in both "
+                    "systems; otherwise optional.",
+    ),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """One campaign's full definition and results, from either system.
+
+    The id spaces overlap, so ``kind`` says which system the id belongs to. Without
+    it, an id that exists in only one system resolves; an id that exists in both is
+    a **409** that lists the candidates, never a silent pick of one of them.
+    """
+    wanted = normalize_kind(kind)
+
+    classic = None
+    if wanted in (None, "campaign"):
+        classic = (
+            await db.execute(select(Campaign).where(Campaign.id == campaign_id))
+        ).scalar_one_or_none()
+    ads_campaign = None
+    if wanted in (None, "ads"):
+        try:
+            from app.models.ads import AdsCampaign
+
+            ads_campaign = (
+                await db.execute(select(AdsCampaign).where(AdsCampaign.id == campaign_id))
+            ).scalar_one_or_none()
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.warning("overview: ads lookup failed: %s", exc)
+
+    if classic is None and ads_campaign is None:
+        where = {"campaign": "classic campaigns", "ads": "Ads Manager campaigns"}.get(
+            wanted or "", "either campaign system"
+        )
+        raise HTTPException(status_code=404, detail=f"No campaign with id {campaign_id} in {where}.")
+
+    replied_ids = await _replied_conversation_ids(db)
+
+    async def row_for(which: str) -> dict:
+        rows = (
+            await _classic_rows(db, replied_ids)
+            if which == "campaign"
+            else await _ads_rows(db, replied_ids)
+        )
+        return next(r for r in rows if r["id"] == campaign_id)
+
+    if classic is not None and ads_campaign is not None:
+        candidates = [_ref(await row_for("campaign")), _ref(await row_for("ads"))]
+        listing = "; ".join(
+            f"[{c['kind']}] '{c['name']}' ({c['status']}, {c['channel']})" for c in candidates
+        )
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "AMBIGUOUS_CAMPAIGN_ID",
+                "message": (
+                    f"Campaign id {campaign_id} exists in both campaign systems — pass "
+                    f"kind=campaign or kind=ads. Candidates: {listing}"
+                ),
+                "hint": "Repeat the request with kind=campaign or kind=ads.",
+                "field": "kind",
+                "candidates": candidates,
+            },
+        )
+
+    if classic is not None:
+        from app.api.v1.campaigns import _campaign_out
+
+        row = await row_for("campaign")
+        definition = _campaign_out(classic)
+        which = "campaign"
+    else:
+        from app.api.v1 import ads as ads_api
+
+        row = await row_for("ads")
+        definition = await ads_api.get_campaign(campaign_id, db=db, user=current_user)
+        which = "ads"
+
+    metrics_keys = (
+        "audience", "sent", "delivered", "failed", "queued", "leads", "replied",
+        "unread", "interested", "delivery_rate", "reply_rate", "is_live",
+        "inbox_url", "replies_url",
+    )
+    return {
+        **definition,
+        "kind": which,
+        "system": SYSTEM_OF_KIND[which],
+        "metrics": {k: row.get(k) for k in metrics_keys},
     }
 
 
@@ -433,7 +653,7 @@ async def unified_metrics(
             if status in ("failed", "cancelled"):
                 bucket["failed"] += n
 
-    campaign_data = await campaign_overview(db=db, current_user=current_user)
+    campaign_data = await campaign_directory(db)
 
     return {
         "period_days": days,

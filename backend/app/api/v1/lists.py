@@ -132,6 +132,41 @@ async def list_lists(
     return {"total": total, "items": items}
 
 
+async def find_list_by_name(
+    db: AsyncSession, name: str, *, exclude_id: Optional[int] = None
+) -> Optional[ContactList]:
+    """The list that already has this name (ignoring case and surrounding spaces), if any."""
+    query = select(ContactList).where(
+        func.lower(func.trim(ContactList.name)) == (name or "").strip().lower()
+    )
+    if exclude_id is not None:
+        query = query.where(ContactList.id != exclude_id)
+    return (await db.execute(query.order_by(ContactList.id).limit(1))).scalars().first()
+
+
+async def require_free_list_name(
+    db: AsyncSession, name: str, *, exclude_id: Optional[int] = None
+) -> str:
+    """The cleaned name, or a 422 (blank) / 409 (taken, naming the list that has it)."""
+    cleaned = (name or "").strip()
+    if not cleaned:
+        raise HTTPException(422, "A list needs a name")
+    existing = await find_list_by_name(db, cleaned, exclude_id=exclude_id)
+    if existing is not None:
+        raise HTTPException(
+            409,
+            detail={
+                "code": "LIST_NAME_EXISTS",
+                "message": (
+                    f"A list named '{existing.name}' already exists (id {existing.id}). "
+                    "Use that list, or choose a different name."
+                ),
+                "existing_id": existing.id,
+            },
+        )
+    return cleaned
+
+
 @router.post("/", status_code=201)
 async def create_list(
     name: str = Query(..., min_length=1, max_length=255),
@@ -139,8 +174,10 @@ async def create_list(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Create a new contact list."""
-    contact_list = ContactList(name=name.strip(), description=description)
+    """Create a new contact list. A name that is blank is a 422; one that is taken (ignoring
+    case and spaces) is a 409 naming the existing list."""
+    name = await require_free_list_name(db, name)
+    contact_list = ContactList(name=name, description=description)
     db.add(contact_list)
     await db.flush()
     await db.refresh(contact_list)
@@ -164,7 +201,7 @@ async def update_list(
     contact_list = await _find_list(db, list_id)
 
     if name:
-        contact_list.name = name.strip()
+        contact_list.name = await require_free_list_name(db, name, exclude_id=list_id)
     if description is not None:
         contact_list.description = description
     await db.flush()

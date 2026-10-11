@@ -304,6 +304,13 @@ ALTER TABLE contacts ADD COLUMN IF NOT EXISTS email_source VARCHAR(30);
 ALTER TABLE contacts ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE contacts ADD COLUMN IF NOT EXISTS email_verified_at TIMESTAMP WITH TIME ZONE;
 ALTER TABLE contacts ADD COLUMN IF NOT EXISTS email_confidence INTEGER;
+
+-- P0-5: what the last verification concluded (deliverable | risky | undeliverable |
+-- unknown; NULL = never checked). Campaigns only send to deliverable (and, last, risky)
+-- addresses. email_verdict is added at startup by schema_repair; this is for hand-run
+-- migrations. The queued-verification table is created at startup by create_all.
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS email_verdict VARCHAR(20);
+CREATE INDEX IF NOT EXISTS ix_contacts_email_verdict ON contacts (email_verdict);
 ALTER TABLE contacts ADD COLUMN IF NOT EXISTS email_enriched_at TIMESTAMP WITH TIME ZONE;
 ALTER TABLE contacts ADD COLUMN IF NOT EXISTS email_enrichment_note VARCHAR(255);
 
@@ -392,4 +399,44 @@ CREATE INDEX IF NOT EXISTS ix_quarantined_sms_sender ON quarantined_sms (sender)
 CREATE INDEX IF NOT EXISTS ix_quarantined_sms_reason ON quarantined_sms (reason);
 CREATE INDEX IF NOT EXISTS ix_quarantined_sms_received_at ON quarantined_sms (received_at);
 
+-- ------------------------------------------------------------
+-- Campaign lifecycle: where a pause came from, and why (P0-1)
+-- ------------------------------------------------------------
+-- A campaign paused while "scheduled" has never sent anything, so resuming it
+-- must put the schedule back instead of starting to send. paused_reason is what
+-- the bounce circuit breaker writes when it pauses a campaign on its own.
+-- The app adds these columns itself at startup (schema_repair); this statement
+-- is for operators who run the migration by hand. NULL means "paused mid-send".
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS paused_from VARCHAR(20);
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS paused_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS paused_reason VARCHAR(500);
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS breaker_reset_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE ads_campaigns ADD COLUMN IF NOT EXISTS paused_reason VARCHAR(500);
+ALTER TABLE ads_campaigns ADD COLUMN IF NOT EXISTS paused_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE ads_campaigns ADD COLUMN IF NOT EXISTS breaker_reset_at TIMESTAMP WITH TIME ZONE;
+
 COMMIT;
+
+-- C5: older code stored an invented "phone number" (email:<address>, cut to 20 characters) for a
+-- contact that only had an email address. The app clears these at startup; this is the same repair
+-- for a hand-run migration. Contacts with no email address are left alone.
+UPDATE contacts SET phone_number = NULL
+ WHERE phone_number LIKE 'email:%' AND email IS NOT NULL AND TRIM(email) <> '';
+
+-- P0-6: sending domains (DNS plan, authentication state, warm-up clock). The table is created at startup by
+-- create_all; this is the same DDL for a hand-run migration.
+CREATE TABLE IF NOT EXISTS sending_domains (
+    id SERIAL PRIMARY KEY,
+    domain VARCHAR(255) NOT NULL UNIQUE,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    records_json TEXT NOT NULL DEFAULT '[]',
+    dmarc_rua VARCHAR(255),
+    email_account_id INTEGER,
+    last_error TEXT,
+    warmup_started_at TIMESTAMP WITH TIME ZONE,
+    authenticated_at TIMESTAMP WITH TIME ZONE,
+    last_checked_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS ix_sending_domains_status ON sending_domains (status);

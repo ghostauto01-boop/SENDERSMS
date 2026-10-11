@@ -1,0 +1,14 @@
+# repro_c10.py
+## BEFORE (code at abeb293)
+GET /email/accounts  -> full token present in the response: True
+   webhook_url = https://app.example.test/api/v1/webhooks/brevo/1?token=<FULL-TOKEN>
+webhook with a wrong token -> HTTP 403
+POST .../webhook/reveal -> HTTP 405
+POST .../webhook/rotate -> HTTP 405
+
+## AFTER (74db82f)
+GET /email/accounts  -> full token present in the response: False
+   webhook_url = https://app.example.test/api/v1/webhooks/brevo/1?token=****in7U
+webhook with a wrong token -> HTTP 403
+POST .../webhook/reveal -> HTTP 200
+POST .../webhook/rotate -> HTTP 200

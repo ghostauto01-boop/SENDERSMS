@@ -12,10 +12,11 @@ import SetupPage from "./SetupPage";
  */
 
 const apiGet = vi.fn();
+const apiPost = vi.fn();
 const navigate = vi.fn();
 
 vi.mock("../api/client", () => ({
-  default: { get: (...a: any[]) => apiGet(...a), post: vi.fn() },
+  default: { get: (...a: any[]) => apiGet(...a), post: (...a: any[]) => apiPost(...a) },
   setSitePasswordRequired: () => {},
 }));
 
@@ -100,6 +101,7 @@ const renderPage = () => render(<MemoryRouter><SetupPage /></MemoryRouter>);
 
 beforeEach(() => {
   apiGet.mockReset();
+  apiPost.mockReset();
   navigate.mockReset();
   apiGet.mockImplementation((url: string) => {
     if (url === "/guide") {
@@ -158,6 +160,43 @@ describe("SetupPage", () => {
     Object.assign(navigator, { clipboard: { writeText } });
     fireEvent.click(screen.getAllByRole("button").find((b) => b.querySelector("svg.lucide-copy"))!);
     await waitFor(() => expect(writeText).toHaveBeenCalled());
+  });
+
+  it("never shows a credential: the copy button fetches the real webhook URL when pressed (C10)", async () => {
+    const masked = "https://app.example.test/api/v1/webhooks/brevo/3?token=****a1b2";
+    const real = "https://app.example.test/api/v1/webhooks/brevo/3?token=REAL-SECRET-TOKEN-a1b2";
+    const brevo = step({
+      id: "brevo-webhook", group: "email", title: "Paste the Brevo webhook", status: "attention",
+      detail: "Paste it in Brevo.",
+      copy: [{
+        label: "Brevo webhook URL", value: masked,
+        reveal: { method: "POST", path: "/api/v1/email/accounts/3/webhook/reveal", field: "webhook_url" },
+      }],
+    });
+    const guide = {
+      ...GUIDE,
+      groups: [{ id: "email", label: "3. Email", hint: "Brevo.", done: 0, total: 1, needs_attention: 1, steps: [brevo] }],
+      steps: [brevo],
+    };
+    apiGet.mockImplementation((url: string) =>
+      url === "/guide" ? Promise.resolve({ data: guide }) : Promise.reject(new Error("unmocked " + url)));
+    apiPost.mockResolvedValue({ data: { account_id: 3, webhook_url: real, webhook_path: "/x" } });
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+    renderPage();
+
+    // What is on screen is the masked preview -- the secret is not in the page at all.
+    await waitFor(() => expect(screen.getByText(masked)).toBeInTheDocument());
+    expect(document.body.textContent).not.toContain("REAL-SECRET-TOKEN");
+    expect(apiPost).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getAllByRole("button").find((b) => b.querySelector("svg.lucide-copy"))!);
+
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(real));
+    // The path is the endpoint relative to the API client's /api/v1 base.
+    expect(apiPost).toHaveBeenCalledWith("/email/accounts/3/webhook/reveal");
+    expect(writeText).not.toHaveBeenCalledWith(masked);
+    expect(document.body.textContent).not.toContain("REAL-SECRET-TOKEN");
   });
 
   it("routes to the screen that fixes the step", async () => {

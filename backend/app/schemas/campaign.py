@@ -88,9 +88,18 @@ class CampaignUpdate(BaseModel):
 
 class CampaignOut(BaseModel):
     id: int
+    #: Which campaign system this id belongs to. The classic campaigns and the Ads
+    #: Manager number independently, so an id is only meaningful with its kind.
+    kind: str = "campaign"
     name: str
     description: Optional[str]
     status: str
+    #: Set while ``status == "paused"``: "scheduled" if it was paused before it
+    #: ever started (resume restores the schedule), otherwise null.
+    paused_from: Optional[str] = None
+    paused_at: Optional[datetime] = None
+    #: Why it is paused. An automatic pause (circuit breaker) always says why.
+    paused_reason: Optional[str] = None
     channel: str = "sms"
     email_account_id: Optional[int] = None
     fallback_email_account_id: Optional[int] = None
@@ -132,7 +141,7 @@ class CampaignOut(BaseModel):
     # for 15:00 UTC is drawn as 15:00 in the user's zone. Stamp UTC on the way
     # out so the offset is always explicit.
     @field_validator(
-        "scheduled_at", "scheduled_start_at", "started_at",
+        "scheduled_at", "scheduled_start_at", "started_at", "paused_at",
         "completed_at", "created_at", "updated_at",
         mode="after",
     )

@@ -1,0 +1,63 @@
+[PASS] login  -- 200
+[PASS] create Brevo account  -- {"id":1,"name":"Acme Leads","provider":"brevo","from_name":"Acme Leads","from_email":"hello@acme-leads.io","reply_to":"replies@acme-leads.io","reply_to_addresses":["replies@acme-leads.io"],"is_active":true,"is_default":true,"has_api_key":true,"api_key_masked":"********ed-key","daily_limit":null,"eff
+[PASS] api key is never returned in clear  -- ********ed-key
+[PASS] verified senders read from Brevo  -- {"items": [{"id": 1, "email": "hello@acme-leads.io", "name": "Acme Leads", "active": true}, {"id": 2, "email": "billing@acme-leads.io", "name": "Acme Billing", "active": true}]}
+[PASS] deliverability returns domain auth + checks  -- score=100 domains=['acme-leads.io']
+[PASS] create contact
+[PASS] create email template with HTML + attachment  -- {"id":1,"name":"Price list (rich)","category":null,"channel":"email","body":"Hi {{first_name}},\n\nHere is the price list you asked for.\n\nAda","subject":"Your price list, {{first_name}}","html_body":"<p>Hi {{first_name}},</p><p><img src=\"https://cdn.acme-leads.io/hero.png\" alt=\"hero\"></p><p><a
+[PASS] template returns attachment metadata, not the payload  -- [{"name": "price-list.pdf", "content_type": "application/pdf", "size": 29}]
+[PASS] template keeps HTML + unsubscribe flag
+[PASS] preview renders variables + lists attachments  -- {"subject": "Your price list, Ada", "text": "Hi Ada,\n\nHere is the price list you asked for.\n\nAda", "html": "<p>Hi Ada,</p><p><img src=\"https://cdn.acme-leads.io/hero.png\" alt=\"hero\"></p><p><a href=\"https://acme-
+[PASS] send email via template  -- {"success":true,"sent":1,"failed":0,"total":1,"message_ids":[1],"email_account_id":1,"skipped":0,"skipped_reason":null,"skipped_reasons":{},"skipped_details":[],"message":"Sent 1."}
+[PASS] history shows the message with attachment metadata  -- [{"name": "price-list.pdf", "content_type": "application/pdf", "size": 29}]
+[PASS] outgoing message has an RFC Message-ID for threading  -- <a72194c784c04b5b845ea0a882882190.1791705698@acme-leads.io>
+[PASS] Brevo payload has html + text + attachment  -- {"sender": {"email": "hello@acme-leads.io", "name": "Acme Leads"}, "to": [{"email": "ada@acme-leads.io", "name": "Ada"}], "subject": "Your price list, Ada", "trackingOptions": {"open": true, "click": 
+[PASS] outgoing mail carries List-Unsubscribe headers  -- {"List-Unsubscribe": "<mailto:replies@acme-leads.io?subject=unsubscribe>, <http://127.0.0.1:8000/api/v1/email/unsubscribe?e=ada%40acme-leads.io&t=dcba403ebef241a73a1d4eea4f952369>", "List-Unsubscribe-Post": "List-Unsubscribe=One-Click"}
+[PASS] account reads show a masked webhook token, never the real one  -- http://127.0.0.1:8000/api/v1/webhooks/brevo/1?token=****5EQw
+[PASS] reveal returns the full webhook URL (not cacheable)  -- {"account_id":1,"webhook_url":"http://127.0.0.1:8000/api/v1/webhooks/brevo/1?token=<token>","webhook_path":"/api/v1/webhooks
+[PASS] inbound webhook accepted  -- {"success":true,"stored":1,"received":1}
+[PASS] a wrong webhook token is refused  -- 403
+[PASS] reply landed in the SAME conversation (not a new thread)  -- 1 -> 2 messages, 1 matched by In-Reply-To
+[PASS] personal reply address is linked without replacing the primary contact email  -- {"email": "ada@acme-leads.io", "aliases": ["ada.personal@gmail.com"]}
+[PASS] reply from the inbox sends  -- {"success":true,"error":null,"message":{"id":3,"conversation_id":1,"contact_id":1,"campaign_id":null,"ads_campaign_id":null,"direction":"outgoing","channel":"email","subject":"Re: Re: Your price list, Ada","body":"500 units it is — quote attached.","
+[PASS] reply is sent to the latest personal sender address  -- [{"email": "ada.personal@gmail.com", "name": "Ada"}]
+[PASS] reply goes out threaded (In-Reply-To the original)  -- {"In-Reply-To": "<a72194c784c04b5b845ea0a882882190.1791705698@acme-leads.io>", "References": "<a72194c784c04b5b845ea0a882882190.1791705698@acme-leads.io>"}
+[PASS] reply is NOT bulk mail (no unsubscribe header on a 1:1 reply)
+[PASS] reply carries its own attachment
+[PASS] the sent reply joined the same thread  -- 3 messages in the thread
+[PASS] newest message shows its attachment  -- [{"name": "quote.txt", "content_type": "application/octet-stream", "size": 16}]
+[PASS] forged unsubscribe token is rejected  -- 400
+[PASS] list has the contact as a member  -- {"success":true,"added":1,"contact_count":1}
+[PASS] create email campaign with an attachment  -- {"id":1,"kind":"campaign","name":"Sim Email Campaign 1791705699","description":null,"status":"draft","paused_from":null,"paused_at":null,"paused_reason":null,"channel":"email","email_account_id":1,"fallback_email_account_id":null,"subject":"Sim subject","html_body":"<p>Hello {{first_name}}</p>","att
+[PASS] campaign stores the attachment  -- [{'name': 'brochure.txt', 'content_type': 'application/octet-stream', 'size': 8}]
+[PASS] duplicating an email campaign keeps channel + subject + attachment  -- {"channel": "email", "subject": "Sim subject", "attachments": [{"name": "brochure.txt", "content_type": "application/octet-stream", "size": 8}]}
+[PASS] email campaign validates against the Brevo sender  -- {"valid":true,"ok":true,"status":"draft","changed":false,"errors":[],"warnings":["No sending domain on file for acme-leads.io: register it (POST /api/v1/email/domains) to get its DNS records, authentication checks and th
+[PASS] validate is a report: the campaign is still a draft  -- {"valid":true,"ok":true,"status":"draft","changed":false,"errors":[],"warnings":["No sending domain on file for acme-lea
+[PASS] start refuses without a broker (no stranded campaign)  -- {"code":"SERVICE_UNAVAILABLE","message":"Background task queue is unavailable. Check that the Redis broker (REDIS_URL) i
+[PASS] web-mode fallback runs the campaign batch  -- campaign 1 is now running processed 1 contact(s) inline 
+[PASS] campaign mail reached Brevo  -- 2 -> 3 sends
+[PASS] campaign mail carried its attachment + unsubscribe headers  -- ["In-Reply-To", "List-Unsubscribe", "List-Unsubscribe-Post", "References"]
+[PASS] probe reads the key's verified senders + domain auth  -- [{"email": "hello@acme-leads.io", "name": "Acme Leads", "active": true, "domain": "acme-leads.io", "domain_verified": true, "spf": true, "dkim": true, "recommended": true}]
+[PASS] probe marks the warm (authenticated-domain) address as recommended  -- ['hello@acme-leads.io', 'billing@acme-leads.io']
+[PASS] an empty key is refused  -- 422
+[PASS] composer test send works  -- {"success":true,"to":"owner@acme-leads.io","attachments":[{"name":"test.txt","content_type":"application/octet-stream","size":9}]}
+[PASS] test mail is marked as a test and carries the attachment  -- [TEST] Price list preview
+[PASS] test mail does NOT appear as outreach in the history  -- 0 test message(s) in history
+[PASS] CC / BCC reach Brevo  -- {"cc": [{"email": "colleague@acme-leads.io"}], "bcc": [{"email": "crm@acme-leads.io"}]}
+[PASS] per-message activity records the open  -- ["clicked", "opened", "sent"]
+[PASS] per-message activity records WHICH link was clicked  -- 1 unique link(s)
+[PASS] contact engagement shows opens, clicks and the clicked link  -- {"sent": 4, "opened": 1, "clicked": 1, "bounced": 0, "open_rate": 25.0, "click_rate": 25.0}
+[PASS] received mail keeps its attachments  -- ["contract.pdf", "notes.txt"]
+[PASS] a received attachment with only a Brevo download link stays clickable  -- {"name": "contract.pdf", "content_type": "application/pdf", "size": 2048, "url": "https://brevo.test/dl/abc123"}
+[PASS] received mail threaded under the message it answers
+[PASS] email follow-up created  -- {"id":1,"contact_id":1,"contact_name":"Ada","contact_phone":"+2348012345001","campaign_id":null,"sequence_id":null,"sequence_step_order":null,"status":"pending","scheduled_at":"2026-10-11T08:06:41.550
+[PASS] send-now refuses without a broker (no silent no-op)  -- 503
+[PASS] follow-up email goes out  -- follow-up 1 sent: True 
+[PASS] follow-up quotes the thread's latest message (same chat in Gmail)  -- expected <c0ef5dad06bf4c35b41684a9c82cfbf7.1791705701@acme-leads.io> got <c0ef5dad06bf4c35b41684a9c82cfbf7.1791705701@acme-leads.io>
+[PASS] the follow-up is a message in the same chat  -- 7 messages in the thread
+[PASS] clicking the real unsubscribe link succeeds  -- <h1>You are unsubscribed</h1><p>ada@acme-leads.io will not receive further email from us.</p>
+[PASS] the contact is now opted out of email only  -- 1 unsubscribed
+[PASS] the address joined the suppression list  -- {"total": 1, "page": 1, "per_page": 50, "items": [{"id": 1, "email_address": "ada@acme-leads.io", "contact_id": 1, "reason": "One-click unsubscribe", "source": 
+[PASS] SMS consent untouched by the email unsubscribe  -- is_opted_out=False
+
+RESULT: ALL PASS

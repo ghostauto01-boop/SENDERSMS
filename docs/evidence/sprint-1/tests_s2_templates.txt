@@ -1,0 +1,30 @@
+# s2_templates -- tests: backend/tests/test_sprint2_templates.py
+# BEFORE = code at 981320d (parent of the fix) with today's tests;  AFTER = 5ec15d2
+
+## BEFORE the fix
+22 failed, 3 passed, 1 warning in 6.40s
+FAILED backend/tests/test_sprint2_templates.py::test_a_bogus_channel_is_a_422_not_silently_sms
+FAILED backend/tests/test_sprint2_templates.py::test_a_column_that_came_in_with_an_import_counts_as_known
+FAILED backend/tests/test_sprint2_templates.py::test_a_preview_checks_the_subject_and_html_too
+FAILED backend/tests/test_sprint2_templates.py::test_a_preview_makes_an_unknown_variable_visible
+FAILED backend/tests/test_sprint2_templates.py::test_a_real_send_still_never_prints_the_marker_to_a_customer
+FAILED backend/tests/test_sprint2_templates.py::test_an_email_template_needs_a_subject[   ]
+FAILED backend/tests/test_sprint2_templates.py::test_an_email_template_needs_a_subject[None]
+FAILED backend/tests/test_sprint2_templates.py::test_an_email_template_needs_a_subject[]
+FAILED backend/tests/test_sprint2_templates.py::test_an_email_templates_subject_cannot_be_blanked_by_an_update
+FAILED backend/tests/test_sprint2_templates.py::test_every_part_of_an_email_template_is_checked
+FAILED backend/tests/test_sprint2_templates.py::test_explicit_sample_values_override_the_contact
+FAILED backend/tests/test_sprint2_templates.py::test_nothing_is_saved_when_it_is_refused
+FAILED backend/tests/test_sprint2_templates.py::test_preview_for_an_unknown_contact_is_a_404_not_the_sample
+FAILED backend/tests/test_sprint2_templates.py::test_preview_matches_what_the_real_renderer_sends
+FAILED backend/tests/test_sprint2_templates.py::test_preview_renders_for_the_contact_it_is_given
+FAILED backend/tests/test_sprint2_templates.py::test_preview_uses_the_variable_registry_like_a_real_send
+FAILED backend/tests/test_sprint2_templates.py::test_preview_without_a_contact_still_uses_the_sample_data
+FAILED backend/tests/test_sprint2_templates.py::test_render_text_preview_declares_contact_id_and_no_hidden_sample_defaults
+FAILED backend/tests/test_sprint2_templates.py::test_saving_a_template_with_an_unknown_variable_is_a_422
+FAILED backend/tests/test_sprint2_templates.py::test_the_assistant_tools_agree_with_each_other_and_honour_contact_id
+FAILED backend/tests/test_sprint2_templates.py::test_updating_a_template_to_an_unknown_variable_is_a_422
+FAILED backend/tests/test_sprint2_templates.py::test_validate_fails_a_campaign_whose_message_has_an_unknown_variable
+
+## AFTER the fix
+25 passed, 1 warning in 6.42s

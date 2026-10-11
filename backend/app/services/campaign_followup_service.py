@@ -270,7 +270,7 @@ async def process_rule(db: AsyncSession, rule: CampaignFollowUp, *, limit: int =
                 ).scalar_one_or_none()
                 if contact is None:
                     raise ValueError("Contact not found")
-                problem = await email_service.contact_email_problem(db, contact)
+                problem = await email_service.contact_email_problem(db, contact, outreach=True)
                 if problem:
                     raise ValueError(f"Contact cannot receive email ({problem})")
                 account = await email_service.get_account(db, campaign.email_account_id)

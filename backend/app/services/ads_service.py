@@ -482,7 +482,7 @@ async def email_blocked_reason(db: AsyncSession, contact: Contact) -> str | None
     """Why this contact cannot be emailed at send time, or ``None``."""
     from app.services.email_service import contact_email_problem
 
-    return await contact_email_problem(db, contact)
+    return await contact_email_problem(db, contact, outreach=True)
 
 
 async def _suppressed_numbers(db: AsyncSession, numbers: Iterable[str]) -> set[str]:
@@ -1140,17 +1140,37 @@ async def dispatch_campaign(
         result["state"] = "sending"
         return result
 
-    # Global sending limits / pacing -- the SAME gate the rest of the app uses.
+    # Global sending limits / pacing -- the SAME gate the rest of the app uses,
+    # scoped to this campaign's channel (and, for email, its mailbox). It decides
+    # both whether anything may go out right now and HOW MANY: ``room`` caps this
+    # slice so a continuous campaign cannot queue its whole audience in minutes.
     if not campaign.test_mode:
-        from app.services.sending_limits import SendingGate
+        from app.services.sending_limits import gate_for_campaign
 
-        gate = await SendingGate(db).check()
+        sending_gate = await gate_for_campaign(db, campaign)
+        gate = await sending_gate.check()
         if not gate["allowed"]:
-            result["state"] = "sending"
+            reason_text = (gate.get("reason") or "").lower()
+            if "daily limit" in reason_text:
+                result["state"] = "daily_limit_reached"
+            elif "sending hours" in reason_text or "weekend" in reason_text:
+                result["state"] = "waiting_for_schedule"
+            else:
+                result["state"] = "sending"
             result["reasons"]["rate_limited"] = 1
-            campaign.last_state = "sending"
+            result["next_window"] = gate.get("next_window")
+            campaign.last_state = result["state"]
             await db.flush()
             return result
+        gate_room = await sending_gate.room()
+        if gate_room is not None:
+            room = min(room, gate_room)
+            if room <= 0:
+                result["state"] = "daily_limit_reached"
+                result["reasons"]["rate_limited"] = 1
+                campaign.last_state = result["state"]
+                await db.flush()
+                return result
 
     rows = list(
         (
@@ -2403,7 +2423,36 @@ async def validate_campaign(db: AsyncSession, campaign: AdsCampaign) -> dict:
 
     if sim.get("eligible") == 0:
         warnings.append("No eligible audience is currently estimated; check audience filters and exclusions.")
-    if campaign.daily_limit is None:
+
+    # How long will the audience take under the rules that really apply? The
+    # campaign's own daily limit is one input; for email so are the mailboxes.
+    projection = None
+    try:
+        from app.services import email_service, sending_limits
+
+        weekdays = None
+        if campaign.send_days:
+            weekdays = {int(x) for x in campaign.send_days.split(",") if x.strip().isdigit()} or None
+        account_ids = None
+        if email_campaign:
+            account = await email_service.get_account(db, campaign.email_account_id)
+            account = account or await email_service.get_default_account(db)
+            account_ids = [account.id] if account else None
+        to_send = (sim.get("eligible") or 0) + (sim.get("already_queued") or 0)
+        projection = await sending_limits.project_send(
+            db,
+            channel="email" if email_campaign else "sms",
+            sendable=to_send,
+            account_ids=account_ids,
+            campaign_daily_limit=campaign.daily_limit,
+            allowed_weekdays=weekdays,
+        )
+        projection_note = sending_limits.projection_warning(projection)
+        if projection_note:
+            warnings.append(projection_note)
+    except Exception:  # noqa: BLE001 — validate must remain informational
+        logger.exception("Projection failed for campaign %s", campaign.id)
+    if campaign.daily_limit is None and not (projection and projection.get("daily_cap")):
         warnings.append("No daily limit is set; the eligible audience may go out quickly.")
 
     followups = (await db.execute(
@@ -2428,10 +2477,30 @@ async def validate_campaign(db: AsyncSession, campaign: AdsCampaign) -> dict:
             "recipient_timezone_enabled": bool(getattr(campaign, "recipient_timezone_enabled", True)),
         },
         "daily_limit": campaign.daily_limit,
+        "projection": projection,
     }
     if campaign.channel == "email":
         warnings.append("Email sender/provider checks do not block launch; failures remain visible at send time.")
-    return {"ok": True, "errors": [], "warnings": warnings, "summary": summary}
+
+    # An email audience containing contacts nobody has verified FAILS validation, with the
+    # count (P0-5). Launch still assigns only the eligible contacts, so an unverified
+    # address is never mailed -- but the operator is told, instead of finding out later
+    # that the audience was smaller than they thought.
+    errors: list[str] = []
+    if email_campaign and not campaign.test_mode:
+        from app.services import sending_domains
+
+        sender_errors, sender_notes = await sending_domains.campaign_sender_checks(db, campaign.email_account_id)
+        errors.extend(sender_errors)
+        warnings.extend(sender_notes)
+    unverified = (sim.get("skipped") or {}).get("unverified", 0) if email_campaign else 0
+    if unverified:
+        errors.append(
+            f"{unverified} contact{'s have' if unverified != 1 else ' has'} an unknown email "
+            "verification status and will not be sent to. Verify them "
+            "(POST /api/v1/validator/jobs) or remove them from the audience, then validate again."
+        )
+    return {"ok": not errors, "errors": errors, "warnings": warnings, "summary": summary}
 
 
 # ==========================================================================

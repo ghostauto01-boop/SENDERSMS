@@ -1,0 +1,10 @@
+# p0_3_startup_step -- tests: backend/tests/test_p0_3_send_throttles.py
+# BEFORE = code at 981320d (parent of the fix) with today's tests;  AFTER = 5ec15d2
+
+## BEFORE the fix
+2 failed, 39 passed, 1 warning in 14.78s
+FAILED backend/tests/test_p0_3_send_throttles.py::test_a_save_made_before_the_startup_step_runs_is_never_overridden
+FAILED backend/tests/test_p0_3_send_throttles.py::test_every_save_records_that_a_person_decided_exactly_once
+
+## AFTER the fix
+41 passed, 1 warning in 14.81s

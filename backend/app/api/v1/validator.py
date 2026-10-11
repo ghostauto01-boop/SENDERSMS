@@ -1,9 +1,14 @@
-"""Read-only by default, bounded validation batches with complete row reports.
+"""Validation: bounded batches with complete row reports, and queued jobs.
 
-The browser snapshots the selected IDs once, then checks small batches. No
-200-row detail truncation, no silent 500-contact ceiling, no Celery dependency,
-and no long-lived task lost when a free-tier service sleeps. CSVs are parsed
-and column-mapped in the browser and use the exact same batch endpoint.
+Two ways to run the verifier:
+
+* ``POST /batch`` -- a small synchronous batch (up to ``BATCH_SIZE`` rows) with a complete
+  row report. Read-only unless ``save`` is set; the browser's "check these" uses it, and
+  CSV rows (which are not contacts yet) are checked the same way.
+* ``POST /jobs`` -- a durable background job over any number of contacts: it snapshots the
+  ids, verifies in chunks on the server, WRITES every verdict onto the contact, publishes
+  progress and resumes after a restart (see ``services/verification_jobs``). This is how a
+  whole list gets verified, which is what unlocks it for sending (P0-5).
 """
 from __future__ import annotations
 
@@ -26,13 +31,16 @@ from app.models.suppression import SuppressionEntry
 from app.models.user import User
 from app.security.auth import get_current_user
 from app.services import email_validator as ev
+from app.services import verification_jobs
 from app.services.email_enrichment import _dns_available
 from app.services.number_filter import classify_number, looks_like_test_data
 
 router = APIRouter(tags=["Validator"])
 # Includes offloaded DNS/SMTP work; the API event loop stays responsive.
-_check_slots = asyncio.Semaphore(5)
-BATCH_SIZE = 5
+_check_slots = asyncio.Semaphore(10)
+#: Rows per synchronous batch. It was 5, which made a 1,297-contact check 260 round trips
+#: with the tab held open; whole lists go through ``POST /jobs`` instead.
+BATCH_SIZE = 25
 
 
 class Selection(BaseModel):
@@ -74,16 +82,22 @@ class Batch(BaseModel):
 @router.get("/status")
 async def status(current_user: User = Depends(get_current_user)):
     # Never expose a configured URL (it may contain a secret), or a key.
+    smtp = await ev.smtp_capability()
     return {
         "engine": "reacher" if ev.reacher_configured() else "builtin",
         "api_key_required": False,
         "reacher_configured": ev.reacher_configured(),
         "reacher_key_configured": bool(settings.REACHER_API_KEY),
         "dns_available": _dns_available(),
-        "smtp_enabled": settings.EMAIL_VALIDATOR_SMTP,
+        # Whether a mailbox can actually be CONFIRMED from here -- not merely whether the
+        # setting is on. When it is false, `smtp_reason` says why and what to do, and every
+        # mailbox stays "unknown" (not sendable).
+        "smtp_enabled": smtp["enabled"],
+        "smtp_reason": smtp["reason"],
+        "can_confirm_mailboxes": smtp["enabled"],
         "batch_size": BATCH_SIZE,
         "phone_region": "NG",
-        "notice": "No key is needed for built-in checks. Reacher is optional; a hosted Reacher service may require its own key. SMTP/DNS failures stay Unknown. Phone checks confirm Nigerian mobile format, not whether a SIM is active. No messages are sent.",
+        "notice": "No key is needed for built-in checks. Reacher is optional; a hosted Reacher service may require its own key. SMTP/DNS failures stay Unknown, and Unknown addresses are not sent to by campaigns. Phone checks confirm Nigerian mobile format, not whether a SIM is active. No messages are sent.",
     }
 
 
@@ -105,12 +119,8 @@ async def self_test(current_user: User = Depends(get_current_user)):
     }
 
 
-@router.post("/selection")
-async def selection(
-    data: Selection,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
+async def _selected_ids(db: AsyncSession, data: "Selection") -> list[int]:
+    """The contact ids a selection names, in id order."""
     if data.scope == "ids":
         if not data.contact_ids:
             raise HTTPException(400, "No contacts selected")
@@ -126,8 +136,91 @@ async def selection(
             query = query.where(Contact.id.in_(
                 select(ContactListMember.contact_id).where(ContactListMember.list_id == data.list_id)
             ))
-    ids = list((await db.execute(query.order_by(Contact.id))).scalars().all())
+    return list((await db.execute(query.order_by(Contact.id))).scalars().all())
+
+
+@router.post("/selection")
+async def selection(
+    data: Selection,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    ids = await _selected_ids(db, data)
     return {"contact_ids": ids, "total": len(ids)}
+
+
+class JobRequest(Selection):
+    deep: bool = True
+    # Re-check contacts that are already proven deliverable (normally skipped).
+    recheck: bool = False
+
+
+@router.post("/jobs", status_code=202)
+async def create_job(
+    data: JobRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Queue a verification of any number of contacts; poll ``GET /jobs/{id}``.
+
+    Every verdict is written onto the contact as it is produced (``email_verified``,
+    ``email_verified_at``, ``email_confidence``, ``email_verdict``) -- that is what makes
+    a contact sendable in a campaign. Contacts with no address, and (unless ``recheck``)
+    those already proven deliverable, are left out of ``total``.
+    """
+    ids = await _selected_ids(db, data)
+    job = await verification_jobs.create_job(
+        db, ids, owner_id=current_user.id, deep=data.deep, recheck=data.recheck
+    )
+    await db.commit()
+    if job.total:
+        verification_jobs.spawn(job.id)
+    else:
+        job.status = "done"
+        job.completed_at = datetime.now(timezone.utc)
+        await db.commit()
+    return verification_jobs.job_dict(job)
+
+
+@router.get("/jobs")
+async def list_jobs(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from app.models.verification_job import EmailVerificationJob
+
+    rows = (await db.execute(
+        select(EmailVerificationJob).order_by(EmailVerificationJob.created_at.desc()).limit(25)
+    )).scalars().all()
+    return {"items": [verification_jobs.job_dict(job) for job in rows]}
+
+
+@router.get("/jobs/{job_id}")
+async def get_job(
+    job_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    job = await verification_jobs.get_job(db, job_id)
+    if job is None:
+        raise HTTPException(404, "Verification job not found")
+    return verification_jobs.job_dict(job)
+
+
+@router.post("/jobs/{job_id}/cancel")
+async def cancel_job(
+    job_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    job = await verification_jobs.get_job(db, job_id)
+    if job is None:
+        raise HTTPException(404, "Verification job not found")
+    if job.status not in verification_jobs.ACTIVE:
+        raise HTTPException(409, f"This job is already {job.status}")
+    await verification_jobs.cancel_job(db, job)
+    await db.commit()
+    return verification_jobs.job_dict(job)
 
 
 def _phone(raw: str | None) -> dict:

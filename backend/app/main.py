@@ -5,6 +5,7 @@ from fastapi import FastAPI, BackgroundTasks, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from sqlalchemy import func
 from fastapi.responses import JSONResponse, HTMLResponse, FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.datastructures import Headers, MutableHeaders
@@ -247,6 +248,10 @@ async def _poll() -> int:
         # asleep (free tier) or Redis unreachable — otherwise campaigns stay
         # “running” with pending contacts forever.
         work += await _process_running_campaigns_inline()
+        # Bounce circuit breaker: pause any email campaign over the bounce limit.
+        # The webhook checks as events arrive; this is the backstop (and the
+        # no-worker fallback for the Celery beat task of the same name).
+        work += await _check_circuit_breakers_inline()
         # Sweep any queued messages that were rate-limited / deferred (or that
         # a dead broker left behind). Uses the same atomic claim as Celery so
         # the two can never double-send the same message.
@@ -299,7 +304,8 @@ async def _pending_work_snapshot() -> tuple[bool, "float | None"]:
         )).scalar() or 0
         queued = (await db.execute(
             select(func.count()).select_from(Message).where(
-                Message.direction == "outgoing", Message.status == "queued")
+                Message.direction == "outgoing", Message.status == "queued",
+                _not_held_by_paused_campaign(Message))
         )).scalar() or 0
         settling = (await db.execute(
             select(func.count()).select_from(Message).where(
@@ -361,7 +367,11 @@ async def _process_queued_messages_inline() -> int:
         async with async_session_factory() as db:
             rows = await db.execute(
                 _select(_Message.id)
-                .where(_Message.direction == "outgoing", _Message.status == "queued")
+                .where(
+                    _Message.direction == "outgoing",
+                    _Message.status == "queued",
+                    _not_held_by_paused_campaign(_Message),
+                )
                 .order_by(_Message.created_at.asc())
                 .limit(20)
             )
@@ -510,6 +520,41 @@ async def _process_meeting_reminders() -> int:
         return 0
 
 
+async def _check_circuit_breakers_inline() -> int:
+    """Run the circuit-breaker sweep when no Celery worker is awake to do it."""
+    try:
+        from app.tasks.campaign_tasks import check_circuit_breakers_async
+
+        tripped = await check_circuit_breakers_async()
+        for t in tripped:
+            logger.warning("CIRCUIT BREAKER (inline): paused %s %s: %s", t["kind"], t["id"], t.get("reason"))
+        return len(tripped)
+    except Exception as exc:
+        logger.warning("Circuit breaker sweep: %s", exc)
+        return 0
+
+
+def _not_held_by_paused_campaign(message_model):
+    """SQL condition: the message's campaign is not paused.
+
+    Mail created before a pause is *held* (left queued) until the campaign
+    resumes. The sweeps must not keep picking it up -- it would starve everything
+    behind it and keep the poller awake forever.
+    """
+    from sqlalchemy import or_ as _or, select as _select
+    from app.models.ads import AdsCampaign
+    from app.models.campaign import Campaign
+
+    paused_classic = _select(Campaign.id).where(Campaign.status == "paused")
+    paused_ads = _select(AdsCampaign.id).where(AdsCampaign.status == "paused")
+    from sqlalchemy import and_ as _and
+
+    return _and(
+        _or(message_model.campaign_id.is_(None), message_model.campaign_id.not_in(paused_classic)),
+        _or(message_model.ads_campaign_id.is_(None), message_model.ads_campaign_id.not_in(paused_ads)),
+    )
+
+
 async def _process_running_campaigns_inline() -> int:
     """Process running campaigns when a Celery worker is unavailable/asleep.
 
@@ -648,10 +693,11 @@ async def _process_scheduled() -> int:
                     # Ensure conversation exists so inbox thread is visible
                     conv = None
                     if contact:
-                        cr = await db.execute(select(Conversation).where(Conversation.contact_id == contact.id).order_by(Conversation.id).limit(1))
+                        # The contact's TEXT thread (never an email thread).
+                        cr = await db.execute(select(Conversation).where(Conversation.contact_id == contact.id, func.coalesce(Conversation.channel, "sms") == "sms").order_by(Conversation.id).limit(1))
                         conv = cr.scalars().first()
                         if not conv:
-                            conv = Conversation(contact_id=contact.id, status="active")
+                            conv = Conversation(contact_id=contact.id, status="active", channel="sms")
                             db.add(conv)
                             await db.flush()
 
@@ -764,12 +810,8 @@ async def _process_scheduled_email(db, sm) -> None:
                 await db.execute(select(Contact).where(func.lower(Contact.email) == target))
             ).scalars().first()
             if contact is None:
-                contact = Contact(
-                    email=target,
-                    phone_number=f"email:{target}"[:20],
-                    country="Nigeria",
-                    lead_status="new",
-                    source="scheduled_email",
+                contact = email_service.new_email_only_contact(
+                    target, lead_status="new", source="scheduled_email",
                 )
                 db.add(contact)
                 await db.flush()
@@ -800,6 +842,7 @@ async def _process_scheduled_email(db, sm) -> None:
         idempotency_key=f"scheduled-{sm.id}",
         attachments=email_service.load_attachments(getattr(sm, "attachments", None)),
         bulk=bool(sm.list_id),
+        outreach=bool(sm.list_id),
         cc=email_service.clean_addresses(getattr(sm, "cc_addresses", None)),
         bcc=email_service.clean_addresses(getattr(sm, "bcc_addresses", None)),
     )
@@ -832,10 +875,10 @@ async def _create_scheduled_message_row(db, sm, contact, status, error):
         import uuid, json
         from app.utils.phone import count_sms_segments
         from datetime import datetime as dt, timezone as tz
-        cr = await db.execute(select(Conversation).where(Conversation.contact_id == contact.id).order_by(Conversation.id).limit(1))
+        cr = await db.execute(select(Conversation).where(Conversation.contact_id == contact.id, func.coalesce(Conversation.channel, "sms") == "sms").order_by(Conversation.id).limit(1))
         conv = cr.scalars().first()
         if not conv:
-            conv = Conversation(contact_id=contact.id, status="active")
+            conv = Conversation(contact_id=contact.id, status="active", channel="sms")
             db.add(conv)
             await db.flush()
         try:
@@ -930,6 +973,27 @@ async def _poll_loop():
             logger.warning("Poll loop: %s", e)
             delay = float(settings.INLINE_POLL_INTERVAL)
 
+async def _apply_safe_sending_defaults() -> None:
+    """One-time: switch the protective sending rules on for a never-configured database."""
+    from app.services.sending_limits import apply_safe_defaults
+
+    async with async_session_factory() as db:
+        result = await apply_safe_defaults(db)
+        await db.commit()
+    logger.info("Sending rules safe-defaults step: %s", result)
+
+
+async def _repair_placeholder_phones() -> None:
+    """Clear the invented ``email:<address>`` phone numbers older code stored (idempotent)."""
+    from app.services.contact_repair import repair_placeholder_phones
+
+    async with async_session_factory() as db:
+        repaired = await repair_placeholder_phones(db)
+        await db.commit()
+    if repaired:
+        logger.info("Cleared %s invented email:<address> phone number(s)", repaired)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     import asyncio
@@ -949,9 +1013,25 @@ async def lifespan(app: FastAPI):
             else:
                 logger.warning("init_db: %s", e)
         try:
+            await asyncio.wait_for(_apply_safe_sending_defaults(), timeout=20)
+        except Exception as e:
+            logger.warning("safe sending defaults: %s", e)
+        try:
+            await asyncio.wait_for(_repair_placeholder_phones(), timeout=30)
+        except Exception as e:
+            logger.warning("placeholder phone repair: %s", e)
+        try:
             await asyncio.wait_for(_startup_webhook(), timeout=20)
         except Exception as e:
             logger.warning("webhook: %s", e)
+        try:
+            from app.services import verification_jobs
+
+            resumed = await asyncio.wait_for(verification_jobs.resume_pending(), timeout=20)
+            if resumed:
+                logger.info("Resumed %s unfinished email verification job(s)", resumed)
+        except Exception as e:
+            logger.warning("verification jobs: %s", e)
 
     boot = asyncio.create_task(_boot())
 
@@ -1148,6 +1228,12 @@ async def _http_error(request: Request, exc: HTTPException):
         "hint": detail.get("hint") if isinstance(detail, dict) else None,
         "request_id": request_id,
     }
+    if isinstance(detail, dict):
+        # Structured errors may carry machine-readable extras (the candidates of
+        # an ambiguous id, the list of validation problems, ...). They ride along
+        # as top-level keys; the envelope above always wins on a name clash.
+        for key, value in detail.items():
+            content.setdefault(key, value)
     return JSONResponse(
         status_code=exc.status_code,
         content=content,

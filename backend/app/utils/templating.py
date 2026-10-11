@@ -21,7 +21,11 @@ Behaviour:
   * ``{{first_name}}`` with no explicit fallback degrades to the business name
     and then to "there", so a greeting never collapses into "Hi ,".
   * Unknown placeholders resolve to empty rather than being sent as literal
-    braces. Leaking template syntax to a customer is worse than a gap.
+    braces. Leaking template syntax to a customer is worse than a gap. (That is the
+    default, which every SEND uses. A preview asks for ``unknown="mark"`` and gets a
+    visible ``[UNKNOWN VARIABLE: name]`` instead, so a typo is seen by the person
+    writing the message rather than silently deleted; saving a template with one is a
+    422, and campaign validation reports it. See ``unknown_names``.)
   * Whatever the substitutions leave behind is tidied: doubled spaces collapse
     and orphaned space-before-punctuation is repaired.
   * Values from a contact's ``custom_fields`` JSON are available by key, so
@@ -74,6 +78,31 @@ _CONTACT_FIELDS = (
 
 #: Greeting fallback used when a contact has no name at all.
 GENERIC_NAME = "there"
+
+#: Names the renderer itself resolves for any contact (columns plus the convenience aliases
+#: ``build_context`` adds). Always "known", whether or not a registry row exists.
+BUILTIN_KEYS = frozenset(_CONTACT_FIELDS) | {"full_name", "name", "brand_name", "brand"}
+
+#: What a preview shows in place of a placeholder that names no variable at all.
+UNKNOWN_MARK = "[UNKNOWN VARIABLE: {name}]"
+
+
+def unknown_names(text: Optional[str], known: Any = ()) -> list[str]:
+    """Placeholders in ``text`` that name no variable, in order, as the author typed them.
+
+    ``known`` is every extra normalized key that exists (the variable registry, the keys a
+    contact carries). A variable that is known but EMPTY for some contact is not unknown:
+    that is a missing value and keeps its documented fallback behaviour.
+    """
+    pool = set(BUILTIN_KEYS) | set(known)
+    found: list[str] = []
+    seen: set[str] = set()
+    for match in _PLACEHOLDER.finditer(text or ""):
+        key = normalize_key(match.group(1))
+        if key and key not in pool and key not in seen:
+            seen.add(key)
+            found.append(match.group(1).strip())
+    return found
 
 
 def _clean(value: Any) -> str:
@@ -193,6 +222,8 @@ def render_template(
     *,
     aliases: Optional[Mapping[str, str]] = None,
     fallbacks: Optional[Mapping[str, str]] = None,
+    unknown: str = "drop",
+    known: Any = (),
     **overrides: Any,
 ) -> str:
     """Render ``body`` for ``contact``.
@@ -206,6 +237,10 @@ def render_template(
     every existing caller keeps working unchanged: without them the renderer
     behaves exactly as before, matching short codes directly against the
     contact's own fields.
+
+    ``unknown`` says what a placeholder that names NO variable becomes: ``"drop"`` (the
+    default, used by every send) removes it; ``"mark"`` (previews) shows
+    ``[UNKNOWN VARIABLE: name]``. ``known`` adds registry keys to what counts as a variable.
     """
     if not body:
         return ""
@@ -215,8 +250,19 @@ def render_template(
         if value is not None:
             context[normalize_key(key)] = _clean(value)
 
+    def _is_known(field: str) -> bool:
+        return (
+            field in context
+            or field in BUILTIN_KEYS
+            or field in known
+            or bool(aliases and (field in aliases or field in aliases.values()))
+        )
+
     def _sub(match: re.Match) -> str:
-        return _resolve(normalize_key(match.group(1)), match.group(2), context, aliases, fallbacks)
+        field = normalize_key(match.group(1))
+        if unknown == "mark" and field and not _is_known(field):
+            return UNKNOWN_MARK.format(name=match.group(1).strip())
+        return _resolve(field, match.group(2), context, aliases, fallbacks)
 
     rendered = _PLACEHOLDER.sub(_sub, body)
 

@@ -125,6 +125,8 @@ class ContactOut(BaseModel):
     email_source: Optional[str] = None
     email_verified: bool = False
     email_verified_at: Optional[datetime] = None
+    email_verdict: Optional[str] = None
+    email_confidence: Optional[int] = None
     email_confidence: Optional[int] = None
     email_enriched_at: Optional[datetime] = None
     email_enrichment_note: Optional[str] = None
@@ -146,6 +148,10 @@ class ContactOut(BaseModel):
 class ContactListOut(BaseModel):
     total: int
     items: list[ContactOut]
+    # Where this page sits, so a client never has to guess whether there is more.
+    page: Optional[int] = None
+    per_page: Optional[int] = None
+    next_page: Optional[int] = None
 
 
 class BulkAction(BaseModel):

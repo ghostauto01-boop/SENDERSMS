@@ -292,11 +292,16 @@ async def test_csv_import_is_multipart_with_an_uploaded_file(captured):
 @pytest.mark.asyncio
 async def test_tools_whose_body_is_mandatory_always_send_one(captured):
     """POST /campaigns/{id}/schedule rejects a missing body with 422."""
+    # Campaign tools first look the id up (it may name a classic AND an Ads Manager
+    # campaign), so pick out the schedule call itself rather than assuming it is first.
+    def schedule_calls():
+        return [c for c in captured if c["path"].endswith("/schedule")]
+
     await _run("schedule_campaign", campaign_id=3)
-    assert captured[0]["body"] == {}
+    assert schedule_calls()[0]["body"] == {}
     await _run("schedule_campaign", campaign_id=3,
                scheduled_start_at="2030-01-01T09:00:00+01:00")
-    assert captured[1]["body"] == {"scheduled_start_at": "2030-01-01T09:00:00+01:00"}
+    assert schedule_calls()[1]["body"] == {"scheduled_start_at": "2030-01-01T09:00:00+01:00"}
 
 
 @pytest.mark.asyncio
@@ -312,9 +317,12 @@ async def test_path_arguments_are_substituted_and_quoted(captured):
 
 @pytest.mark.asyncio
 async def test_empty_arguments_are_not_sent(captured):
-    """Blank optional values must not become ``?search=`` on the wire."""
+    """Blank optional values must not become ``?search=`` on the wire. An argument that is left
+    out (or None) gets the default the tool ADVERTISES -- it used to be dropped and the endpoint's own
+    default applied, so a schema could promise one thing and the call do another (C4/C7)."""
     await _run("search_contacts", search="", per_page=None)
-    assert captured[0]["query"] == {}
+    assert "search" not in captured[0]["query"], "a blank value never reaches the wire"
+    assert captured[0]["query"] == {"channel": "all", "page": 1, "per_page": 25}
 
 
 @pytest.mark.asyncio
@@ -333,7 +341,9 @@ async def test_trailing_slash_paths_are_preserved(captured):
 
 @pytest.mark.asyncio
 async def test_preview_template_uses_the_apps_own_renderer(captured):
-    """Two reads then the real preview endpoint — never a second renderer."""
+    """One read then the real preview endpoint — never a second renderer. The contact is
+    handed over by id and loaded by the endpoint, so its imported columns and the registry's
+    fallbacks count (it used to be copied field by field here)."""
     calls: list[dict] = []
 
     async def fake_call_app(method, path, **kwargs):
@@ -359,13 +369,12 @@ async def test_preview_template_uses_the_apps_own_renderer(captured):
         mcp_server.call_app = original  # type: ignore[assignment]
 
     assert outcome.result["isError"] is False
-    assert [c["path"] for c in calls] == [
-        "/api/v1/templates/5", "/api/v1/contacts/2", "/api/v1/templates/preview",
-    ]
-    preview_query = calls[2]["query"]
+    assert [c["path"] for c in calls] == ["/api/v1/templates/5", "/api/v1/templates/preview"]
+    preview_query = calls[1]["query"]
     assert preview_query["body"] == "Hi {{first_name}}"
     assert preview_query["subject"] == "About {{business_name}}"
-    assert preview_query["first_name"] == "Ada" and preview_query["business_name"] == "Acme"
+    assert preview_query["contact_id"] == 2, "the contact travels by id; the endpoint renders for it"
+    assert "first_name" not in preview_query, "no copied-over values: that was a second renderer"
     assert outcome.result["structuredContent"]["preview"] == "Hi Ada"
 
 

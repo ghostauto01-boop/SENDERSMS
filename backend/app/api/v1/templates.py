@@ -18,13 +18,12 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.models.contact import Contact
 from app.models.template import Template
 from app.models.user import User
 from app.schemas.template import TemplateCreate, TemplateUpdate, TemplateOut
 from app.security.auth import get_current_user
 from app.utils.phone import count_sms_segments
-from app.utils.templating import render_template
-
 router = APIRouter()
 
 VALID_CHANNELS = ("sms", "email")
@@ -36,6 +35,20 @@ def _clean_channel(raw: Optional[str]) -> Optional[str]:
     if raw not in VALID_CHANNELS:
         raise HTTPException(422, f"channel must be one of {list(VALID_CHANNELS)}")
     return raw
+
+
+async def _refuse_unknown_variables(db, *texts) -> None:
+    """422 when a template uses a variable that does not exist (it used to be deleted silently)."""
+    from app.services import variable_service
+
+    unknown, known = await variable_service.unknown_in(db, *texts)
+    if unknown:
+        raise HTTPException(422, detail=variable_service.unknown_variables_error(unknown, known))
+
+
+def _require_subject(subject) -> None:
+    if not (subject or "").strip():
+        raise HTTPException(422, "An email template needs a subject line")
 
 
 def _store_attachments(items) -> str | None:
@@ -129,46 +142,57 @@ async def preview_template(
     subject: Optional[str] = Query(None),
     html_body: Optional[str] = Query(None),
     channel: str = Query("sms"),
-    first_name: str = "John",
-    last_name: str = "Doe",
-    business_name: str = "Acme Ltd",
-    phone_number: str = "08012345678",
-    email: str = "john.doe@example.com",
-    city: str = "Lagos",
-    state: str = "Lagos",
-    website: str = "https://example.com",
-    industry: str = "Technology",
+    contact_id: Optional[int] = Query(
+        None, description="Render for this contact (their values, imported columns and the "
+                          "operator's fallbacks). Omit to use sample data."),
+    first_name: Optional[str] = None,
+    last_name: Optional[str] = None,
+    business_name: Optional[str] = None,
+    phone_number: Optional[str] = None,
+    email: Optional[str] = None,
+    city: Optional[str] = None,
+    state: Optional[str] = None,
+    website: Optional[str] = None,
+    industry: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    """Preview a template with sample data.
+    """Preview a message for a contact, or with sample data.
 
     Registered *before* ``/{template_id}`` in the router, so "preview" is never
     parsed as a template id.
-    """
-    sample = dict(
-        first_name=first_name,
-        last_name=last_name,
-        business_name=business_name,
-        phone_number=phone_number,
-        email=email,
-        city=city,
-        state=state,
-        website=website,
-        industry=industry,
-    )
-    # Same renderer the senders use, so the preview is an honest picture of
-    # the outgoing message rather than a second implementation that drifts.
-    preview = render_template(body, None, **sample)
-    preview_subject = render_template(subject, None, **sample) if subject else None
-    preview_html = render_template(html_body, None, **sample) if html_body else None
 
-    char_count, segment_count = count_sms_segments(preview)
+    One renderer: ``variable_service.render_preview`` -- the same registry-aware path the
+    senders use, so the preview is an honest picture of the outgoing message. Explicit
+    sample values (``first_name=...``) override the contact's. A variable that does not
+    exist is shown as ``[UNKNOWN VARIABLE: name]`` and listed in ``unknown_variables``
+    rather than silently deleted.
+    """
+    from app.services import variable_service
+
+    contact = None
+    if contact_id is not None:
+        contact = (await db.execute(select(Contact).where(Contact.id == contact_id))).scalar_one_or_none()
+        if contact is None:
+            raise HTTPException(404, "Contact not found")
+    rendered = await variable_service.render_preview(
+        db, body=body, subject=subject, html_body=html_body, contact=contact,
+        overrides=dict(first_name=first_name, last_name=last_name, business_name=business_name,
+                       phone_number=phone_number, email=email, city=city, state=state,
+                       website=website, industry=industry),
+    )
+    char_count, segment_count = count_sms_segments(rendered["body"])
     return {
-        "preview": preview,
-        "subject": preview_subject,
-        "html": preview_html,
+        "preview": rendered["body"],
+        "subject": rendered["subject"],
+        "html": rendered["html"],
         "char_count": char_count,
         "segment_count": segment_count,
         "channel": "email" if channel == "email" else "sms",
+        "contact": rendered["contact"],
+        "sample": rendered["sample"],
+        "unknown_variables": rendered["unknown_variables"],
+        "warnings": rendered["warnings"],
     }
 
 
@@ -193,10 +217,17 @@ async def create_template(
     current_user: User = Depends(get_current_user),
 ):
     """Create a template (SMS or email)."""
-    channel = data.channel if data.channel in VALID_CHANNELS else "sms"
+    channel = data.channel
+    if channel not in VALID_CHANNELS:  # no longer silently turned into "sms"
+        raise HTTPException(422, f"channel must be one of {list(VALID_CHANNELS)}")
     body = data.body or ""
     if channel == "email" and not (body or data.html_body):
         raise HTTPException(422, "An email template needs a body (or an HTML body)")
+    if channel == "email":
+        _require_subject(data.subject)
+    await _refuse_unknown_variables(
+        db, body, data.subject if channel == "email" else None,
+        data.html_body if channel == "email" else None)
     char_count, segment_count = (
         _email_metrics(data.subject, body, data.html_body)
         if channel == "email"
@@ -240,6 +271,15 @@ async def update_template(
         raise HTTPException(status_code=404, detail="Template not found")
 
     update_data = data.model_dump(exclude_unset=True)
+    if template.channel == "email" and "subject" in update_data:
+        _require_subject(update_data["subject"])
+    if {"body", "subject", "html_body"} & update_data.keys():
+        await _refuse_unknown_variables(
+            db,
+            update_data.get("body", template.body),
+            update_data.get("subject", template.subject) if template.channel == "email" else None,
+            update_data.get("html_body", template.html_body) if template.channel == "email" else None,
+        )
     if "attachments" in update_data:
         update_data["attachments"] = _store_attachments(update_data["attachments"])
     if "body" in update_data or "subject" in update_data or "html_body" in update_data:
