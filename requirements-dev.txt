@@ -1,0 +1,18 @@
+# Extra dependencies for running the full test suite locally.
+#
+#   pip install -r requirements-dev.txt
+#   python -m pytest backend/tests
+#
+# The production image installs requirements.txt only.
+-r requirements.txt
+
+# An embedded PostgreSQL, used by the Postgres-only regression suites:
+#   backend/tests/test_postgres_compat.py
+#   backend/tests/test_postgres_inbox.py
+#
+# SQLite accepts SQL that PostgreSQL rejects (grouping by an expression it
+# cannot match, integer-vs-boolean comparisons, ...). Those tests boot a real
+# PostgreSQL so that class of bug fails locally instead of in production.
+# Both modules skip automatically when pgserver is not installed, which is why
+# this file is separate from requirements.txt: it downloads a ~60 MB binary.
+pgserver

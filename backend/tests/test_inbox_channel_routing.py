@@ -419,3 +419,38 @@ async def test_the_settings_screen_lists_every_connected_gmail_inbox(client, mon
     # the value itself never appears.
     assert all("credential_encrypted" not in m for m in body["gmail_mailboxes"])
     assert "refresh-token" not in str(body)
+
+
+# ==========================================================================
+# 4. The per-tab counters
+# ==========================================================================
+#
+# The counters come from the inbox list endpoint, and the query behind them is
+# also the one PostgreSQL refused in production (see test_postgres_inbox.py).
+# These run everywhere, on SQLite, and pin the numbers the tabs show.
+
+
+@pytest.mark.asyncio
+async def test_the_tab_counters_reflect_every_thread_in_the_channel(client):
+    ac, session = client
+    sms = await _contact(session, phone="+2348030000101")
+    unread = await _contact(session, phone="+2348030000102")
+    email = await _contact(session, email="ada@example.test")
+    await _thread(session, sms, channel="sms")
+    unread_conv = await _thread(session, unread, channel="sms", replied=True)
+    unread_conv.status = "unread"
+    unread_conv.unread_count = 2
+    await _thread(session, email, channel="email", replied=True)
+    await session.commit()
+
+    sms_body = (await ac.get("/api/v1/inbox/conversations?channel=sms")).json()
+    assert sms_body["counts"]["all"] == 2
+    assert sms_body["counts"]["unread"] == 1
+    assert sms_body["counts"]["active"] == 1
+
+    # The email thread is not part of the SMS counters: "all" is the channel
+    # total, and the unread thread is counted in it exactly once.
+    assert "email" not in sms_body["counts"]
+
+    everything = (await ac.get("/api/v1/inbox/conversations?channel=all")).json()
+    assert everything["counts"]["all"] == 3

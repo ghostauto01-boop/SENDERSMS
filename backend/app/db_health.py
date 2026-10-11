@@ -45,10 +45,33 @@ KIND_AUTH = "auth_failed"
 KIND_UNREACHABLE = "unreachable"
 KIND_TIMEOUT = "timeout"
 KIND_SCHEMA = "schema"
+KIND_QUERY = "query_invalid"
 KIND_UNKNOWN = "unknown"
+
+# Every kind except KIND_QUERY means "the database is not answering". A rejected
+# statement is different: the database answered, and told us our SQL was wrong.
+_DB_DOWN_KINDS = {KIND_QUOTA, KIND_SUSPENDED, KIND_AUTH, KIND_UNREACHABLE, KIND_TIMEOUT, KIND_SCHEMA, KIND_UNKNOWN}
 
 # Order matters: the first matching pattern wins.
 _PATTERNS: list[tuple[str, re.Pattern[str]]] = [
+    # The database is healthy; it refused to *execute* our statement. These are
+    # application bugs, and reporting them as "Database unavailable" hid the
+    # real cause of a broken inbox for a whole release (a GROUP BY the server
+    # rejected), so they get their own kind and their own, truthful message.
+    (KIND_QUERY, re.compile(
+        r"must appear in the group by clause"
+        r"|is not in group by clause"
+        r"|grouping error"
+        r"|aggregate functions are not allowed"
+        r"|operator does not exist"
+        r"|datatype mismatch"
+        r"|invalid column reference"
+        r"|function .{0,120} does not exist"
+        r"|cannot be cast"
+        r"|invalid input syntax"
+        r"|syntax error at or near",
+        re.I,
+    )),
     (KIND_QUOTA, re.compile(r"exceeded .*quota|quota exceeded|compute time quota|data transfer quota", re.I)),
     (KIND_SUSPENDED, re.compile(r"endpoint is disabled|compute is suspended|project is suspended|suspended", re.I)),
     (KIND_AUTH, re.compile(r"password authentication failed|authentication failed|invalid authorization|role .* does not exist|no pg_hba", re.I)),
@@ -84,6 +107,12 @@ _HINTS = {
     KIND_SCHEMA: (
         "A table or column is missing. Restart the service so the schema "
         "auto-repair runs, or run scripts/migrate_existing_db.sql."
+    ),
+    KIND_QUERY: (
+        "The database is running and answered, but it rejected a query the "
+        "application built (for example a GROUP BY or type mismatch). This is "
+        "an application bug, not an outage — nothing is wrong with your data. "
+        "The failing request path is in the service log next to this message."
     ),
     KIND_UNKNOWN: "The database returned an unexpected error. Check the service logs on Render.",
 }
@@ -150,6 +179,23 @@ def hint_for(kind: str) -> str:
     return _HINTS.get(kind, _HINTS[KIND_UNKNOWN])
 
 
+def is_db_down_kind(kind: Optional[str]) -> bool:
+    """True when ``kind`` means the database itself is unavailable.
+
+    ``query_invalid`` is deliberately excluded: the database is up, and only
+    the statement was refused. Nothing should back off, show a database-outage
+    banner or mark the process-wide status as down for one bad query.
+    """
+    if kind is None:
+        return False
+    return kind in _DB_DOWN_KINDS
+
+
+def is_query_rejected(exc: BaseException) -> bool:
+    """True when ``exc`` is a statement the database refused to run."""
+    return classify_db_error(exc)[0] == KIND_QUERY
+
+
 # ----------------------------------------------------------------------------
 # Last-known state (process local; cheap to read from any request)
 # ----------------------------------------------------------------------------
@@ -163,6 +209,10 @@ class DbStatus:
     last_ok_at: Optional[float] = None
     last_error_at: Optional[float] = None
     consecutive_failures: int = 0
+    #: Last statement the database refused to run. Recorded separately: it is
+    #: an application bug, and it must never make the database look down.
+    last_query_error: Optional[str] = None
+    last_query_error_at: Optional[float] = None
     _extra: dict = field(default_factory=dict, repr=False)
 
     def note_ok(self) -> None:
@@ -176,6 +226,15 @@ class DbStatus:
 
     def note_error(self, exc: BaseException) -> tuple[str, str]:
         kind, message = classify_db_error(exc)
+        if kind == KIND_QUERY:
+            # The server answered: it rejected the SQL, it did not fail. A bad
+            # query in one handler must not flip the process-wide status to
+            # "database unavailable" (that is what made a single GROUP BY bug
+            # look like a Neon outage).
+            self.last_query_error = message
+            self.last_query_error_at = time.time()
+            logger.error("Database rejected a query (application bug): %s", message)
+            return kind, message
         first = self.ok is not False or self.kind != kind
         self.ok = False
         self.kind = kind
@@ -195,6 +254,8 @@ class DbStatus:
             "last_ok_at": self.last_ok_at,
             "last_error_at": self.last_error_at,
             "consecutive_failures": self.consecutive_failures,
+            "last_query_error": self.last_query_error,
+            "last_query_error_at": self.last_query_error_at,
         }
 
 

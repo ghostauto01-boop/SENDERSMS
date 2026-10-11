@@ -17,7 +17,7 @@ import asyncio
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import OperationalError, ProgrammingError
 
 from app import db_health
 from tests.test_inbound_receive import client, db  # noqa: F401
@@ -204,3 +204,90 @@ async def test_non_database_crashes_are_a_generic_json_500(client):
     assert r.json()["detail"].startswith("Internal server error")
     assert "12345" not in r.text
     assert "Traceback" not in r.text
+
+
+# ---------------------------------------------------------------------------
+# A query the database refuses is NOT an outage
+# ---------------------------------------------------------------------------
+#
+# The production inbox failed with
+#   column "conversations.status" must appear in the GROUP BY clause ...
+# and the app reported it as "Database unavailable", which sent everyone
+# looking at Neon/Render for a database that was perfectly healthy. The
+# database had answered — it rejected our SQL. These tests pin the distinction.
+
+
+def test_a_rejected_statement_is_not_reported_as_an_outage():
+    exc = ProgrammingError(
+        "SELECT 1",
+        {},
+        Exception(
+            'column "conversations.status" must appear in the GROUP BY clause '
+            "or be used in an aggregate function"
+        ),
+    )
+    kind, message = db_health.classify_db_error(exc)
+    assert kind == db_health.KIND_QUERY
+    assert "GROUP BY" in message
+    assert not db_health.is_db_down_kind(kind)
+    assert db_health.is_query_rejected(exc)
+    hint = db_health.hint_for(kind)
+    assert "application bug" in hint
+    assert "nothing is wrong with your data" in hint
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        'column "x" must appear in the GROUP BY clause or be used in an aggregate function',
+        'operator does not exist: integer = boolean',
+        'function lower(integer) does not exist',
+        'invalid input syntax for type integer: "abc"',
+        'syntax error at or near "SELCT"',
+    ],
+)
+def test_statement_bugs_are_their_own_kind(text):
+    assert db_health.classify_db_error(_operational(text))[0] == db_health.KIND_QUERY
+
+
+def test_a_rejected_statement_never_marks_the_database_down():
+    s = db_health.status
+    s.ok = True
+    kind, _ = s.note_error(ProgrammingError("SELECT 1", {}, Exception(
+        'column "conversations.status" must appear in the GROUP BY clause'
+    )))
+    assert kind == db_health.KIND_QUERY
+    # The database is still fine: no outage banner, no back-off.
+    assert s.ok is True
+    assert s.kind is None
+    assert s.consecutive_failures == 0
+    # ... but the bug is recorded for whoever reads /health/db next.
+    assert "GROUP BY" in (s.last_query_error or "")
+
+
+@pytest.mark.asyncio
+async def test_a_rejected_statement_answers_a_truthful_500(client):
+    """Not a 503 "Database unavailable": the database is up, the query is wrong."""
+    from app.database import get_db
+    from app.main import app
+
+    async def _bad_query_db():
+        raise ProgrammingError("SELECT 1", {}, Exception(
+            'column "conversations.status" must appear in the GROUP BY clause '
+            "or be used in an aggregate function"
+        ))
+        yield  # pragma: no cover
+
+    app.dependency_overrides[get_db] = _bad_query_db
+    try:
+        r = await client.get("/api/v1/inbox/conversations")
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert r.status_code == 500, r.text
+    body = r.json()
+    assert body["code"] == "DATABASE_QUERY_REJECTED"
+    assert "database itself is running" in body["detail"]
+    assert "Database unavailable" not in body["detail"]
+    assert body["db"]["ok"] is True
+    assert db_health.status.ok is not False
