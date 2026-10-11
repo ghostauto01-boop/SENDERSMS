@@ -587,12 +587,18 @@ async def get_campaign_conversations(
     if not campaign:
         raise HTTPException(status_code=404, detail="Campaign not found")
 
-    # Threads this campaign either sourced (first touch) or last messaged.
+    # Threads this campaign either sourced (first touch) or last messaged —
+    # on the campaign's own channel. A contact can hold one SMS thread and one
+    # email thread, and without the channel filter an email campaign's reply
+    # list also showed the person's text thread, which then deep-linked into
+    # the SMS inbox for a conversation that happened by email.
+    channel = (campaign.channel or "sms").strip().lower() or "sms"
     query = select(Conversation).where(
+        func.coalesce(Conversation.channel, "sms") == channel,
         or_(
             Conversation.campaign_id == campaign_id,
             Conversation.last_campaign_id == campaign_id,
-        )
+        ),
     )
     if replied_only:
         replied = (
@@ -652,6 +658,9 @@ async def get_campaign_conversations(
                 "contact_id": conv.contact_id,
                 "contact_name": contact_display_name(contact),
                 "contact_phone": contact.phone_number if contact else "",
+                "contact_email": contact.email if contact else "",
+                #: Which inbox this row belongs in — the drawer routes on it.
+                "channel": conv.channel or channel,
                 "lead_status": contact.lead_status if contact else "",
                 "status": conv.status,
                 "unread_count": conv.unread_count,
@@ -674,7 +683,8 @@ async def get_campaign_conversations(
             }
         )
 
-    return {"total": total, "items": items, "page": page, "per_page": per_page}
+    return {"total": total, "items": items, "page": page, "per_page": per_page,
+            "channel": channel}
 
 
 @router.get("/{campaign_id}/performance")
@@ -690,7 +700,7 @@ async def get_campaign_performance(
     These numbers are computed from ``messages`` and ``conversations``, so
     they always reconcile with what the inbox shows.
     """
-    from sqlalchemy import or_
+    from sqlalchemy import and_, or_
 
     from app.models.contact import Contact
     from app.models.conversation import Conversation, Message
@@ -712,9 +722,16 @@ async def get_campaign_performance(
     failed = await count(*outgoing, Message.status.in_(("failed", "cancelled")))
     queued = await count(*outgoing, Message.status.in_(("queued", "sending")))
 
-    conv_filter = or_(
-        Conversation.campaign_id == campaign_id,
-        Conversation.last_campaign_id == campaign_id,
+    # Scoped to the campaign's channel for the same reason the conversations
+    # drill-down is: a contact can hold an SMS thread and an email thread, and
+    # an email campaign's "leads" must not count the text conversation.
+    channel = (campaign.channel or "sms").strip().lower() or "sms"
+    conv_filter = and_(
+        func.coalesce(Conversation.channel, "sms") == channel,
+        or_(
+            Conversation.campaign_id == campaign_id,
+            Conversation.last_campaign_id == campaign_id,
+        ),
     )
     leads = (
         await db.execute(
@@ -802,6 +819,9 @@ async def get_campaign_performance(
         "campaign_id": campaign_id,
         "name": campaign.name,
         "status": campaign.status,
+        #: Which inbox these numbers belong to — the replies drawer routes on it,
+        #: so an email campaign opens the Email Inbox and never the SMS one.
+        "channel": channel,
         "audience": campaign.total_contacts,
         "sent": sent,
         "delivered": delivered,

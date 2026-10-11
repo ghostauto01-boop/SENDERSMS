@@ -52,6 +52,9 @@ const CHANNELS: NavItem[] = [
   { to: "/sms-manager", label: "SMS Manager", icon: Sparkles },
   { to: "/email-manager", label: "Email Manager", icon: Mail },
   { to: "/email-inbox", label: "Email Inbox", icon: MailOpen },
+  // The same screen with one filter, and a destination of its own: only the
+  // people who wrote back, i.e. the threads you are actually talking in.
+  { to: "/email-inbox?view=replied", label: "Conversations", icon: MessageSquareReply },
   { to: "/inbox", label: "Inbox", icon: Inbox },
   { to: "/calendar", label: "Calendar", icon: Calendar },
 ];
@@ -145,8 +148,36 @@ export default function MainLayout() {
     navigate(`/contacts?search=${encodeURIComponent(term)}`);
   };
 
-  const isActive = (to: string) =>
-    location.pathname === to || location.pathname.startsWith(`${to}/`);
+  /** Does this URL match an item, including a query the item names? */
+  const matches = (to: string) => {
+    const [path, search] = to.split("?");
+    if (location.pathname !== path && !location.pathname.startsWith(`${path}/`)) return false;
+    if (!search) return true;
+    const current = new URLSearchParams(location.search);
+    return [...new URLSearchParams(search).entries()].every(
+      ([key, value]) => current.get(key) === value
+    );
+  };
+
+  /**
+   * The sidebar highlights exactly one item: the most specific match.
+   *
+   * "/email-inbox?view=replied" and "/email-inbox" both match the Conversations
+   * page by pathname, and lighting up both would make it look like two places —
+   * so the longest matching item wins and the other stays quiet. The thumb bar
+   * keeps the loose pathname check below, because its Email tab should stay lit
+   * on either of the two email pages.
+   */
+  const activeItem = useMemo(() => {
+    const items = [...OVERVIEW, ...WORK, ...CHANNELS, ...AUTOMATION, ...CONTENT];
+    return (
+      items
+        .filter((item) => matches(item.to))
+        .sort((a, b) => b.to.length - a.to.length)[0]?.to ?? null
+    );
+  }, [location.pathname, location.search]);
+
+  const isActive = (to: string) => to === activeItem;
 
   const groups = useMemo(
     () => [
@@ -320,7 +351,9 @@ export default function MainLayout() {
       >
         <div className="grid grid-cols-6">
           {TAB_BAR.map((item) => {
-            const active = isActive(item.to);
+            // Pathname only: the Email tab covers the inbox and its
+            // Conversations page, and the SMS tab covers /inbox and its chats.
+            const active = matches(item.to);
             return (
               <Link
                 key={item.to}

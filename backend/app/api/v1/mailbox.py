@@ -44,8 +44,8 @@ from app.models.email_inbox import EmailMailbox
 from app.models.user import User
 from app.providers import gmail as gmail_provider
 from app.security.auth import get_current_user
-from app.services import mailbox_service
-from app.utils.urls import public_base_url
+from app.services import mailbox_service, system_settings
+from app.utils.urls import public_base_url, public_base_url_source
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +53,12 @@ router = APIRouter()
 
 STATE_TTL_SECONDS = 600
 CALLBACK_PATH = "/api/v1/mailbox/google/callback"
+#: ``consent`` gets a refresh token even for an account that already granted
+#: access; ``select_account`` forces Google's account chooser, which is what
+#: makes "add a second Gmail inbox" work — without it Google silently reuses
+#: the account already signed in to the browser and the new mailbox never
+#: appears.
+GOOGLE_PROMPT = "consent select_account"
 
 
 # ===========================================================================
@@ -65,38 +71,74 @@ def _sign(value: str) -> str:
     return hmac.new(secret, value.encode(), hashlib.sha256).hexdigest()[:32]
 
 
-def _make_state(user_id: int | None) -> str:
-    """A signed, short-lived ``state`` for the Google round-trip."""
+def _clean_return_to(value: str | None) -> str:
+    """A same-origin path Google may send the operator back to, or "".
+
+    Only ``/something`` is accepted. An absolute URL (or a protocol-relative
+    ``//host``) would turn the post-consent redirect into an open one, so
+    anything else is dropped and the default page is used instead.
+    """
+    path = (value or "").strip()
+    if not path.startswith("/") or path.startswith("//"):
+        return ""
+    return path[:300]
+
+
+def _make_state(user_id: int | None, return_to: str = "") -> str:
+    """A signed, short-lived ``state`` for the Google round-trip.
+
+    It carries the page the operator started from, so connecting a Gmail inbox
+    from Settings lands them back in Settings rather than in the Email Manager —
+    the mailbox they just added is listed in both places.
+    """
     issued = int(time.time())
     body = f"{user_id or 0}.{issued}.{int(time.time() * 1000) % 100000}"
+    cleaned = _clean_return_to(return_to)
+    if cleaned:
+        body += "." + base64.urlsafe_b64encode(cleaned.encode()).decode().rstrip("=")
     raw = base64.urlsafe_b64encode(body.encode()).decode().rstrip("=")
     return f"{raw}.{_sign(body)}"
 
 
-def _read_state(state: str | None) -> tuple[Optional[int], Optional[str]]:
-    """Return ``(user_id, error)`` — the error is a sentence the operator sees."""
+def _read_state(state: str | None) -> tuple[Optional[int], Optional[str], str]:
+    """Return ``(user_id, error, return_to)`` — the error is a sentence the
+    operator sees."""
     if not state or "." not in state:
-        return None, "The Google sign-in link expired. Start the connection again."
+        return None, "The Google sign-in link expired. Start the connection again.", ""
     raw, _, signature = state.rpartition(".")
     try:
         body = base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4)).decode()
     except Exception:  # noqa: BLE001 — a malformed state is simply rejected
-        return None, "The Google sign-in link was malformed. Start the connection again."
+        return None, "The Google sign-in link was malformed. Start the connection again.", ""
     if not hmac.compare_digest(_sign(body), signature):
-        return None, "The Google sign-in link did not come from this app. Start again."
+        return None, "The Google sign-in link did not come from this app. Start again.", ""
     parts = body.split(".")
     if len(parts) < 2 or not parts[1].isdigit():
-        return None, "The Google sign-in link was malformed. Start the connection again."
+        return None, "The Google sign-in link was malformed. Start the connection again.", ""
     if int(time.time()) - int(parts[1]) > STATE_TTL_SECONDS:
-        return None, "The Google sign-in link expired. Start the connection again."
+        return None, "The Google sign-in link expired. Start the connection again.", ""
     user_id = int(parts[0]) or None
-    return user_id, None
+    return_to = ""
+    if len(parts) > 3 and parts[3]:
+        try:
+            return_to = _clean_return_to(
+                base64.urlsafe_b64decode(parts[3] + "=" * (-len(parts[3]) % 4)).decode()
+            )
+        except Exception:  # noqa: BLE001 — an unreadable target just uses the default
+            return_to = ""
+    return user_id, None, return_to
 
 
-def _google_client() -> tuple[str | None, str | None]:
-    client_id = (settings.GOOGLE_CLIENT_ID or "").strip() or None
-    secret = (settings.GOOGLE_CLIENT_SECRET or "").strip() or None
-    return client_id, secret
+async def _google_client(db: AsyncSession) -> tuple[str | None, str | None]:
+    """The OAuth client to use: the one saved in Settings → Gmail replies first.
+
+    Reading the environment alone meant "Connect with Google" was dead on any
+    deployment whose operator could not edit server variables — which is every
+    deployment set up from the app UI. The database value wins, the environment
+    is the fallback, and :func:`system_settings.google_oauth_credentials` is the
+    single place that decides.
+    """
+    return await system_settings.google_oauth_credentials(db)
 
 
 def _redirect_uri() -> str:
@@ -114,11 +156,25 @@ def _redirect_uri() -> str:
     return f"{base}{CALLBACK_PATH}"
 
 
-def _frontend_url(**params: str) -> str:
+def _redirect_uri_or_none() -> str | None:
+    """The same URI without the 503 — for panels that only display it."""
+    base = public_base_url()
+    return f"{base}{CALLBACK_PATH}" if base else None
+
+
+def _frontend_url(return_to: str = "", **params: str) -> str:
+    """Where the post-consent page sends the operator.
+
+    ``return_to`` is the page they pressed "Connect" on, taken from the signed
+    state; the Email Manager's Replies tab is the default, because that is where
+    the connected mailbox list has always lived.
+    """
     base = public_base_url() or ""
     query = "&".join(f"{k}={v}" for k, v in params.items() if v)
-    target = f"{base}/email-manager?section=Replies"
-    return f"{target}&{query}" if query else target
+    target = f"{base}{_clean_return_to(return_to) or '/email-manager?section=Replies'}"
+    if not query:
+        return target
+    return f"{target}{'&' if '?' in target else '?'}{query}"
 
 
 def _result_page(title: str, body: str, *, ok: bool, url: str) -> HTMLResponse:
@@ -228,39 +284,58 @@ async def list_mailboxes(
     cu: User = Depends(get_current_user),
 ):
     rows = await mailbox_service.list_mailboxes(db, include_inactive=include_inactive)
-    client_id, client_secret = _google_client()
+    oauth = await system_settings.get_google_oauth_settings(db)
     return {
         "items": [mailbox_service.serialize_mailbox(m) for m in rows],
         "count": len(rows),
-        "google_oauth_ready": bool(client_id and client_secret),
+        "google_oauth_ready": oauth["configured"],
+        # Where the OAuth client came from, and the exact redirect URI Google
+        # must be told about: the Replies tab shows both so "Connect with
+        # Google" can be fixed from the screen that needs it.
+        "google_oauth_source": oauth["source"],
+        "google_client_id_masked": oauth["client_id_masked"],
+        "redirect_uri": _redirect_uri_or_none(),
         "poll_interval": settings.GMAIL_POLL_INTERVAL,
     }
 
 
 @router.get("/google/start")
 async def google_start(
+    login_hint: Optional[str] = Query(default=None, max_length=255),
+    return_to: Optional[str] = Query(
+        default=None, max_length=300,
+        description="Same-origin path to land on after Google sends you back",
+    ),
     db: AsyncSession = Depends(get_db),
     cu: User = Depends(get_current_user),
 ):
-    """The Google consent URL for "Connect with Google"."""
-    client_id, _ = _google_client()
+    """The Google consent URL for "Connect with Google".
+
+    Call it once per Gmail inbox you want to read: ``prompt`` includes
+    ``select_account``, so Google always shows the account chooser and a second,
+    third or tenth mailbox is added the same way as the first. ``login_hint``
+    pre-fills the account you meant, which helps when several are signed in.
+    """
+    client_id, _ = await _google_client(db)
     if not client_id:
         raise HTTPException(
             status_code=400,
             detail=(
-                "Google OAuth is not configured on this deployment: GOOGLE_CLIENT_ID and "
-                "GOOGLE_CLIENT_SECRET are missing. Create an OAuth client at "
-                "console.cloud.google.com (Desktop app), enable the Gmail API, add "
-                f"{public_base_url() or 'https://your-app'}{CALLBACK_PATH} as an authorized "
-                "redirect URI, and put both values in the environment. Or connect with an IMAP "
-                "app password instead — that works without any Google project."
+                "Google OAuth is not configured yet. Open Settings → Gmail replies and follow the "
+                "step-by-step: create an OAuth client at console.cloud.google.com (Web "
+                "application), enable the Gmail API, add "
+                f"{_redirect_uri_or_none() or 'https://your-app' + CALLBACK_PATH} as an authorized "
+                "redirect URI, then paste the client ID and secret there — or set "
+                "GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in the environment instead. Or connect "
+                "with an IMAP app password, which works without any Google project."
             ),
         )
     url = gmail_provider.google_authorize_url(
-        client_id, _redirect_uri(), _make_state(cu.id)
+        client_id, _redirect_uri(), _make_state(cu.id, return_to or ""),
+        prompt=GOOGLE_PROMPT, login_hint=login_hint,
     )
     return {"url": url, "redirect_uri": _redirect_uri(),
-            "scope": gmail_provider.GMAIL_SCOPE}
+            "scope": gmail_provider.GMAIL_SCOPE, "prompt": GOOGLE_PROMPT}
 
 
 @router.get("/google/callback")
@@ -277,29 +352,30 @@ async def google_callback(
     ``state`` instead, because the cookie may not be readable if the operator
     completed the consent in a fresh browser profile.
     """
-    user_id, state_error = _read_state(state)
+    user_id, state_error, return_to = _read_state(state)
     if state_error:
         return _result_page("That link is no longer valid", state_error, ok=False,
-                            url=_frontend_url(mailbox="error"))
+                            url=_frontend_url(return_to, mailbox="error"))
     if error:
         detail = error_description or error
         if error == "access_denied":
             detail = ("You cancelled the Google sign-in. Nothing was changed — connect again "
                       "whenever you are ready.")
         return _result_page("Google did not grant access", detail, ok=False,
-                            url=_frontend_url(mailbox="error"))
+                            url=_frontend_url(return_to, mailbox="error"))
     if not request_code:
         return _result_page("Google sent no code", "The redirect arrived without an "
                             "authorization code. Try connecting again.", ok=False,
-                            url=_frontend_url(mailbox="error"))
+                            url=_frontend_url(return_to, mailbox="error"))
 
-    client_id, client_secret = _google_client()
+    client_id, client_secret = await _google_client(db)
     if not client_id or not client_secret:
         return _result_page(
             "OAuth is not configured",
-            "GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET are missing on this server, so the code "
-            "cannot be exchanged. Connect with an IMAP app password instead.",
-            ok=False, url=_frontend_url(mailbox="error"),
+            "No Google OAuth client is saved on this server, so the code cannot be exchanged. "
+            "Open Settings → Gmail replies, paste your client ID and secret, and connect again — "
+            "or use an IMAP app password instead.",
+            ok=False, url=_frontend_url(return_to, mailbox="error"),
         )
 
     exchanged = await gmail_provider.google_exchange_code(
@@ -307,23 +383,23 @@ async def google_callback(
     )
     if not exchanged.get("success"):
         return _result_page("Google rejected the code", str(exchanged.get("error")), ok=False,
-                            url=_frontend_url(mailbox="error"))
+                            url=_frontend_url(return_to, mailbox="error"))
 
     token_result = await gmail_provider.google_refresh_access_token(
         client_id, client_secret, str(exchanged["refresh_token"])
     )
     if not token_result.get("success"):
         return _result_page("Could not read the mailbox", str(token_result.get("error")),
-                            ok=False, url=_frontend_url(mailbox="error"))
+                            ok=False, url=_frontend_url(return_to, mailbox="error"))
     profile = await gmail_provider.gmail_profile(str(token_result["access_token"]))
     if not profile.get("success"):
         return _result_page("Could not read the mailbox", str(profile.get("error")), ok=False,
-                            url=_frontend_url(mailbox="error"))
+                            url=_frontend_url(return_to, mailbox="error"))
 
     address = str(profile.get("email") or "").strip().lower()
     if not address:
         return _result_page("Google did not say which address", "The profile call returned no "
-                            "email address.", ok=False, url=_frontend_url(mailbox="error"))
+                            "email address.", ok=False, url=_frontend_url(return_to, mailbox="error"))
 
     existing = await mailbox_service.find_mailbox_for_address(db, address)
     if existing is not None:
@@ -332,6 +408,9 @@ async def google_callback(
         existing.provider = "gmail_api"
         existing.credential_encrypted = encrypt_value(str(exchanged["refresh_token"]))[:2000]
         existing.client_id = client_id
+        # Stored per mailbox so a later change to the global OAuth client cannot
+        # silently break the token refresh of an inbox connected with this one.
+        existing.client_secret_encrypted = encrypt_value(client_secret)[:1000]
         existing.is_active = True
         existing.last_error = None
         mailbox = existing
@@ -375,7 +454,7 @@ async def google_callback(
           "filing their replies away."
     )
     return _result_page("Mailbox connected", detail, ok=True,
-                        url=_frontend_url(mailbox=str(mailbox.id), address=address))
+                        url=_frontend_url(return_to, mailbox=str(mailbox.id), address=address))
 
 
 @router.post("")

@@ -97,18 +97,25 @@ async def test_the_public_url_step_explains_what_it_breaks(db):
 
 
 @pytest.mark.asyncio
-async def test_the_mailbox_step_gives_the_app_password_route_first(db):
-    """The operator has no domain, so IMAP + app password is the primary path."""
+async def test_the_mailbox_step_gives_the_google_sign_in_route_first(db):
+    """Gmail OAuth is the path the operator asked for, so the guide leads with it.
+
+    The app-password route stays documented in the same step: it is the answer
+    for somebody who does not want a Google Cloud project, and dropping it would
+    leave them with no way in at all.
+    """
     guide = await setup_guide.build_guide(db)
     step = _step(guide, "mailbox")
 
     assert step["status"] == "todo"
     joined = " ".join(step["steps"])
-    assert "apppasswords" in joined           # where to get the app password
-    assert "2-Step Verification" in joined    # the prerequisite Google insists on
-    assert "Spam" in joined                   # the rescue toggle that fixes the complaint
-    assert "GOOGLE_CLIENT_ID" in joined       # OAuth is documented as the optional extra
-    assert step["route"] == "/email-manager?section=Replies"
+    assert "Settings → Gmail replies" in joined   # where the OAuth client is saved
+    assert "redirect URI" in joined               # the callback URL must match exactly
+    assert "Gmail API" in joined                  # the API the console must enable
+    assert "Spam" in joined                       # the filter that fixes the complaint
+    assert "apppasswords" in joined               # the fallback, still spelled out
+    assert "2-Step Verification" in joined        # the prerequisite Google insists on
+    assert step["route"] == "/settings?tab=gmail"
 
 
 # ==========================================================================
@@ -278,7 +285,8 @@ async def test_every_step_is_renderable(db, monkeypatch):
 
     allowed = {"done", "todo", "attention", "optional"}
     routes = {
-        "/settings", "/send", "/email-manager", "/email-manager?section=Replies",
+        "/settings", "/settings?tab=gmail", "/send", "/email-manager",
+        "/email-manager?section=Replies",
         "/contacts", "/dashboard", "/overview", "/setup", None,
     }
     assert guide["steps"], "the guide must never be empty"

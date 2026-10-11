@@ -500,24 +500,29 @@ async def _reply_steps(db: AsyncSession) -> list[dict]:
                 "mailbox the reply exists only in Gmail and never appears in the app."
             ),
             detail=(
-                "No mailbox connected. The app can read INBOX and Spam over IMAP with a Google app "
-                "password (no Google Cloud project needed), or over the Gmail API with OAuth."
+                "No mailbox connected. Sign in with Google (Settings → Gmail replies) and the app "
+                "reads INBOX and Spam through the Gmail API; an IMAP app password is the fallback "
+                "when you would rather not create a Google Cloud project."
             ),
             steps=[
-                "Email Manager → Replies → App password.",
-                "Google blocks IMAP with your normal password: turn on 2-Step Verification, then "
-                "create a 16-character app password at myaccount.google.com/apppasswords.",
-                "Paste it with the mailbox address. The app verifies the login, imports the last "
-                "seven days of replies and starts checking every minute.",
-                "Keep \"Move recognised replies out of Spam\" on — that is the fix for a reply that "
-                "Gmail filed away.",
-                "Optional, for filters and API sending: set GOOGLE_CLIENT_ID and "
-                "GOOGLE_CLIENT_SECRET, register "
-                f"{(public_base_url() or 'https://your-app')}/api/v1/mailbox/google/callback as an "
-                "authorized redirect URI, then use Connect with Google.",
+                "Settings → Gmail replies. The step-by-step there walks through the Google Cloud "
+                "Console: create a project, enable the Gmail API, configure the consent screen, "
+                "create a Web application OAuth client.",
+                f"Copy the redirect URI this app shows you "
+                f"({(public_base_url() or 'https://your-app')}/api/v1/mailbox/google/callback) into "
+                "the client's Authorized redirect URIs, then paste the client ID and secret back "
+                "into Settings → Gmail replies.",
+                "Press Connect a Gmail inbox and pick the account. Repeat it for every inbox you "
+                "want read — Google's account chooser appears each time, so several mailboxes can "
+                "be connected side by side.",
+                "Turn on Never send it to Spam for the connected inbox: that is Gmail's own filter, "
+                "and it stops prospects' replies being filed away before the app can read them.",
+                "No Google project? Email Manager → Replies → App password still works: turn on "
+                "2-Step Verification, create a 16-character app password at "
+                "myaccount.google.com/apppasswords and paste it with the mailbox address.",
             ],
-            route="/email-manager?section=Replies",
-            route_label="Open Email Manager → Replies",
+            route="/settings?tab=gmail",
+            route_label="Open Settings → Gmail replies",
             verify="Reply to one of your own campaigns from another address; it appears in Email Inbox within a minute.",
         ))
     else:
@@ -794,7 +799,15 @@ async def _optional_steps(db: AsyncSession) -> list[dict]:
 
 async def build_guide(db: AsyncSession) -> dict:
     """The whole tutorial, with live status for every step."""
+    from app.services import system_settings
+
     status = db_health.status
+    # Read once: the environment panel reports it, and an OAuth client saved
+    # from Settings → Gmail replies counts exactly like one set in the env.
+    try:
+        google_oauth = await system_settings.get_google_oauth_settings(db)
+    except Exception:  # noqa: BLE001 — the guide must still render without it
+        google_oauth = {"configured": False, "source": "none"}
     steps: list[dict] = []
     steps += _foundation_steps(getattr(status, "ok", None), getattr(status, "kind", None))
 
@@ -846,7 +859,8 @@ async def build_guide(db: AsyncSession) -> dict:
             "app_env": settings.APP_ENV,
             "public_base_url": public_base_url(),
             "inline_poller": bool(settings.ENABLE_INLINE_POLLER),
-            "google_oauth_ready": bool(settings.GOOGLE_CLIENT_ID and settings.GOOGLE_CLIENT_SECRET),
+            "google_oauth_ready": google_oauth["configured"],
+            "google_oauth_source": google_oauth["source"],
             "gmail_send_replies": bool(settings.GMAIL_SEND_REPLIES),
             "gmail_rescue_from_spam": bool(settings.GMAIL_RESCUE_FROM_SPAM),
             "mcp_oauth_enabled": bool(settings.MCP_OAUTH_ENABLED),

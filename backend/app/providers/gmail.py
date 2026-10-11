@@ -555,8 +555,17 @@ async def smtp_send(address: str, password: str, raw: str, recipients: list[str]
 
 
 def google_authorize_url(client_id: str, redirect_uri: str, state: str,
-                         *, prompt: str = "consent") -> str:
-    """The Google consent URL the operator is sent to when connecting a mailbox."""
+                         *, prompt: str = "consent", login_hint: str | None = None) -> str:
+    """The Google consent URL the operator is sent to when connecting a mailbox.
+
+    ``prompt`` carries two values on purpose. ``consent`` is what makes Google
+    hand back a *refresh token* to an account that has already authorized this
+    client once (without it the second mailbox of the same Google account comes
+    back with no refresh token and can never be polled). ``select_account``
+    forces the account chooser, so connecting a second, third or tenth Gmail
+    inbox is the same click as the first instead of silently reusing whichever
+    account the browser happens to be signed in to.
+    """
     from urllib.parse import urlencode
 
     params = {
@@ -569,6 +578,9 @@ def google_authorize_url(client_id: str, redirect_uri: str, state: str,
         "state": state,
         "include_granted_scopes": "true",
     }
+    if login_hint and login_hint.strip():
+        # Pre-fills the account the operator meant; the chooser still appears.
+        params["login_hint"] = login_hint.strip()
     return f"{GOOGLE_AUTH_URL}?{urlencode(params)}"
 
 

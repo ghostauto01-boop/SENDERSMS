@@ -13,6 +13,7 @@ import { useChannel } from "../hooks/useChannel";
 import ChannelSwitch from "../components/ChannelSwitch";
 import emailApi, { EmailAccount } from "../api/email";
 import RichEmailEditor, { AttachmentPayload } from "../components/RichEmailEditor";
+import { inboxLabelFor, inboxLink } from "../utils/inboxRoute";
 
 const statusBadge = (status: string) => {
   const map: Record<string, string> = {
@@ -365,9 +366,15 @@ export default function CampaignsPage() {
                           </button>
                           {(l?.unread ?? 0) > 0 && (
                             <Link
-                              to={`/inbox?campaign_id=${camp.id}`}
+                              // The campaign's own channel decides which inbox
+                              // this opens: an email campaign has no SMS thread.
+                              to={inboxLink(camp.channel ?? l?.channel ?? channel, {
+                                campaign_id: camp.id,
+                              })}
                               className="btn-ghost btn-sm text-warning-600"
-                              title="Unread replies from this campaign"
+                              title={`Unread replies from this campaign — opens the ${inboxLabelFor(
+                                camp.channel ?? l?.channel ?? channel
+                              )}`}
                             >
                               {l.unread} unread
                             </Link>
@@ -469,6 +476,7 @@ export default function CampaignsPage() {
           key={`replies-${viewing.campaign.id}`}
           campaignId={viewing.campaign.id}
           campaignName={viewing.campaign.name}
+          channel={viewing.campaign.channel ?? channel}
           initialTab={viewing.tab}
           onClose={() => setViewing(null)}
         />

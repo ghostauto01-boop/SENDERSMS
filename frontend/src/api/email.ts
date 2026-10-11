@@ -218,6 +218,19 @@ export type EmailEvent = {
 
 export type Paged<T> = { total: number; page?: number; per_page?: number; items: T[] };
 
+/**
+ * What the inbox list answers in one call, so the "All mail | Conversations"
+ * switch can label both sides with a real number instead of guessing from the
+ * page it happens to be showing.
+ */
+export type InboxPage = Paged<EmailConversation> & {
+  /** Threads the contact actually replied to — the Conversations page. */
+  replied_total?: number;
+  /** Every email thread, ignoring any filter — the "All mail" tab label. */
+  thread_total?: number;
+  replied_only?: boolean;
+};
+
 export type EmailSendInput = {
   contact_id?: number | null;
   email?: string | null;
@@ -313,7 +326,13 @@ const emailApi = {
     per_page?: number;
     status?: string;
     search?: string;
-  }): Promise<Paged<EmailConversation>> =>
+    /** Only threads with an inbound reply — the Conversations page. */
+    replied_only?: boolean;
+    unread_only?: boolean;
+    /** Deep links: scope the list to one campaign or one person. */
+    campaign_id?: number;
+    contact_id?: number;
+  }): Promise<InboxPage> =>
     (await api.get("/email/inbox/conversations", { params })).data,
   conversation: async (
     id: number

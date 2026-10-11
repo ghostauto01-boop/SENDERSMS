@@ -13,6 +13,8 @@ import {
 } from "recharts";
 import type { OverviewCampaign, UnifiedMetrics } from "../types";
 import { campaignColor } from "../components/CampaignChip";
+import { useChannel } from "../hooks/useChannel";
+import { inboxLink, inboxPathFor } from "../utils/inboxRoute";
 
 /**
  * APPLICATION OVERVIEW
@@ -69,6 +71,13 @@ function StatCard({
 }
 
 export default function OverviewPage() {
+  /**
+   * The numbers on this page count both channels on purpose — it is the
+   * application overview. The *links* still follow the app-wide SMS | Email
+   * switch, because a card that always opened the SMS inbox sent anybody
+   * working in email to a page with none of their threads on it.
+   */
+  const { channel } = useChannel();
   const [metrics, setMetrics] = useState<UnifiedMetrics | null>(null);
   const [campaigns, setCampaigns] = useState<OverviewCampaign[]>([]);
   const [loading, setLoading] = useState(true);
@@ -197,21 +206,21 @@ export default function OverviewPage() {
         />
         <StatCard
           label="Replies" value={msg?.replies ?? 0}
-          sub={`${msg?.reply_rate ?? 0}% reply rate`}
+          sub={`${msg?.reply_rate ?? 0}% reply rate · both channels`}
           icon={MessageCircle} tone="text-primary-600 bg-primary-50 dark:bg-primary-900/40"
-          to="/inbox"
+          to={inboxPathFor(channel)}
         />
         <StatCard
           label="Unread in inbox" value={inbox?.unread ?? 0}
           sub="waiting for you"
           icon={InboxIcon} tone="text-warning-600 bg-warning-50 dark:bg-warning-900/40"
-          to="/inbox"
+          to={inboxPathFor(channel)}
         />
         <StatCard
           label="Interested leads" value={inbox?.interested ?? 0}
           sub="marked in the inbox"
           icon={Star} tone="text-warning-600 bg-warning-50 dark:bg-warning-900/40"
-          to="/inbox?status=interested"
+          to={inboxLink(channel, { status: "interested" })}
         />
         <StatCard
           label="Failed" value={msg?.failed ?? 0}
@@ -288,7 +297,7 @@ export default function OverviewPage() {
                   </div>
                 );
               })}
-              <Link to="/inbox" className="btn-secondary btn-sm w-full mt-4 justify-center">
+              <Link to={inboxPathFor(channel)} className="btn-secondary btn-sm w-full mt-4 justify-center">
                 <InboxIcon size={14} className="mr-1" /> Open inbox
               </Link>
             </div>

@@ -320,6 +320,123 @@ async def set_site_access(
     return await get_site_access(db)
 
 
+# --- Google OAuth for Gmail replies --------------------------------------
+# The OAuth client the operator creates in Google Cloud Console. It is saved
+# from Settings → Gmail replies so the whole Gmail setup can be finished inside
+# the app, with no access to the server environment; GOOGLE_CLIENT_ID /
+# GOOGLE_CLIENT_SECRET remain as the fallback for deployments that prefer to
+# configure it there. A value saved in the app wins, and every read reports
+# which source it came from so the two can never disagree silently.
+GOOGLE_OAUTH_CLIENT_ID = "google_oauth.client_id"
+GOOGLE_OAUTH_CLIENT_SECRET = "google_oauth.client_secret"
+
+
+def _maybe_decrypt(raw: Optional[str]) -> str:
+    """A stored credential, decrypted when it was stored encrypted."""
+    from app.security.encryption import decrypt_value
+
+    if not raw:
+        return ""
+    try:
+        decrypted = decrypt_value(raw)
+        if decrypted:
+            return decrypted
+    except Exception:  # noqa: BLE001 — an undecryptable value reads as "not set"
+        pass
+    # Stored in plain text because no CREDENTIAL_ENCRYPTION_KEY was available.
+    return "" if raw.startswith("enc:") else raw
+
+
+def mask_client_id(value: str) -> str:
+    """A Google client id is not a secret, but it is long and identifying.
+
+    ``1234567890-abc…-0f9.apps.googleusercontent.com`` is enough to recognise
+    which OAuth client is in use without printing the whole thing in a screen
+    that anybody looking over your shoulder can read.
+    """
+    clean = (value or "").strip()
+    if not clean:
+        return ""
+    head, _, tail = clean.partition(".")
+    if len(head) > 12:
+        head = f"{head[:8]}…{head[-4:]}"
+    return f"{head}.{tail}" if tail else head
+
+
+async def get_google_oauth_settings(db: AsyncSession) -> dict:
+    """Effective Google OAuth config: the app-saved value wins, env is fallback.
+
+    The secret itself is never returned — only whether one is stored. Callers
+    that need it (:mod:`app.api.v1.mailbox`, the token refresh in
+    :mod:`app.services.mailbox_service`) read it through
+    :func:`google_oauth_credentials`.
+    """
+    from app.config import settings
+
+    client_id = (await get_setting(db, GOOGLE_OAUTH_CLIENT_ID) or "").strip()
+    secret = _maybe_decrypt(await get_setting(db, GOOGLE_OAUTH_CLIENT_SECRET))
+    source = "db" if (client_id and secret) else "none"
+
+    if not (client_id and secret):
+        env_id = (settings.GOOGLE_CLIENT_ID or "").strip()
+        env_secret = (settings.GOOGLE_CLIENT_SECRET or "").strip()
+        if env_id and env_secret:
+            client_id, secret, source = env_id, env_secret, "env"
+        else:
+            # Half-configured either way: say which half is missing.
+            client_id = client_id or env_id
+            secret = secret or env_secret
+
+    return {
+        "client_id": client_id,
+        "client_id_masked": mask_client_id(client_id),
+        "has_secret": bool(secret),
+        "configured": bool(client_id and secret),
+        "source": source if (client_id and secret) else "none",
+    }
+
+
+async def google_oauth_credentials(db: AsyncSession) -> tuple[Optional[str], Optional[str]]:
+    """``(client_id, client_secret)`` — the pair the OAuth round-trip needs."""
+    config = await get_google_oauth_settings(db)
+    if not config["configured"]:
+        return None, None
+    from app.config import settings
+
+    secret = _maybe_decrypt(await get_setting(db, GOOGLE_OAUTH_CLIENT_SECRET))
+    if not secret:
+        secret = (settings.GOOGLE_CLIENT_SECRET or "").strip()
+    return config["client_id"] or None, secret or None
+
+
+async def set_google_oauth_settings(
+    db: AsyncSession,
+    *,
+    client_id: Optional[str] = None,
+    client_secret: Optional[str] = None,
+) -> dict:
+    """Persist the OAuth client saved from Settings → Gmail replies.
+
+    ``None`` means "leave it alone" (the form only sends the secret when the
+    operator typed a new one); an empty string clears it.
+    """
+    from app.security.encryption import encrypt_value
+
+    if client_id is not None:
+        cleaned = client_id.strip()
+        await set_setting(db, GOOGLE_OAUTH_CLIENT_ID, cleaned, category="google_oauth",
+                          description="Google OAuth client id (Gmail replies)")
+    if client_secret is not None:
+        cleaned = client_secret.strip()
+        try:
+            stored = encrypt_value(cleaned) if cleaned else ""
+        except Exception:  # noqa: BLE001 — no encryption key: store as typed
+            stored = cleaned
+        await set_setting(db, GOOGLE_OAUTH_CLIENT_SECRET, stored, category="google_oauth",
+                          description="Google OAuth client secret (encrypted)")
+    return await get_google_oauth_settings(db)
+
+
 # --- Inbuilt browser notifications (VAPID keypair, generated once) ---
 VAPID_PUBLIC_KEY = "push.vapid_public"
 VAPID_PRIVATE_KEY = "push.vapid_private"

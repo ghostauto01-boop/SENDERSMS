@@ -868,6 +868,11 @@ TOOLS: list[Tool] = [
         params=[Param("status", where="query"),
                 Param("unread_only", type="boolean", where="query",
                       description="Only threads with unread messages."),
+                Param("replied_only", type="boolean", where="query",
+                      description="Only threads the contact actually replied to — a real "
+                                  "conversation rather than mail nobody answered."),
+                Param("campaign_id", type="integer", where="query",
+                      description="Only threads attributed to this campaign."),
                 Param("search", where="query", description="Match the contact's email or name."),
                 Param("page", type="integer", default=1, where="query"),
                 Param("per_page", type="integer", default=25, minimum=1, maximum=100, where="query",

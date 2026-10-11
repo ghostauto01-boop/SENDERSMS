@@ -140,6 +140,25 @@ async def _attributed_totals(db: AsyncSession, replied_ids: set[int]) -> dict[st
     return totals
 
 
+def _inbox_links(channel: str | None, campaign_id: int, *, param: str = "campaign_id") -> tuple[str, str]:
+    """``(inbox_url, replies_url)`` for a campaign, on the channel it sent on.
+
+    The app has two inboxes. Every one of these links used to say ``/inbox``, so
+    clicking "replies" on an **email** campaign opened the SMS inbox — which has
+    no thread for that person, because an email conversation lives on the email
+    side. The channel now decides the destination, and so does the spelling of
+    the "only the ones who replied" filter (``replied=1`` in the SMS inbox,
+    ``view=replied`` in the Email Inbox).
+    """
+    email = (channel or "sms").strip().lower() == "email"
+    base = "/email-inbox" if email else "/inbox"
+    replied_flag = "view=replied" if email else "replied=1"
+    return (
+        f"{base}?{param}={campaign_id}",
+        f"{base}?{param}={campaign_id}&{replied_flag}",
+    )
+
+
 async def _classic_rows(db: AsyncSession, replied_ids: set[int]) -> list[dict]:
     """Every classic campaign, with inbox-derived engagement counts."""
     campaigns = list((await db.execute(select(Campaign))).scalars().all())
@@ -218,9 +237,10 @@ async def _classic_rows(db: AsyncSession, replied_ids: set[int]) -> list[dict]:
                 "started_at": _iso(camp.started_at),
                 "completed_at": _iso(camp.completed_at),
                 "updated_at": _iso(camp.updated_at),
-                # Deep links the UI turns into buttons.
-                "inbox_url": f"/inbox?campaign_id={camp.id}",
-                "replies_url": f"/inbox?campaign_id={camp.id}&replied=1",
+                # Deep links the UI turns into buttons — into the inbox this
+                # campaign actually used (see _inbox_links).
+                "inbox_url": _inbox_links(camp.channel, camp.id)[0],
+                "replies_url": _inbox_links(camp.channel, camp.id)[1],
             }
         )
     return out
@@ -323,8 +343,10 @@ async def _ads_rows(db: AsyncSession, replied_ids: set[int]) -> list[dict]:
                 "started_at": _iso(camp.start_date),
                 "completed_at": _iso(camp.end_date),
                 "updated_at": _iso(camp.updated_at),
-                "inbox_url": f"/inbox?ads_campaign_id={camp.id}",
-                "replies_url": f"/inbox?ads_campaign_id={camp.id}&replied=1",
+                # The Ads Manager sends SMS, so these are the SMS inbox links —
+                # built by the same helper so the two cannot drift apart.
+                "inbox_url": _inbox_links("sms", camp.id, param="ads_campaign_id")[0],
+                "replies_url": _inbox_links("sms", camp.id, param="ads_campaign_id")[1],
             }
         )
     return out

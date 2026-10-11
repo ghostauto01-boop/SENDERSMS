@@ -211,6 +211,26 @@ def _google_credentials(mailbox: EmailMailbox) -> tuple[str | None, str | None]:
     return client_id, (secret or "").strip() or None
 
 
+async def _google_credentials_with_db(
+    db: AsyncSession, mailbox: EmailMailbox
+) -> tuple[str | None, str | None]:
+    """The mailbox's own OAuth client, then the app-saved one, then the env.
+
+    A mailbox stores the client it was connected with, so this only matters when
+    it does not (an older row, or one connected before the secret was kept per
+    mailbox) — but without the database step, an inbox connected through
+    Settings → Gmail replies could not be refreshed by the poller, which reads
+    no request and therefore sees no environment override.
+    """
+    client_id, secret = _google_credentials(mailbox)
+    if client_id and secret:
+        return client_id, secret
+    from app.services import system_settings
+
+    saved_id, saved_secret = await system_settings.google_oauth_credentials(db)
+    return client_id or saved_id, secret or saved_secret
+
+
 async def access_token_for(db: AsyncSession, mailbox: EmailMailbox) -> tuple[str | None, str | None]:
     """A live Gmail API access token, refreshing the stored one when needed.
 
@@ -220,12 +240,13 @@ async def access_token_for(db: AsyncSession, mailbox: EmailMailbox) -> tuple[str
     refresh_token = decrypt_value(mailbox.credential_encrypted or "")
     if not refresh_token:
         return None, "This mailbox has no stored Google credential"
-    client_id, client_secret = _google_credentials(mailbox)
+    client_id, client_secret = await _google_credentials_with_db(db, mailbox)
     if not client_id or not client_secret:
         return None, (
-            "GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET are not configured, so the refresh token "
-            "cannot be exchanged. Add them to the environment, or connect with an IMAP app "
-            "password instead."
+            "No Google OAuth client is configured, so the refresh token cannot be exchanged. "
+            "Save one under Settings → Gmail replies (or set GOOGLE_CLIENT_ID / "
+            "GOOGLE_CLIENT_SECRET in the environment), or connect with an IMAP app password "
+            "instead."
         )
     result = await gmail_provider.google_refresh_access_token(client_id, client_secret,
                                                              refresh_token)

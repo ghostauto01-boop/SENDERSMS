@@ -842,14 +842,16 @@ async def test_api_builds_a_google_consent_url(client, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_google_callback_rejects_a_forged_state(client):
-    user_id, error = mailbox_api._read_state("abc.def")
-    assert user_id is None and "malformed" in error
+    # (user_id, error, return_to) — the return target travels inside the same
+    # signed value, so a forged state cannot choose where the browser lands.
+    user_id, error, return_to = mailbox_api._read_state("abc.def")
+    assert user_id is None and "malformed" in error and return_to == ""
 
-    user_id, error = mailbox_api._read_state(None)
-    assert user_id is None and "expired" in error
+    user_id, error, return_to = mailbox_api._read_state(None)
+    assert user_id is None and "expired" in error and return_to == ""
 
     good = mailbox_api._make_state(7)
-    assert mailbox_api._read_state(good) == (7, None)
+    assert mailbox_api._read_state(good) == (7, None, "")
     tampered = good[:-2] + ("aa" if not good.endswith("aa") else "bb")
     assert mailbox_api._read_state(tampered)[1] is not None
 

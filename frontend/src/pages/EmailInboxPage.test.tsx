@@ -93,9 +93,9 @@ const meeting = {
   location: "Online",
 };
 
-function renderEmailInbox() {
+function renderEmailInbox(url = "/email-inbox") {
   return render(
-    <MemoryRouter initialEntries={["/email-inbox"]}>
+    <MemoryRouter initialEntries={[url]}>
       <EmailInboxPage />
     </MemoryRouter>
   );
@@ -154,5 +154,90 @@ describe("EmailInboxPage contact information", () => {
       expect(initial.sendInvite).toBe(false);
       expect(initial.sendReminder).toBe(false);
     });
+  });
+});
+
+/**
+ * THE CONVERSATIONS PAGE — only the people who replied.
+ *
+ * Same screen, one filter, and the filter lives in the URL so it can be linked
+ * to from the sidebar, from a campaign's reply list and from a notification.
+ */
+describe("EmailInboxPage — Conversations (only people who replied)", () => {
+  it("asks for replied threads only, and says so", async () => {
+    emailApi.conversations.mockResolvedValue({
+      ...conversationList,
+      total: 1,
+      thread_total: 9,
+      replied_total: 1,
+    });
+    renderEmailInbox("/email-inbox?view=replied");
+
+    await screen.findByRole("button", { name: /Ada Lovelace/ });
+
+    expect(emailApi.conversations).toHaveBeenCalledWith(
+      expect.objectContaining({ replied_only: true }),
+    );
+    expect(screen.getByRole("heading", { name: "Conversations" })).toBeInTheDocument();
+    // Both tab labels carry a real number, from the same response.
+    expect(screen.getByRole("button", { name: /All mail/ })).toHaveTextContent("9");
+    expect(screen.getByRole("button", { name: /Conversations/ })).toHaveTextContent("1");
+  });
+
+  it("the default page is every thread, including the ones nobody answered", async () => {
+    emailApi.conversations.mockResolvedValue({
+      ...conversationList,
+      thread_total: 9,
+      replied_total: 1,
+    });
+    renderEmailInbox();
+
+    await screen.findByRole("button", { name: /Ada Lovelace/ });
+
+    expect(emailApi.conversations).toHaveBeenCalledWith(
+      expect.objectContaining({ replied_only: undefined }),
+    );
+    expect(screen.getByRole("heading", { name: "Inbox" })).toBeInTheDocument();
+  });
+
+  it("switching to Conversations re-reads the list with the filter on", async () => {
+    emailApi.conversations.mockResolvedValue({
+      ...conversationList,
+      thread_total: 9,
+      replied_total: 1,
+    });
+    renderEmailInbox();
+    await screen.findByRole("button", { name: /Ada Lovelace/ });
+
+    fireEvent.click(screen.getByRole("button", { name: /^Conversations/ }));
+
+    await waitFor(() =>
+      expect(emailApi.conversations).toHaveBeenLastCalledWith(
+        expect.objectContaining({ replied_only: true }),
+      ),
+    );
+  });
+
+  it("a campaign's deep link scopes the list and opens that person's thread", async () => {
+    emailApi.conversations.mockResolvedValue({ ...conversationList, thread_total: 1 });
+    renderEmailInbox("/email-inbox?campaign_id=5&contact_id=42");
+
+    // The list is filtered by the campaign and the person the link named…
+    await waitFor(() =>
+      expect(emailApi.conversations).toHaveBeenCalledWith(
+        expect.objectContaining({ campaign_id: 5, contact_id: 42 }),
+      ),
+    );
+    // …and their conversation opens itself, which is the whole point of the link.
+    await waitFor(() => expect(emailApi.conversation).toHaveBeenCalledWith(77));
+    expect(await screen.findByText("Showing one person's thread")).toBeInTheDocument();
+  });
+
+  it("offers a way back to every thread", async () => {
+    renderEmailInbox("/email-inbox?campaign_id=5");
+    await screen.findByRole("button", { name: /Ada Lovelace/ });
+
+    expect(screen.getByText("Showing the threads from campaign #5")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Show every thread/ })).toBeInTheDocument();
   });
 });
