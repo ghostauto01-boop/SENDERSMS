@@ -320,6 +320,17 @@ class CampaignService:
         if gateway_error:
             errors.append(gateway_error)
 
+        if (campaign.channel or "sms") == "email":
+            # The sender must be one the internet will deliver for: not a free-mail address, and -- once
+            # its domain is registered -- an authenticated one (and, while it is warming up, within the ramp).
+            from app.services import sending_domains
+
+            sender_errors, sender_notes = await sending_domains.campaign_sender_checks(
+                self.db, campaign.email_account_id
+            )
+            errors.extend(sender_errors)
+            check.warnings.extend(sender_notes)
+
         if campaign.list_id and check.audience.get("list_members"):
             await self._analyse_audience(campaign, check)
         return check

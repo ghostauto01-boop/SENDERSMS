@@ -521,6 +521,15 @@ async def launch(
         # Launch re-activates a paused campaign, so it must not be a way around
         # the acknowledgement that resume requires.
         raise _breaker_conflict(campaign)
+    if campaign.channel == "email" and not campaign.test_mode:
+        # A sender the internet will not deliver for (free-mail, or a domain not yet authenticated) must
+        # not be started, exactly as for a classic campaign.
+        from app.services import sending_domains
+
+        sender_errors, _notes = await sending_domains.campaign_sender_checks(db, campaign.email_account_id)
+        if sender_errors:
+            raise HTTPException(
+                409, detail={"code": "SENDER_NOT_READY", "message": " ".join(sender_errors)})
     try:
         result = await svc.launch(db, campaign, actor=user.username)
         if result["ok"] and campaign.status in ("active", "scheduled") and campaign.paused_reason:

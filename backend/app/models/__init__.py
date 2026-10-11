@@ -19,6 +19,7 @@ from app.models.system import SystemSetting
 from app.models.system_error import SystemErrorRecord
 from app.models.import_job import ContactImportJob
 from app.models.verification_job import EmailVerificationJob
+from app.models.sending_domain import SendingDomain
 from app.models.quarantine import QuarantinedSMS
 from app.models.scheduled import ScheduledMessage
 from app.models.autoreply import AutoReplyRule
@@ -80,6 +81,7 @@ __all__ = [
     "SystemErrorRecord",
     "ContactImportJob",
     "EmailVerificationJob",
+    "SendingDomain",
     "QuarantinedSMS",
     "ScheduledMessage",
     "AutoReplyRule",

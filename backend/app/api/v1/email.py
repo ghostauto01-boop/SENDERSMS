@@ -25,6 +25,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from pydantic import BaseModel
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -123,6 +124,16 @@ async def _accounts_by_id(db: AsyncSession) -> dict[int, EmailAccount]:
 # ===========================================================================
 
 
+def _refuse_free_mail_sender(address: str) -> None:
+    """A From address on gmail.com, yahoo.com, outlook.com ... can never be authenticated through
+    Brevo (the app does not control that domain's DNS): the mail fails DMARC and is junked or bounced."""
+    from app.services import sending_domains
+    from app.utils.email_domains import is_free_mail
+
+    if is_free_mail(address):
+        raise HTTPException(422, sending_domains.free_mail_error(address))
+
+
 @router.get("/accounts")
 async def list_accounts(
     db: AsyncSession = Depends(get_db),
@@ -155,6 +166,7 @@ async def create_account(
         raise HTTPException(422, "Paste the Brevo API key")
     if not email_service.normalize_email(data.from_email):
         raise HTTPException(422, "Enter a valid From email address")
+    _refuse_free_mail_sender(data.from_email)
 
     account = await email_service.create_account(
         db,
@@ -203,6 +215,7 @@ async def update_account(
     if "from_email" in updates and updates["from_email"]:
         if not email_service.normalize_email(updates["from_email"]):
             raise HTTPException(422, "Enter a valid From email address")
+        _refuse_free_mail_sender(updates["from_email"])
     for key, value in updates.items():
         if key == "reply_to":
             value = email_service.normalize_email(value) or None
@@ -239,6 +252,106 @@ async def delete_account(
     await db.flush()
     if was_default:
         await email_service.ensure_default_account(db)
+    await db.commit()
+
+
+# --------------------------------------------------------------------------
+# Sending domains: the DNS a sender needs, checked, and the warm-up that follows
+# --------------------------------------------------------------------------
+
+
+class SendingDomainIn(BaseModel):
+    domain: str
+    #: Where DMARC aggregate reports should go. Merged into the domain's single DMARC record.
+    rua: Optional[str] = None
+    email_account_id: Optional[int] = None
+
+
+def _domain_http_error(exc) -> HTTPException:
+    return HTTPException(exc.status, detail={"code": exc.code, "message": exc.message, **exc.extra})
+
+
+@router.post("/domains", status_code=201)
+async def register_sending_domain(
+    data: SendingDomainIn,
+    db: AsyncSession = Depends(get_db),
+    cu: User = Depends(get_current_user),
+):
+    """Register a sending domain with Brevo and get the DNS records it needs.
+
+    The plan holds exactly ONE DMARC record: whatever is already published at ``_dmarc.<domain>`` is read
+    and the ``rua`` address merged into it, and the plan says to REPLACE it -- never to add a second
+    (two DMARC records make both invalid). A free-mail domain is a 422."""
+    from app.services import sending_domains
+
+    try:
+        out = await sending_domains.register_domain(
+            db, domain=data.domain, rua=data.rua, account_id=data.email_account_id)
+    except sending_domains.DomainError as exc:
+        raise _domain_http_error(exc)
+    await db.commit()
+    return out
+
+
+@router.get("/domains")
+async def list_sending_domains(
+    db: AsyncSession = Depends(get_db),
+    cu: User = Depends(get_current_user),
+):
+    from app.models.sending_domain import SendingDomain
+    from app.services import sending_domains
+
+    rows = (await db.execute(select(SendingDomain).order_by(SendingDomain.id))).scalars().all()
+    return {"items": [sending_domains.serialize(r) for r in rows], "total": len(rows)}
+
+
+async def _domain_or_404(db: AsyncSession, domain_id: int):
+    from app.models.sending_domain import SendingDomain
+
+    row = (await db.execute(select(SendingDomain).where(SendingDomain.id == domain_id))).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(404, "Sending domain not found")
+    return row
+
+
+@router.get("/domains/{domain_id}")
+async def get_sending_domain(
+    domain_id: int,
+    db: AsyncSession = Depends(get_db),
+    cu: User = Depends(get_current_user),
+):
+    from app.services import sending_domains
+
+    return sending_domains.serialize(await _domain_or_404(db, domain_id))
+
+
+@router.post("/domains/{domain_id}/verify")
+async def verify_sending_domain(
+    domain_id: int,
+    db: AsyncSession = Depends(get_db),
+    cu: User = Depends(get_current_user),
+):
+    """Ask Brevo to check the published records now, re-read the domain's DMARC, and -- the first time
+    it authenticates -- start the warm-up ramp."""
+    from app.services import sending_domains
+
+    row = await _domain_or_404(db, domain_id)
+    try:
+        out = await sending_domains.refresh(db, row)
+    except sending_domains.DomainError as exc:
+        raise _domain_http_error(exc)
+    await db.commit()
+    return out
+
+
+@router.delete("/domains/{domain_id}", status_code=204)
+async def delete_sending_domain(
+    domain_id: int,
+    db: AsyncSession = Depends(get_db),
+    cu: User = Depends(get_current_user),
+):
+    row = await _domain_or_404(db, domain_id)
+    await db.delete(row)
     await db.commit()
 
 

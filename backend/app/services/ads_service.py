@@ -2487,6 +2487,12 @@ async def validate_campaign(db: AsyncSession, campaign: AdsCampaign) -> dict:
     # address is never mailed -- but the operator is told, instead of finding out later
     # that the audience was smaller than they thought.
     errors: list[str] = []
+    if email_campaign and not campaign.test_mode:
+        from app.services import sending_domains
+
+        sender_errors, sender_notes = await sending_domains.campaign_sender_checks(db, campaign.email_account_id)
+        errors.extend(sender_errors)
+        warnings.extend(sender_notes)
     unverified = (sim.get("skipped") or {}).get("unverified", 0) if email_campaign else 0
     if unverified:
         errors.append(

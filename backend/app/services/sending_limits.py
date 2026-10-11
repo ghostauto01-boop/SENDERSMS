@@ -330,6 +330,12 @@ async def _usable_accounts(db: AsyncSession, account_ids: Optional[list[int]] = 
     return list((await db.execute(query.order_by(EmailAccount.id))).scalars().all())
 
 
+def _lowest(*caps: Optional[int]) -> Optional[int]:
+    """The smallest cap that is set (None = no cap)."""
+    given = [c for c in caps if c is not None]
+    return min(given) if given else None
+
+
 async def email_capacity(
     db: AsyncSession, rules: Optional[dict] = None, account_ids: Optional[list[int]] = None
 ) -> dict:
@@ -339,17 +345,22 @@ async def email_capacity(
     account sets one, or no mailbox is configured at all).
     """
     rules = rules or await get_sending_rules(db)
+    from app.services.warmup import warmup_caps
+
     accounts = await _usable_accounts(db, account_ids)
-    caps = [account_daily_cap(a, rules) for a in accounts]
+    # A mailbox on a domain that is still warming up is held to the ramp (5 a day in week one, 25 from
+    # week four), whatever the per-mailbox default allows.
+    warm = await warmup_caps(db, accounts)
+    caps = [_lowest(account_daily_cap(a, rules), warm.get(a.id)) for a in accounts]
     daily_cap = None if (not caps or any(c is None for c in caps)) else sum(caps)
     return {
         "mailboxes": len(accounts),
         "per_mailbox": int(rules.get(EMAIL_DAILY_PER_MAILBOX) or 0),
         "daily_cap": daily_cap,
         "accounts": [
-            {"id": a.id, "name": a.name, "from_email": a.from_email,
-             "daily_cap": account_daily_cap(a, rules)}
-            for a in accounts
+            {"id": a.id, "name": a.name, "from_email": a.from_email, "daily_cap": cap,
+             "warmup_cap": warm.get(a.id)}
+            for a, cap in zip(accounts, caps)
         ],
     }
 
@@ -385,8 +396,14 @@ class SendingGate:
                 accounts = await _usable_accounts(self.db, [self.account_id])
                 if not accounts:
                     return None, ""
-                cap = account_daily_cap(accounts[0], rules)
-                return cap, f"mailbox '{accounts[0].name}' daily limit"
+                from app.services.warmup import warmup_caps
+
+                warm = (await warmup_caps(self.db, accounts)).get(accounts[0].id)
+                cap = _lowest(account_daily_cap(accounts[0], rules), warm)
+                label = f"mailbox '{accounts[0].name}' daily limit"
+                if warm is not None and cap == warm:
+                    label += " (warm-up)"
+                return cap, label
             capacity = await email_capacity(self.db, rules)
             return capacity["daily_cap"], "daily limit"
         return int(rules["daily_maximum"]), "daily limit"

@@ -270,6 +270,37 @@ TOOLS: list[Tool] = [
         ],
     ),
     Tool(
+        name="register_sending_domain",
+        description=(
+            "Register the domain your email is sent FROM (acme-leads.io, not gmail.com: a free-mail "
+            "domain is refused) with Brevo and get the DNS records to publish: the verification code, "
+            "DKIM, and exactly ONE DMARC record. If the domain already publishes DMARC, your report "
+            "address is merged into that record and you are told to REPLACE it -- never to add a second. "
+            "Campaigns cannot start from a domain that is registered but not authenticated."
+        ),
+        method="POST", path="/api/v1/email/domains", scope="write", group="email",
+        params=[
+            Param("domain", required=True, where="body", description="e.g. acme-leads.io"),
+            Param("rua", where="body", description="Address for DMARC aggregate reports."),
+            Param("email_account_id", type="integer", where="body",
+                  description="The Brevo sender to register it with (the default sender if omitted)."),
+        ],
+    ),
+    Tool(
+        name="list_sending_domains",
+        description="Every registered sending domain with its status, DNS records and warm-up progress.",
+        method="GET", path="/api/v1/email/domains", group="email",
+    ),
+    Tool(
+        name="verify_sending_domain",
+        description=(
+            "Ask Brevo to check the published DNS records now, re-read the domain's DMARC, and -- the first "
+            "time it authenticates -- start the warm-up ramp (about 5 a day in week one, 25 from week four)."
+        ),
+        method="POST", path="/api/v1/email/domains/{domain_id}/verify", scope="write", group="email",
+        params=[Param("domain_id", type="integer", required=True, where="path")],
+    ),
+    Tool(
         name="validator_status",
         description=(
             "Can this server actually CONFIRM a mailbox? Reports the engine (builtin | reacher), "

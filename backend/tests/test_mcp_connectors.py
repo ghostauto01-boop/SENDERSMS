@@ -750,7 +750,8 @@ async def test_claude_gets_every_tool_with_annotations(client):
     tokens = await _exchange(client, profile, form=True)
     reply = _body(await _rpc(client, profile, tokens["access_token"], "tools/list"))
     tools = reply["result"]["tools"]
-    assert len(tools) == 64  # 60 + validator_status, verify_contacts, verification_job (P0-5) + delete_followup (C4)
+    assert len(tools) == 67  # 60 + validator_status, verify_contacts, verification_job (P0-5) + delete_followup (C4)
+    #                          + register_sending_domain, list_sending_domains, verify_sending_domain (P0-6)
     for tool in tools:
         assert tool.get("title"), tool["name"]
         annotations = tool.get("annotations") or {}
@@ -790,7 +791,7 @@ async def test_static_bearer_token_still_works(client, session_factory):
     assert reply["result"]["protocolVersion"] == "2026-07-28"
 
     listed = _body(await _rpc(client, C.ARENA, raw, "tools/list", msg_id=2))
-    assert len(listed["result"]["tools"]) == 64
+    assert len(listed["result"]["tools"]) == 67
 
 
 @pytest.mark.asyncio
