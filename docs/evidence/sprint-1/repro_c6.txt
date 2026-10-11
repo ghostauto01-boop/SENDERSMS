@@ -1,0 +1,24 @@
+# repro_c6.py
+## BEFORE (code at 981320d)
+SMS numbers (truth: sent 11 (12 all-time), delivered 6 (7), failed 1, replies 3)
+  dashboard/stats?channel=sms  (all time)      sent= 12 delivered=  6 failed=  1 replies=  3
+  analytics/overview  (30 days, 'SMS')         sent= 19 delivered=  9 failed=  2 replies=  5
+  analytics/funnel  (same page, chart)         sent= 19 delivered=  9 failed=  3 replies=None
+  analytics/timeseries  (same page, chart)     sent= 19 delivered=  9 failed=  3 replies=  5
+  send/history rows (should be SMS only: 12 incl. the old one): 21
+Email numbers (truth: sent 8 (9 all-time), delivered 5 (6), failed 1, replies 2)
+  email/stats  (30 days)                       sent=  8 delivered=  5 failed=  1 replies=  2
+  email/overview totals  (30 days)             sent=  8 delivered=  5 failed=  1 replies=  2
+  dashboard/stats?channel=email  (all time)    sent=  9 delivered=  5 failed=  1 replies=  2
+
+## AFTER (5ec15d2)
+SMS numbers (truth: sent 11 (12 all-time), delivered 6 (7), failed 1, replies 3)
+  dashboard/stats?channel=sms  (all time)      sent= 12 delivered=  7 failed=  1 replies=  3
+  analytics/overview  (30 days, 'SMS')         sent= 11 delivered=  6 failed=  1 replies=  3
+  analytics/funnel  (same page, chart)         sent= 11 delivered=  6 failed=  1 replies=None
+  analytics/timeseries  (same page, chart)     sent= 11 delivered=  6 failed=  1 replies=  3
+  send/history rows (should be SMS only: 12 incl. the old one): 12
+Email numbers (truth: sent 8 (9 all-time), delivered 5 (6), failed 1, replies 2)
+  email/stats  (30 days)                       sent=  8 delivered=  5 failed=  1 replies=  2
+  email/overview totals  (30 days)             sent=  8 delivered=  5 failed=  1 replies=  2
+  dashboard/stats?channel=email  (all time)    sent=  9 delivered=  6 failed=  1 replies=  2

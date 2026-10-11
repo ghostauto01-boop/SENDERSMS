@@ -1,0 +1,13 @@
+# s2_tool_contracts -- tests: backend/tests/test_sprint2_tool_contracts.py
+# BEFORE = code at 981320d (parent of the fix) with today's tests;  AFTER = 5ec15d2
+
+## BEFORE the fix
+5 failed, 2 passed, 1 warning in 2.78s
+FAILED backend/tests/test_sprint2_tool_contracts.py::test_an_omitted_argument_gets_the_default_the_tool_advertises
+FAILED backend/tests/test_sprint2_tool_contracts.py::test_every_tool_matches_its_endpoint
+FAILED backend/tests/test_sprint2_tool_contracts.py::test_the_create_campaign_tool_offers_no_knob_the_engine_ignores
+FAILED backend/tests/test_sprint2_tool_contracts.py::test_the_email_inbox_filter_the_tool_offers_really_filters
+FAILED backend/tests/test_sprint2_tool_contracts.py::test_what_the_caller_passes_beats_the_default_and_none_means_omitted
+
+## AFTER the fix
+7 passed, 1 warning in 2.84s

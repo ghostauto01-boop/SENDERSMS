@@ -1,0 +1,18 @@
+# s2_http -- tests: backend/tests/test_sprint2_http_semantics.py
+# BEFORE = code at 981320d (parent of the fix) with today's tests;  AFTER = 5ec15d2
+
+## BEFORE the fix
+10 failed, 6 passed, 1 warning in 4.58s
+FAILED backend/tests/test_sprint2_http_semantics.py::test_an_enum_value_in_another_case_is_accepted_in_its_canonical_form
+FAILED backend/tests/test_sprint2_http_semantics.py::test_an_invalid_mark_is_a_422_that_lists_the_valid_ones[bogus]
+FAILED backend/tests/test_sprint2_http_semantics.py::test_an_invalid_mark_is_a_422_that_lists_the_valid_ones[mark-]
+FAILED backend/tests/test_sprint2_http_semantics.py::test_an_invalid_mark_is_a_422_that_lists_the_valid_ones[mark-bogus]
+FAILED backend/tests/test_sprint2_http_semantics.py::test_an_invalid_mark_is_a_422_that_lists_the_valid_ones[reply-all]
+FAILED backend/tests/test_sprint2_http_semantics.py::test_patch_and_put_behave_the_same
+FAILED backend/tests/test_sprint2_http_semantics.py::test_patch_changes_only_the_fields_it_is_given
+FAILED backend/tests/test_sprint2_http_semantics.py::test_patch_is_refused_for_a_campaign_that_is_sending_exactly_like_put
+FAILED backend/tests/test_sprint2_http_semantics.py::test_patching_a_missing_campaign_is_a_404
+FAILED backend/tests/test_sprint2_http_semantics.py::test_the_tool_refuses_an_invalid_mark_without_calling_the_app
+
+## AFTER the fix
+16 passed, 1 warning in 4.34s

@@ -1,0 +1,19 @@
+# s2_metrics -- tests: backend/tests/test_sprint2_metrics.py
+# BEFORE = code at 981320d (parent of the fix) with today's tests;  AFTER = 5ec15d2
+
+## BEFORE the fix
+11 failed, 1 warning in 4.76s
+FAILED backend/tests/test_sprint2_metrics.py::test_a_cancelled_message_is_not_a_failed_one_anywhere
+FAILED backend/tests/test_sprint2_metrics.py::test_all_channels_is_the_sum_of_the_two
+FAILED backend/tests/test_sprint2_metrics.py::test_each_endpoint_says_what_scope_and_definitions_its_numbers_use
+FAILED backend/tests/test_sprint2_metrics.py::test_every_endpoint_cuts_the_window_at_the_same_instant
+FAILED backend/tests/test_sprint2_metrics.py::test_send_history_lists_sms_by_default_not_email
+FAILED backend/tests/test_sprint2_metrics.py::test_send_history_rejects_a_bogus_channel
+FAILED backend/tests/test_sprint2_metrics.py::test_sms_analytics_does_not_count_email
+FAILED backend/tests/test_sprint2_metrics.py::test_the_assistant_tools_can_ask_for_a_scope
+FAILED backend/tests/test_sprint2_metrics.py::test_the_dashboard_and_both_email_endpoints_agree
+FAILED backend/tests/test_sprint2_metrics.py::test_the_dashboard_and_the_sms_analytics_agree_for_the_same_scope
+FAILED backend/tests/test_sprint2_metrics.py::test_the_dashboard_stays_all_time_unless_given_a_window
+
+## AFTER the fix
+11 passed, 1 warning in 4.12s

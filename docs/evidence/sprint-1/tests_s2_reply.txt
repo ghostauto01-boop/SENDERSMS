@@ -1,0 +1,16 @@
+# s2_reply -- tests: backend/tests/test_sprint2_reply.py
+# BEFORE = code at 981320d (parent of the fix) with today's tests;  AFTER = 5ec15d2
+
+## BEFORE the fix
+8 failed, 1 passed, 1 warning in 3.92s
+FAILED backend/tests/test_sprint2_reply.py::test_a_direct_sms_send_does_not_land_in_the_contacts_email_thread
+FAILED backend/tests/test_sprint2_reply.py::test_a_reply_to_an_email_conversation_goes_out_as_email_not_sms
+FAILED backend/tests/test_sprint2_reply.py::test_an_inbound_text_does_not_mark_the_contacts_email_thread_unread
+FAILED backend/tests/test_sprint2_reply.py::test_an_sms_reply_lands_in_the_conversation_it_answers
+FAILED backend/tests/test_sprint2_reply.py::test_the_endpoint_takes_a_json_body_and_still_takes_the_old_query_parameters
+FAILED backend/tests/test_sprint2_reply.py::test_the_reply_tool_advertises_what_the_endpoint_accepts
+FAILED backend/tests/test_sprint2_reply.py::test_the_reply_tool_can_answer_with_a_template
+FAILED backend/tests/test_sprint2_reply.py::test_the_reply_tool_sends_an_sms
+
+## AFTER the fix
+9 passed, 1 warning in 3.61s

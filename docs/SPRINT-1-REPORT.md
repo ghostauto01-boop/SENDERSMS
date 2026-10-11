@@ -99,6 +99,10 @@ Each fix has tests that **fail on the code before the fix and pass after** (`tes
 * **Also fixed:** an email campaign carrying its own message and no template raised `UnboundLocalError` on its first contact, so it
   could never send. Fixed together with the throttles on purpose — fixing it alone would have released an unthrottled send.
 * **Not verified:** real Brevo bounce/complaint webhooks; behaviour over a real week; the Celery beat sweep (the inline sweep is tested).
+* **A flaw found later, in this workstream (fixed in Sprint 2, see `SPRINT-2-REPORT.md`):** the one-time startup step that applies the safe
+  defaults ran in the background while the server was already answering requests, and could overwrite rules an operator had *just saved*
+  (when the saved values were exactly the old all-open ones). The statement above that an operator's own configuration is never touched was
+  therefore not true for a save during boot. Every save now records that a person decided, and the step re-checks right before it writes.
 
 ## P0-4 — nothing silently truncated (commit `60c0f4f`)
 
@@ -176,9 +180,9 @@ Each fix has tests that **fail on the code before the fix and pass after** (`tes
 * The simulator's helper scripts must share the server's `CREDENTIAL_ENCRYPTION_KEY` (a shared `.env`); with mismatched keys four steps fail with `api_key_unreadable`.
   I proved that was the cause by re-running with matching keys (61/61).
 
-## Not done
+## Not done (as of the end of Sprint 1; Sprints 2–3 are in their own reports)
 
-* **P0-6** (Sprint 3) and **C1–C9** (Sprint 2) were not started. **C11:** only the missing-campaign 404 is done (as part of P0-1); PATCH 405 and the invalid-mark 422 are not.
-* **§E data work** (tagging `pattern_generated`, consent model, RFC 8058 headers, …): none; no data was touched.
+* **C1–C9 and C11 were done afterwards: see `docs/SPRINT-2-REPORT.md`.** C10's HMAC-signing is still not done (Brevo does not sign its webhooks).
+* **P0-6 and §E:** see `docs/SPRINT-3-REPORT.md` for what was and was not done.
 * Production: P0-0, the deploy, and lifting the "freeze outbound sends" are your calls. New schema is created at startup (`contacts.email_verdict` by
   `schema_repair`, `email_verification_jobs` by `create_all`) and also listed in `scripts/migrate_existing_db.sql`.

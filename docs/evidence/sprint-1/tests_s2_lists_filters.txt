@@ -1,0 +1,18 @@
+# s2_lists_filters -- tests: backend/tests/test_sprint2_lists_and_filters.py
+# BEFORE = code at 981320d (parent of the fix) with today's tests;  AFTER = 5ec15d2
+
+## BEFORE the fix
+10 failed, 5 passed, 1 warning in 5.44s
+FAILED backend/tests/test_sprint2_lists_and_filters.py::test_a_blank_name_is_a_422_not_an_empty_list
+FAILED backend/tests/test_sprint2_lists_and_filters.py::test_a_bogus_channel_filter_is_a_422_not_an_empty_page[/api/v1/inbox/campaign-filters]
+FAILED backend/tests/test_sprint2_lists_and_filters.py::test_a_bogus_channel_filter_is_a_422_not_an_empty_page[/api/v1/inbox/conversations]
+FAILED backend/tests/test_sprint2_lists_and_filters.py::test_a_second_list_with_the_same_name_is_a_409
+FAILED backend/tests/test_sprint2_lists_and_filters.py::test_an_import_that_names_a_new_list_that_already_exists_is_a_409
+FAILED backend/tests/test_sprint2_lists_and_filters.py::test_renaming_a_list_to_another_lists_name_is_a_409
+FAILED backend/tests/test_sprint2_lists_and_filters.py::test_the_comparison_ignores_case_and_surrounding_spaces[  Leads  ]
+FAILED backend/tests/test_sprint2_lists_and_filters.py::test_the_comparison_ignores_case_and_surrounding_spaces[LEADS]
+FAILED backend/tests/test_sprint2_lists_and_filters.py::test_the_comparison_ignores_case_and_surrounding_spaces[leads ]
+FAILED backend/tests/test_sprint2_lists_and_filters.py::test_the_comparison_ignores_case_and_surrounding_spaces[leads]
+
+## AFTER the fix
+15 passed, 1 warning in 4.82s
