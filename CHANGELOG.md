@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased — Ads campaigns stuck "waiting" never resumed sending
+
+An Ads Manager campaign that had to wait for its sending window, its daily cap or
+its next drip batch was woken again and again by the poller. Every one of those
+wake-ups counted as an attempt, and the job allows five. After five ordinary
+wake-ups, one transient error (a database blip, a provider exception) marked the
+job `failed` for good; `create_missing_jobs` never revives a failed job, so the
+campaign stayed `active` with pending contacts and nothing was ever sent again.
+
+- **The retry budget counts failures only.** A claim no longer increments
+  `AdsCampaignJob.attempts`. A failed slice adds one; any slice that completes
+  clears the count. `max_retries` now means what the docs say: five consecutive
+  failed attempts before the job is marked `failed` and needs an operator retry.
+- Regression coverage in `backend/tests/test_ads_job_retry_budget.py` (waiting
+  wake-ups, a transient error after many wake-ups, five real failures still fail
+  the job, and a success clears the count). Three of the five fail on the old code.
+
 ## Unreleased — follow-up steps: every parameter honoured, editable, chainable
 
 A campaign's follow-up chain was write-only: the POST ignored most of what it was

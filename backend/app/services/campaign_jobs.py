@@ -318,9 +318,13 @@ async def process_campaign_job(job_id: str, *, send_inline: bool = False, batch:
                 AdsCampaignJob.scheduled_for.is_not(None),
                 AdsCampaignJob.scheduled_for <= now,
             )
+            # ``attempts`` counts consecutive FAILED slices only (see the failure
+            # handler below). Counting every claim here meant a campaign that is
+            # routinely woken to wait for its sending window, a daily cap or the
+            # next drip batch used up its five retries without ever failing, and
+            # then one transient error marked the job "failed" for good.
             .values(
                 status="running",
-                attempts=AdsCampaignJob.attempts + 1,
                 started_at=func.coalesce(AdsCampaignJob.started_at, now),
                 worker_id=f"{socket.gethostname()}:{os.getpid()}",
                 updated_at=now,
@@ -349,6 +353,7 @@ async def process_campaign_job(job_id: str, *, send_inline: bool = False, batch:
                 if (svc.as_utc(campaign.start_date) or now_utc()) > now_utc():
                     job.status = "queued"
                     job.scheduled_for = svc.as_utc(campaign.start_date)
+                    job.attempts = 0
                     await db.commit()
                     return {"ok": True, "job_id": job_id, "state": "scheduled"}
                 svc.transition_campaign(
@@ -358,6 +363,7 @@ async def process_campaign_job(job_id: str, *, send_inline: bool = False, batch:
 
             if campaign.status != "active":
                 await refresh_job_status(db, job)
+                job.attempts = 0
                 await db.commit()
                 return {"ok": True, "job_id": job_id, "state": campaign.status}
 
@@ -366,6 +372,7 @@ async def process_campaign_job(job_id: str, *, send_inline: bool = False, batch:
             result = await svc.dispatch_campaign(db, campaign, limit=batch, send_inline=send_inline)
             await svc.sync_delivery(db, campaign.id)
             await refresh_job_status(db, job, result=result)
+            job.attempts = 0
             await db.commit()
             return {"ok": True, "job_id": job_id, **result, "job_status": job.status}
         except Exception as exc:  # noqa: BLE001 - persist failures for the operator
@@ -374,7 +381,8 @@ async def process_campaign_job(job_id: str, *, send_inline: bool = False, batch:
             async with async_session_factory() as err_db:
                 job = (await err_db.execute(select(AdsCampaignJob).where(AdsCampaignJob.id == job_id))).scalar_one_or_none()
                 if job is not None:
-                    job.attempts = max(int(job.attempts or 0), 1)
+                    # One more consecutive failure (the claim no longer counts).
+                    job.attempts = int(job.attempts or 0) + 1
                     job.error = "Campaign processing failed. The worker will retry automatically; check system health if the problem continues."
                     job.updated_at = now_utc()
                     if job.attempts >= job.max_retries:
