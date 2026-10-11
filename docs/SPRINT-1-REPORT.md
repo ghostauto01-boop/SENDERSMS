@@ -4,6 +4,12 @@ Branch `arena/191f89ff-sendersms`, six commits on top of `45c0937`
 (`d9002cf` P0-1, `b9eedb5` P0-2, `38d3b87` P0-3, `60c0f4f` P0-4, `abeb293` P0-5, `04f946b` C10 + P0-5 follow-up).
 Evidence (raw before/after output) is in [`docs/evidence/sprint-1/`](evidence/sprint-1/).
 
+> **About the evidence.** The first logs I cited were lost: `.gitignore` excludes `*.log`, so they were never committed, and
+> the sandbox was rebuilt between turns. I regenerated everything with two scripts that are now in the repo
+> (`collect.sh`: each workstream's tests against the code *before* the fix and *after*, plus the reproduction scripts in `repro/`;
+> `integration.sh`: the real app + fake Brevo driven by the repo's own end-to-end tools). Where a regenerated figure differs from what I
+> first reported, this report uses the regenerated one and says so.
+
 **Everything below was verified in a sandbox with synthetic data. I had no production URL or credentials, so
 nothing was run against production, and none of the brief's production numbers (1,297 contacts, 184 bounced,
 525 pending, 45% failure rate…) were re-measured by me. Where my environment differs from the brief I say so.**
@@ -34,8 +40,9 @@ validation. That last sentence is an inference from the brief's numbers, not som
 | Email-channel simulator (real server + fake Brevo) | `python tools/simulate_email_flow.py` | gate off: **61/61 PASS**; gate on: **35/35 PASS** (stops at the gate by design) |
 | MCP smoke (real JSON-RPC) | `python tools/mcp_smoke.py` | **92/92** |
 | Every parameterless GET | `python tools/smoke_all_endpoints.py` | 95 endpoints, all clean |
+| Regenerate the evidence | `docs/evidence/sprint-1/collect.sh`, `integration.sh` | see the folder |
 
-Each fix has a test that **failed on the pre-change code and passes now** (the failing runs are in the evidence folder).
+Each fix has tests that **fail on the code before the fix and pass after** (`tests_*.txt`); the table of counts is under each workstream.
 
 ---
 
@@ -45,7 +52,8 @@ Each fix has a test that **failed on the pre-change code and passes now** (the f
   `tasks/campaign_tasks.py`, `mcp/registry.py`, `frontend/src/pages/CampaignsPage.tsx`, `scripts/migrate_existing_db.sql`;
   tests `backend/tests/test_p0_1_campaign_lifecycle.py` (46).
 * **Verify:** `python -m pytest backend/tests/test_p0_1_campaign_lifecycle.py`
-* **Before → after:** pre-fix code **27 of 46 failed** (`p0_1_before.log`); now 46 pass (`p0_1_after.log`).
+* **Before → after** (`tests_p0_1.txt`): on the code before the fix **25 of 46 fail** (my first run counted 27; the log was lost and the tests have been
+  adjusted since); now all 46 pass.
   Reproduced: a draft with a past `scheduled_start_at` was launched by the scheduler right after a `validate`.
   Now `validate` is a report (`changed: false`, any number of calls leaves the status alone); `scheduled` has exits —
   pause (records `paused_from`, resume restores `scheduled`), delete when `messages_sent == 0`, stop, edit —
@@ -63,7 +71,7 @@ Each fix has a test that **failed on the pre-change code and passes now** (the f
 * **Changed:** `api/v1/overview.py`, `api/v1/dashboard.py`, `mcp/registry.py`, `mcp/server.py`, `main.py`, schemas;
   tests `test_p0_2_unified_campaigns.py` (23).
 * **Verify:** `python -m pytest backend/tests/test_p0_2_unified_campaigns.py`
-* **Before → after:** dashboard `active_campaigns` **1 → 3** on a fixture with overlapping ids; `get_campaign(2, kind=ads)`
+* **Before → after** (`tests_p0_2.txt`): **20 of 23 tests fail** on the code before the fix, all 23 pass now. Headline: dashboard `active_campaigns` **1 → 3** on a fixture with overlapping ids; `get_campaign(2, kind=ads)`
   returned the classic "Legacy email draft" (now the ads campaign); MCP `pause_campaign(1)` guessed a system (now an id in
   both systems is a 409 `AMBIGUOUS_CAMPAIGN_ID` listing the candidates). The "surfaced anywhere" test collects every campaign id shown by the
   campaign directory and by the inbox conversation badges (each now carries a `kind`) and checks each resolves to the same campaign it was
@@ -80,10 +88,11 @@ Each fix has a test that **failed on the pre-change code and passes now** (the f
   `SettingsPage.tsx`/`CampaignsPage.tsx`/`ads/CampaignDetail.tsx`; docs `docs/SENDING-RULES.md`;
   tests `test_p0_3_send_throttles.py` (37) + `test_p0_3_circuit_breaker.py` (22).
 * **Verify:** `python -m pytest backend/tests/test_p0_3_send_throttles.py backend/tests/test_p0_3_circuit_breaker.py`
-* **Before → after** (`p0_3_before.log` / `p0_3_after.log`): Saturday 23:30 Lagos, 200-contact email campaign, one mailbox —
-  **200 of 200** messages created and handed to the provider → **0** created (200 stay pending). Wednesday noon: **30**
-  created (cap = 30 per mailbox × 1 mailbox) and still 30 on a second pass, 170 pending. (The log's "handed to the provider: 1"
-  is the existing 30-second pacing in a harness that does not wait.) Defaults: daily cap on, 09:00–17:00 Africa/Lagos,
+* **Before → after** (`repro_p0_3.txt`; tests `tests_p0_3.txt`: 36 of 59 fail and 23 error before the fix — the tests exercise machinery that did not exist — 59 pass now):
+  Saturday 23:30 Lagos, 200-contact email campaign, one mailbox — **200 of 200** messages created and handed to the provider → **0** created
+  (200 stay pending). Wednesday noon: **30** created (cap = 30 per mailbox × 1 mailbox) and still 30 on a second pass, 170 pending. (The "handed to the
+  provider: 1" after the fix is the existing 30-second send pacing in a harness that does not wait it out. On the old code the repro needs a template
+  on the campaign; without one the old code crashed with the `UnboundLocalError` described below before it reached the throttle.) Defaults: daily cap on, 09:00–17:00 Africa/Lagos,
   weekends off. `validate` reports a projection (sendable, daily cap, sending days, finish date). The breaker pauses an email
   campaign above 2% bounces/refusals or 0.10% complaints (rolling 7 days, ≥20 sends), records why in `paused_reason`;
   a synthetic 5% bounce run is the test. Resume/start/launch need `acknowledge_breaker=true`.
@@ -97,11 +106,11 @@ Each fix has a test that **failed on the pre-change code and passes now** (the f
   `api/v1/inbox.py`, `api/v1/webhooks.py`, `api/v1/mcp.py`, `schemas/contact.py`, `tools/mcp_smoke.py`; docs `docs/MCP-RESPONSES.md`;
   tests `test_p0_4_no_silent_truncation.py` (34).
 * **Verify:** `python -m pytest backend/tests/test_p0_4_no_silent_truncation.py`
-* **Before → after** (5,000-contact fixture; `p0_4_before.log`, `p0_4_after.log`, `p0_4_tests_before.log`): `export_contacts_csv` returned
-  **4,000 characters = 26 complete rows** with no flag; `search_contacts per_page=100` returned 6,034 characters of **unparseable JSON**.
+* **Before → after** (5,000-contact fixture; `repro_p0_4.txt`, `tests_p0_4.txt`): `export_contacts_csv` returned
+  **4,107 characters = 25 complete rows** (my first count said 26) with no flag; `search_contacts per_page=100` returned 6,034 characters of **unparseable JSON**.
   Now every tool result is one valid JSON envelope (`truncated`, `returned`, `total`, `next_cursor`, `cut`, `data`); the 1,297-contact export
   yields **1,297 rows over 10 pages** (default 20 KB page budget), 5,000 → 5,000 over 39 pages, every page valid JSON, last page
-  `truncated:false`; `per_page=101` is a **422**. 25 of the 34 tests fail on the old code.
+  `truncated:false`; `per_page=101` is a **422**. 25 of the 34 tests fail on the old code, 9 pass (they cover the new response builder, which is present but unused there).
 * **Not verified:** how real MCP clients (Claude/ChatGPT/Arena) follow `next_cursor` — only through this server's JSON-RPC (`mcp_smoke` 92/92).
 
 ## P0-5 — unknown is not a yes (commits `abeb293`, `04f946b`)
@@ -111,7 +120,8 @@ Each fix has a test that **failed on the pre-change code and passes now** (the f
   `services/campaign_service.py` (set-based population, risky last), `services/ads_service.py`, `tasks/*`, `config.py`
   (`EMAIL_REQUIRE_VERIFIED`), `mcp/registry.py` (+3 tools), `frontend/src/pages/ValidatorPage.tsx`; docs `docs/EMAIL-VERIFICATION.md`;
   tests `test_p0_5_verification_gate.py` (50).
-* **Verify:** `python -m pytest backend/tests/test_p0_5_verification_gate.py`; repro `p0_5_before.log` / `p0_5_after.log`.
+* **Verify:** `python -m pytest backend/tests/test_p0_5_verification_gate.py`; repro `repro_p0_5.txt`; tests `tests_p0_5.txt` (before the fix 43 fail and 6 error,
+  because the model has no `email_verdict` column; 50 pass now).
 * **Before → after** (5 contacts, 3 verified + 2 never checked, email campaign): `validate` **valid, 5 of 5 sendable** → **invalid, "2 of 5
   contacts have an unknown email verification status"**; `start` **200, 5 messages created, 2 to unverified addresses** → **400, 0 messages**;
   validator `batch_size` 5 → 25 (`/batch` with 6 rows: 422 → 200); `/validator/status`: `smtp_enabled: true, reason: none` →
@@ -137,8 +147,8 @@ Each fix has a test that **failed on the pre-change code and passes now** (the f
   (`X-Sendsms-Via: mcp`), `services/setup_guide.py`, UI `EmailManagerPage.tsx`, `SetupPage.tsx`, `api/email.ts`, `api/guide.ts`; docs `docs/WEBHOOK-SECURITY.md`;
   tests `test_c10_secrets.py` (19) + one `SetupPage` UI test.
 * **Verify:** `python -m pytest backend/tests/test_c10_secrets.py backend/tests/test_setup_guide.py`; `npx vitest run frontend/src/pages/SetupPage.test.tsx`
-* **Before → after** (`c10_before.log` / `c10_after.log`): `GET /email/accounts` contained the **full webhook token: True → False** (now `token=****a1b2`).
-  13 of 19 tests fail on the old code; the new UI test fails on the old page. Rotation replaces the token and the old one gets a 403 immediately; reveal and
+* **Before → after** (`repro_c10.txt`, `tests_c10.txt`): `GET /email/accounts` contained the **full webhook token: True → False** (now `token=****a1b2`).
+  13 of 19 tests fail on the old code; the new UI test (`SetupPage.test.tsx`) failed on the old page when I ran it before the change (that run's output was in the lost logs). Rotation replaces the token and the old one gets a 403 immediately; reveal and
   rotate are refused to the MCP bridge, including through the generic `api_request` tool.
 * **Not done:** HMAC-signing of webhooks (Brevo does not sign its transactional webhooks, so there is nothing to verify; the SMS gateway webhook already has a
   signature check). The gateway device id is masked in `/inbox/device-info`, `/inbox/poll-debug` and the device hint in the inbox status, but only `/inbox/device-info` has a test; other secrets-in-reads were not audited. Because Brevo can only be

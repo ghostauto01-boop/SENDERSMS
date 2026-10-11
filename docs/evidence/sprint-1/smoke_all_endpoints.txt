@@ -1,0 +1,3 @@
+checked 95 parameterless GET endpoints
+
+RESULT: ALL CLEAN

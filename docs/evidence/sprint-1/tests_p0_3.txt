@@ -1,9 +1,43 @@
 # p0_3 -- tests: backend/tests/test_p0_3_send_throttles.py backend/tests/test_p0_3_circuit_breaker.py
-# BEFORE = code at b9eedb5 (parent of the fix) with today's tests;  AFTER = 74db82f
+# BEFORE = code at b9eedb5 (parent of the fix) with today's tests;  AFTER = c2a99c5
 
 ## BEFORE the fix
-!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
-1 error in 0.82s
+35 failed, 1 passed, 1 warning, 23 errors in 14.16s
+FAILED backend/tests/test_p0_3_circuit_breaker.py::test_a_synthetic_five_percent_bounce_run_pauses_the_campaign
+FAILED backend/tests/test_p0_3_circuit_breaker.py::test_a_tiny_sample_cannot_trip_it
+FAILED backend/tests/test_p0_3_circuit_breaker.py::test_ads_resume_after_a_trip_needs_acknowledgement_too
+FAILED backend/tests/test_p0_3_circuit_breaker.py::test_an_acknowledged_resume_restarts_the_window_instead_of_retripping
+FAILED backend/tests/test_p0_3_circuit_breaker.py::test_bounce_webhooks_trip_the_breaker_by_themselves
+FAILED backend/tests/test_p0_3_circuit_breaker.py::test_exactly_the_threshold_does_not_trip
+FAILED backend/tests/test_p0_3_circuit_breaker.py::test_launch_cannot_be_used_to_dodge_the_breaker
+FAILED backend/tests/test_p0_3_circuit_breaker.py::test_messages_we_filtered_before_sending_are_not_provider_failures
+FAILED backend/tests/test_p0_3_circuit_breaker.py::test_no_complaints_no_trip
+FAILED backend/tests/test_p0_3_circuit_breaker.py::test_old_bounces_roll_out_of_the_window
+FAILED backend/tests/test_p0_3_circuit_breaker.py::test_one_percent_does_not_trip
+FAILED backend/tests/test_p0_3_circuit_breaker.py::test_only_a_sending_campaign_is_paused
+FAILED backend/tests/test_p0_3_circuit_breaker.py::test_provider_rejections_count_as_failures
+FAILED backend/tests/test_p0_3_circuit_breaker.py::test_resume_after_a_trip_needs_acknowledgement
+FAILED backend/tests/test_p0_3_circuit_breaker.py::test_sms_campaigns_are_not_judged_by_email_bounces
+FAILED backend/tests/test_p0_3_circuit_breaker.py::test_spam_complaints_trip_at_a_tenth_of_a_percent
+FAILED backend/tests/test_p0_3_circuit_breaker.py::test_stopping_a_campaign_cancels_its_queued_mail
+FAILED backend/tests/test_p0_3_circuit_breaker.py::test_the_breaker_can_be_switched_off
+FAILED backend/tests/test_p0_3_circuit_breaker.py::test_the_paused_reason_is_visible_in_the_api_and_the_directory
+FAILED backend/tests/test_p0_3_circuit_breaker.py::test_the_same_run_pauses_an_ads_campaign_and_records_why
+FAILED backend/tests/test_p0_3_circuit_breaker.py::test_the_sweep_pauses_every_offender_and_nobody_else
+FAILED backend/tests/test_p0_3_send_throttles.py::test_a_disabled_or_unusable_mailbox_adds_no_capacity
+FAILED backend/tests/test_p0_3_send_throttles.py::test_a_fresh_install_needs_no_migration
+FAILED backend/tests/test_p0_3_send_throttles.py::test_an_accounts_own_limit_can_only_lower_the_default
+FAILED backend/tests/test_p0_3_send_throttles.py::test_an_operators_own_configuration_is_never_overwritten
+FAILED backend/tests/test_p0_3_send_throttles.py::test_clearing_the_window_is_still_an_explicit_opt_out
+FAILED backend/tests/test_p0_3_send_throttles.py::test_defaults_are_on
+FAILED backend/tests/test_p0_3_send_throttles.py::test_email_daily_cap_is_per_mailbox_times_mailbox_count
+FAILED backend/tests/test_p0_3_send_throttles.py::test_gate_blocks_nights_and_weekends_by_default[email]
+FAILED backend/tests/test_p0_3_send_throttles.py::test_gate_blocks_nights_and_weekends_by_default[sms]
+FAILED backend/tests/test_p0_3_send_throttles.py::test_safe_defaults_are_applied_once_when_every_throttle_is_off
+FAILED backend/tests/test_p0_3_send_throttles.py::test_sending_rules_api_exposes_the_new_rules_and_the_effective_email_cap
+FAILED backend/tests/test_p0_3_send_throttles.py::test_sending_rules_can_be_changed_and_are_validated
+FAILED backend/tests/test_p0_3_send_throttles.py::test_startup_applies_the_safe_defaults_step
+FAILED backend/tests/test_p0_3_send_throttles.py::test_the_breaker_sweep_is_scheduled_and_registered
 
 ## AFTER the fix
-59 passed, 1 warning in 19.77s
+59 passed, 1 warning in 20.12s

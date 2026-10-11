@@ -32,7 +32,7 @@ worktree() {  # name parent [extra files] -> a checkout of `parent` with today's
   local path="/tmp/sprint1_before_$1"
   rm -rf "$path"; git worktree prune
   git worktree add -f --detach "$path" "$2" > /dev/null 2>&1
-  (cd "$REPO" && git archive HEAD backend/tests pyproject.toml $3) | tar -x -C "$path"
+  (cd "$REPO" && git archive HEAD backend/tests pyproject.toml ${3:-}) | tar -x -C "$path"
   echo "$path"
 }
 

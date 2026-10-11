@@ -1,0 +1,39 @@
+[PASS] login  -- 200
+[PASS] create Brevo account  -- {"id":1,"name":"Acme Leads","provider":"brevo","from_name":"Acme Leads","from_email":"hello@acme-leads.io","reply_to":"replies@acme-leads.io","reply_to_addresses":["replies@acme-leads.io"],"is_active":true,"is_default":true,"has_api_key":true,"api_key_masked":"********ed-key","daily_limit":null,"eff
+[PASS] api key is never returned in clear  -- ********ed-key
+[PASS] verified senders read from Brevo  -- {"items": [{"id": 1, "email": "hello@acme-leads.io", "name": "Acme Leads", "active": true}, {"id": 2, "email": "billing@acme-leads.io", "name": "Acme Billing", "active": true}]}
+[PASS] deliverability returns domain auth + checks  -- score=100 domains=['acme-leads.io']
+[PASS] create contact
+[PASS] create email template with HTML + attachment  -- {"id":1,"name":"Price list (rich)","category":null,"channel":"email","body":"Hi {{first_name}},\n\nHere is the price list you asked for.\n\nAda","subject":"Your price list, {{first_name}}","html_body":"<p>Hi {{first_name}},</p><p><img src=\"https://cdn.acme-leads.io/hero.png\" alt=\"hero\"></p><p><a
+[PASS] template returns attachment metadata, not the payload  -- [{"name": "price-list.pdf", "content_type": "application/pdf", "size": 29}]
+[PASS] template keeps HTML + unsubscribe flag
+[PASS] preview renders variables + lists attachments  -- {"subject": "Your price list, Ada", "text": "Hi Ada,\n\nHere is the price list you asked for.\n\nAda", "html": "<p>Hi Ada,</p><p><img src=\"https://cdn.acme-leads.io/hero.png\" alt=\"hero\"></p><p><a href=\"https://acme-
+[PASS] send email via template  -- {"success":true,"sent":1,"skipped":0,"failed":0,"total":1,"message_ids":[1],"email_account_id":1}
+[PASS] history shows the message with attachment metadata  -- [{"name": "price-list.pdf", "content_type": "application/pdf", "size": 29}]
+[PASS] outgoing message has an RFC Message-ID for threading  -- <94a982895bb248e8901fdee3dc1295b8.1791701179@acme-leads.io>
+[PASS] Brevo payload has html + text + attachment  -- {"sender": {"email": "hello@acme-leads.io", "name": "Acme Leads"}, "to": [{"email": "ada@acme-leads.io", "name": "Ada"}], "subject": "Your price list, Ada", "trackingOptions": {"open": true, "click": 
+[PASS] outgoing mail carries List-Unsubscribe headers  -- {"List-Unsubscribe": "<mailto:replies@acme-leads.io?subject=unsubscribe>, <http://127.0.0.1:8000/api/v1/email/unsubscribe?e=ada%40acme-leads.io&t=dcba403ebef241a73a1d4eea4f952369>", "List-Unsubscribe-Post": "List-Unsubscribe=One-Click"}
+[PASS] account reads show a masked webhook token, never the real one  -- http://127.0.0.1:8000/api/v1/webhooks/brevo/1?token=****qhXc
+[PASS] reveal returns the full webhook URL (not cacheable)  -- {"account_id":1,"webhook_url":"http://127.0.0.1:8000/api/v1/webhooks/brevo/1?token=<token>","webhook_path":"/api/v1/webhooks
+[PASS] inbound webhook accepted  -- {"success":true,"stored":1,"received":1}
+[PASS] a wrong webhook token is refused  -- 403
+[PASS] reply landed in the SAME conversation (not a new thread)  -- 1 -> 2 messages, 1 matched by In-Reply-To
+[PASS] personal reply address is linked without replacing the primary contact email  -- {"email": "ada@acme-leads.io", "aliases": ["ada.personal@gmail.com"]}
+[PASS] reply from the inbox sends  -- {"success":true,"error":null,"message":{"id":3,"conversation_id":1,"contact_id":1,"campaign_id":null,"ads_campaign_id":null,"direction":"outgoing","channel":"email","subject":"Re: Re: Your price list, Ada","body":"500 units it is — quote attached.","
+[PASS] reply is sent to the latest personal sender address  -- [{"email": "ada.personal@gmail.com", "name": "Ada"}]
+[PASS] reply goes out threaded (In-Reply-To the original)  -- {"In-Reply-To": "<94a982895bb248e8901fdee3dc1295b8.1791701179@acme-leads.io>", "References": "<94a982895bb248e8901fdee3dc1295b8.1791701179@acme-leads.io>"}
+[PASS] reply is NOT bulk mail (no unsubscribe header on a 1:1 reply)
+[PASS] reply carries its own attachment
+[PASS] the sent reply joined the same thread  -- 3 messages in the thread
+[PASS] newest message shows its attachment  -- [{"name": "quote.txt", "content_type": "application/octet-stream", "size": 16}]
+[PASS] forged unsubscribe token is rejected  -- 400
+[PASS] list has the contact as a member  -- {"success":true,"added":1,"contact_count":1}
+[PASS] create email campaign with an attachment  -- {"id":1,"kind":"campaign","name":"Sim Email Campaign 1791701179","description":null,"status":"draft","paused_from":null,"paused_at":null,"paused_reason":null,"channel":"email","email_account_id":1,"fallback_email_account_id":null,"subject":"Sim subject","html_body":"<p>Hello {{first_name}}</p>","att
+[PASS] campaign stores the attachment  -- [{'name': 'brochure.txt', 'content_type': 'application/octet-stream', 'size': 8}]
+[PASS] duplicating an email campaign keeps channel + subject + attachment  -- {"channel": "email", "subject": "Sim subject", "attachments": [{"name": "brochure.txt", "content_type": "application/octet-stream", "size": 8}]}
+[PASS] P0-5: validate fails an email audience with an unverified contact, and counts it  -- {"valid":false,"ok":false,"status":"draft","changed":false,"errors":["1 of 1 contacts have an unknown email verification status and will not be sent to. Verify them (POST /api/v1/validator/jobs with this list) or remove them from the list, then validate again.
+[PASS] P0-5: start refuses it, and nothing is queued  -- {"code":"BAD_REQUEST","message":"1 of 1 contacts have an unknown email verification status and will not be sent to. Verify them (POST /api/v1/validator/jobs wit
+
+NOTE: the rest of this flow (campaign send, unsubscribe) is skipped because the server enforces the verification gate. Restart it with EMAIL_REQUIRE_VERIFIED=false to run it against the fake Brevo.
+
+RESULT: ALL PASS (gate verified; remainder skipped)
