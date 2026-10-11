@@ -5,6 +5,7 @@ from fastapi import FastAPI, BackgroundTasks, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from sqlalchemy import func
 from fastapi.responses import JSONResponse, HTMLResponse, FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.datastructures import Headers, MutableHeaders
@@ -692,10 +693,11 @@ async def _process_scheduled() -> int:
                     # Ensure conversation exists so inbox thread is visible
                     conv = None
                     if contact:
-                        cr = await db.execute(select(Conversation).where(Conversation.contact_id == contact.id).order_by(Conversation.id).limit(1))
+                        # The contact's TEXT thread (never an email thread).
+                        cr = await db.execute(select(Conversation).where(Conversation.contact_id == contact.id, func.coalesce(Conversation.channel, "sms") == "sms").order_by(Conversation.id).limit(1))
                         conv = cr.scalars().first()
                         if not conv:
-                            conv = Conversation(contact_id=contact.id, status="active")
+                            conv = Conversation(contact_id=contact.id, status="active", channel="sms")
                             db.add(conv)
                             await db.flush()
 
@@ -808,12 +810,8 @@ async def _process_scheduled_email(db, sm) -> None:
                 await db.execute(select(Contact).where(func.lower(Contact.email) == target))
             ).scalars().first()
             if contact is None:
-                contact = Contact(
-                    email=target,
-                    phone_number=f"email:{target}"[:20],
-                    country="Nigeria",
-                    lead_status="new",
-                    source="scheduled_email",
+                contact = email_service.new_email_only_contact(
+                    target, lead_status="new", source="scheduled_email",
                 )
                 db.add(contact)
                 await db.flush()
@@ -877,10 +875,10 @@ async def _create_scheduled_message_row(db, sm, contact, status, error):
         import uuid, json
         from app.utils.phone import count_sms_segments
         from datetime import datetime as dt, timezone as tz
-        cr = await db.execute(select(Conversation).where(Conversation.contact_id == contact.id).order_by(Conversation.id).limit(1))
+        cr = await db.execute(select(Conversation).where(Conversation.contact_id == contact.id, func.coalesce(Conversation.channel, "sms") == "sms").order_by(Conversation.id).limit(1))
         conv = cr.scalars().first()
         if not conv:
-            conv = Conversation(contact_id=contact.id, status="active")
+            conv = Conversation(contact_id=contact.id, status="active", channel="sms")
             db.add(conv)
             await db.flush()
         try:
@@ -985,6 +983,17 @@ async def _apply_safe_sending_defaults() -> None:
     logger.info("Sending rules safe-defaults step: %s", result)
 
 
+async def _repair_placeholder_phones() -> None:
+    """Clear the invented ``email:<address>`` phone numbers older code stored (idempotent)."""
+    from app.services.contact_repair import repair_placeholder_phones
+
+    async with async_session_factory() as db:
+        repaired = await repair_placeholder_phones(db)
+        await db.commit()
+    if repaired:
+        logger.info("Cleared %s invented email:<address> phone number(s)", repaired)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     import asyncio
@@ -1007,6 +1016,10 @@ async def lifespan(app: FastAPI):
             await asyncio.wait_for(_apply_safe_sending_defaults(), timeout=20)
         except Exception as e:
             logger.warning("safe sending defaults: %s", e)
+        try:
+            await asyncio.wait_for(_repair_placeholder_phones(), timeout=30)
+        except Exception as e:
+            logger.warning("placeholder phone repair: %s", e)
         try:
             await asyncio.wait_for(_startup_webhook(), timeout=20)
         except Exception as e:

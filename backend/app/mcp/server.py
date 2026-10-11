@@ -502,8 +502,25 @@ async def _run_declared(
             if param.required:
                 missing = f"Missing required argument '{param.name}'."
                 return ToolOutcome(_tool_result(missing, is_error=True), token_error=missing)
-            continue
-        value = args[param.name]
+            if param.default is None or param.where not in ("query", "body", "form"):
+                continue
+            # A default the tool ADVERTISES is a promise about what happens when the argument is
+            # left out. It used to be documentation only -- the argument was simply dropped and the
+            # endpoint's own default applied -- so a tool could say "channel: all" while the
+            # endpoint quietly used "sms" (an assistant listing conversations never saw email).
+            value = param.default
+        else:
+            value = args[param.name]
+            if param.enum and param.where != "meta":
+                # A value the schema forbids is refused here, with the allowed ones, instead of being
+                # forwarded for the endpoint to answer with whatever it happens to answer (for a bad
+                # `mark` that was a 405). A different case is accepted in its canonical spelling.
+                canonical = next((e for e in param.enum if str(e).lower() == str(value).strip().lower()), None)
+                if canonical is None:
+                    refusal = (f"Invalid value {value!r} for '{param.name}'. "
+                               f"Allowed: {', '.join(str(e) for e in param.enum)}.")
+                    return ToolOutcome(_tool_result(refusal, is_error=True), token_error=refusal)
+                value = canonical
         if param.root:
             root_body = value
         elif param.where == "meta":

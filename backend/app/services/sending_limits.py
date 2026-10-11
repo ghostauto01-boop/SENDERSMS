@@ -832,6 +832,28 @@ def projection_warning(projection: dict) -> Optional[str]:
 # --------------------------------------------------------------------------
 
 
+async def record_operator_choice(db: AsyncSession) -> None:
+    """Remember that a PERSON has now saved the sending rules.
+
+    Called by every save. The one-time safe-defaults step below reads "every stored throttle is at
+    the old all-open values" as "nobody ever configured this" -- but a person who deliberately saves
+    exactly those values (a closed test environment, say) looks identical. The step runs in a
+    background task while the server is already answering requests, so a save can land before it:
+    this marker is how the step knows not to run over it. Only the first save writes it.
+    """
+    marker = (
+        await db.execute(select(SystemSetting).where(SystemSetting.key == SAFE_DEFAULTS_MARKER))
+    ).scalar_one_or_none()
+    if marker is None:
+        db.add(SystemSetting(
+            key=SAFE_DEFAULTS_MARKER,
+            value=f"{_utcnow().isoformat()} operator saved the rules: the safe-defaults step never runs over a save",
+            category=CATEGORY,
+            description="One-time safe sending defaults: when/what was decided",
+        ))
+        await db.flush()
+
+
 async def apply_safe_defaults(db: AsyncSession) -> dict:
     """Turn the protective defaults ON for a database that was never configured.
 
@@ -881,6 +903,14 @@ async def apply_safe_defaults(db: AsyncSession) -> dict:
         mark("operator-configured: left untouched")
         await db.flush()
         return {"applied": False, "reason": "operator_configured"}
+
+    # Look again, right before writing: a person may have saved the rules since the read above (this
+    # runs in a background task while requests are already being served).
+    fresh = (
+        await db.execute(select(SystemSetting).where(SystemSetting.key == SAFE_DEFAULTS_MARKER))
+    ).scalar_one_or_none()
+    if fresh is not None:
+        return {"applied": False, "reason": "already_applied"}
 
     safe = {
         "enable_daily_limit": "true",

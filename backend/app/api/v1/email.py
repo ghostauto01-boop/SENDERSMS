@@ -832,11 +832,7 @@ async def send_email(
             await db.execute(select(Contact).where(func.lower(Contact.email) == address))
         ).scalars().first()
         if contact is None:
-            contact = Contact(
-                email=address,
-                phone_number=f"email:{address}"[:20],
-                source="email_send",
-            )
+            contact = email_service.new_email_only_contact(address, source="email_send")
             db.add(contact)
             await db.flush()
         targets = [contact]
@@ -855,7 +851,12 @@ async def send_email(
     else:
         raise HTTPException(422, "Choose a contact, an email address or a list")
 
-    sent, skipped, failed, message_ids = 0, 0, 0, []
+    sent, failed, message_ids = 0, 0, []
+    skipped_details: list[dict] = []
+
+    def _skip(contact_id, code):
+        skipped_details.append({"contact_id": contact_id, "reason": code or "contact_not_emailable",
+                                "message": email_service.skip_reason_text(code or "contact_not_emailable")})
     # Outreach = recipients picked from an audience. One contact chosen by a person is
     # one-to-one even when the template carries unsubscribe headers (``bulk``), so a
     # marketing template sent to a single contact is not held back by the verification gate.
@@ -863,7 +864,7 @@ async def send_email(
     for contact in targets:
         problem = await email_service.contact_email_problem(db, contact, outreach=outreach)
         if problem:
-            skipped += 1
+            _skip(contact.id, problem)
             continue
         message, result = await email_service.send_now(
             db, contact, subject=subject, text_body=body, html_body=html, account=account,
@@ -874,7 +875,7 @@ async def send_email(
             bcc=data.bcc,
         )
         if message is None:
-            skipped += 1
+            _skip(contact.id, result.get("skipped_reason"))
             continue
         message_ids.append(message.id)
         if result.get("success"):
@@ -883,14 +884,17 @@ async def send_email(
             failed += 1
     await db.commit()
 
+    from app.utils.send_report import skip_summary, summary_sentence
+
     return {
         "success": sent > 0,
         "sent": sent,
-        "skipped": skipped,
         "failed": failed,
         "total": len(targets),
         "message_ids": message_ids,
         "email_account_id": account.id,
+        **skip_summary(skipped_details),
+        "message": summary_sentence(sent, skipped_details),
     }
 
 
@@ -995,6 +999,7 @@ async def list_conversations(
     per_page: int = Query(default=30, ge=1, le=100),
     status_filter: Optional[str] = Query(default=None, alias="status"),
     search: Optional[str] = None,
+    unread_only: bool = Query(default=False, description="Only threads with unread messages"),
     db: AsyncSession = Depends(get_db),
     cu: User = Depends(get_current_user),
 ):
@@ -1002,6 +1007,8 @@ async def list_conversations(
     query = select(Conversation).where(func.coalesce(Conversation.channel, "sms") == "email")
     if status_filter and status_filter != "all":
         query = query.where(Conversation.status == status_filter)
+    if unread_only:
+        query = query.where(func.coalesce(Conversation.unread_count, 0) > 0)
     if search:
         like = f"%{search.strip()}%"
         contact_ids = (

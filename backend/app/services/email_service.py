@@ -481,6 +481,23 @@ def serialize_account(
     }
 
 
+#: Plain-language text for each reason an email is refused (the codes are what a program reads).
+SKIP_REASON_TEXT = {
+    "no_email": "the contact has no email address",
+    "placeholder_email": "the address is a placeholder (example.com, noreply, test ...)",
+    "email_opted_out": "the contact opted out of email",
+    "email_bounced": "the address bounced before and is blocked",
+    "inferred_unverified": "a guessed address that was never verified",
+    "suppressed": "the address is on the suppression list",
+    "unverified": "the address has never been verified (an unknown address is not sent to as part of an audience)",
+    "contact_not_emailable": "the contact cannot be emailed",
+}
+
+
+def skip_reason_text(code: str | None) -> str:
+    return SKIP_REASON_TEXT.get(code or "", (code or "not sent").replace("_", " "))
+
+
 def mask_secret(value: str | None, *, keep: int = 4) -> str:
     """``****a1b2`` -- enough to tell two secrets apart, useless to anyone who needs the value."""
     if not value:
@@ -510,6 +527,17 @@ def email_webhook_url(account: EmailAccount, *, reveal: bool = False) -> str | N
 
 def _new_webhook_token() -> str:
     return secrets.token_urlsafe(32)
+
+
+def new_email_only_contact(address: str, *, source: str, **fields) -> Contact:
+    """A contact that exists only as an email address.
+
+    ``phone_number`` is None and the country is left unknown. Older code stored the address,
+    prefixed ``email:`` and cut to 20 characters, in ``phone_number`` (the column used to be NOT
+    NULL) -- an invented number that an assistant then read back, and updated, as if it were real --
+    and filled in ``country="Nigeria"`` for a stranger. Neither is known, so neither is stored.
+    """
+    return Contact(email=address, email_lower=address, phone_number=None, source=source, **fields)
 
 
 async def ensure_webhook_token(db: AsyncSession, account: EmailAccount) -> str:
@@ -1216,6 +1244,7 @@ async def queue_email(
     bcc: list[str] | str | None = None,
     recipient_address: str | None = None,
     outreach: bool | None = None,
+    refused: dict | None = None,
 ) -> Message | None:
     """Create the outbound email ``Message`` row (delivery happens elsewhere).
 
@@ -1236,6 +1265,8 @@ async def queue_email(
     problem = await contact_email_problem(db, contact, address, outreach=outreach)
     if problem:
         logger.info("EMAIL: skipping contact %s (%s)", contact.id, problem)
+        if refused is not None:
+            refused["reason"] = problem  # so the caller can say WHY nothing was queued
         return None
 
     account = account or await resolve_account(db, None)
@@ -1325,15 +1356,18 @@ async def send_now(
     outreach: bool | None = None,
 ) -> tuple[Message | None, dict]:
     """Queue + deliver in one call. Used by the API's "send now" paths."""
+    refused: dict = {}
     message = await queue_email(
         db, contact,
         subject=subject, text_body=text_body, html_body=html_body,
         account=account, campaign_id=campaign_id, ads_campaign_id=ads_campaign_id,
         is_auto_reply=is_auto_reply, attachments=attachments, bulk=bulk,
         cc=cc, bcc=bcc, recipient_address=recipient_address, outreach=outreach,
+        refused=refused,
     )
     if message is None:
-        return None, {"success": False, "error": "contact_not_emailable"}
+        return None, {"success": False, "error": "contact_not_emailable",
+                      "skipped_reason": refused.get("reason")}
     result = await deliver(db, message)
     return message, result
 
@@ -2160,12 +2194,10 @@ async def process_inbound_email(db: AsyncSession, payload: dict) -> dict:
             display = ""
             if isinstance(name_hint, dict):
                 display = str(name_hint.get("Name") or "")
-            contact = Contact(
-                email=from_address,
+            contact = new_email_only_contact(
+                from_address,
                 first_name=(display.split(" ")[0] if display else None),
                 last_name=(" ".join(display.split(" ")[1:]) or None) if display else None,
-                phone_number=f"email:{from_address}"[:20],
-                country="Nigeria",
                 lead_status="replied",
                 source="inbound_email",
             )
@@ -2504,41 +2536,43 @@ async def send_test_email(
 
 
 async def email_totals(db: AsyncSession, *, days: int = 30, account_id: int | None = None) -> dict:
-    since = _now() - timedelta(days=days - 1)
-    query = select(Message).where(Message.channel == "email", Message.created_at >= since)
-    if account_id:
-        query = query.where(Message.email_account_id == account_id)
-    messages = list((await db.execute(query)).scalars().all())
+    """Email totals for the last ``days`` days (the numbers behind ``email/stats`` and ``email/overview``).
 
+    Every count comes from ``services/message_metrics`` -- the same definitions and the same window
+    the dashboard and the analytics use -- so the same database gives the same numbers on every screen.
+    Only the daily ``series`` needs the rows themselves.
+    """
+    from app.services import message_metrics as metrics
+
+    since = metrics.window_start(days)
+    counts = await metrics.message_counts(db, channel="email", days=days, account_id=account_id)
+    query = select(Message).where(*metrics.message_filters(channel="email", days=days, account_id=account_id))
+    messages = list((await db.execute(query)).scalars().all())
     outbound = [m for m in messages if m.direction == "outgoing"]
     inbound = [m for m in messages if m.direction == "incoming"]
-    delivered = [m for m in outbound if m.status == "delivered" or m.delivered_at or m.opened_at]
-    failed = [m for m in outbound if m.status == "failed"]
-    opened = [m for m in outbound if (m.open_count or 0) > 0 or m.opened_at]
-    clicked = [m for m in outbound if (m.click_count or 0) > 0 or m.clicked_at]
     suppressed = (await db.execute(select(func.count()).select_from(EmailSuppression))).scalar() or 0
 
-    def rate(part: int, whole: int) -> float:
-        return round(part / whole * 100, 2) if whole else 0.0
-
+    sent = counts["sent"]
     return {
         "period_days": days,
-        "sent": len(outbound),
-        "delivered": len(delivered),
-        "failed": len(failed),
-        "queued": len([m for m in outbound if m.status in ("queued", "sending", "retrying")]),
-        "replies": len(inbound),
-        "opened": len(opened),
-        "clicked": len(clicked),
-        "opens": sum((m.open_count or 0) for m in outbound),
-        "clicks": sum((m.click_count or 0) for m in outbound),
+        "sent": sent,
+        "delivered": counts["delivered"],
+        "failed": counts["failed"],
+        "queued": counts["queued"],
+        "replies": counts["replies"],
+        "opened": counts["opened"],
+        "clicked": counts["clicked"],
+        "opens": counts["opens"],
+        "clicks": counts["clicks"],
         "unsubscribed": suppressed,
-        "delivery_rate": rate(len(delivered), len(outbound)),
-        "open_rate": rate(len(opened), len(outbound)),
-        "click_rate": rate(len(clicked), len(outbound)),
-        "reply_rate": rate(len(inbound), len(outbound)),
-        "failure_rate": rate(len(failed), len(outbound)),
+        "delivery_rate": metrics.rate(counts["delivered"], sent),
+        "open_rate": metrics.rate(counts["opened"], sent),
+        "click_rate": metrics.rate(counts["clicked"], sent),
+        "reply_rate": metrics.rate(counts["replies"], sent),
+        "failure_rate": metrics.rate(counts["failed"], sent),
         "series": _series(outbound, inbound, since=since, days=days),
+        "scope": metrics.scope("email", days),
+        "definitions": metrics.DEFINITIONS,
     }
 
 

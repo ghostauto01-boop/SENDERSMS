@@ -209,12 +209,19 @@ async def put_sr(dl:Optional[bool]=Query(None),dm:Optional[int]=Query(None),hl:O
     breaker_min_sample:Optional[int]=Query(None,ge=1,le=10000,description="Fewer recent sends than this can never trip the breaker (default 20)."),
     breaker_window_hours:Optional[int]=Query(None,ge=1,le=720,description="How far back the rolling window looks (default 168 = 7 days)."),
     db:AsyncSession=Depends(get_db),cu:User=Depends(get_current_user)):
+    changed=False
     for k,v in{"enable_daily_limit":dl,"daily_maximum":dm,"enable_hourly_limit":hl,"hourly_maximum":hm,"enable_per_minute_limit":ml,"messages_per_minute":mm,"sending_start_time":ss,"sending_end_time":se,"allow_weekends":aw,"allow_holidays":ah,"enable_pacing":pc,"min_delay_seconds":md,"email_daily_per_mailbox":email_daily_per_mailbox,"breaker_enabled":breaker_enabled,"breaker_bounce_pct":breaker_bounce_pct,"breaker_complaint_pct":breaker_complaint_pct,"breaker_min_sample":breaker_min_sample,"breaker_window_hours":breaker_window_hours}.items():
         if v is not None:
+            changed=True
             s=(await db.execute(select(SystemSetting).where(SystemSetting.key==k))).scalar_one_or_none()
             val=str(v).lower()if isinstance(v,bool)else str(v)
             if s:s.value=val
             else:db.add(SystemSetting(key=k,value=val,category="sending_rules"))
+    if changed:
+        # A person has decided: the one-time startup step (which runs in the background while requests
+        # are already served) must never run over this save, even when it is exactly the old open values.
+        from app.services.sending_limits import record_operator_choice
+        await record_operator_choice(db)
     await db.flush();return{"success":True}
 
 # --------------------------------------------------------------------------

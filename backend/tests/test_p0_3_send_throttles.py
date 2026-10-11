@@ -765,3 +765,70 @@ def test_the_breaker_sweep_is_scheduled_and_registered():
     entry = celery_app.conf.beat_schedule["check-circuit-breakers"]
     assert entry["task"] in celery_app.tasks
     assert entry["schedule"] <= timedelta(minutes=10), "a missed webhook must not wait long"
+
+
+# --------------------------------------------------------------------------
+# the startup safe-defaults step must never run over a person's own save
+# --------------------------------------------------------------------------
+#
+# Found by running the email simulator against a real server: the app serves requests while its
+# background boot task is still running, and that task's one-time step reads "every throttle is at
+# the old all-open values" as "nobody ever configured this". The simulator had just SAVED exactly
+# those values on purpose (a closed test environment); the step then overwrote them with the
+# 09:00-17:00 / weekends-off defaults, and on a Sunday the campaign it started simply held.
+
+
+@pytest.mark.asyncio
+async def test_a_save_made_before_the_startup_step_runs_is_never_overridden(api_client, api_db):
+    from app.services.sending_limits import apply_safe_defaults
+
+    saved = await api_client.put("/api/v1/settings/sending-rules", params={
+        "dl": "false", "ss": "", "se": "", "aw": "true", "pc": "false"})
+    assert saved.status_code == 200
+
+    outcome = await apply_safe_defaults(api_db)
+
+    assert outcome == {"applied": False, "reason": "already_applied"}
+    rules = await get_sending_rules(api_db)
+    assert rules["enable_daily_limit"] is False and rules["allow_weekends"] is True
+    assert rules["sending_start_time"] == "" and rules["sending_end_time"] == ""
+
+
+@pytest.mark.asyncio
+async def test_an_install_nobody_has_touched_still_gets_the_safe_defaults(api_db):
+    """The migration this step exists for is unchanged: stored all-open values, no marker, no save."""
+    from app.services.sending_limits import apply_safe_defaults
+
+    for key, value in {"enable_daily_limit": "false", "sending_start_time": "", "sending_end_time": "",
+                       "allow_weekends": "true"}.items():
+        api_db.add(SystemSetting(key=key, value=value, category="sending_rules"))
+    await api_db.flush()
+
+    outcome = await apply_safe_defaults(api_db)
+
+    assert outcome["applied"] is True and outcome["reason"] == "all_throttles_were_off"
+    rules = await get_sending_rules(api_db)
+    assert rules["enable_daily_limit"] is True and rules["allow_weekends"] is False
+
+
+@pytest.mark.asyncio
+async def test_every_save_records_that_a_person_decided_exactly_once(api_client, api_db):
+    from app.services.sending_limits import SAFE_DEFAULTS_MARKER
+
+    await api_client.put("/api/v1/settings/sending-rules", params={"dl": "true"})
+    await api_client.put("/api/v1/settings/sending-rules", params={"dm": "40"})
+
+    rows = (await api_db.execute(
+        select(SystemSetting).where(SystemSetting.key == SAFE_DEFAULTS_MARKER))).scalars().all()
+    assert len(rows) == 1 and "operator" in rows[0].value
+
+
+@pytest.mark.asyncio
+async def test_a_save_that_changes_nothing_is_not_a_decision(api_client, api_db):
+    from app.services.sending_limits import SAFE_DEFAULTS_MARKER
+
+    assert (await api_client.put("/api/v1/settings/sending-rules")).status_code == 200
+
+    marker = (await api_db.execute(
+        select(SystemSetting).where(SystemSetting.key == SAFE_DEFAULTS_MARKER))).scalar_one_or_none()
+    assert marker is None

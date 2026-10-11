@@ -37,67 +37,39 @@ def _channel_filter(query, channel):
 @router.get("/stats")
 async def get_dashboard_stats(
     channel: Optional[str] = None,
+    days: Optional[int] = Query(
+        None, ge=1, le=365,
+        description="Count messages from the last N days (midnight UTC, today included). Omit for all time."),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Get dashboard summary statistics (optionally for one channel only)."""
-    wanted = None if (not channel or str(channel).lower() == "all") else str(channel).lower()
+    """Get dashboard summary statistics (optionally for one channel only).
+
+    The message numbers come from ``services/message_metrics`` -- the same definitions the
+    analytics and email endpoints use -- and the response says which ``scope`` and
+    ``definitions`` they are for.
+    """
+    from app.services import message_metrics as metrics
+    from app.utils.channels import validate_channel
+
+    wanted = validate_channel(channel)
+    wanted = None if wanted in (None, "all") else wanted
     # Total contacts
     total_result = await db.execute(select(func.count(Contact.id)))
     total_contacts = total_result.scalar() or 0
 
-    # Contacts contacted (have messages)
-    contacted_result = await db.execute(
-        _channel_filter(
-            select(func.count(func.distinct(Message.contact_id))).where(
-                Message.direction == "outgoing"
-            ),
-            wanted,
-        )
-    )
-    contacted = contacted_result.scalar() or 0
-
-    # Messages sent
-    sent_result = await db.execute(
-        _channel_filter(select(func.count(Message.id)).where(Message.direction == "outgoing"), wanted)
-    )
-    messages_sent = sent_result.scalar() or 0
-
-    # Delivered
-    delivered_result = await db.execute(
-        _channel_filter(
-            select(func.count(Message.id)).where(
-                Message.direction == "outgoing",
-                Message.status == "delivered",
-            ),
-            wanted,
-        )
-    )
-    delivered = delivered_result.scalar() or 0
-
-    # Failed
-    failed_result = await db.execute(
-        _channel_filter(
-            select(func.count(Message.id)).where(
-                Message.direction == "outgoing",
-                Message.status == "failed",
-            ),
-            wanted,
-        )
-    )
-    failed = failed_result.scalar() or 0
-
-    # Replies
-    replies_result = await db.execute(
-        _channel_filter(select(func.count(Message.id)).where(Message.direction == "incoming"), wanted)
-    )
-    replies = replies_result.scalar() or 0
+    counts = await metrics.message_counts(db, channel=wanted, days=days)
+    contacted = counts["contacted"]
+    messages_sent = counts["sent"]
+    delivered = counts["delivered"]
+    failed = counts["failed"]
+    replies = counts["replies"]
 
     # Reply rate
-    reply_rate = round(replies / max(messages_sent, 1) * 100, 1)
+    reply_rate = metrics.rate(replies, max(messages_sent, 1))
 
     # Delivery rate
-    delivery_rate = round(delivered / max(messages_sent, 1) * 100, 1)
+    delivery_rate = metrics.rate(delivered, max(messages_sent, 1))
 
     # Interested leads
     interested_result = await db.execute(
@@ -207,12 +179,15 @@ async def get_dashboard_stats(
         "messages_sent": messages_sent,
         "messages_delivered": delivered,
         "messages_failed": failed,
+        "messages_queued": counts["queued"],
         "replies": replies,
         "reply_rate": reply_rate,
         "delivery_rate": delivery_rate,
         "interested_leads": interested,
         "active_campaigns": active_campaigns,
         "active_campaigns_by_kind": active_by_kind,
+        "scope": metrics.scope(wanted, days),
+        "definitions": metrics.DEFINITIONS,
         "followups_due_today": followups_due,
         "overdue_followups": overdue,
         "completed_campaigns": completed_campaigns,

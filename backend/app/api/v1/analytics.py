@@ -24,88 +24,29 @@ router = APIRouter()
 async def get_analytics_overview(
     days: int = Query(default=30, ge=1, le=365),
     campaign_id: Optional[int] = None,
+    channel: Optional[str] = Query(default="sms", description="sms | email | all"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Get analytics overview."""
-    start_date = datetime.now(timezone.utc) - timedelta(days=days)
+    """Analytics overview for one channel (SMS unless told otherwise).
 
-    # Base queries
-    msg_query = select(Message)
-    if campaign_id:
-        msg_query = msg_query.where(Message.campaign_id == campaign_id)
-    msg_query = msg_query.where(Message.created_at >= start_date)
+    It is the SMS analytics page's headline, and it used to count EMAIL rows too (no channel
+    filter at all). The numbers now come from ``services/message_metrics`` -- the same
+    definitions and window the dashboard and the email endpoints use.
+    """
+    from app.services import message_metrics as metrics
+    from app.utils.channels import validate_channel
 
-    # Total SMS
-    total_sms_query = select(func.count()).select_from(msg_query.subquery())
-    total_sms = (await db.execute(total_sms_query)).scalar() or 0
+    wanted = validate_channel(channel, default="sms")
+    scoped = None if wanted == "all" else wanted
+    start_date = metrics.window_start(days)
 
-    # Sent
-    sent_query = select(func.count()).select_from(
-        msg_query.where(Message.direction == "outgoing").subquery()
-    )
-    sent = (await db.execute(sent_query)).scalar() or 0
+    counts = await metrics.message_counts(db, channel=scoped, days=days, campaign_id=campaign_id)
+    sent, delivered, failed, replies = (counts[k] for k in ("sent", "delivered", "failed", "replies"))
+    total_sms = sent + replies
 
-    # Delivered
-    delivered_query = select(func.count()).select_from(
-        select(Message).where(
-            Message.direction == "outgoing",
-            Message.status == "delivered",
-            Message.created_at >= start_date,
-        ).subquery()
-    )
-    if campaign_id:
-        delivered_query = select(func.count()).select_from(
-            select(Message).where(
-                Message.direction == "outgoing",
-                Message.status == "delivered",
-                Message.created_at >= start_date,
-                Message.campaign_id == campaign_id,
-            ).subquery()
-        )
-    delivered = (await db.execute(delivered_query)).scalar() or 0
-
-    # Failed
-    failed_query = select(func.count()).select_from(
-        select(Message).where(
-            Message.direction == "outgoing",
-            Message.status == "failed",
-            Message.created_at >= start_date,
-        ).subquery()
-    )
-    if campaign_id:
-        failed_query = select(func.count()).select_from(
-            select(Message).where(
-                Message.direction == "outgoing",
-                Message.status == "failed",
-                Message.created_at >= start_date,
-                Message.campaign_id == campaign_id,
-            ).subquery()
-        )
-    failed = (await db.execute(failed_query)).scalar() or 0
-
-    # Replies
-    replies_query = select(func.count()).select_from(
-        select(Message).where(
-            Message.direction == "incoming",
-            Message.created_at >= start_date,
-        ).subquery()
-    )
-    if campaign_id:
-        replies_query = select(func.count()).select_from(
-            select(Message).where(
-                Message.direction == "incoming",
-                Message.created_at >= start_date,
-                Message.campaign_id == campaign_id,
-            ).subquery()
-        )
-    replies = (await db.execute(replies_query)).scalar() or 0
-
-    # Delivery rate
-    delivery_rate = round(delivered / max(sent, 1) * 100, 1)
-
-    # Reply rate
-    reply_rate = round(replies / max(sent, 1) * 100, 1)
+    delivery_rate = metrics.rate(delivered, max(sent, 1))
+    reply_rate = metrics.rate(replies, max(sent, 1))
 
     # Opt-outs
     opt_query = select(func.count()).select_from(
@@ -140,6 +81,9 @@ async def get_analytics_overview(
         "followups": followups,
         "interested_leads": interested,
         "period_days": days,
+        "queued": counts["queued"],
+        "scope": metrics.scope(scoped, days),
+        "definitions": metrics.DEFINITIONS,
     }
 
 
@@ -157,28 +101,28 @@ def _day_floor(col):
 async def get_timeseries(
     days: int = Query(default=30, ge=1, le=365),
     campaign_id: Optional[int] = None,
+    channel: Optional[str] = Query(default="sms", description="sms | email | all"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Per-day sent / delivered / failed / replies for line & bar charts."""
-    start_date = datetime.now(timezone.utc) - timedelta(days=days)
+    """Per-day sent / delivered / failed / replies for line & bar charts (same definitions and
+    window as the overview, so the points add up to its headline)."""
+    from app.services import message_metrics as metrics
+    from app.utils.channels import validate_channel
+
+    wanted = validate_channel(channel, default="sms")
     day = _day_floor(Message.created_at)
     q = (
         select(
             day.label("day"),
-            func.sum(case((Message.direction == "outgoing", 1), else_=0)).label("sent"),
-            func.sum(case(
-                ((Message.direction == "outgoing") & (Message.status == "delivered"), 1),
-                else_=0)).label("delivered"),
-            func.sum(case(
-                ((Message.direction == "outgoing") & (Message.status.in_(["failed", "cancelled"])), 1),
-                else_=0)).label("failed"),
-            func.sum(case((Message.direction == "incoming", 1), else_=0)).label("replies"),
+            func.sum(case((metrics.OUTGOING, 1), else_=0)).label("sent"),
+            func.sum(case((metrics.OUTGOING & metrics.DELIVERED, 1), else_=0)).label("delivered"),
+            func.sum(case((metrics.OUTGOING & metrics.FAILED, 1), else_=0)).label("failed"),
+            func.sum(case((metrics.INCOMING, 1), else_=0)).label("replies"),
         )
-        .where(Message.created_at >= start_date)
+        .where(*metrics.message_filters(
+            channel=None if wanted == "all" else wanted, days=days, campaign_id=campaign_id))
     )
-    if campaign_id:
-        q = q.where(Message.campaign_id == campaign_id)
     q = q.group_by(day).order_by(day)
     rows = (await db.execute(q)).all()
     points = []
@@ -196,39 +140,35 @@ async def get_timeseries(
             "delivery_rate": round(delivered / max(sent, 1) * 100, 1),
             "reply_rate": round(replies / max(sent, 1) * 100, 1),
         })
-    return {"period_days": days, "points": points}
+    return {"period_days": days, "points": points,
+            "scope": metrics.scope(None if wanted == "all" else wanted, days)}
 
 
 @router.get("/funnel")
 async def get_funnel(
     days: int = Query(default=30, ge=1, le=365),
     campaign_id: Optional[int] = None,
+    channel: Optional[str] = Query(default="sms", description="sms | email | all"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Sent -> delivered -> replied -> interested funnel + failure reasons."""
-    start_date = datetime.now(timezone.utc) - timedelta(days=days)
-    base = [Message.created_at >= start_date]
-    if campaign_id:
-        base.append(Message.campaign_id == campaign_id)
+    """Sent -> delivered -> replied -> interested funnel + failure reasons (same definitions and
+    window as the overview; a cancelled message is reported on its own, not as a failure)."""
+    from app.services import message_metrics as metrics
+    from app.utils.channels import validate_channel
 
-    async def _count(*conds):
-        q = select(func.count()).where(*base, *conds)
-        return (await db.execute(q)).scalar() or 0
-
-    sent = await _count(Message.direction == "outgoing")
-    delivered = await _count(Message.direction == "outgoing", Message.status == "delivered")
-    failed = await _count(Message.direction == "outgoing",
-                          Message.status.in_(["failed", "cancelled"]))
-    replies = await _count(Message.direction == "incoming")
+    wanted = validate_channel(channel, default="sms")
+    scoped = None if wanted == "all" else wanted
+    base = metrics.message_filters(channel=scoped, days=days, campaign_id=campaign_id)
+    counts = await metrics.message_counts(db, channel=scoped, days=days, campaign_id=campaign_id)
+    sent, delivered, failed, replies = (counts[k] for k in ("sent", "delivered", "failed", "replies"))
     interested = (await db.execute(
         select(func.count()).where(Contact.lead_status == "interested"))).scalar() or 0
 
     # Top failure reasons for the "why did sends fail" breakdown.
     rq = (
         select(Message.last_error, func.count().label("n"))
-        .where(*base, Message.direction == "outgoing",
-               Message.status.in_(["failed", "cancelled"]))
+        .where(*base, metrics.OUTGOING, metrics.FAILED)
         .group_by(Message.last_error).order_by(func.count().desc()).limit(8)
     )
     reasons = [{"reason": (r[0] or "Unknown")[:80], "count": int(r[1])}
@@ -252,8 +192,10 @@ async def get_funnel(
             {"stage": "Interested", "count": interested},
         ],
         "failed": failed,
-        "delivery_rate": round(delivered / max(sent, 1) * 100, 1),
-        "reply_rate": round(replies / max(sent, 1) * 100, 1),
+        "cancelled": counts["cancelled"],
+        "delivery_rate": metrics.rate(delivered, max(sent, 1)),
+        "reply_rate": metrics.rate(replies, max(sent, 1)),
+        "scope": metrics.scope(scoped, days),
         "failure_reasons": reasons,
         "quarantine_reasons": quarantine,
     }
@@ -263,21 +205,25 @@ async def get_funnel(
 async def get_by_campaign(
     days: int = Query(default=30, ge=1, le=365),
     limit: int = Query(default=10, ge=1, le=50),
+    channel: Optional[str] = Query(default="sms", description="sms | email | all"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Per-campaign sent/delivered/replies comparison for bar charts."""
-    start_date = datetime.now(timezone.utc) - timedelta(days=days)
+    """Per-campaign sent/delivered/replies comparison for bar charts (same definitions and window
+    as the overview)."""
+    from app.services import message_metrics as metrics
+    from app.utils.channels import validate_channel
+
+    wanted = validate_channel(channel, default="sms")
     q = (
         select(
             Message.campaign_id,
-            func.sum(case((Message.direction == "outgoing", 1), else_=0)).label("sent"),
-            func.sum(case(
-                ((Message.direction == "outgoing") & (Message.status == "delivered"), 1),
-                else_=0)).label("delivered"),
-            func.sum(case((Message.direction == "incoming", 1), else_=0)).label("replies"),
+            func.sum(case((metrics.OUTGOING, 1), else_=0)).label("sent"),
+            func.sum(case((metrics.OUTGOING & metrics.DELIVERED, 1), else_=0)).label("delivered"),
+            func.sum(case((metrics.INCOMING, 1), else_=0)).label("replies"),
         )
-        .where(Message.created_at >= start_date, Message.campaign_id.isnot(None))
+        .where(*metrics.message_filters(channel=None if wanted == "all" else wanted, days=days),
+               Message.campaign_id.isnot(None))
         .group_by(Message.campaign_id).order_by(func.count().desc()).limit(limit)
     )
     rows = (await db.execute(q)).all()

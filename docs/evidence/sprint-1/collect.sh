@@ -15,9 +15,11 @@ OUT="$REPO/docs/evidence/sprint-1"
 PY="${PYTHON:-python}"
 AFTER_SHA="$(git rev-parse --short HEAD)"
 
+SPRINT="${SPRINT:-1}"        # 1 = the P0 workstreams + C10, 2 = QA findings C1-C11 (+ the P0-3 follow-up)
+
 # name | parent commit of the fix | test files | NEW modules the tests import (copied in so the
 # import succeeds and the BEHAVIOUR is what fails -- they are not used by the old code)
-WORKSTREAMS=(
+WORKSTREAMS_S1=(
   "p0_1|45c0937|backend/tests/test_p0_1_campaign_lifecycle.py|"
   "p0_2|d9002cf|backend/tests/test_p0_2_unified_campaigns.py|"
   "p0_3|b9eedb5|backend/tests/test_p0_3_send_throttles.py backend/tests/test_p0_3_circuit_breaker.py|backend/app/services/circuit_breaker.py"
@@ -25,6 +27,20 @@ WORKSTREAMS=(
   "p0_5|60c0f4f|backend/tests/test_p0_5_verification_gate.py|"
   "c10|abeb293|backend/tests/test_c10_secrets.py|"
 )
+# Sprint 2: every item's "before" is the code at 981320d (the end of Sprint 1).
+WORKSTREAMS_S2=(
+  "s2_templates|981320d|backend/tests/test_sprint2_templates.py|"
+  "s2_lists_filters|981320d|backend/tests/test_sprint2_lists_and_filters.py|"
+  "s2_reply|981320d|backend/tests/test_sprint2_reply.py|"
+  "s2_followups|981320d|backend/tests/test_sprint2_followups.py|"
+  "s2_contacts|981320d|backend/tests/test_sprint2_contacts.py|"
+  "s2_tool_contracts|981320d|backend/tests/test_sprint2_tool_contracts.py|"
+  "s2_http|981320d|backend/tests/test_sprint2_http_semantics.py|"
+  "s2_skipped_reasons|981320d|backend/tests/test_sprint2_skipped_reasons.py|"
+  "s2_metrics|981320d|backend/tests/test_sprint2_metrics.py|"
+  "p0_3_startup_step|981320d|backend/tests/test_p0_3_send_throttles.py|"
+)
+if [ "$SPRINT" = "2" ]; then WORKSTREAMS=("${WORKSTREAMS_S2[@]}"); else WORKSTREAMS=("${WORKSTREAMS_S1[@]}"); fi
 ONLY="${ONLY:-}"   # e.g. ONLY="p0_3 p0_4" re-runs just those
 want() { [ -z "$ONLY" ] || [[ " $ONLY " == *" $1 "* ]]; }
 
@@ -62,8 +78,9 @@ for entry in "${WORKSTREAMS[@]}"; do
 done
 
 # Reproduction scripts: same script, old code vs new code.
-declare -A REPRO_PARENT=( [p0_3]=b9eedb5 [p0_4]=38d3b87 [p0_5]=60c0f4f [c10]=abeb293 )
-for name in p0_3 p0_4 p0_5 c10; do
+declare -A REPRO_PARENT=( [p0_3]=b9eedb5 [p0_4]=38d3b87 [p0_5]=60c0f4f [c10]=abeb293 [c6]=981320d )
+if [ "$SPRINT" = "2" ]; then REPROS=(c6); else REPROS=(p0_3 p0_4 p0_5 c10); fi
+for name in "${REPROS[@]}"; do
   want "$name" || continue
   wt="$(worktree "repro_$name" "${REPRO_PARENT[$name]}")"
   {

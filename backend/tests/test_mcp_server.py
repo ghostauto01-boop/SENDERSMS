@@ -317,9 +317,12 @@ async def test_path_arguments_are_substituted_and_quoted(captured):
 
 @pytest.mark.asyncio
 async def test_empty_arguments_are_not_sent(captured):
-    """Blank optional values must not become ``?search=`` on the wire."""
+    """Blank optional values must not become ``?search=`` on the wire. An argument that is left
+    out (or None) gets the default the tool ADVERTISES -- it used to be dropped and the endpoint's own
+    default applied, so a schema could promise one thing and the call do another (C4/C7)."""
     await _run("search_contacts", search="", per_page=None)
-    assert captured[0]["query"] == {}
+    assert "search" not in captured[0]["query"], "a blank value never reaches the wire"
+    assert captured[0]["query"] == {"channel": "all", "page": 1, "per_page": 25}
 
 
 @pytest.mark.asyncio

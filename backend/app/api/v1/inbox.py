@@ -1,7 +1,8 @@
 """Inbox API — full SMS sync with proper chat threading."""
 import logging, base64, json
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
@@ -253,20 +254,39 @@ async def preview_reply_template(
     }
 
 
+class ReplyIn(BaseModel):
+    """A reply, as JSON. The same fields are still accepted as query parameters (the
+    dashboard sends them that way)."""
+
+    body: Optional[str] = None
+    template_id: Optional[int] = None
+    #: Email conversations only; defaults to "Re: <the thread's subject>".
+    subject: Optional[str] = None
+
+
 @router.post("/conversations/{conversation_id}/reply")
 async def send_reply(
     conversation_id: int,
+    payload: Optional[ReplyIn] = Body(None),
     body: Optional[str] = Query(None, min_length=1),
     template_id: Optional[int] = Query(None),
+    subject: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     cu: User = Depends(get_current_user),
 ):
-    """Send a plain or template-based outbound reply via SMS-Gate.
+    """Reply in a conversation. The app sends it on the conversation's own channel: a text
+    message for an SMS thread, an email (from the sender the thread started on) for an email thread.
 
-    If only ``template_id`` is provided, personalization happens server-side at
-    send time. The UI normally sends the personalized (and optionally edited)
-    body too, while template_id records usage.
+    Send ``body`` and/or ``template_id`` as a JSON body or as query parameters. If only
+    ``template_id`` is provided, personalization happens server-side at send time. The UI
+    normally sends the personalized (and optionally edited) body too, while template_id records usage.
+    (Until now only the query form worked: a client that sent the JSON body -- as the assistant
+    tool did -- always got "Message body or template is required".)
     """
+    if payload is not None:
+        body = payload.body if payload.body is not None else body
+        template_id = payload.template_id if payload.template_id is not None else template_id
+        subject = payload.subject if payload.subject is not None else subject
     conv = await _get_conv(db, conversation_id)
     template = None
     if template_id is not None:
@@ -274,6 +294,24 @@ async def send_reply(
         template = await get_active_template(db, template_id)
         if not template:
             raise HTTPException(404, "Template not found or inactive")
+
+    if not (body or "").strip() and not template:
+        raise HTTPException(422, "Message body or template is required")
+
+    if (conv.channel or "sms") == "email":
+        # One endpoint, the right channel: this used to text the contact's phone instead.
+        from app.api.v1 import email as email_api
+        from app.schemas.email import EmailReplyIn
+
+        result = await email_api.reply(
+            conversation_id,
+            EmailReplyIn(body=(body or "").strip() or None, template_id=template_id, subject=subject),
+            db, cu,
+        )
+        sent = result.get("message") or {}
+        return {"success": bool(result.get("success")), "message_id": sent.get("id"),
+                "status": sent.get("status"), "provider_message_id": sent.get("provider_message_id"),
+                "channel": "email", **({"error": result["error"]} if result.get("error") else {})}
 
     outgoing_body = (body or "").strip()
     if not outgoing_body and template:
@@ -286,16 +324,17 @@ async def send_reply(
         raise HTTPException(422, "Message body or template is required")
 
     from app.services.sms_service import SMSService
-    msg = await SMSService(db).send_message(contact_id=conv.contact_id, body=outgoing_body)
+    msg = await SMSService(db).send_message(
+        contact_id=conv.contact_id, body=outgoing_body, conversation_id=conv.id)
     if not msg:
         raise HTTPException(409, "Cannot send: the contact has opted out or is on the suppression list.")
     if template:
         template.use_count = (template.use_count or 0) + 1
     await db.flush()
     if msg.status == "failed":
-        return {"success": False, "message_id": msg.id, "status": msg.status,
+        return {"success": False, "message_id": msg.id, "status": msg.status, "channel": "sms",
                 "error": msg.last_error or "The SMS gateway rejected the message."}
-    return {"success": True, "message_id": msg.id, "status": msg.status,
+    return {"success": True, "message_id": msg.id, "status": msg.status, "channel": "sms",
             "provider_message_id": msg.provider_message_id}
 
 async def _get_conv(db, conversation_id: int) -> Conversation:
@@ -747,3 +786,17 @@ async def message_feedback(message_id: int, data: _ReplyFeedback,
     return {"success": True, "message_id": msg.id, "ai_sentiment": msg.ai_sentiment,
             "ai_intent": msg.ai_intent, "status": conv.status,
             "is_opted_out": bool(contact.is_opted_out) if contact else False}
+
+
+#: The actions a conversation can be marked with (each is its own route above).
+CONVERSATION_MARKS = ("mark-interested", "mark-not-interested", "mark-close", "mark-unread")
+
+
+# Registered LAST on purpose: it only catches what no real route above matched. An unknown action
+# used to fall through to a 405 "Method Not Allowed" -- the wrong problem entirely.
+@router.post("/conversations/{conversation_id}/{mark}", include_in_schema=False)
+async def unknown_conversation_action(conversation_id: int, mark: str):
+    raise HTTPException(
+        422,
+        f"'{mark}' is not a valid conversation mark. Valid marks: {', '.join(CONVERSATION_MARKS)}.",
+    )

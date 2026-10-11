@@ -160,7 +160,9 @@ def _contact_fields(for_create: bool = False) -> list[Param]:
         Param("business_name", where="body"),
         Param("city", where="body"),
         Param("state", where="body"),
-        Param("country", where="body", default="Nigeria"),
+        # No default: an unknown country stays unknown (the API stopped defaulting it to Nigeria).
+        # A default advertised here is applied to every call, creates AND updates.
+        Param("country", where="body"),
         Param("website", where="body"),
         Param("industry", where="body"),
         Param("lead_status", where="body"),
@@ -539,7 +541,9 @@ TOOLS: list[Tool] = [
             "Create a campaign (draft). Pick ONE channel: 'sms' or 'email'. Provide the audience "
             "(list_id) and the message — either message_body, or template_id to use a saved "
             "template. Email campaigns also take subject, html_body and email_account_id. "
-            "Nothing is sent until you start it (or schedule it for a time)."
+            "Nothing is sent until you start it (or schedule it for a time). Pacing and daily "
+            "caps are NOT per campaign: they come from Settings -> Sending Rules (the classic "
+            "engine does not read a campaign's own daily_limit / min_delay), so they are not offered here."
         ),
         method="POST", path="/api/v1/campaigns/", scope="write", group="campaigns",
         params=[
@@ -558,9 +562,6 @@ TOOLS: list[Tool] = [
             Param("scheduled_start_at", description="ISO-8601 time to launch automatically.",
                   where="body"),
             Param("description", where="body"),
-            Param("daily_limit", type="integer", where="body"),
-            Param("min_delay", type="integer", description="Minimum seconds between messages.",
-                  where="body"),
         ],
     ),
     Tool(
@@ -785,9 +786,13 @@ TOOLS: list[Tool] = [
     ),
     Tool(
         name="send_history",
-        description="Recent SMS sends with their status.",
+        description=(
+            "Recent sends with their status. SMS by default (email rows used to be mixed in); "
+            "channel=email or channel=all asks for the others."
+        ),
         method="GET", path="/api/v1/send/history", group="sending",
-        params=[Param("page", type="integer", default=1, where="query"),
+        params=[Param("channel", enum=["sms", "email", "all"], default="sms", where="query"),
+                Param("page", type="integer", default=1, where="query"),
                 Param("per_page", type="integer", default=25, minimum=1, maximum=100, where="query",
                       description="Page size, 1-100 (above 100 is refused, not clamped).")],
     ),
@@ -819,7 +824,9 @@ TOOLS: list[Tool] = [
         description="Email conversations in the shared inbox, newest activity first.",
         method="GET", path="/api/v1/email/inbox/conversations", group="email",
         params=[Param("status", where="query"),
-                Param("unread_only", type="boolean", where="query"),
+                Param("unread_only", type="boolean", where="query",
+                      description="Only threads with unread messages."),
+                Param("search", where="query", description="Match the contact's email or name."),
                 Param("page", type="integer", default=1, where="query"),
                 Param("per_page", type="integer", default=25, minimum=1, maximum=100, where="query",
                       description="Page size, 1-100 (above 100 is refused, not clamped).")],
@@ -894,12 +901,21 @@ TOOLS: list[Tool] = [
     ),
     Tool(
         name="reply_to_conversation",
-        description="Reply in a conversation (the app routes it to SMS or email automatically).",
+        description=(
+            "Reply in a conversation. The app sends it on the conversation's own channel: a text "
+            "message for an SMS thread, an email from the sender the thread started on for an email "
+            "thread. Give `body`, or a `template_id` to have it written from a template (variables "
+            "filled in for this contact); the reply is refused if you give neither."
+        ),
         method="POST", path="/api/v1/inbox/conversations/{conversation_id}/reply", scope="write",
         group="inbox",
         params=[
             Param("conversation_id", type="integer", required=True, where="path"),
-            Param("body", required=True, where="body"),
+            Param("body", where="body", description="The message text. Optional when template_id is given."),
+            Param("template_id", type="integer", where="body",
+                  description="Reply from this saved template instead of writing the text."),
+            Param("subject", where="body",
+                  description="Email conversations only. Defaults to 'Re: <the thread's subject>'."),
         ],
     ),
     Tool(
@@ -916,8 +932,29 @@ TOOLS: list[Tool] = [
     # -------------------------------------------------------------- follow-ups
     Tool(
         name="list_followups",
-        description="Pending follow-ups (the ones scheduled for specific contacts).",
+        description=(
+            "Follow-ups scheduled for specific contacts, both channels. By default: every follow-up "
+            "that has not been sent yet, whatever day it is due. (The dashboard page opens on "
+            "'due today, SMS only' -- this tool does not, so a follow-up you scheduled for next week "
+            "or by email is here.) Use `view` for overdue / upcoming / completed / skipped."
+        ),
         method="GET", path="/api/v1/followups/", group="follow-ups",
+        params=[
+            Param("view", enum=["pending", "due_today", "overdue", "upcoming", "completed", "skipped", "all"],
+                  default="pending", where="query"),
+            Param("channel", enum=["sms", "email", "all"], default="all", where="query"),
+            Param("page", type="integer", default=1, minimum=1, where="query"),
+            Param("per_page", type="integer", default=25, minimum=1, maximum=100, where="query"),
+        ],
+    ),
+    Tool(
+        name="delete_followup",
+        description=(
+            "Remove a follow-up that has not gone out yet. One that was already sent stays in the "
+            "history. Removing a campaign's follow-up ends that contact's automation, like skipping it."
+        ),
+        method="DELETE", path="/api/v1/followups/{followup_id}", scope="write", group="follow-ups",
+        params=[Param("followup_id", type="integer", required=True, where="path")],
     ),
     Tool(
         name="create_followup",
@@ -972,8 +1009,19 @@ TOOLS: list[Tool] = [
     # -------------------------------------------------------------- analytics
     Tool(
         name="dashboard_stats",
-        description="Headline numbers: contacts, messages, replies, campaigns.",
+        description=(
+            "Headline numbers: contacts, messages, replies, campaigns. All channels and all time by "
+            "default; pass channel and/or days to scope it. The response says which scope and which "
+            "definitions its numbers use, and they are the same ones analytics_overview and the email "
+            "tools use -- the same database gives the same numbers in all of them."
+        ),
         method="GET", path="/api/v1/dashboard/stats", group="analytics",
+        params=[
+            Param("channel", enum=["sms", "email", "all"], where="query",
+                  description="One channel, or all (the default)."),
+            Param("days", type="integer", minimum=1, maximum=365, where="query",
+                  description="Only the last N days (UTC, today included). Omit for all time."),
+        ],
     ),
     Tool(
         name="email_overview",
@@ -982,8 +1030,17 @@ TOOLS: list[Tool] = [
     ),
     Tool(
         name="analytics_overview",
-        description="SMS analytics overview (volume, replies, funnel).",
+        description=(
+            "Analytics overview (volume, delivery, replies) for the last N days. SMS by default -- "
+            "pass channel=email or channel=all for the others. Same definitions and window as "
+            "dashboard_stats and the email tools."
+        ),
         method="GET", path="/api/v1/analytics/overview", group="analytics",
+        params=[
+            Param("days", type="integer", default=30, minimum=1, maximum=365, where="query"),
+            Param("channel", enum=["sms", "email", "all"], default="sms", where="query"),
+            Param("campaign_id", type="integer", where="query"),
+        ],
     ),
     Tool(
         name="list_variables",

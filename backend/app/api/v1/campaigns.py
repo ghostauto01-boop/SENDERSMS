@@ -177,13 +177,16 @@ async def create_campaign(
 
 
 @router.put("/{campaign_id}", response_model=CampaignOut)
+@router.patch("/{campaign_id}", response_model=CampaignOut)
 async def update_campaign(
     campaign_id: int,
     data: CampaignUpdate,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Update campaign settings."""
+    """Update campaign settings. Only the fields in the body change, so ``PATCH`` (what a REST
+    client reaches for to change one field) and ``PUT`` are the same operation -- ``PATCH`` used
+    to be a 405."""
     result = await db.execute(select(Campaign).where(Campaign.id == campaign_id))
     campaign = result.scalar_one_or_none()
     if not campaign:

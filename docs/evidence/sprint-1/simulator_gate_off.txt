@@ -8,12 +8,12 @@
 [PASS] template returns attachment metadata, not the payload  -- [{"name": "price-list.pdf", "content_type": "application/pdf", "size": 29}]
 [PASS] template keeps HTML + unsubscribe flag
 [PASS] preview renders variables + lists attachments  -- {"subject": "Your price list, Ada", "text": "Hi Ada,\n\nHere is the price list you asked for.\n\nAda", "html": "<p>Hi Ada,</p><p><img src=\"https://cdn.acme-leads.io/hero.png\" alt=\"hero\"></p><p><a href=\"https://acme-
-[PASS] send email via template  -- {"success":true,"sent":1,"skipped":0,"failed":0,"total":1,"message_ids":[1],"email_account_id":1}
+[PASS] send email via template  -- {"success":true,"sent":1,"failed":0,"total":1,"message_ids":[1],"email_account_id":1,"skipped":0,"skipped_reason":null,"skipped_reasons":{},"skipped_details":[],"message":"Sent 1."}
 [PASS] history shows the message with attachment metadata  -- [{"name": "price-list.pdf", "content_type": "application/pdf", "size": 29}]
-[PASS] outgoing message has an RFC Message-ID for threading  -- <027072bae7f04f658a049c6bdc9d27fa.1791701183@acme-leads.io>
+[PASS] outgoing message has an RFC Message-ID for threading  -- <77c248a12e5c4086a2ad2853f40a8b71.1791703979@acme-leads.io>
 [PASS] Brevo payload has html + text + attachment  -- {"sender": {"email": "hello@acme-leads.io", "name": "Acme Leads"}, "to": [{"email": "ada@acme-leads.io", "name": "Ada"}], "subject": "Your price list, Ada", "trackingOptions": {"open": true, "click": 
 [PASS] outgoing mail carries List-Unsubscribe headers  -- {"List-Unsubscribe": "<mailto:replies@acme-leads.io?subject=unsubscribe>, <http://127.0.0.1:8000/api/v1/email/unsubscribe?e=ada%40acme-leads.io&t=dcba403ebef241a73a1d4eea4f952369>", "List-Unsubscribe-Post": "List-Unsubscribe=One-Click"}
-[PASS] account reads show a masked webhook token, never the real one  -- http://127.0.0.1:8000/api/v1/webhooks/brevo/1?token=****WHqg
+[PASS] account reads show a masked webhook token, never the real one  -- http://127.0.0.1:8000/api/v1/webhooks/brevo/1?token=****zFGY
 [PASS] reveal returns the full webhook URL (not cacheable)  -- {"account_id":1,"webhook_url":"http://127.0.0.1:8000/api/v1/webhooks/brevo/1?token=<token>","webhook_path":"/api/v1/webhooks
 [PASS] inbound webhook accepted  -- {"success":true,"stored":1,"received":1}
 [PASS] a wrong webhook token is refused  -- 403
@@ -21,14 +21,14 @@
 [PASS] personal reply address is linked without replacing the primary contact email  -- {"email": "ada@acme-leads.io", "aliases": ["ada.personal@gmail.com"]}
 [PASS] reply from the inbox sends  -- {"success":true,"error":null,"message":{"id":3,"conversation_id":1,"contact_id":1,"campaign_id":null,"ads_campaign_id":null,"direction":"outgoing","channel":"email","subject":"Re: Re: Your price list, Ada","body":"500 units it is — quote attached.","
 [PASS] reply is sent to the latest personal sender address  -- [{"email": "ada.personal@gmail.com", "name": "Ada"}]
-[PASS] reply goes out threaded (In-Reply-To the original)  -- {"In-Reply-To": "<027072bae7f04f658a049c6bdc9d27fa.1791701183@acme-leads.io>", "References": "<027072bae7f04f658a049c6bdc9d27fa.1791701183@acme-leads.io>"}
+[PASS] reply goes out threaded (In-Reply-To the original)  -- {"In-Reply-To": "<77c248a12e5c4086a2ad2853f40a8b71.1791703979@acme-leads.io>", "References": "<77c248a12e5c4086a2ad2853f40a8b71.1791703979@acme-leads.io>"}
 [PASS] reply is NOT bulk mail (no unsubscribe header on a 1:1 reply)
 [PASS] reply carries its own attachment
 [PASS] the sent reply joined the same thread  -- 3 messages in the thread
 [PASS] newest message shows its attachment  -- [{"name": "quote.txt", "content_type": "application/octet-stream", "size": 16}]
 [PASS] forged unsubscribe token is rejected  -- 400
 [PASS] list has the contact as a member  -- {"success":true,"added":1,"contact_count":1}
-[PASS] create email campaign with an attachment  -- {"id":1,"kind":"campaign","name":"Sim Email Campaign 1791701184","description":null,"status":"draft","paused_from":null,"paused_at":null,"paused_reason":null,"channel":"email","email_account_id":1,"fallback_email_account_id":null,"subject":"Sim subject","html_body":"<p>Hello {{first_name}}</p>","att
+[PASS] create email campaign with an attachment  -- {"id":1,"kind":"campaign","name":"Sim Email Campaign 1791703979","description":null,"status":"draft","paused_from":null,"paused_at":null,"paused_reason":null,"channel":"email","email_account_id":1,"fallback_email_account_id":null,"subject":"Sim subject","html_body":"<p>Hello {{first_name}}</p>","att
 [PASS] campaign stores the attachment  -- [{'name': 'brochure.txt', 'content_type': 'application/octet-stream', 'size': 8}]
 [PASS] duplicating an email campaign keeps channel + subject + attachment  -- {"channel": "email", "subject": "Sim subject", "attachments": [{"name": "brochure.txt", "content_type": "application/octet-stream", "size": 8}]}
 [PASS] email campaign validates against the Brevo sender  -- {"valid":true,"ok":true,"status":"draft","changed":false,"errors":[],"warnings":[],"audience":{"list_members":1,"sendable":1,"skipped":{},"unverified":0,"risky":0},"projection":{"channel":"email","sendable":1,"mailboxes"
@@ -50,10 +50,10 @@
 [PASS] received mail keeps its attachments  -- ["contract.pdf", "notes.txt"]
 [PASS] a received attachment with only a Brevo download link stays clickable  -- {"name": "contract.pdf", "content_type": "application/pdf", "size": 2048, "url": "https://brevo.test/dl/abc123"}
 [PASS] received mail threaded under the message it answers
-[PASS] email follow-up created  -- {"id":1,"contact_id":1,"contact_name":"Ada","contact_phone":"+2348012345001","campaign_id":null,"sequence_id":null,"sequence_step_order":null,"status":"pending","scheduled_at":"2026-10-11T06:51:26.944
+[PASS] email follow-up created  -- {"id":1,"contact_id":1,"contact_name":"Ada","contact_phone":"+2348012345001","campaign_id":null,"sequence_id":null,"sequence_step_order":null,"status":"pending","scheduled_at":"2026-10-11T07:38:02.075
 [PASS] send-now refuses without a broker (no silent no-op)  -- 503
 [PASS] follow-up email goes out  -- follow-up 1 sent: True 
-[PASS] follow-up quotes the thread's latest message (same chat in Gmail)  -- expected <0a2a4349f857416ea8b6620cf6febaa7.1791701186@acme-leads.io> got <0a2a4349f857416ea8b6620cf6febaa7.1791701186@acme-leads.io>
+[PASS] follow-up quotes the thread's latest message (same chat in Gmail)  -- expected <e162df0f13164f10af8ad2383d5f7a0c.1791703981@acme-leads.io> got <e162df0f13164f10af8ad2383d5f7a0c.1791703981@acme-leads.io>
 [PASS] the follow-up is a message in the same chat  -- 7 messages in the thread
 [PASS] clicking the real unsubscribe link succeeds  -- <h1>You are unsubscribed</h1><p>ada@acme-leads.io will not receive further email from us.</p>
 [PASS] the contact is now opted out of email only  -- 1 unsubscribed

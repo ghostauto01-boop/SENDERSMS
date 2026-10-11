@@ -1,7 +1,7 @@
 """SMS Service — uses direct send_sms + Pushover notifications."""
 import json,logging,uuid,os
 from datetime import datetime, timezone
-from sqlalchemy import select,update
+from sqlalchemy import func,select,update
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.contact import Contact
 from app.models.conversation import Conversation,Message
@@ -27,7 +27,7 @@ class SMSService:
         from app.services.system_settings import get_sim_number
         return await get_sim_number(self.db)
 
-    async def send_message(self,contact_id,body,campaign_id=None):
+    async def send_message(self,contact_id,body,campaign_id=None,conversation_id=None):
         c=(await self.db.execute(select(Contact).where(Contact.id==contact_id))).scalar_one_or_none()
         if not c or c.is_opted_out:return None
         from app.services.list_hygiene import contact_is_blocked_from_send, mark_undeliverable
@@ -43,8 +43,15 @@ class SMSService:
         from app.services.variable_service import render_for_contact
         body=await render_for_contact(self.db,body,c)
         ch,sg=count_sms_segments(body);ik=f"send-{contact_id}-{uuid.uuid4().hex[:12]}"
-        cr=(await self.db.execute(select(Conversation).where(Conversation.contact_id==contact_id).order_by(Conversation.id).limit(1))).scalars().first()
-        if not cr:cr=Conversation(contact_id=contact_id,campaign_id=campaign_id,status="active");self.db.add(cr);await self.db.flush()
+        cr=None
+        if conversation_id:
+            # A reply belongs in the conversation it answers.
+            cr=(await self.db.execute(select(Conversation).where(Conversation.id==conversation_id,Conversation.contact_id==contact_id))).scalars().first()
+        if not cr:
+            # Otherwise the contact's first TEXT conversation. This used to take their first
+            # conversation of ANY channel, so an SMS could land in an email thread.
+            cr=(await self.db.execute(select(Conversation).where(Conversation.contact_id==contact_id,func.coalesce(Conversation.channel,"sms")=="sms").order_by(Conversation.id).limit(1))).scalars().first()
+        if not cr:cr=Conversation(contact_id=contact_id,campaign_id=campaign_id,status="active",channel="sms");self.db.add(cr);await self.db.flush()
         # Keep the thread's campaign attribution current (first touch + last
         # touch), so the inbox badge and the campaign->replies drill-down agree.
         if campaign_id:
@@ -135,10 +142,12 @@ class SMSService:
             c.consent_status="opted_out";c.has_consented=False
             self.db.add(SuppressionEntry(phone_number=n,contact_id=c.id,reason=f"Opt-out:{kw}",source="keyword",opt_out_keyword=kw))
             await self._stop_seq(c.id)
-        cr=(await self.db.execute(select(Conversation).where(Conversation.contact_id==c.id).order_by(Conversation.id).limit(1))).scalars().first()
+        # An inbound TEXT belongs in the contact's text thread; it used to attach to whichever
+        # conversation they had first, so a text could mark an email thread unread.
+        cr=(await self.db.execute(select(Conversation).where(Conversation.contact_id==c.id,func.coalesce(Conversation.channel,"sms")=="sms").order_by(Conversation.id).limit(1))).scalars().first()
         if not cr:
             # A brand-new conversation still has one unread message in it.
-            cr=Conversation(contact_id=c.id,status="unread",unread_count=1);self.db.add(cr);await self.db.flush()
+            cr=Conversation(contact_id=c.id,status="unread",unread_count=1,channel="sms");self.db.add(cr);await self.db.flush()
         else:cr.status="unread";cr.unread_count=(cr.unread_count or 0)+1
         ch,sg=count_sms_segments(body)
         # Preserve the real receive time. Inbox export replays historical SMS, and

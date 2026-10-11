@@ -175,7 +175,8 @@ async def send_sms_now(
     from app.services.sending_limits import await_slot
     results = []
 
-    for contact in recipients:
+    rate_limited_from = None
+    for index, contact in enumerate(recipients):
         # Respect Settings -> Sending Rules (hourly/daily/per-minute caps and
         # pacing) so a manual "send to list" cannot trip a carrier flag either.
         slot = await await_slot(db, cap_seconds=10, channel="sms")
@@ -186,16 +187,21 @@ async def send_sms_now(
                     f"Rate limited: {slot['reason']}. "
                     f"Try again in about {slot['wait_seconds']} seconds.",
                 )
+            rate_limited_from = (index, slot["reason"])
             break
 
         msg = await render_for_contact(db, body, contact)
         char_count, segment_count = count_sms_segments(msg)
         cr = await db.execute(
-            select(Conversation).where(Conversation.contact_id == contact.id).order_by(Conversation.id).limit(1)
+            # The contact's TEXT thread: this used to take their first conversation of ANY channel,
+            # so a text could land in an email thread.
+            select(Conversation).where(
+                Conversation.contact_id == contact.id, func.coalesce(Conversation.channel, "sms") == "sms"
+            ).order_by(Conversation.id).limit(1)
         )
         conv = cr.scalars().first()
         if not conv:
-            conv = Conversation(contact_id=contact.id, status="active")
+            conv = Conversation(contact_id=contact.id, status="active", channel="sms")
             db.add(conv)
             await db.flush()
         message = Message(
@@ -254,11 +260,28 @@ async def send_sms_now(
 
     await db.flush()
     sc = sum(1 for x in results if x["status"] == "sent")
+    # Everyone who was NOT sent to, with why: numbers the pre-send filter refused, and recipients the
+    # rate limit stopped the send before reaching (they used to vanish from the response).
+    from app.utils.send_report import skip_summary, summary_sentence
+
+    skipped_details = [
+        {"contact_id": f["contact_id"], "reason": f["reason"] or "filtered",
+         "message": f.get("detail") or (f["reason"] or "filtered").replace("_", " ")}
+        for f in (filtered_out if list_id else [])
+    ]
+    if rate_limited_from is not None:
+        start, why = rate_limited_from
+        skipped_details += [
+            {"contact_id": c.id, "reason": "rate_limited", "message": f"rate limited: {why}"}
+            for c in recipients[start:]
+        ]
     return {
         "success": sc > 0,
         "sent": sc,
         "failed": len(results) - sc,
         "total": len(results),
+        **skip_summary(skipped_details),
+        "message": summary_sentence(sc, skipped_details),
         "filtered": filtered_out if list_id else [],
         "filtered_count": len(filtered_out) if list_id else 0,
         "deferred": len(recipients) - len(results),
@@ -385,11 +408,20 @@ async def get_history(
     per_page: int = Query(50, ge=1, le=100),
     status: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
+    channel: Optional[str] = Query("sms", description="sms | email | all"),
     db: AsyncSession = Depends(get_db),
     cu: User = Depends(get_current_user),
 ):
-    """List actual sent messages (from messages table) filtered by status. Powers Sent / Failed tabs."""
+    """List actual sent messages (from messages table) filtered by status. Powers Sent / Failed tabs.
+
+    SMS by default -- this is the SMS send page's history, and email rows used to be listed in it.
+    ``channel=email`` or ``channel=all`` asks for the others."""
+    from app.utils.channels import validate_channel
+
+    wanted = validate_channel(channel, default="sms")
     base = select(Message).where(Message.direction == "outgoing")
+    if wanted != "all":
+        base = base.where(func.coalesce(Message.channel, "sms") == wanted)
     if status and status != "all":
         # map 'failed' includes both failed and cancelled for visibility
         if status == "failed":

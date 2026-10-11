@@ -416,3 +416,9 @@ ALTER TABLE ads_campaigns ADD COLUMN IF NOT EXISTS paused_at TIMESTAMP WITH TIME
 ALTER TABLE ads_campaigns ADD COLUMN IF NOT EXISTS breaker_reset_at TIMESTAMP WITH TIME ZONE;
 
 COMMIT;
+
+-- C5: older code stored an invented "phone number" (email:<address>, cut to 20 characters) for a
+-- contact that only had an email address. The app clears these at startup; this is the same repair
+-- for a hand-run migration. Contacts with no email address are left alone.
+UPDATE contacts SET phone_number = NULL
+ WHERE phone_number LIKE 'email:%' AND email IS NOT NULL AND TRIM(email) <> '';
