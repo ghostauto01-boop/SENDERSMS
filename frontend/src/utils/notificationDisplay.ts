@@ -1,4 +1,5 @@
 import {
+  AlertTriangle,
   Bell,
   CalendarClock,
   CheckCircle2,
@@ -115,6 +116,17 @@ export function notificationDisplay(item: NotificationLike): NotificationDisplay
       preview: body,
       href: item.url || "/campaigns",
       channel: "Campaign",
+    };
+  }
+
+  if (item.event_type === "bounce_rate_alert") {
+    return {
+      Icon: AlertTriangle,
+      iconClass: "bg-warning-50 text-warning-600 dark:bg-warning-950/60 dark:text-warning-300",
+      sender: stripLeadingEmoji(rawTitle) || "High bounce rate",
+      preview: body,
+      href: item.url || "/campaigns",
+      channel: "Bounce",
     };
   }
 

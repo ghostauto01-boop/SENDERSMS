@@ -214,6 +214,35 @@ async def notify_campaign_failed(db: AsyncSession, campaign_name: str, reason: s
     )
 
 
+async def notify_bounce_rate(
+    db: AsyncSession,
+    *,
+    campaign_name: str,
+    detail: str,
+    campaign_id: Optional[int] = None,
+    url: str = "/campaigns",
+    reference_type: str = "campaign",
+) -> NotificationEvent:
+    """A campaign's bounce (or complaint) rate is above its limit.
+
+    This is a *report*, never a stop -- see :mod:`app.services.bounce_watch`.
+    The body therefore says what the numbers are and what to do about them, and
+    spells out that the campaign is still running, because a recipient who has
+    just been told "5% bounces" needs to know nothing has been switched off
+    behind their back.
+    """
+    return await notify(
+        db,
+        "bounce_rate_alert",
+        f"⚠️ High bounce rate: {campaign_name}",
+        f"{detail[:200]} The campaign is still sending — verify the list to bring it down.",
+        url=url,
+        reference_id=campaign_id,
+        reference_type=reference_type,
+        tag=f"bounce-{reference_type}-{campaign_id}" if campaign_id else "bounce-rate",
+    )
+
+
 async def notify_missed_call(db: AsyncSession, contact_name: str, phone: str) -> NotificationEvent:
     return await notify(
         db, "missed_call", f"📞 Missed call from {contact_name}", phone,

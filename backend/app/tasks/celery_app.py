@@ -92,10 +92,10 @@ celery_app.conf.beat_schedule = {
         "task": "app.tasks.campaign_tasks.launch_due_campaigns",
         "schedule": timedelta(minutes=1),
     },
-    # Provider-health breaker is also checked from webhooks; this sweep catches
-    # missed events without imposing a send rate, window or account cap.
-    "check-circuit-breakers": {
-        "task": "app.tasks.campaign_tasks.check_circuit_breakers",
+    # The bounce watchdog also reports from webhooks; this sweep catches missed
+    # events. It only ever notifies -- no send rate, window or account cap.
+    "watch-bounce-rates": {
+        "task": "app.tasks.campaign_tasks.watch_bounce_rates",
         "schedule": timedelta(minutes=5),
     },
     "process-campaign-followups": {

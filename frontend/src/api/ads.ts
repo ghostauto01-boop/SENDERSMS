@@ -43,7 +43,7 @@ export type AdsCampaign = {
   description?: string | null;
   objective: string;
   status: string;
-  // Why it is paused. An automatic (circuit breaker) pause always says why.
+  // Why it is paused, when an operator paused it.
   paused_reason?: string | null;
   paused_at?: string | null;
   channel?: string;
@@ -247,13 +247,7 @@ export const adsApi = {
   simulate: (id: number) => unwrap<any>(api.post(`/ads/campaigns/${id}/simulate`)),
   launch: (id: number) => unwrap<any>(api.post(`/ads/campaigns/${id}/launch`)),
   pause: (id: number) => unwrap<any>(api.post(`/ads/campaigns/${id}/pause`)),
-  // After a circuit-breaker pause the server wants an explicit acknowledgement.
-  resume: (id: number, acknowledgeBreaker = false) =>
-    unwrap<any>(
-      api.post(`/ads/campaigns/${id}/resume`, null, {
-        params: acknowledgeBreaker ? { acknowledge_breaker: true } : undefined,
-      }),
-    ),
+  resume: (id: number) => unwrap<any>(api.post(`/ads/campaigns/${id}/resume`)),
   complete: (id: number) => unwrap<any>(api.post(`/ads/campaigns/${id}/complete`)),
   archive: (id: number) => unwrap<any>(api.post(`/ads/campaigns/${id}/archive`)),
   duplicate: (id: number, copyAudience = false) =>

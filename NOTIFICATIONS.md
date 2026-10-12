@@ -25,6 +25,7 @@ Events covered today:
 | ❌ Campaign failed | failure hook ready (see API below) |
 | 📞 Missed call | inbound CallGate call ends unanswered |
 | ⏰ Follow-up due | hook ready for follow-up engine |
+| ⚠️ High bounce rate | an email campaign's bounce or complaint rate passes its limit (report only — nothing is paused) |
 | 🔔 Test | "Send test" button |
 
 ## Setup (30 seconds per phone)
@@ -70,5 +71,8 @@ Manage devices any time in **Settings → Notifications**: per-browser status,
   await notify(db, "followup_due", "⏰ Follow-up due: Ada",
                "Quote sent 3 days ago.", url="/follow-ups")
   ```
+- The bounce watchdog (`app/services/bounce_watch.py`) emits `bounce_rate_alert`
+  through `push_service.notify_bounce_rate()` — one per campaign per
+  `bounce_alert_cooldown_hours` (6), however many bounces land in between.
 - Tests: `backend/tests/test_notifications.py` (8) and
   `frontend/src/utils/push.test.ts` (6).

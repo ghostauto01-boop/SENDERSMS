@@ -45,22 +45,6 @@ class CampaignStateError(CampaignError):
     """The request is fine but the campaign's current state forbids it (HTTP 409)."""
 
 
-class BreakerTripped(CampaignStateError):
-    """The campaign was paused by the bounce circuit breaker and has not been acknowledged.
-
-    Resuming is allowed -- a person may know better than a percentage -- but only
-    deliberately (``acknowledge_breaker=true``), never by a reflexive click.
-    """
-
-    def __init__(self, campaign):
-        self.campaign_id = campaign.id
-        self.reason = campaign.paused_reason or ""
-        super().__init__(
-            f"This campaign was paused automatically. {self.reason} Fix the list first "
-            "(verify the addresses), then repeat with acknowledge_breaker=true to resume anyway."
-        )
-
-
 @dataclass
 class CampaignCheck:
     """Everything a validation pass learned. Reading it changes nothing."""
@@ -583,9 +567,7 @@ class CampaignService:
             ),
         }
 
-    async def start_campaign(
-        self, campaign_id: int, *, acknowledge_breaker: bool = False
-    ) -> Campaign:
+    async def start_campaign(self, campaign_id: int) -> Campaign:
         """Start a campaign: queue all contacts for processing.
 
         A ``draft`` is validated *here*, inline, so "start" is one honest step
@@ -597,8 +579,6 @@ class CampaignService:
 
         This creates CampaignContact records; actual sending is done by the workers.
         """
-        from app.services import circuit_breaker
-
         campaign = await self._get(campaign_id)
         status = campaign.status
         fresh = status in ("draft", "scheduled") or (
@@ -606,11 +586,6 @@ class CampaignService:
         )
         if not fresh and status != "paused":
             raise CampaignStateError(f"Cannot start campaign in {status} status")
-        if circuit_breaker.is_breaker_pause(campaign):
-            # /start must not be a back door around the breaker's acknowledgement.
-            if not acknowledge_breaker:
-                raise BreakerTripped(campaign)
-            circuit_breaker.acknowledge(campaign)
 
         if fresh:
             check = await self._collect(campaign)
@@ -707,9 +682,7 @@ class CampaignService:
         await self.db.flush()
         return campaign
 
-    async def resume_campaign(
-        self, campaign_id: int, *, acknowledge_breaker: bool = False
-    ) -> Campaign:
+    async def resume_campaign(self, campaign_id: int) -> Campaign:
         """Resume a paused campaign.
 
         Paused mid-send: back to ``running``. Paused while scheduled: back to
@@ -724,7 +697,7 @@ class CampaignService:
                 f"Only paused campaigns can be resumed (this one is {campaign.status})"
             )
         if campaign.paused_from != "scheduled":
-            return await self.start_campaign(campaign_id, acknowledge_breaker=acknowledge_breaker)
+            return await self.start_campaign(campaign_id)
 
         self.transition(campaign, "scheduled")
         campaign.paused_from = None

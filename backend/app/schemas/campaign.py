@@ -108,7 +108,7 @@ class CampaignOut(BaseModel):
     #: ever started (resume restores the schedule), otherwise null.
     paused_from: Optional[str] = None
     paused_at: Optional[datetime] = None
-    #: Why it is paused. An automatic pause (circuit breaker) always says why.
+    #: Why it is paused. Only operators pause campaigns, so this always says why.
     paused_reason: Optional[str] = None
     channel: str = "sms"
     email_account_id: Optional[int] = None

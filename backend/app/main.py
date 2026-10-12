@@ -251,8 +251,9 @@ async def _poll() -> int:
         # asleep (free tier) or Redis unreachable — otherwise campaigns stay
         # “running” with pending contacts forever.
         work += await _process_running_campaigns_inline()
-        # Email campaign health backstop when no Celery worker is available.
-        work += await _check_circuit_breakers_inline()
+        # Email campaign health backstop (notifications only) when no Celery
+        # worker is available.
+        work += await _watch_bounce_rates_inline()
         # Sweep any queued messages that were rate-limited / deferred (or that
         # a dead broker left behind). Uses the same atomic claim as Celery so
         # the two can never double-send the same message.
@@ -549,20 +550,20 @@ async def _process_meeting_reminders() -> int:
         return 0
 
 
-async def _check_circuit_breakers_inline() -> int:
-    """Campaign-local provider-health sweep for no-worker deployments."""
+async def _watch_bounce_rates_inline() -> int:
+    """Campaign-local bounce reporting for no-worker deployments."""
     try:
-        from app.tasks.campaign_tasks import check_circuit_breakers_async
+        from app.tasks.campaign_tasks import watch_bounce_rates_async
 
-        tripped = await check_circuit_breakers_async()
-        for item in tripped:
+        alerts = await watch_bounce_rates_async()
+        for item in alerts:
             logger.warning(
-                "CIRCUIT BREAKER (inline): paused %s %s: %s",
+                "BOUNCE WATCH (inline): %s %s: %s",
                 item["kind"], item["id"], item.get("reason"),
             )
-        return len(tripped)
+        return len(alerts)
     except Exception as exc:
-        logger.warning("Circuit breaker sweep: %s", exc)
+        logger.warning("Bounce watch sweep: %s", exc)
         return 0
 
 

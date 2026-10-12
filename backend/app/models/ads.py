@@ -166,13 +166,11 @@ class AdsCampaign(Base):
     priority: Mapped[str] = mapped_column(String(10), default="normal", nullable=False)
 
     # --- Why it is paused ---------------------------------------------------
-    #: Written when the bounce circuit breaker pauses the campaign (and by nothing
-    #: else), so an automatic pause always says why. Cleared on resume.
+    #: Written when a campaign is paused, so an operator (or the UI) can always
+    #: read why. Only people pause campaigns now: the bounce watchdog reports a
+    #: high bounce rate as a notification and never touches this. Cleared on resume.
     paused_reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
     paused_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    #: Start of the breaker's rolling window; moved forward when an operator
-    #: acknowledges a trip and resumes.
-    breaker_reset_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # --- Cached counters (authoritative numbers come from the queue) ---
     sent_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)

@@ -18,7 +18,7 @@ stateDiagram-v2
     scheduled --> archived: archive
     scheduled --> error: unrecoverable internal failure
 
-    active --> paused: operator or circuit breaker pauses
+    active --> paused: an operator pauses it (only people pause campaigns)
     active --> completed: end date or total limit reached / operator completes
     active --> archived: archive
     active --> error: unrecoverable internal failure

@@ -179,21 +179,10 @@ export default function CampaignsPage() {
     }
   };
 
-  /** Resume. A pause by the bounce circuit breaker needs a deliberate "yes", not a reflex click. */
+  /** Resume. Nothing stands in the way: a high bounce rate is reported, never enforced. */
   const handleResume = async (camp: Campaign) => {
-    const tripped = (camp.paused_reason || "").startsWith("Circuit breaker");
-    if (
-      tripped &&
-      !window.confirm(`${camp.paused_reason}\n\nResume anyway? Fix the list first (verify the addresses).`)
-    ) {
-      return;
-    }
     try {
-      const { data } = await api.post(
-        `/campaigns/${camp.id}/resume`,
-        null,
-        tripped ? { params: { acknowledge_breaker: true } } : undefined,
-      );
+      const { data } = await api.post(`/campaigns/${camp.id}/resume`);
       toast.success(data?.message || "Campaign resumed");
       loadCampaigns();
     } catch (err: any) {

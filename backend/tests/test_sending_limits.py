@@ -46,18 +46,38 @@ async def test_legacy_global_gate_does_not_enforce_saved_caps_or_windows(db):
 
 
 @pytest.mark.asyncio
-async def test_breaker_configuration_is_the_only_legacy_setting_still_loaded(db):
+async def test_bounce_watch_configuration_is_the_only_legacy_setting_still_loaded(db):
     from app.services.sending_limits import get_sending_rules
 
     db.add_all([
-        SystemSetting(key="breaker_enabled", value="false", category="sending_rules"),
+        SystemSetting(key="bounce_alert_enabled", value="false", category="sending_rules"),
         SystemSetting(key="daily_maximum", value="1", category="sending_rules"),
     ])
     await db.flush()
 
     rules = await get_sending_rules(db)
 
-    assert rules["breaker_enabled"] is False
-    assert rules["breaker_bounce_pct"] == 2.0
+    assert rules["bounce_alert_enabled"] is False
+    assert rules["bounce_alert_bounce_pct"] == 2.0
+    assert rules["bounce_alert_cooldown_hours"] == 6
     assert "daily_maximum" not in rules
     assert "sending_start_time" not in rules
+
+
+@pytest.mark.asyncio
+async def test_the_old_breaker_settings_still_count(db):
+    """An install that tuned the retired circuit breaker keeps its thresholds."""
+    from app.services.sending_limits import get_sending_rules
+
+    db.add_all([
+        SystemSetting(key="breaker_enabled", value="false", category="sending_rules"),
+        SystemSetting(key="breaker_bounce_pct", value="4", category="sending_rules"),
+        SystemSetting(key="breaker_min_sample", value="50", category="sending_rules"),
+    ])
+    await db.flush()
+
+    rules = await get_sending_rules(db)
+
+    assert rules["bounce_alert_enabled"] is False
+    assert rules["bounce_alert_bounce_pct"] == 4.0
+    assert rules["bounce_alert_min_sample"] == 50

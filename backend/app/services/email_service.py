@@ -1844,12 +1844,12 @@ async def apply_event(db: AsyncSession, event_type: str, data: dict) -> dict:
 
     await db.flush()
     if message is not None and event_type in ("bounce", "blocked", "spam", "error"):
-        # The campaign breaker evaluates the updated message and event records,
-        # so flush before checking. It is a campaign-local health safeguard,
-        # not a global send-rate limit.
-        from app.services import circuit_breaker
+        # The bounce watchdog reads the updated message and event records, so
+        # flush before checking. It only reports what it sees -- it never pauses
+        # the campaign -- and it is not a global send-rate limit.
+        from app.services import bounce_watch
 
-        await circuit_breaker.check_after_event(
+        await bounce_watch.check_after_event(
             db,
             campaign_id=message.campaign_id,
             ads_campaign_id=message.ads_campaign_id,

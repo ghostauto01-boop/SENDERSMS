@@ -1,4 +1,4 @@
-# Sending rules, mailbox caps and the bounce circuit breaker
+# Sending rules, mailbox caps and the bounce watchdog
 
 Outbound throttles are **on by default**. They exist because a mailbox (like a SIM)
 has a reputation, and a burst of cold mail from a new mailbox destroys it faster
@@ -13,7 +13,7 @@ than anything can repair it.
 | Weekends | off | `aw=true` |
 | Pacing | 30 s between messages | `pc`, `md` |
 | Emails per mailbox per day | 30 (`EMAIL_DEFAULT_DAILY_LIMIT`) | `email_daily_per_mailbox` (1–500; 20–50 is the usual guidance) |
-| Circuit breaker | on: pause above 2% bounces or 0.10% complaints, after at least 20 sends, over 7 days | `breaker_enabled`, `breaker_bounce_pct`, `breaker_complaint_pct`, `breaker_min_sample`, `breaker_window_hours` |
+| Bounce watchdog | on: **notify** above 2% bounces or 0.10% complaints, after at least 20 sends, over 7 days (one alert per campaign per 6 hours) | `bounce_alert_enabled`, `bounce_alert_bounce_pct`, `bounce_alert_complaint_pct`, `bounce_alert_min_sample`, `bounce_alert_window_hours`, `bounce_alert_cooldown_hours` |
 
 Every rule can still be switched off. When a send is held, the reason is always
 spelled out ("outside sending hours", "sending paused on weekends", "daily limit
@@ -51,26 +51,36 @@ reply to someone who wrote to you is never held by the window or the cap.
 comes from, the sending days needed, calendar days and the projected finish date.
 A 925-contact email audience on one mailbox at 30/day is **31 sending days**.
 
-## The bounce circuit breaker
+## The bounce watchdog (report only — it never stops a campaign)
 
-For every email campaign, in both campaign systems, the breaker looks at a rolling
-window and **pauses the campaign** when
+For every email campaign, in both campaign systems, the watchdog looks at the same
+rolling window and **notifies you** when
 
-* more than `breaker_bounce_pct` of recent sends bounced or were refused by the
+* more than `bounce_alert_bounce_pct` of recent sends bounced or were refused by the
   provider, or
-* spam complaints exceed `breaker_complaint_pct`.
+* spam complaints exceed `bounce_alert_complaint_pct`.
 
-A minimum sample (`breaker_min_sample`, default 20) stops one bounce in five sends
-from reading as "20%". It checks as each bounce webhook arrives, after a provider
-refusal, and every five minutes as a backstop.
+A minimum sample (`bounce_alert_min_sample`, default 20) stops one bounce in five
+sends from reading as "20%". It checks as each bounce webhook arrives, after a
+provider refusal, and every five minutes as a backstop.
 
-The reason is written on the campaign (`paused_reason`, also visible in
-`GET /overview/campaigns/{id}` and `GET /settings/sending-rules/status` →
-`breaker.tripped`). **Resuming needs an explicit acknowledgement**
-(`POST …/resume?acknowledge_breaker=true`; the UI asks first). The acknowledgement
-restarts the window, so the bounces that tripped it are not judged again the instant
-it resumes. `/start` and the Ads Manager's `/launch` honour the same rule: neither
-is a way around it. Fix the list (verify the addresses) before overriding.
+The alert is an ordinary in-app notification **and** a browser push
+(`⚠️ High bounce rate: <campaign>` — see `NOTIFICATIONS.md`), so it reaches the
+person who can fix the list instead of waiting for them to open the campaign page.
+One alert per campaign per `bounce_alert_cooldown_hours` (6 by default): a bad list
+bounces on every send, and a notification per bounce would bury everything else.
+
+**Nothing is paused, stopped or held.** A campaign with a high bounce rate keeps
+sending until a person decides otherwise; `/resume`, `/start` and the Ads Manager's
+`/launch` are never refused because of it, and `paused_reason` is only ever what an
+operator wrote.
+
+> This replaced the *bounce circuit breaker*, which paused an email campaign above
+> the same thresholds and demanded `acknowledge_breaker=true` to resume it. A
+> campaign that stops itself halfway down its list is worse than one that keeps
+> going with a dozen bad addresses — every good contact queued behind them simply
+> never hears from you. The old `breaker_*` settings are still honoured, so an
+> install that tuned them keeps its thresholds.
 
 ## Existing deployments: the one-time safe-defaults step
 

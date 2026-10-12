@@ -5,8 +5,9 @@ application rules, and optional caps/windows/delays are enforced by
 :mod:`app.services.campaign_sending` for the campaign that owns a message.
 
 This module keeps the old ``SendingGate`` import as a permissive shim for older
-integrations, while exposing the email circuit-breaker settings consumed by
-``circuit_breaker``. It must never reintroduce global rate limits.
+integrations, while exposing the bounce-watch thresholds consumed by
+:mod:`app.services.bounce_watch`. It must never reintroduce global rate limits,
+and none of these settings may ever stop a campaign.
 """
 
 from __future__ import annotations
@@ -20,20 +21,33 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.system import SystemSetting
 
 CATEGORY = "sending_rules"
-BREAKER_ENABLED = "breaker_enabled"
-BREAKER_BOUNCE_PCT = "breaker_bounce_pct"
-BREAKER_COMPLAINT_PCT = "breaker_complaint_pct"
-BREAKER_MIN_SAMPLE = "breaker_min_sample"
-BREAKER_WINDOW_HOURS = "breaker_window_hours"
+BOUNCE_ALERT_ENABLED = "bounce_alert_enabled"
+BOUNCE_ALERT_BOUNCE_PCT = "bounce_alert_bounce_pct"
+BOUNCE_ALERT_COMPLAINT_PCT = "bounce_alert_complaint_pct"
+BOUNCE_ALERT_MIN_SAMPLE = "bounce_alert_min_sample"
+BOUNCE_ALERT_WINDOW_HOURS = "bounce_alert_window_hours"
+BOUNCE_ALERT_COOLDOWN_HOURS = "bounce_alert_cooldown_hours"
 
-# Only campaign-health safety settings remain in this legacy category. Sending
-# caps and windows are never loaded from SystemSetting or applied globally.
+# Only bounce-watch thresholds remain in this legacy category. Sending caps and
+# windows are never loaded from SystemSetting or applied globally.
 DEFAULTS = {
-    BREAKER_ENABLED: True,
-    BREAKER_BOUNCE_PCT: 2.0,
-    BREAKER_COMPLAINT_PCT: 0.10,
-    BREAKER_MIN_SAMPLE: 20,
-    BREAKER_WINDOW_HOURS: 168,
+    BOUNCE_ALERT_ENABLED: True,
+    BOUNCE_ALERT_BOUNCE_PCT: 2.0,
+    BOUNCE_ALERT_COMPLAINT_PCT: 0.10,
+    BOUNCE_ALERT_MIN_SAMPLE: 20,
+    BOUNCE_ALERT_WINDOW_HOURS: 168,
+    BOUNCE_ALERT_COOLDOWN_HOURS: 6,
+}
+
+#: The keys the retired bounce *circuit breaker* used. A value already saved
+#: under one of them is honoured, so an operator who tuned the old thresholds
+#: keeps them after the upgrade instead of silently falling back to defaults.
+LEGACY_KEYS = {
+    BOUNCE_ALERT_ENABLED: "breaker_enabled",
+    BOUNCE_ALERT_BOUNCE_PCT: "breaker_bounce_pct",
+    BOUNCE_ALERT_COMPLAINT_PCT: "breaker_complaint_pct",
+    BOUNCE_ALERT_MIN_SAMPLE: "breaker_min_sample",
+    BOUNCE_ALERT_WINDOW_HOURS: "breaker_window_hours",
 }
 
 
@@ -58,13 +72,13 @@ def _int(value: str | None, default: int, *, minimum: int = 1) -> int:
 
 
 async def get_sending_rules(db: AsyncSession) -> dict:
-    """Return only the email circuit-breaker configuration.
+    """Return only the bounce-watch configuration.
 
-    The historical function name stays for compatibility with the breaker, but
+    The historical function name stays for compatibility with older callers, but
     global daily/hourly/minute limits, windows and pacing are intentionally not
     returned or enforced.
     """
-    keys = tuple(DEFAULTS)
+    keys = tuple(DEFAULTS) + tuple(LEGACY_KEYS.values())
     rows = (
         await db.execute(
             select(SystemSetting).where(
@@ -74,16 +88,31 @@ async def get_sending_rules(db: AsyncSession) -> dict:
         )
     ).scalars().all()
     raw = {row.key: row.value for row in rows}
+
+    def _setting(key: str) -> str | None:
+        """The current value, or the one the old circuit breaker saved."""
+        if key in raw:
+            return raw[key]
+        return raw.get(LEGACY_KEYS.get(key, ""))
+
     return {
-        BREAKER_ENABLED: _bool(raw.get(BREAKER_ENABLED), DEFAULTS[BREAKER_ENABLED]),
-        BREAKER_BOUNCE_PCT: max(
-            0.01, _float(raw.get(BREAKER_BOUNCE_PCT), DEFAULTS[BREAKER_BOUNCE_PCT])
+        BOUNCE_ALERT_ENABLED: _bool(_setting(BOUNCE_ALERT_ENABLED), DEFAULTS[BOUNCE_ALERT_ENABLED]),
+        BOUNCE_ALERT_BOUNCE_PCT: max(
+            0.01, _float(_setting(BOUNCE_ALERT_BOUNCE_PCT), DEFAULTS[BOUNCE_ALERT_BOUNCE_PCT])
         ),
-        BREAKER_COMPLAINT_PCT: max(
-            0.001, _float(raw.get(BREAKER_COMPLAINT_PCT), DEFAULTS[BREAKER_COMPLAINT_PCT])
+        BOUNCE_ALERT_COMPLAINT_PCT: max(
+            0.001,
+            _float(_setting(BOUNCE_ALERT_COMPLAINT_PCT), DEFAULTS[BOUNCE_ALERT_COMPLAINT_PCT]),
         ),
-        BREAKER_MIN_SAMPLE: _int(raw.get(BREAKER_MIN_SAMPLE), DEFAULTS[BREAKER_MIN_SAMPLE]),
-        BREAKER_WINDOW_HOURS: _int(raw.get(BREAKER_WINDOW_HOURS), DEFAULTS[BREAKER_WINDOW_HOURS]),
+        BOUNCE_ALERT_MIN_SAMPLE: _int(
+            _setting(BOUNCE_ALERT_MIN_SAMPLE), DEFAULTS[BOUNCE_ALERT_MIN_SAMPLE]
+        ),
+        BOUNCE_ALERT_WINDOW_HOURS: _int(
+            _setting(BOUNCE_ALERT_WINDOW_HOURS), DEFAULTS[BOUNCE_ALERT_WINDOW_HOURS]
+        ),
+        BOUNCE_ALERT_COOLDOWN_HOURS: _int(
+            _setting(BOUNCE_ALERT_COOLDOWN_HOURS), DEFAULTS[BOUNCE_ALERT_COOLDOWN_HOURS]
+        ),
     }
 
 

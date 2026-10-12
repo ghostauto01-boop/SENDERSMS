@@ -737,8 +737,6 @@ TOOLS: list[Tool] = [
                   description="Which campaign system the id belongs to (see list_campaigns). "
                               "Optional when the id exists in only one system; required when "
                               "it exists in both (the call is refused, listing the candidates)."),
-            Param("acknowledge_breaker", type="boolean", where="query",
-                  description="Only to continue a campaign the bounce circuit breaker paused."),
         ],
     ),
     Tool(
@@ -763,7 +761,7 @@ TOOLS: list[Tool] = [
         description=(
             "Resume a paused campaign. One paused mid-send continues sending; one paused while "
             "scheduled goes back to scheduled and does NOT start sending (use start_campaign "
-            "for that). A campaign paused by the circuit breaker says why in 'paused_reason'."
+            "for that). Nothing refuses a resume: a high bounce rate is only reported."
         ),
         method="POST", path="/api/v1/campaigns/{campaign_id}/resume", scope="write",
         group="campaigns", by_kind=True,
@@ -774,9 +772,6 @@ TOOLS: list[Tool] = [
                   description="Which campaign system the id belongs to (see list_campaigns). "
                               "Optional when the id exists in only one system; required when "
                               "it exists in both (the call is refused, listing the candidates)."),
-            Param("acknowledge_breaker", type="boolean", where="query",
-                  description="Required to resume a campaign the bounce circuit breaker paused "
-                              "(read 'paused_reason' first; fix the list)."),
         ],
     ),
     Tool(

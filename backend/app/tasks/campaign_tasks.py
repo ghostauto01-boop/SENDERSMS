@@ -157,23 +157,27 @@ def launch_due_campaigns():
 
 
 @celery_app.task
-def check_circuit_breakers():
+def watch_bounce_rates():
     """Sweep email campaigns for bounce/complaint risk as a webhook backstop."""
     loop = asyncio.get_event_loop()
     if loop.is_closed():
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-    return loop.run_until_complete(check_circuit_breakers_async())
+    return loop.run_until_complete(watch_bounce_rates_async())
 
 
-async def check_circuit_breakers_async() -> list[dict]:
-    """Check and persist every active email campaign's provider health."""
-    from app.services import circuit_breaker
+async def watch_bounce_rates_async() -> list[dict]:
+    """Report on every active email campaign's provider health.
+
+    "Report" is the whole job: the alerts are notifications, and no campaign is
+    paused, held or otherwise touched here.
+    """
+    from app.services import bounce_watch
 
     async with async_session_factory() as db:
-        tripped = await circuit_breaker.check_all(db)
+        alerts = await bounce_watch.check_all(db)
         await db.commit()
-    return tripped
+    return alerts
 
 
 async def process_campaign_batch_async(
