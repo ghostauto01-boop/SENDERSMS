@@ -20,7 +20,6 @@ export type EmailAccount = {
   is_default: boolean;
   has_api_key: boolean;
   api_key_masked: string;
-  daily_limit?: number | null;
   sent_today: number;
   total_sent: number;
   track_opens: boolean;
@@ -41,6 +40,23 @@ export type EmailAccount = {
   campaigns_using?: number;
 };
 
+export type EmailSender = {
+  /** Positive IDs are Brevo accounts; negative IDs are connected Gmail mailboxes. */
+  id: number;
+  name: string;
+  provider: string;
+  sender_type: "brevo" | "gmail";
+  from_name: string;
+  from_email: string;
+  is_active: boolean;
+  is_default: boolean;
+  connection_status?: string | null;
+  last_error?: string | null;
+  sent_today?: number | null;
+  total_sent?: number;
+  mailbox_id?: number;
+};
+
 export type WebhookSecret = {
   account_id: number;
   webhook_url: string | null;
@@ -53,7 +69,6 @@ export type EmailAccountInput = {
   from_email: string;
   api_key?: string;
   reply_to?: string | string[] | null;
-  daily_limit?: number | null;
   is_active?: boolean;
   is_default?: boolean;
   track_opens?: boolean;
@@ -254,6 +269,8 @@ const emailApi = {
   // ---- senders -----------------------------------------------------------
   listAccounts: async (): Promise<Paged<EmailAccount>> =>
     (await api.get("/email/accounts")).data,
+  listSenders: async (): Promise<Paged<EmailSender>> =>
+    (await api.get("/email/senders")).data,
   createAccount: async (payload: EmailAccountInput): Promise<EmailAccount> =>
     (await api.post("/email/accounts", payload)).data,
   updateAccount: async (id: number, payload: Partial<EmailAccountInput>): Promise<EmailAccount> =>
@@ -294,8 +311,9 @@ const emailApi = {
     (await api.get("/email/stats", { params })).data,
   reference: async () =>
     (await api.get("/email/reference")).data as {
-      accounts: EmailAccount[];
+      accounts: EmailSender[];
       default_account_id?: number | null;
+      brevo_accounts?: EmailAccount[];
       templates: { id: number; name: string; subject?: string | null; category?: string | null }[];
       lists: { id: number; name: string; contact_count?: number | null }[];
       emailable_contacts: number;

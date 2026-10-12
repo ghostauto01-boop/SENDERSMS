@@ -81,38 +81,27 @@ async def _send_one(mid, final_on_failure=False, rate_wait_cap=_INLINE_RATE_WAIT
             await db.commit()
             return False
 
-        # Enforce sending limits + pacing before touching the gateway. This used to
-        # be skipped for email ("no SIM to protect"), which meant an email campaign
-        # could send its whole audience in minutes from one brand-new mailbox. A
-        # mailbox has a reputation to protect just as a SIM does, so outreach email
-        # goes through the same gate -- scoped to email and to the mailbox about to
-        # send. A one-to-one reply to someone who wrote to us is not outreach and is
-        # never held by the window or the cap.
-        from app.services.sending_limits import SendingGate
-        if is_email:
-            outreach = bool(m.bulk_send or m.campaign_id or m.ads_campaign_id)
-            account_id = m.email_account_id
-            if account_id is None and outreach:
-                from app.services import email_service
-                default = await email_service.get_default_account(db)
-                account_id = default.id if default else None
-            gate = SendingGate(db, "email", account_id=account_id)
-            check = await gate.check() if outreach else {"allowed": True}
-        else:
-            gate = SendingGate(db, "sms")
-            check = await gate.check()
-        if not check["allowed"]:
-            wait = int(check["wait_seconds"] or 60)
-            if final_on_failure and 0 < wait <= rate_wait_cap:
-                await asyncio.sleep(wait)
-                check = await gate.check()
-            if not check["allowed"]:
-                m.status = "queued"
-                wait = max(int(check["wait_seconds"] or 60), 5)
-                m.retry_at = datetime.now(timezone.utc) + timedelta(seconds=wait)
-                m.last_error = f"Sending is paused by the configured limit: {check['reason']}. Retry is scheduled automatically."
-                await db.commit()
-                return wait
+        # Campaign rules are checked against the campaign, never against a
+        # global Settings gate. Ads campaigns enforce their own schedule and
+        # budget while dispatching; classic campaigns use CampaignSendingGate.
+        if m.campaign_id is not None:
+            from app.models.campaign import Campaign
+            from app.services.campaign_sending import CampaignSendingGate
+
+            campaign = (await db.execute(
+                select(Campaign).where(Campaign.id == m.campaign_id)
+            )).scalar_one_or_none()
+            if campaign is not None:
+                check = await CampaignSendingGate(db, campaign).check(
+                    exclude_message_id=m.id
+                )
+                if not check["allowed"]:
+                    wait = max(int(check.get("wait_seconds") or 60), 5)
+                    m.status = "queued"
+                    m.retry_at = datetime.now(timezone.utc) + timedelta(seconds=wait)
+                    m.last_error = f"Campaign rule: {check['reason']} Retry is scheduled automatically."
+                    await db.commit()
+                    return wait
 
         from app.models.contact import Contact
         c=(await db.execute(select(Contact).where(Contact.id==m.contact_id))).scalar_one_or_none()
@@ -272,13 +261,14 @@ async def _send_one_email(db, m, contact, *, final_on_failure=False):
     provider_error = " ".join(str(result.get("error") or "Email provider did not accept the message.").split())[:500]
     permanent = status_code in (400, 401, 402, 403, 404, 422) or provider_error.lower().startswith("no email could be sent:")
     rate_limited = status_code == 429
+    provider_name = "Gmail" if m.provider in ("gmail_api", "imap") else "Brevo"
     m.retry_count = attempt_number
     if not permanent and attempt_number < 5:
         delay = 60 if rate_limited else min(60 * (2 ** (attempt_number - 1)), 3600)
         m.status = "retrying"
         m.retry_at = now + timedelta(seconds=delay)
         if rate_limited:
-            user_error = "Brevo rate limit reached (HTTP 429). Automatic retry is scheduled in 60 seconds."
+            user_error = f"{provider_name} rate limit reached (HTTP 429). Automatic retry is scheduled in 60 seconds."
         else:
             user_error = (
                 f"Temporary email delivery error: {provider_error} "
@@ -288,10 +278,14 @@ async def _send_one_email(db, m, contact, *, final_on_failure=False):
         m.status = "failed"
         m.failed_at = now
         m.retry_at = None
-        if status_code in (401, 403):
+        if status_code in (401, 403) and provider_name == "Gmail":
+            user_error = "Gmail rejected the mailbox credentials. Reconnect the Gmail sender and retry."
+        elif status_code in (401, 403):
             user_error = "Brevo rejected the API key. Reconnect the sender or re-save its key in Email Manager."
         elif status_code == 402:
             user_error = "Brevo reports the account has no sending credit. Check the Brevo plan and balance."
+        elif status_code == 400 and provider_name == "Gmail":
+            user_error = f"Gmail rejected this message: {provider_error}. Check the recipient, content, and mailbox permissions."
         elif status_code == 400:
             user_error = f"Brevo rejected this message: {provider_error}. Check the sender address, domain authentication, and content."
         elif attempt_number >= 5:
@@ -313,10 +307,6 @@ async def _send_one_email(db, m, contact, *, final_on_failure=False):
     if m.status == "failed":
         contact.email_fail_count = (contact.email_fail_count or 0) + 1
         contact.email_last_error = m.last_error
-        from app.services import circuit_breaker
-        await circuit_breaker.check_after_event(
-            db, campaign_id=m.campaign_id, ads_campaign_id=m.ads_campaign_id
-        )
     await db.commit()
     if m.status == "retrying":
         return max(1, int((m.retry_at - now).total_seconds()))

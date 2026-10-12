@@ -13,6 +13,7 @@ from app.models.user import User
 from app.schemas.automation import AutomationCreate, AutomationOut, AutomationUpdate
 from app.security.auth import get_current_user
 from app.services.automation_service import load_json
+from app.services import email_service
 
 router = APIRouter()
 
@@ -60,13 +61,17 @@ async def create_automation(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    channel = payload.channel if payload.channel in ("sms", "email") else "sms"
+    if channel == "email" and payload.email_account_id is not None:
+        if await email_service.get_sender(db, payload.email_account_id) is None:
+            raise HTTPException(status_code=404, detail="Selected email sender not found")
     automation = Automation(
         name=payload.name.strip(),
         description=payload.description,
         is_enabled=payload.is_enabled,
         priority=payload.priority,
         trigger_type=payload.trigger_type,
-        channel=payload.channel if payload.channel in ("sms", "email") else "sms",
+        channel=channel,
         email_account_id=payload.email_account_id,
         conditions_json=json.dumps(payload.conditions, ensure_ascii=False),
         match_all=payload.match_all,
@@ -102,6 +107,11 @@ async def update_automation(
         raise HTTPException(status_code=404, detail="Automation not found")
 
     data = payload.model_dump(exclude_unset=True)
+    target_channel = data.get("channel", automation.channel or "sms")
+    target_sender_id = data.get("email_account_id", automation.email_account_id)
+    if target_channel == "email" and target_sender_id is not None:
+        if await email_service.get_sender(db, target_sender_id) is None:
+            raise HTTPException(status_code=404, detail="Selected email sender not found")
     if "name" in data and not (data["name"] or "").strip():
         raise HTTPException(status_code=400, detail="name cannot be blank")
     if "conditions" in data:

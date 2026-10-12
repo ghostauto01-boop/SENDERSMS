@@ -285,6 +285,7 @@ def build_rfc822(
     cc: list[str] | None = None,
     bcc: list[str] | None = None,
     attachments: list[dict] | None = None,
+    headers: dict | None = None,
 ) -> tuple[str, list[str]]:
     """Render an outbound message as ``(rfc822, recipients)``.
 
@@ -307,6 +308,18 @@ def build_rfc822(
     if references:
         message["References"] = references
     message["X-Mailer"] = "SENDERSMS"
+    for header_name, header_value in (headers or {}).items():
+        # Threading and envelope headers above are authoritative; the extra
+        # application headers are for list-unsubscribe and future extensions.
+        if not header_value or header_name.lower() in {
+            "from", "to", "cc", "bcc", "subject", "date", "message-id",
+            "in-reply-to", "references",
+        }:
+            continue
+        try:
+            message[header_name] = str(header_value)
+        except (KeyError, ValueError):
+            logger.warning("GMAIL: ignored invalid outbound header %r", header_name)
 
     if html:
         message.set_content(text or re.sub(r"<[^>]+>", " ", html).strip() or " ")

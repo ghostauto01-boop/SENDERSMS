@@ -172,24 +172,9 @@ async def send_sms_now(
     if segment_count > 5:
         raise HTTPException(400, f"Message is {segment_count} segments ({char_count} chars). Split it — messages over 5 segments are blocked to protect your credit.")
     from app.providers.smsgate import send_sms_direct
-    from app.services.sending_limits import await_slot
     results = []
 
-    rate_limited_from = None
-    for index, contact in enumerate(recipients):
-        # Respect Settings -> Sending Rules (hourly/daily/per-minute caps and
-        # pacing) so a manual "send to list" cannot trip a carrier flag either.
-        slot = await await_slot(db, cap_seconds=10, channel="sms")
-        if not slot["allowed"]:
-            if len(recipients) == 1:
-                raise HTTPException(
-                    429,
-                    f"Rate limited: {slot['reason']}. "
-                    f"Try again in about {slot['wait_seconds']} seconds.",
-                )
-            rate_limited_from = (index, slot["reason"])
-            break
-
+    for contact in recipients:
         msg = await render_for_contact(db, body, contact)
         char_count, segment_count = count_sms_segments(msg)
         cr = await db.execute(
@@ -260,8 +245,7 @@ async def send_sms_now(
 
     await db.flush()
     sc = sum(1 for x in results if x["status"] == "sent")
-    # Everyone who was NOT sent to, with why: numbers the pre-send filter refused, and recipients the
-    # rate limit stopped the send before reaching (they used to vanish from the response).
+    # Everyone who was NOT sent to, with why: numbers the pre-send filter refused.
     from app.utils.send_report import skip_summary, summary_sentence
 
     skipped_details = [
@@ -269,12 +253,6 @@ async def send_sms_now(
          "message": f.get("detail") or (f["reason"] or "filtered").replace("_", " ")}
         for f in (filtered_out if list_id else [])
     ]
-    if rate_limited_from is not None:
-        start, why = rate_limited_from
-        skipped_details += [
-            {"contact_id": c.id, "reason": "rate_limited", "message": f"rate limited: {why}"}
-            for c in recipients[start:]
-        ]
     return {
         "success": sc > 0,
         "sent": sc,
@@ -516,13 +494,6 @@ async def retry_message(mid: int, db: AsyncSession = Depends(get_db), cu: User =
 
     from app.providers.smsgate import send_sms_direct
     from app.services.system_settings import get_sim_number
-    from app.services.sending_limits import await_slot
-    slot = await await_slot(db, cap_seconds=8, channel="sms")
-    if not slot["allowed"]:
-        raise HTTPException(
-            429,
-            f"Rate limited: {slot['reason']}. Try again in about {slot['wait_seconds']} seconds.",
-        )
     sim = await get_sim_number(db)
     result = await send_sms_direct(contact.phone_number, m.body, sim)
     if result["success"]:

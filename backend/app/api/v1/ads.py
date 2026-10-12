@@ -91,18 +91,16 @@ async def _require_email_sender(db: AsyncSession, campaign: AdsCampaign) -> None
     """Require a configured account/key; domain authentication is not a launch gate."""
     from app.services import email_service
 
-    account = await email_service.get_account(db, campaign.email_account_id)
-    if account is None:
-        account = await email_service.get_default_account(db)
+    account = await email_service.resolve_sender(db, campaign.email_account_id)
     if account is None:
         raise HTTPException(
             400,
-            "No email sender is configured. Add a Brevo API key and From address on the "
-            "Email Senders page, then choose it on this campaign.",
+            "No email sender is configured. Connect a Gmail mailbox or add a Brevo sender, "
+            "then choose it on this campaign.",
         )
-    usable, why = await email_service.account_is_usable(account, check_room=False)
+    usable, why = await email_service.sender_is_usable(account)
     if not usable:
-        raise HTTPException(400, f"Email sender '{account.name}' cannot send ({why}).")
+        raise HTTPException(400, f"Email sender '{email_service.sender_name(account)}' cannot send ({why}).")
 
 
 def _breaker_conflict(campaign: AdsCampaign) -> HTTPException:
@@ -251,13 +249,7 @@ async def overview(
 
     from app.services import email_service
 
-    from app.services.sending_limits import default_mailbox_limit, get_sending_rules
-
-    default_limit = default_mailbox_limit(await get_sending_rules(db))
-    accounts = []
-    for account in await email_service.list_accounts(db):
-        await email_service.reset_daily_counter(account)
-        accounts.append(email_service.serialize_account(account, default_limit=default_limit))
+    accounts = await email_service.list_senders(db)
 
     return {
         "channel": channel or "all",
@@ -3087,13 +3079,7 @@ async def reference(db: AsyncSession = Depends(get_db), user: User = Depends(get
     ).scalar() or 0
     from app.services import email_service
 
-    from app.services.sending_limits import default_mailbox_limit, get_sending_rules
-
-    default_limit = default_mailbox_limit(await get_sending_rules(db))
-    accounts = []
-    for account in await email_service.list_accounts(db):
-        await email_service.reset_daily_counter(account)
-        accounts.append(email_service.serialize_account(account, default_limit=default_limit))
+    accounts = await email_service.list_senders(db)
     return {
         "lists": [{"id": l.id, "name": l.name, "count": counts.get(l.id, 0)} for l in lists],
         "tags": [t.name for t in tags],

@@ -273,9 +273,9 @@ async def process_rule(db: AsyncSession, rule: CampaignFollowUp, *, limit: int =
                 problem = await email_service.contact_email_problem(db, contact, outreach=True)
                 if problem:
                     raise ValueError(f"Contact cannot receive email ({problem})")
-                account = await email_service.get_account(db, campaign.email_account_id)
-                if account is None:
-                    account = await email_service.get_default_account(db)
+                account = await email_service.resolve_sender(db, campaign.email_account_id)
+                if campaign.email_account_id is not None and account is None:
+                    raise ValueError("Campaign email sender no longer exists")
                 message, send_result = await email_service.send_now(
                     db, contact,
                     subject=rule.subject or campaign.subject or "Follow-up",
@@ -286,7 +286,7 @@ async def process_rule(db: AsyncSession, rule: CampaignFollowUp, *, limit: int =
                 if message is None:
                     raise ValueError("Contact cannot receive email")
                 if not send_result.get("success"):
-                    raise ValueError(send_result.get("error") or "Brevo rejected the email")
+                    raise ValueError(send_result.get("error") or "The email sender rejected the message")
             else:
                 message = await SMSService(db).send_message(
                     cc.contact_id, body, campaign_id=campaign.id

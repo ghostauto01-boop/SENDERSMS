@@ -7,8 +7,8 @@ automation, analytics and simulation.
 Design rules honoured throughout:
 
 * Existing infrastructure is reused, never duplicated. Contacts, lists, tags,
-  the suppression list, the ``messages`` table, ``SendingGate`` (limits/pacing)
-  and the SMS provider are all the pre-existing ones.
+  the suppression list, the ``messages`` table, campaign-scoped pacing and the
+  configured SMS/email providers are all pre-existing.
 * A contact is assigned exactly one creative per campaign, enforced by a UNIQUE
   constraint, so no retry, restart or double worker can duplicate a send.
 * Creative edits create a new version; sent history keeps its version.
@@ -46,6 +46,7 @@ from app.models.contact import Contact, ContactTag, Tag
 from app.models.contact_list import ContactListMember
 from app.models.conversation import Conversation, Message
 from app.models.suppression import SuppressionEntry
+from app.security.encryption import decrypt_value
 
 logger = logging.getLogger(__name__)
 
@@ -967,7 +968,7 @@ async def drip_allowance(db: AsyncSession, campaign: AdsCampaign) -> int:
 
     Modes
     -----
-    ``off``      — no pacing (global Sending Rules still apply).
+    ``off``      — no additional drip pacing; campaign-specific caps/windows still apply.
     ``interval`` — 1 message per interval window.
     ``batch``    — ``drip_batch_size`` messages per interval window.
     ``smart``    — like batch, with the release size shaped by ``pacing``
@@ -1218,37 +1219,6 @@ async def dispatch_campaign(
         result["state"] = "sending"
         return result
 
-    # Global sending limits / pacing -- the SAME gate the rest of the app uses,
-    # scoped to this campaign's channel (and, for email, its mailbox). It decides
-    # both whether anything may go out right now and HOW MANY: ``room`` caps this
-    # slice so a continuous campaign cannot queue its whole audience in minutes.
-    if not campaign.test_mode:
-        from app.services.sending_limits import gate_for_campaign
-
-        sending_gate = await gate_for_campaign(db, campaign)
-        gate = await sending_gate.check()
-        if not gate["allowed"]:
-            reason_text = (gate.get("reason") or "").lower()
-            if "daily limit" in reason_text:
-                result["state"] = "daily_limit_reached"
-            elif "sending hours" in reason_text or "weekend" in reason_text:
-                result["state"] = "waiting_for_schedule"
-            else:
-                result["state"] = "sending"
-            result["reasons"]["rate_limited"] = 1
-            result["next_window"] = gate.get("next_window")
-            campaign.last_state = result["state"]
-            await db.flush()
-            return result
-        gate_room = await sending_gate.room()
-        if gate_room is not None:
-            room = min(room, gate_room)
-            if room <= 0:
-                result["state"] = "daily_limit_reached"
-                result["reasons"]["rate_limited"] = 1
-                campaign.last_state = result["state"]
-                await db.flush()
-                return result
 
     rows = list(
         (
@@ -1460,34 +1430,38 @@ async def dispatch_campaign(
             # edit of the contact never rewrites what was sent.
             from app.services import email_service
 
-            account = (
-                await email_service.get_account(db, creative.email_account_id)
-                or await email_service.get_account(db, campaign.email_account_id)
-                or await email_service.get_default_account(db)
+            sender = await email_service.resolve_sender(
+                db, creative.email_account_id or campaign.email_account_id
             )
-            if account is None:
+            usable, sender_issue = await email_service.sender_is_usable(sender)
+            if not usable:
                 assignment.send_status = "pending"
-                assignment.skip_reason = "no_email_account"
+                assignment.skip_reason = sender_issue or "no_email_sender"
                 assignment.next_attempt_at = now_utc() + timedelta(minutes=30)
-                skip("no_email_account")
+                skip(assignment.skip_reason)
                 continue
+            sender_address = email_service.sender_email(sender)
+            rendered, rendered_html = email_service.apply_unsubscribe(
+                rendered, rendered_html,
+                (getattr(sender, "reply_to", None) or sender_address).strip(),
+            )
             message = Message(
                 conversation_id=conversation.id,
                 contact_id=contact.id,
                 ads_campaign_id=campaign.id,
                 channel="email",
                 bulk_send=True,
-                rfc_message_id=email_service._new_rfc_message_id(account.from_email),
+                rfc_message_id=email_service._new_rfc_message_id(sender_address),
                 direction="outgoing",
                 body=rendered,
                 html_body=rendered_html,
                 subject=(rendered_subject or "(no subject)")[:500],
-                from_address=account.from_email,
+                from_address=sender_address,
                 to_address=(contact.email or "").strip().lower() or None,
-                email_account_id=account.id,
+                email_account_id=email_service.sender_id(sender),
                 char_count=len(rendered or ""),
                 status="queued",
-                provider="brevo",
+                provider=(sender.provider if email_service._sender_is_mailbox(sender) else "brevo"),
                 idempotency_key=assignment.idempotency_key,
             )
         else:
@@ -2075,14 +2049,16 @@ async def send_adhoc_sms(
             campaign = (
                 await db.execute(select(AdsCampaign).where(AdsCampaign.id == campaign_id))
             ).scalar_one_or_none()
-        account = await email_service.get_account(
-            db, campaign.email_account_id if campaign else None
-        ) or await email_service.get_default_account(db)
+        selected_sender_id = campaign.email_account_id if campaign else None
+        sender = await email_service.resolve_sender(db, selected_sender_id)
+        if selected_sender_id is not None and sender is None:
+            logger.error("Ads campaign %s references missing email sender %s", campaign_id, selected_sender_id)
+            return None
         message = await email_service.queue_email(
             db, contact,
             subject=subject or (campaign.subject if campaign else None) or "Follow-up",
             text_body=body,
-            account=account,
+            account=sender,
             ads_campaign_id=campaign_id,
         )
         return message.id if message else None
@@ -2735,46 +2711,44 @@ async def validate_campaign(db: AsyncSession, campaign: AdsCampaign) -> dict:
     account = None
     if email_campaign:
         from app.services import email_service
-        from app.security.encryption import decrypt_value
 
-        account = await email_service.get_account(db, campaign.email_account_id)
-        account = account or await email_service.get_default_account(db)
-        account_issue = None
-        if account is None:
-            account_issue = "No Brevo sender is configured. Add a sender and API key in Email Manager."
-        elif not account.is_active:
-            account_issue = f"Email sender '{account.name}' is disabled. Enable it in Email Manager."
-        elif not account.from_email:
-            account_issue = f"Email sender '{account.name}' has no From address."
-        else:
-            try:
-                if not decrypt_value(account.api_key_encrypted or ""):
-                    account_issue = f"Email sender '{account.name}' has no readable Brevo API key."
-            except Exception:  # noqa: BLE001 - don't leak credential/crypto details
-                account_issue = f"Email sender '{account.name}' has an unreadable Brevo API key. Re-save it."
+        account = await email_service.resolve_sender(db, campaign.email_account_id)
+        usable, why = await email_service.sender_is_usable(account)
+        account_issue = None if usable else (
+            "No email sender is configured. Connect Gmail or add a Brevo sender in Email Manager."
+            if account is None else
+            f"Email sender '{email_service.sender_name(account)}' cannot send ({why})."
+        )
         add_check(
             "email_account", account_issue is None,
-            account_issue or f"Account '{account.name}' is active and configured.",
+            account_issue or f"Sender '{email_service.sender_name(account)}' is active and configured.",
         )
 
         if account_issue or account is None:
-            add_check("brevo_health", False, account_issue or "No Brevo sender is configured.")
+            add_check("sender_health", False, account_issue or "No email sender is configured.")
         elif campaign.test_mode:
-            add_check("brevo_health", True, "Skipped in test mode; no email will be sent to Brevo.")
+            add_check("sender_health", True, "Skipped in test mode; no email will be sent.")
         else:
             try:
-                from app.providers.brevo import test_api_key
+                if email_service._sender_is_mailbox(account):
+                    from app.services import mailbox_service
 
-                health = await test_api_key(decrypt_value(account.api_key_encrypted or ""))
+                    health = await mailbox_service.check_credentials(db, account)
+                    provider_name = "Gmail mailbox"
+                else:
+                    from app.providers.brevo import test_api_key
+
+                    health = await test_api_key(decrypt_value(account.api_key_encrypted or ""))
+                    provider_name = "Brevo API"
                 healthy = bool(health.get("success"))
-                message = "Brevo API is responding." if healthy else (
-                    f"Brevo connection failed: {health.get('error') or 'no response'}"
+                message = f"{provider_name} is responding." if healthy else (
+                    f"{provider_name} connection failed: {health.get('error') or 'no response'}"
                 )
-                add_check("brevo_health", healthy, message)
+                add_check("sender_health", healthy, message)
             except Exception as exc:  # noqa: BLE001 - provider failures are user-facing checks
-                add_check("brevo_health", False, f"Brevo connection failed: {str(exc)[:300]}")
+                add_check("sender_health", False, f"Email sender connection failed: {str(exc)[:300]}")
 
-        sender_email = (account.from_email or "").strip() if account else ""
+        sender_email = email_service.sender_email(account) if account else ""
         sender_ok = bool(
             account and account.is_active and email_service.normalize_email(sender_email)
         )
@@ -2797,7 +2771,7 @@ async def validate_campaign(db: AsyncSession, campaign: AdsCampaign) -> dict:
         )
         add_check("sms_gateway", sms_ok, sms_message)
         add_check("email_account", True, "Not required for SMS campaigns.")
-        add_check("brevo_health", True, "Not required for SMS campaigns.")
+        add_check("sender_health", True, "Not required for SMS campaigns.")
         add_check("sender_identity", True, "Not required for SMS campaigns.")
 
     if campaign.daily_limit is not None and int(campaign.daily_limit) <= 0:
@@ -2957,28 +2931,17 @@ async def validate_campaign(db: AsyncSession, campaign: AdsCampaign) -> dict:
 
     projection = None
     try:
-        from app.services import sending_limits
+        from app.services.campaign_sending import project_campaign
 
-        weekdays = None
-        if campaign.send_days:
-            weekdays = {int(x) for x in campaign.send_days.split(",") if x.strip().isdigit()} or None
-        account_ids = [account.id] if email_campaign and account is not None else None
-        projection = await sending_limits.project_send(
-            db,
-            channel="email" if email_campaign else "sms",
-            sendable=audience_count,
-            account_ids=account_ids,
-            campaign_daily_limit=campaign.daily_limit,
-            allowed_weekdays=weekdays,
+        projection = project_campaign(
+            campaign, audience_count, channel="email" if email_campaign else "sms"
         )
-        projection_note = sending_limits.projection_warning(projection)
-        if projection_note:
-            warnings.append(projection_note)
+        warnings.extend(projection.get("warnings") or [])
     except Exception as exc:  # noqa: BLE001
         logger.info("Campaign send projection unavailable for %s: %s", campaign.id, exc)
 
-    send_start = campaign.send_start_hour if campaign.send_start_hour is not None else 9
-    send_end = campaign.send_end_hour if campaign.send_end_hour is not None else 18
+    send_start = campaign.send_start_hour
+    send_end = campaign.send_end_hour
     summary = {
         **sim,
         "audience_size": sim.get("audience"),

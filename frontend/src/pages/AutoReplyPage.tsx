@@ -3,7 +3,7 @@ import api from "../api/client";
 import { MessageSquareReply, Plus, Trash2, Pencil, FlaskConical } from "lucide-react";
 import { useChannel } from "../hooks/useChannel";
 import ChannelSwitch from "../components/ChannelSwitch";
-import emailApi, { EmailAccount } from "../api/email";
+import emailApi, { EmailSender } from "../api/email";
 
 interface AutoReplyRule {
   id: number;
@@ -73,12 +73,12 @@ function RuleModal({
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [accounts, setAccounts] = useState<EmailAccount[]>([]);
+  const [accounts, setAccounts] = useState<EmailSender[]>([]);
   const isEmail = form.channel === "email";
 
   useEffect(() => {
     if (!isEmail) return;
-    emailApi.listAccounts().then((data) => setAccounts(data.items)).catch(() => {});
+    emailApi.listSenders().then((data) => setAccounts(data.items)).catch(() => {});
   }, [isEmail]);
 
   const needsKeywords = form.match_type !== "any";
@@ -136,10 +136,10 @@ function RuleModal({
                   value={form.email_account_id}
                   onChange={(e) => setForm({ ...form, email_account_id: e.target.value })}
                 >
-                  <option value="">Default Brevo sender</option>
+                  <option value="">Default email sender</option>
                   {accounts.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name} — {a.from_email}
+                    <option key={a.id} value={a.id} disabled={!a.is_active}>
+                      {a.name} ({a.sender_type === "gmail" ? "Gmail" : "Brevo"}) — {a.from_email}
                     </option>
                   ))}
                 </select>

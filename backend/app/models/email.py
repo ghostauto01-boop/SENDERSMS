@@ -46,7 +46,7 @@ def _now() -> datetime:
 
 
 class EmailAccount(Base):
-    """One Brevo sender: API key + identity, selectable per campaign."""
+    """One Brevo sender: API key + identity, selectable alongside connected Gmail mailboxes."""
 
     __tablename__ = "email_accounts"
 
@@ -73,11 +73,11 @@ class EmailAccount(Base):
     #: The account used when a campaign does not pick one explicitly.
     is_default: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
-    #: Optional daily ceiling enforced by this app (Brevo has its own quota;
-    #: this one stops a runaway campaign before the provider starts rejecting).
+    #: Retained for database compatibility only. Sender-level caps are retired;
+    #: optional sending limits belong to campaigns.
     daily_limit: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    #: True means NULL is an intentional unlimited setting, not inheritance from
-    #: the legacy per-mailbox sending rule. New accounts default to unlimited.
+    #: Legacy compatibility flag. New sends ignore sender-level limit columns.
+    daily_limit_unlimited: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     daily_limit_unlimited: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     sent_today: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     last_reset_date: Mapped[date | None] = mapped_column(Date, nullable=True)

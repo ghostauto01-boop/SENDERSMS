@@ -1,6 +1,6 @@
 """SMS Service — uses direct send_sms + Pushover notifications."""
 import json,logging,uuid,os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from sqlalchemy import func,select,update
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.contact import Contact
@@ -59,16 +59,26 @@ class SMSService:
             stamp_conversation(cr,campaign_id=campaign_id)
         msg=Message(conversation_id=cr.id,contact_id=contact_id,campaign_id=campaign_id,direction="outgoing",body=body,segment_count=sg,char_count=ch,status="sending",provider="smsgate",idempotency_key=ik)
         self.db.add(msg);await self.db.flush()
-        # Respect the sending limits / pacing configured in Settings. When the
-        # next slot is not available yet, the message is left queued and the
-        # poller's queued-message sweep (or Celery) sends it once allowed.
-        from app.services.sending_limits import SendingGate
-        gate=await SendingGate(self.db, "sms").check()
-        if not gate["allowed"]:
-            msg.status="queued"
-            msg.last_error=f"Rate limited: {gate['reason']}"
-            await self.db.flush()
-            return msg
+        # Only campaign-owned sends consult campaign rules. Direct replies and
+        # one-off sends never inherit application-wide limits.
+        if campaign_id is not None:
+            from app.models.campaign import Campaign
+            from app.services.campaign_sending import CampaignSendingGate
+
+            campaign = (await self.db.execute(
+                select(Campaign).where(Campaign.id == campaign_id)
+            )).scalar_one_or_none()
+            if campaign is not None:
+                gate = await CampaignSendingGate(self.db, campaign).check(
+                    exclude_message_id=msg.id
+                )
+                if not gate["allowed"]:
+                    wait = max(int(gate.get("wait_seconds") or 60), 5)
+                    msg.status = "queued"
+                    msg.retry_at = datetime.now(timezone.utc) + timedelta(seconds=wait)
+                    msg.last_error = f"Campaign rule: {gate['reason']} Retry is scheduled automatically."
+                    await self.db.flush()
+                    return msg
         from app.providers.smsgate import send_sms_direct
         r=await send_sms_direct(c.phone_number,body,await self._get_sim())
         if r["success"]:msg.status="sent";msg.provider_message_id=r.get("provider_message_id","");msg.sent_at=datetime.now(timezone.utc)

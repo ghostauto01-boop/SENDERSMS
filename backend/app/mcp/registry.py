@@ -584,9 +584,10 @@ TOOLS: list[Tool] = [
             "Create a campaign (draft). Pick ONE channel: 'sms' or 'email'. Provide the audience "
             "(list_id) and the message — either message_body, or template_id to use a saved "
             "template. Email campaigns also take subject, html_body and email_account_id. "
-            "Nothing is sent until you start it (or schedule it for a time). Pacing and daily "
-            "caps are NOT per campaign: they come from Settings -> Sending Rules (the classic "
-            "engine does not read a campaign's own daily_limit / min_delay), so they are not offered here."
+            "Nothing is sent until you start it (or schedule it for a time). Optional daily, "
+            "hourly and per-minute caps, send hours, weekend access and min/max delays belong to "
+            "this campaign only; leave them unset for unrestricted pacing. Direct sends are not "
+            "limited by campaign controls."
         ),
         method="POST", path="/api/v1/campaigns/", scope="write", group="campaigns",
         params=[
@@ -599,9 +600,22 @@ TOOLS: list[Tool] = [
             Param("subject", description="Email only: subject line.", where="body"),
             Param("html_body", description="Email only: HTML version.", where="body"),
             Param("email_account_id", type="integer",
-                  description="Email only: send through this Brevo account (default if omitted).",
+                  description="Email only: unified sender id (positive Brevo, negative connected Gmail); default if omitted.",
                   where="body"),
-            Param("fallback_email_account_id", type="integer", where="body"),
+            Param("fallback_email_account_id", type="integer",
+                  description="Optional Brevo or Gmail sender id tried if the primary provider fails.",
+                  where="body"),
+            Param("daily_limit", type="integer", description="Optional daily cap for this campaign only.", where="body"),
+            Param("hourly_limit", type="integer", description="Optional hourly cap for this campaign only.", where="body"),
+            Param("per_minute_limit", type="integer", description="Optional per-minute cap for this campaign only.", where="body"),
+            Param("min_delay", type="integer", description="Optional minimum delay between sends, in seconds.", where="body"),
+            Param("max_delay", type="integer", description="Optional maximum delay between sends, in seconds.", where="body"),
+            Param("send_start_hour", type="integer", minimum=0, maximum=23,
+                  description="Optional local hour to begin sending (0-23); leave unset for 24/7.", where="body"),
+            Param("send_end_hour", type="integer", minimum=0, maximum=23,
+                  description="Optional local hour to stop sending (0-23); leave unset for 24/7.", where="body"),
+            Param("allow_weekends", type="boolean", default=True,
+                  description="Allow weekend sends for this campaign.", where="body"),
             Param("scheduled_start_at", description="ISO-8601 time to launch automatically.",
                   where="body"),
             Param("description", where="body"),
@@ -609,7 +623,10 @@ TOOLS: list[Tool] = [
     ),
     Tool(
         name="update_campaign",
-        description="Edit a campaign that has not started sending yet.",
+        description=(
+            "Edit a campaign that has not started sending yet. Optional caps, delays, and send "
+            "windows are campaign-scoped; leave them unset for unrestricted sending."
+        ),
         method="PUT", path="/api/v1/campaigns/{campaign_id}", scope="write", group="campaigns",
         by_kind=True,
         params=[
@@ -624,7 +641,19 @@ TOOLS: list[Tool] = [
             Param("template_id", type="integer", where="body"),
             Param("subject", where="body"),
             Param("html_body", where="body"),
-            Param("email_account_id", type="integer", where="body"),
+            Param("email_account_id", type="integer",
+                  description="Email sender id: positive Brevo, negative connected Gmail; default if omitted.",
+                  where="body"),
+            Param("daily_limit", type="integer", description="Optional daily cap for this campaign only.", where="body"),
+            Param("hourly_limit", type="integer", description="Optional hourly cap for this campaign only.", where="body"),
+            Param("per_minute_limit", type="integer", description="Optional per-minute cap for this campaign only.", where="body"),
+            Param("min_delay", type="integer", description="Optional minimum delay between sends, in seconds.", where="body"),
+            Param("max_delay", type="integer", description="Optional maximum delay between sends, in seconds.", where="body"),
+            Param("send_start_hour", type="integer", minimum=0, maximum=23,
+                  description="Optional local start hour; unset means 24/7.", where="body"),
+            Param("send_end_hour", type="integer", minimum=0, maximum=23,
+                  description="Optional local end hour; unset means 24/7.", where="body"),
+            Param("allow_weekends", type="boolean", description="Allow weekend sends for this campaign.", where="body"),
             Param("scheduled_start_at", where="body"),
         ],
     ),
@@ -784,7 +813,8 @@ TOOLS: list[Tool] = [
         description=(
             "Send ONE email through Brevo now, or schedule it. Target a contact_id, a raw "
             "address, or a whole list_id. Supports subject, body (plain text), html_body, "
-            "attachments ([{name, content_base64}]), cc/bcc and template_id."
+            "attachments ([{name, content_base64}]), cc/bcc and template_id. Choose any connected "
+            "Gmail or Brevo sender; direct sends ignore campaign-only pacing controls."
         ),
         method="POST", path="/api/v1/email/send", scope="write", group="sending",
         params=[
@@ -801,7 +831,9 @@ TOOLS: list[Tool] = [
             Param("list_id", type="integer", description="Send to everyone in the list.",
                   where="body"),
             Param("template_id", type="integer", where="body"),
-            Param("email_account_id", type="integer", where="body"),
+            Param("email_account_id", type="integer",
+                  description="Unified sender id: positive Brevo, negative connected Gmail; default if omitted.",
+                  where="body"),
             Param("cc", type="array", items="string", where="body"),
             Param("bcc", type="array", items="string", where="body"),
             Param("attachments", type="array", items="object",
@@ -846,9 +878,17 @@ TOOLS: list[Tool] = [
     ),
     Tool(
         name="email_history",
-        description="Recent email sends with status, opens, clicks and attachments.",
+        description=(
+            "Email history including sent and failed messages, failure reasons, sender, opens, "
+            "clicks and attachments. Filter status=failed to inspect errors or status=sent,delivered "
+            "for successful delivery."
+        ),
         method="GET", path="/api/v1/email/history", group="sending",
-        params=[Param("page", type="integer", default=1, where="query"),
+        params=[Param("status", description="Comma-separated statuses such as sent,delivered or failed.", where="query"),
+                Param("direction", enum=["incoming", "outgoing"], where="query"),
+                Param("account_id", type="integer", description="Unified sender id (positive Brevo, negative Gmail).", where="query"),
+                Param("campaign_id", type="integer", where="query"),
+                Param("page", type="integer", default=1, where="query"),
                 Param("per_page", type="integer", default=25, minimum=1, maximum=200, where="query",
                       description="Page size, 1-200 (above 200 is refused, not clamped).")],
     ),
@@ -856,11 +896,11 @@ TOOLS: list[Tool] = [
     Tool(
         name="list_email_accounts",
         description=(
-            "The Brevo senders configured in this app, with their From address, reply-to and "
-            "whether they are the default. Use an account id when sending so mail leaves from "
-            "the right address."
+            "Every selectable email sender: Brevo API accounts and all connected Gmail "
+            "mailboxes. Each has a From address and unified sender id (positive Brevo, negative "
+            "Gmail); use that id for sends, replies, and campaigns."
         ),
-        method="GET", path="/api/v1/email/accounts", group="email",
+        method="GET", path="/api/v1/email/senders", group="email",
     ),
     Tool(
         name="email_inbox",
@@ -1116,8 +1156,9 @@ TOOLS: list[Tool] = [
         name="app_api_request",
         description=(
             "Escape hatch: call any endpoint of this app directly (path from list_api_endpoints), "
-            "e.g. PUT /api/v1/settings/sending-rules to change sending rules. Same auth, same "
-            "validation as the UI. Prefer the named tools when one exists."
+            "e.g. PATCH /api/v1/campaigns/{campaign_id} to change that campaign's optional "
+            "limits and sending window. Direct sends are not subject to campaign controls. Same "
+            "auth and validation as the UI. Prefer the named tools when one exists."
         ),
         # Usable by read-only tokens for GETs; the executor refuses writes when
         # the token's scope is read.

@@ -23,7 +23,7 @@ export default function CampaignBuilder({
   saved: (id: number) => void;
   /** "sms" (default) or "email" — decides delivery, audience rules and labels. */
   channel?: string;
-  emailAccounts?: { id: number; name: string; from_email: string; is_default?: boolean }[];
+  emailAccounts?: { id: number; name: string; from_email: string; is_default?: boolean; is_active?: boolean; sender_type?: string; provider?: string }[];
   defaultEmailAccountId?: number | null;
 }) {
   const isEmail = (campaign?.channel || channel) === "email";
@@ -31,13 +31,13 @@ export default function CampaignBuilder({
     name: "",
     description: "",
     objective: "replies",
-    daily_limit: 200,
+    daily_limit: "",
     total_limit: "",
     start_date: "",
     end_date: "",
-    send_start_hour: 9,
-    send_end_hour: 18,
-    send_days: "0,1,2,3,4",
+    send_start_hour: "",
+    send_end_hour: "",
+    send_days: "",
     drip_mode: "off",
     drip_batch_size: 50,
     drip_interval_minutes: 60,
@@ -89,7 +89,7 @@ export default function CampaignBuilder({
     e.preventDefault();
     if (!form.name.trim()) return toast.error("Give the campaign a name");
     if (isEmail && emailAccounts.length === 0 && !campaign)
-      return toast.error("Add a Brevo sender first (Email Manager → Senders)");
+      return toast.error("Connect a Gmail mailbox or add a Brevo sender first (Email Manager)");
     const payload: any = {
       name: form.name.trim(),
       description: form.description || null,
@@ -144,13 +144,16 @@ export default function CampaignBuilder({
   };
 
   const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-  const selectedDays = (form.send_days || "").split(",").filter(Boolean);
+  const selectedDays = form.send_days == null || form.send_days === ""
+    ? days.map((_, i) => String(i))
+    : String(form.send_days).split(",").filter(Boolean);
   const toggleDay = (i: number) => {
     const key = String(i);
+    if (selectedDays.includes(key) && selectedDays.length === 1) return;
     const next = selectedDays.includes(key)
       ? selectedDays.filter((d: string) => d !== key)
       : [...selectedDays, key].sort();
-    set("send_days", next.join(","));
+    set("send_days", next.length === days.length ? "" : next.join(","));
   };
 
   return (
@@ -191,8 +194,7 @@ export default function CampaignBuilder({
             <h3 className="font-semibold text-sm text-gray-500 uppercase tracking-wide">Email sender</h3>
             {emailAccounts.length === 0 ? (
               <div className="p-3 rounded-lg bg-warning-50 dark:bg-warning-900/20 text-sm text-warning-800 dark:text-warning-200">
-                No Brevo sender yet — add one under Email Manager → Senders first, or this campaign
-                can never send.
+                No email sender yet — connect a Gmail mailbox under Email Manager → Replies or add a Brevo sender.
               </div>
             ) : (
               <>
@@ -205,8 +207,8 @@ export default function CampaignBuilder({
                     >
                       <option value="">Default sender</option>
                       {emailAccounts.map((a) => (
-                        <option key={a.id} value={a.id}>
-                          {a.name} — {a.from_email}
+                        <option key={a.id} value={a.id} disabled={!a.is_active}>
+                          {a.name} ({a.sender_type === "gmail" ? "Gmail" : "Brevo"}) — {a.from_email}
                         </option>
                       ))}
                     </select>
@@ -225,9 +227,9 @@ export default function CampaignBuilder({
                         <option
                           key={a.id}
                           value={a.id}
-                          disabled={String(a.id) === String(form.email_account_id)}
+                          disabled={!a.is_active || String(a.id) === String(form.email_account_id)}
                         >
-                          {a.name} — {a.from_email}
+                          {a.name} ({a.sender_type === "gmail" ? "Gmail" : "Brevo"}) — {a.from_email}
                         </option>
                       ))}
                     </select>
@@ -318,7 +320,7 @@ export default function CampaignBuilder({
                 onChange={(e) => set("end_date", e.target.value)}
               />
             </Field>
-            <Field label="Sending window starts">
+            <Field label="Sending window starts" hint="Leave both hours blank for 24/7 sending.">
               <input
                 type="number"
                 min={0}

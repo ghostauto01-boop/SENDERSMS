@@ -3,8 +3,9 @@
 Why this exists
 ---------------
 The app has seven things that have to be right before it works end to end —
-secrets, a public URL, the SMS gateway and its webhook, a Brevo sender and its
-webhook, a mailbox that reads replies, and the AI connectors — and every one of
+secrets, a public URL, the SMS gateway and its webhook, an email sender (Gmail
+or Brevo), provider webhooks where applicable, a mailbox that reads replies, and
+AI connectors — and every one of
 them fails *silently* in a way that looks like a bug in the app rather than a
 missing setting. "My replies never arrive" is a missing mailbox connection.
 "The connector is not working" is a missing ``PUBLIC_BASE_URL``. "Inbound SMS
@@ -47,10 +48,10 @@ OPTIONAL = "optional"  # not required; worth doing
 GROUPS = (
     ("foundation", "1. Foundation", "Secrets, the public address and the database. Everything else is built on these."),
     ("sms", "2. SMS (Nigeria)", "The handset gateway that sends and receives SMS."),
-    ("email", "3. Email sending", "Brevo: the sender, its authentication and its webhook."),
+    ("email", "3. Email sending", "Gmail and Brevo senders, their authentication and delivery."),
     ("replies", "4. Email replies", "Getting a prospect's reply back into the app — and out of Spam."),
     ("ai", "5. AI connectors", "Letting ChatGPT, Claude or an Arena agent operate the app."),
-    ("optional", "6. Optional", "Notifications, calls, sending rules and the first send."),
+    ("optional", "6. Optional", "Notifications, calls, campaign controls and the first send."),
 )
 
 
@@ -352,44 +353,56 @@ async def _sms_steps(db: AsyncSession) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
-# 3. Email sending (Brevo)
+# 3. Email sending (Gmail or Brevo)
 # ---------------------------------------------------------------------------
 
 
 async def _email_steps(db: AsyncSession) -> list[dict]:
-    from app.services import email_service
+    from app.services import email_service, mailbox_service
 
     steps: list[dict] = []
     accounts = await email_service.list_accounts(db, include_inactive=True)
     active = [a for a in accounts if a.is_active]
+    mailboxes = await mailbox_service.list_mailboxes(db, include_inactive=True)
+    active_mailboxes = [m for m in mailboxes if m.is_active and m.credential_encrypted]
     default = next((a for a in active if a.is_default), active[0] if active else None)
 
-    if not accounts:
+    if not accounts and not active_mailboxes:
         steps.append(_step(
-            "brevo-sender", "email", "Add a Brevo sender",
+            "brevo-sender", "email", "Connect an email sender",
             status=TODO,
             why=(
-                "Email leaves through Brevo. Nothing sends — campaigns, one-off mail or replies — "
-                "until at least one API key is saved."
+                "No email sender is connected yet. Connect a Gmail mailbox or add a Brevo sender "
+                "before sending campaigns or one-off emails."
             ),
-            detail="No sender saved yet.",
+            detail="No active Gmail mailbox or Brevo sender is available.",
             steps=[
-                "Create a free Brevo account, then an API key: brevo.com → SMTP & API → API keys "
-                "(v3 scope).",
-                "Email Manager → Senders → Add sender, and paste the key with the From name and "
-                "From address you want recipients to see.",
-                "Press Test — it verifies the key against Brevo and tells you whether the From "
-                "address is allowed to send.",
-                "You can save several keys: if one gets rate-limited or burned, sending falls "
-                "through to the next automatically.",
+                "For Gmail, connect a mailbox under Email Manager → Replies; it will also appear "
+                "as a selectable sender in campaigns and one-off sends.",
+                "Or create a free Brevo account and an API key under SMTP & API → API keys.",
+                "In Email Manager → Senders, add the Brevo key with the From name and address, "
+                "then press Test.",
+                "You can connect several senders and choose the one each campaign should use.",
             ],
             route="/email-manager",
-            route_label="Open Email Manager → Senders",
+            route_label="Open Email Manager",
             docs=[{"label": "Brevo API keys", "url": "https://app.brevo.com/settings/keys"}],
         ))
+    elif not accounts:
+        steps.append(_step(
+            "brevo-sender", "email", "Gmail email sender",
+            status=DONE,
+            why="A connected Gmail mailbox can send one-off emails and campaigns when selected.",
+            detail=(
+                f"{len(active_mailboxes)} active Gmail sender(s) are available. "
+                "Brevo is optional."
+            ),
+            route="/email-manager?section=Replies",
+            route_label="Open Email Manager → Replies",
+        ))
     else:
-        # `connection_status == "ok"` is itself proof the key was checked against
-        # Brevo, so a sender that has never been *re*-tested is not a problem.
+        # `connection_status == "ok"` proves the Brevo key was checked; Gmail
+        # mailbox health is tracked separately by mailbox_service.
         never_tested = [
             a for a in active
             if not a.last_tested_at and (a.connection_status or "") != "ok"
@@ -401,19 +414,20 @@ async def _email_steps(db: AsyncSession) -> list[dict]:
         elif never_tested:
             status = ATTENTION
         steps.append(_step(
-            "brevo-sender", "email", "Brevo sender",
-            status=status,
-            why="Email leaves through Brevo, and the sender decides what recipients see in the From line.",
+            "brevo-sender", "email", "Email senders",
+            status=(DONE if active_mailboxes and not active else status),
+            why="Choose a connected Gmail or Brevo sender; that identity appears in the recipient's From line.",
             detail=(
-                f"{len(active)} active sender(s); default is "
-                f"{default.from_email if default else 'none'}."
+                f"{len(active)} active Brevo sender(s) and {len(active_mailboxes)} active Gmail sender(s); "
+                f"Brevo default is {default.from_email if default else 'none'}."
                 + (f" Not tested yet: {', '.join(a.name for a in never_tested)}." if never_tested else "")
                 + (f" Failing: {', '.join(f'{a.name} ({a.connection_status})' for a in failing)}."
                    if failing else "")
             ),
             steps=[
-                "Press Test on each sender — it checks the key and the From address against Brevo.",
-                "Mark the one you want campaigns to use as default; a campaign can override it.",
+                "For Brevo senders, press Test to check the API key and From address.",
+                "Select a connected Gmail or Brevo sender in Quick Send or on each campaign; "
+                "campaigns can override the default Brevo sender.",
             ] if status != DONE else [],
             route="/email-manager",
             route_label="Open Email Manager → Senders",
@@ -463,9 +477,9 @@ async def _email_steps(db: AsyncSession) -> list[dict]:
         ))
         _ = registered
 
-    if accounts and not active:
+    if accounts and not active and not active_mailboxes:
         # Only worth its own step when senders exist but are all switched off —
-        # with none saved, the "Add a Brevo sender" step above already says it.
+        # with none saved, the connect-an-email-sender step above already says it.
         steps.append(_step(
             "brevo-sender-active", "email", "Enable a sender",
             status=TODO,
@@ -726,15 +740,15 @@ async def _optional_steps(db: AsyncSession) -> list[dict]:
     ))
 
     steps.append(_step(
-        "sending-rules", "optional", "Sending rules and compliance",
+        "campaign-controls", "optional", "Campaign-specific sending controls",
         status=OPTIONAL,
         why=(
-            "Quiet hours, daily caps and the consent rules that keep you out of a carrier's spam "
-            "filter and a regulator's inbox. They apply to every send, including an assistant's."
+            "Optional caps, delays and send windows are chosen on each campaign. Leaving them "
+            "blank keeps that campaign unrestricted; direct sends are not governed by campaign rules."
         ),
-        detail="Set quiet hours, per-channel daily limits and the compliance toggles.",
-        route="/settings",
-        route_label="Open Settings → Sending Rules",
+        detail="Set daily/hourly caps, pacing and hours while creating or editing a campaign.",
+        route="/campaigns",
+        route_label="Open Campaigns",
     ))
 
     counts = {

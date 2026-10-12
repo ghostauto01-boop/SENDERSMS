@@ -175,28 +175,22 @@ async def test_an_sms_list_send_reports_what_it_filtered_out_and_why(api_client,
 
 
 @pytest.mark.asyncio
-async def test_recipients_a_rate_limit_stopped_the_send_before_reaching_are_not_silently_dropped(
+async def test_direct_sms_sends_are_not_limited_by_campaign_pacing(
         api_client, api_db, sms_out, monkeypatch):
     from app.services import sending_limits
 
-    calls = {"n": 0}
+    async def forbidden_global_gate(*args, **kwargs):
+        raise AssertionError("one-off sends must not consult campaign pacing")
 
-    async def one_then_limited(db, cap_seconds=8, channel=None):
-        calls["n"] += 1
-        if calls["n"] == 1:
-            return {"allowed": True, "wait_seconds": 0, "reason": None}
-        return {"allowed": False, "wait_seconds": 25, "reason": "wait 30 seconds between messages"}
-
-    monkeypatch.setattr(sending_limits, "await_slot", one_then_limited)
+    monkeypatch.setattr(sending_limits, "await_slot", forbidden_global_gate)
     contacts = [Contact(first_name=f"P{i}", phone_number=f"+23480312{i:05d}") for i in range(1, 5)]
     api_db.add_all(contacts)
     await api_db.flush()
     lst = await _list(api_db, contacts)
 
-    body = (await api_client.post("/api/v1/send/", params={"list_id": lst.id, "body": "Hello"})).json()
+    response = await api_client.post("/api/v1/send/", params={"list_id": lst.id, "body": "Hello"})
+    assert response.status_code == 200, response.text
+    body = response.json()
 
-    assert body["sent"] == 1 and len(sms_out) == 1
-    assert body["skipped"] == 3
-    assert body["skipped_reasons"] == {"rate_limited": 3}
-    assert body["skipped_reason"] == "rate_limited"
-    assert "rate limited" in body["message"] and "3" in body["message"]
+    assert body["sent"] == 4 and len(sms_out) == 4
+    assert body["skipped"] == 0

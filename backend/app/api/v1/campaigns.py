@@ -158,19 +158,23 @@ async def create_campaign(
             payload["attachments"] = email_service.dump_attachments(
                 email_service.clean_attachments(payload["attachments"])
             )
-        account = await email_service.get_account(db, payload.get("email_account_id"))
-        if account is None:
-            account = await email_service.get_default_account(db)
+        requested_sender_id = payload.get("email_account_id")
+        account = (
+            await email_service.get_sender(db, requested_sender_id)
+            if requested_sender_id is not None
+            else await email_service.get_default_sender(db)
+        )
+        if requested_sender_id is not None and account is None:
+            raise HTTPException(status_code=404, detail="Selected email sender not found")
         if account is None:
             raise HTTPException(
                 status_code=400,
-                detail=(
-                    "No email sender configured. Add a Brevo API key and From address on the "
-                    "Email Senders page first."
-                ),
+                detail="No email sender configured. Connect Gmail or add a Brevo sender first.",
             )
-        if not payload.get("email_account_id"):
-            payload["email_account_id"] = account.id
+        payload["email_account_id"] = email_service.sender_id(account)
+        fallback_id = payload.get("fallback_email_account_id")
+        if fallback_id is not None and await email_service.get_sender(db, fallback_id) is None:
+            raise HTTPException(status_code=404, detail="Selected fallback email sender not found")
     service = CampaignService(db)
     campaign = await service.create_campaign(payload)
     return _campaign_out(campaign)
@@ -213,6 +217,17 @@ async def update_campaign(
         update_data["attachments"] = email_service.dump_attachments(
             email_service.clean_attachments(update_data["attachments"])
         )
+
+    if (update_data.get("channel", campaign.channel) or "sms") == "email":
+        from app.services import email_service
+
+        for key, label in (
+            ("email_account_id", "email sender"),
+            ("fallback_email_account_id", "fallback email sender"),
+        ):
+            sender_id = update_data.get(key)
+            if sender_id is not None and await email_service.get_sender(db, sender_id) is None:
+                raise HTTPException(status_code=404, detail=f"Selected {label} not found")
 
     # Writing a message and picking a template are mutually exclusive choices.
     # Setting one clears the other, otherwise a campaign edited from template to
@@ -370,21 +385,19 @@ async def start_campaign(
     message = "Campaign started"
     waiting = None
     try:
-        # Tell the operator when the rules mean nothing will go out yet (night,
-        # weekend, today's cap used) rather than leaving a "running" campaign that
-        # appears to do nothing.
-        from app.services.sending_limits import gate_for_campaign
+        # Tell the operator when this campaign's own controls mean it will wait.
+        from app.services.campaign_sending import CampaignSendingGate
 
-        check = await (await gate_for_campaign(db, campaign)).check()
+        check = await CampaignSendingGate(db, campaign).check()
         reason = check.get("reason") or ""
-        if not check["allowed"] and not reason.startswith("pacing"):
+        if not check["allowed"]:
             waiting = {
                 "reason": reason,
                 "next_window": check.get("next_window"),
                 "wait_seconds": check.get("wait_seconds"),
             }
             message = (
-                f"Campaign started, but nothing will send yet: {reason}. "
+                f"Campaign started, but its campaign-level controls are holding sends: {reason}. "
                 + (f"The first messages go out at {check['next_window']}." if check.get("next_window") else "")
             ).strip()
     except Exception:  # noqa: BLE001 — the hint must never fail the start

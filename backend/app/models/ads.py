@@ -91,16 +91,13 @@ class AdsCampaign(Base):
     objective: Mapped[str] = mapped_column(String(40), default="replies", nullable=False)
     status: Mapped[str] = mapped_column(String(30), default="draft", nullable=False, index=True)
 
-    #: "sms" or "email". The Ads Manager engine is channel-agnostic; the
-    #: channel decides how the queued messages are finally delivered
-    #: (SMS-Gate vs Brevo) and which suppression/validation rules apply.
+    #: "sms" or "email". The channel selects the SMS gateway or configured email sender.
     channel: Mapped[str] = mapped_column(String(10), default="sms", nullable=False, index=True)
 
-    # ---- Email sender selection (multi-API) -------------------------------
-    #: Brevo account this campaign sends through. NULL = the default account.
+    # ---- Email sender selection (Brevo + connected mailboxes) -------------
+    #: Unified sender id: positive Brevo, negative mailbox. NULL = active default.
     email_account_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
-    #: Tried automatically when the primary account rejects the send (a burned
-    #: API key / banned domain / exhausted quota) so the campaign keeps going.
+    #: Optional unified sender tried automatically if the primary provider rejects the send.
     fallback_email_account_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     #: Subject used by creatives that do not set their own.
     subject: Mapped[str | None] = mapped_column(String(500), nullable=True)
@@ -354,7 +351,7 @@ class AdsCreative(Base):
     #: (HTML + the plain-text `body` as fallback).
     html_body: Mapped[str | None] = mapped_column(Text, nullable=True)
     #: Per-creative sender override: lets an A/B test pit two different
-    #: Brevo accounts (domains) against each other.
+    #: selectable sender identities (and domains) against each other.
     email_account_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     #: Optional saved template this creative was started from. It records where

@@ -11,7 +11,7 @@ import ImportContactsModal from "../components/ImportContactsModal";
 import CampaignRepliesDrawer from "../components/CampaignRepliesDrawer";
 import { useChannel } from "../hooks/useChannel";
 import ChannelSwitch from "../components/ChannelSwitch";
-import emailApi, { EmailAccount } from "../api/email";
+import emailApi, { EmailSender } from "../api/email";
 import RichEmailEditor, { AttachmentPayload } from "../components/RichEmailEditor";
 import { inboxLabelFor, inboxLink } from "../utils/inboxRoute";
 
@@ -522,7 +522,15 @@ function CampaignModal({
       ? String((campaign as any).fallback_email_account_id)
       : ""
   );
-  const [emailAccounts, setEmailAccounts] = useState<EmailAccount[]>([]);
+  const [dailyLimit, setDailyLimit] = useState((campaign as any)?.daily_limit?.toString() ?? "");
+  const [hourlyLimit, setHourlyLimit] = useState((campaign as any)?.hourly_limit?.toString() ?? "");
+  const [perMinuteLimit, setPerMinuteLimit] = useState((campaign as any)?.per_minute_limit?.toString() ?? "");
+  const [minDelay, setMinDelay] = useState((campaign as any)?.min_delay?.toString() ?? "");
+  const [maxDelay, setMaxDelay] = useState((campaign as any)?.max_delay?.toString() ?? "");
+  const [sendStartHour, setSendStartHour] = useState((campaign as any)?.send_start_hour?.toString() ?? "");
+  const [sendEndHour, setSendEndHour] = useState((campaign as any)?.send_end_hour?.toString() ?? "");
+  const [allowWeekends, setAllowWeekends] = useState((campaign as any)?.allow_weekends ?? true);
+  const [emailAccounts, setEmailAccounts] = useState<EmailSender[]>([]);
   const [attachments, setAttachments] = useState<AttachmentPayload[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [showImport, setShowImport] = useState(false);
@@ -538,9 +546,9 @@ function CampaignModal({
   useEffect(() => {
     if (!isEmail) return;
     emailApi
-      .listAccounts()
+      .listSenders()
       .then((data) => setEmailAccounts(data.items))
-      .catch(() => toast.error("Could not load your Brevo senders"));
+      .catch(() => toast.error("Could not load your email senders"));
   }, [isEmail]);
 
   // GSM-7 vs UCS-2: one emoji or curly quote drops the limit from 160 to 70,
@@ -593,6 +601,14 @@ function CampaignModal({
       template_id: !sequenceId && mode === "template" && templateId ? parseInt(templateId) : null,
       message_body: !sequenceId && mode === "write" && messageBody.trim() ? messageBody : null,
       sequence_id: sequenceId ? parseInt(sequenceId) : null,
+      daily_limit: dailyLimit === "" ? null : Number(dailyLimit),
+      hourly_limit: hourlyLimit === "" ? null : Number(hourlyLimit),
+      per_minute_limit: perMinuteLimit === "" ? null : Number(perMinuteLimit),
+      min_delay: minDelay === "" ? null : Number(minDelay),
+      max_delay: maxDelay === "" ? null : Number(maxDelay),
+      send_start_hour: sendStartHour === "" ? null : Number(sendStartHour),
+      send_end_hour: sendEndHour === "" ? null : Number(sendEndHour),
+      allow_weekends: allowWeekends,
       ...(isEmail
         ? {
             channel: "email",
@@ -779,7 +795,7 @@ function CampaignModal({
                     <option value="">Default sender</option>
                     {emailAccounts.map((a) => (
                       <option key={a.id} value={a.id} disabled={!a.is_active}>
-                        {a.name} — {a.from_email}
+                        {a.name} ({a.sender_type === "gmail" ? "Gmail" : "Brevo"}) — {a.from_email}
                         {a.is_active ? "" : " (off)"}
                       </option>
                     ))}
@@ -797,9 +813,9 @@ function CampaignModal({
                       <option
                         key={a.id}
                         value={a.id}
-                        disabled={String(a.id) === emailAccountId}
+                        disabled={String(a.id) === emailAccountId || !a.is_active}
                       >
-                        {a.name}
+                        {a.name} ({a.sender_type === "gmail" ? "Gmail" : "Brevo"})
                       </option>
                     ))}
                   </select>
@@ -807,6 +823,59 @@ function CampaignModal({
               </div>
             </>
           )}
+
+          <section className="rounded-lg border border-gray-200 dark:border-gray-700 p-3 space-y-3">
+            <div>
+              <h3 className="font-semibold text-sm">Campaign sending controls</h3>
+              <p className="text-xs text-gray-500 mt-1">
+                These optional controls affect only this campaign. Leave caps and delays blank for
+                unrestricted pacing; blank sending hours mean 24/7. Direct sends are not restricted
+                by campaign controls. Hours use the app timezone.
+              </p>
+            </div>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div>
+                <label className="label">Daily cap</label>
+                <input className="input" type="number" min={1} value={dailyLimit}
+                  onChange={(e) => setDailyLimit(e.target.value)} placeholder="Unlimited" />
+              </div>
+              <div>
+                <label className="label">Hourly cap</label>
+                <input className="input" type="number" min={1} value={hourlyLimit}
+                  onChange={(e) => setHourlyLimit(e.target.value)} placeholder="Unlimited" />
+              </div>
+              <div>
+                <label className="label">Per-minute cap</label>
+                <input className="input" type="number" min={1} value={perMinuteLimit}
+                  onChange={(e) => setPerMinuteLimit(e.target.value)} placeholder="Unlimited" />
+              </div>
+              <div>
+                <label className="label">Minimum delay (sec)</label>
+                <input className="input" type="number" min={0} value={minDelay}
+                  onChange={(e) => setMinDelay(e.target.value)} placeholder="None" />
+              </div>
+              <div>
+                <label className="label">Maximum delay (sec)</label>
+                <input className="input" type="number" min={0} value={maxDelay}
+                  onChange={(e) => setMaxDelay(e.target.value)} placeholder="None" />
+              </div>
+              <div>
+                <label className="label">Send from hour (0–23)</label>
+                <input className="input" type="number" min={0} max={23} value={sendStartHour}
+                  onChange={(e) => setSendStartHour(e.target.value)} placeholder="24/7" />
+              </div>
+              <div>
+                <label className="label">Send until hour (0–23)</label>
+                <input className="input" type="number" min={0} max={23} value={sendEndHour}
+                  onChange={(e) => setSendEndHour(e.target.value)} placeholder="24/7" />
+              </div>
+              <label className="flex items-center gap-2 text-sm pt-2">
+                <input type="checkbox" checked={allowWeekends}
+                  onChange={(e) => setAllowWeekends(e.target.checked)} />
+                Allow weekend sending
+              </label>
+            </div>
+          </section>
 
           {!isEmail && (
           <div>

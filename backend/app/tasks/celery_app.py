@@ -92,9 +92,8 @@ celery_app.conf.beat_schedule = {
         "task": "app.tasks.campaign_tasks.launch_due_campaigns",
         "schedule": timedelta(minutes=1),
     },
-    # Bounce circuit breaker: pause any email campaign whose recent bounce or
-    # complaint rate is over the limit. The bounce webhook checks as events
-    # arrive; this is the backstop for a missed webhook.
+    # Provider-health breaker is also checked from webhooks; this sweep catches
+    # missed events without imposing a send rate, window or account cap.
     "check-circuit-breakers": {
         "task": "app.tasks.campaign_tasks.check_circuit_breakers",
         "schedule": timedelta(minutes=5),

@@ -21,6 +21,7 @@ from app.schemas.autoreply import (
 )
 from app.security.auth import get_current_user
 from app.services.autoreply_service import AutoReplyService
+from app.services import email_service
 from app.utils.templating import render_template
 
 router = APIRouter()
@@ -71,6 +72,9 @@ async def create_rule(
     data = payload.model_dump()
     if data.get("channel") not in ("sms", "email"):
         raise HTTPException(status_code=422, detail="channel must be 'sms' or 'email'")
+    if data["channel"] == "email" and data.get("email_account_id") is not None:
+        if await email_service.get_sender(db, data["email_account_id"]) is None:
+            raise HTTPException(status_code=404, detail="Selected email sender not found")
     rule = AutoReplyRule(**data)
     db.add(rule)
     await db.commit()
@@ -102,6 +106,13 @@ async def update_rule(
         raise HTTPException(status_code=404, detail="Rule not found")
 
     data = payload.model_dump(exclude_unset=True)
+    target_channel = data.get("channel", rule.channel or "sms")
+    target_sender_id = data.get("email_account_id", rule.email_account_id)
+    if target_channel not in ("sms", "email"):
+        raise HTTPException(status_code=422, detail="channel must be 'sms' or 'email'")
+    if target_channel == "email" and target_sender_id is not None:
+        if await email_service.get_sender(db, target_sender_id) is None:
+            raise HTTPException(status_code=404, detail="Selected email sender not found")
     if "reply_body" in data and (not data["reply_body"] or not data["reply_body"].strip()):
         raise HTTPException(status_code=400, detail="reply_body cannot be blank")
 

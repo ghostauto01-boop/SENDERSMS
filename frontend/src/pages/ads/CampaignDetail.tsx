@@ -1709,8 +1709,8 @@ function CreativeEditor({
               >
                 <option value="">Campaign sender</option>
                 {emailAccounts.map((a: any) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name} — {a.from_email}
+                  <option key={a.id} value={a.id} disabled={!a.is_active}>
+                    {a.name} ({a.sender_type === "gmail" ? "Gmail" : "Brevo"}) — {a.from_email}
                   </option>
                 ))}
               </select>

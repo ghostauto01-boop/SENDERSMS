@@ -1,12 +1,10 @@
-"""Email channel service — Brevo accounts, outbound sends, inbound mail, events.
+"""Email channel service — Brevo/Gmail senders, outbound sends, inbound mail, events.
 
 This is the email twin of ``services/sms_service.py``. It owns:
 
-* **Senders (EmailAccount)** — create/update/test Brevo API keys, pick the
-  account for a campaign, enforce per-account daily ceilings, and fail over to
-  a backup account when the primary one is rejected (burned key, banned
-  domain, quota exhausted). Multiple accounts at once is a first-class
-  feature, not an afterthought.
+* **Unified senders** — select Brevo API accounts or connected Gmail mailboxes
+  for direct sends, campaigns, replies and fallbacks. Campaign-scoped controls
+  are optional; senders themselves have no app-side daily cap.
 * **Outbound email** — renders ``{{shortcodes}}`` exactly like SMS does,
   stores a ``Message`` row with ``channel="email"`` and hands the actual
   delivery to :func:`app.tasks.sms_tasks._send_one`, which routes on channel.
@@ -41,7 +39,7 @@ from app.models.campaign import Campaign, CampaignContact
 from app.models.contact import Contact
 from app.models.conversation import Conversation, Message
 from app.models.email import EmailAccount, EmailEvent, EmailSuppression
-from app.models.email_inbox import EmailContactAddress
+from app.models.email_inbox import EmailContactAddress, EmailMailbox
 from app.security.encryption import decrypt_value, encrypt_value
 # One definition of "a usable email address" for the whole app: import,
 # enrichment and sending all call this.
@@ -353,6 +351,122 @@ async def resolve_account(db: AsyncSession, account_id: int | None) -> EmailAcco
     return await get_default_account(db)
 
 
+def _sender_is_mailbox(sender) -> bool:
+    return isinstance(sender, EmailMailbox)
+
+
+def sender_email(sender) -> str:
+    return str(getattr(sender, "email_address", None) or getattr(sender, "from_email", None) or "")
+
+
+def sender_name(sender) -> str:
+    return str(getattr(sender, "from_name", None) or getattr(sender, "name", None) or sender_email(sender))
+
+
+def sender_id(sender) -> int | None:
+    if sender is None:
+        return None
+    return -int(sender.id) if _sender_is_mailbox(sender) else int(sender.id)
+
+
+async def list_senders(db: AsyncSession, *, include_inactive: bool = True) -> list[dict]:
+    """Unified selectable senders: Brevo accounts and connected Gmail mailboxes.
+
+    Positive ids are Brevo ``EmailAccount`` ids; negative ids are connected
+    ``EmailMailbox`` ids. Existing integer sender fields can therefore keep
+    working without a schema migration or collisions between the tables.
+    """
+    from app.services import mailbox_service
+
+    accounts = await list_accounts(db, include_inactive=include_inactive)
+    mailboxes = await mailbox_service.list_mailboxes(db, include_inactive=include_inactive)
+    items: list[dict] = []
+    for account in accounts:
+        items.append({
+            "id": int(account.id),
+            "name": account.name,
+            "provider": "brevo",
+            "sender_type": "brevo",
+            "from_name": account.from_name,
+            "from_email": account.from_email,
+            "is_active": bool(account.is_active),
+            "is_default": bool(account.is_default),
+            "connection_status": account.connection_status,
+            "last_error": account.last_error,
+            "sent_today": int(account.sent_today or 0),
+            "total_sent": int(account.total_sent or 0),
+        })
+    for mailbox in mailboxes:
+        items.append({
+            "id": -int(mailbox.id),
+            "name": mailbox.name,
+            "provider": mailbox.provider,
+            "sender_type": "gmail",
+            "from_name": mailbox.name,
+            "from_email": mailbox.email_address,
+            "is_active": bool(mailbox.is_active),
+            "is_default": False,
+            "connection_status": (
+                "error" if mailbox.last_sync_status == "error" else
+                "connected" if mailbox.last_sync_status == "ok" else
+                "untested"
+            ),
+            "last_error": mailbox.last_error,
+            "sent_today": None,
+            "total_sent": int(mailbox.total_sent or 0),
+            "mailbox_id": int(mailbox.id),
+        })
+    items.sort(key=lambda item: (not item["is_default"], item["name"].lower(), item["id"]))
+    if not any(item["is_default"] and item["is_active"] for item in items):
+        first = next((item for item in items if item["is_active"]), None)
+        if first:
+            first["is_default"] = True
+    return items
+
+
+async def get_sender(db: AsyncSession, sender_id: int | None):
+    """Resolve one unified sender id without confusing Gmail and Brevo ids."""
+    if sender_id is None or int(sender_id) == 0:
+        return None
+    if int(sender_id) < 0:
+        from app.services.mailbox_service import get_mailbox
+
+        return await get_mailbox(db, abs(int(sender_id)))
+    return await get_account(db, int(sender_id))
+
+
+async def get_default_sender(db: AsyncSession):
+    """Return the same active sender marked default by the unified picker."""
+    items = await list_senders(db, include_inactive=False)
+    selected = next((item for item in items if item["is_default"]), None)
+    return await get_sender(db, selected["id"]) if selected else None
+
+
+async def resolve_sender(db: AsyncSession, sender_id: int | None):
+    """Return an explicit sender exactly, or the active default when none was chosen.
+
+    An invalid explicit ID is not silently redirected through a different From
+    address. Returning None lets each send path explain the missing selection.
+    """
+    if sender_id is not None and int(sender_id) != 0:
+        return await get_sender(db, sender_id)
+    return await get_default_sender(db)
+
+
+async def sender_is_usable(sender) -> tuple[bool, str | None]:
+    if sender is None:
+        return False, "no_sender_configured"
+    if _sender_is_mailbox(sender):
+        if not sender.is_active:
+            return False, "sender_disabled"
+        if not sender.email_address:
+            return False, "no_from_address"
+        if not decrypt_value(sender.credential_encrypted or ""):
+            return False, "mailbox_credential_missing_or_unreadable"
+        return True, None
+    return await account_is_usable(sender, check_room=False)
+
+
 async def ensure_default_account(db: AsyncSession) -> EmailAccount | None:
     """Guarantee exactly one default when accounts exist."""
     accounts = await list_accounts(db)
@@ -381,68 +495,39 @@ async def reset_daily_counter(account: EmailAccount, today: date | None = None) 
 
 
 def effective_daily_limit(account: EmailAccount, default_limit: int | None = None) -> int | None:
-    """Return the account's chosen cap (NULL means unlimited), or a legacy fallback.
-
-    Explicit account configuration always wins. ``daily_limit_unlimited`` makes
-    a saved NULL distinguishable from older rows that inherited a Sending Rules
-    default; it is set when a user sends ``daily_limit: null`` and defaults to
-    unlimited for new accounts. The argument remains for compatibility with old
-    callers, but cannot override an explicit account choice.
-    """
-    explicit = int(account.daily_limit) if account.daily_limit is not None and int(account.daily_limit) > 0 else None
-    if explicit is not None:
-        return explicit
-    if getattr(account, "daily_limit_unlimited", True):
-        return None
-    return int(default_limit) if default_limit and int(default_limit) > 0 else None
+    """Account-level caps are retired; limits belong to campaigns now."""
+    return None
 
 
 async def account_room(account: EmailAccount, default_limit: int | None = None) -> int | None:
-    """Remaining sends today for this account, or None when unlimited."""
-    limit = effective_daily_limit(account, default_limit)
-    if not limit:
-        return None
-    return max(limit - (account.sent_today or 0), 0)
+    """There is no per-sender app-side cap."""
+    return None
 
 
 async def account_is_usable(
     account: EmailAccount, *, default_limit: int | None = None, check_room: bool = True
 ) -> tuple[bool, str | None]:
+    """Validate credentials/identity only; delivery limits are campaign-scoped."""
     if not account.is_active:
         return False, "account_disabled"
     if not account.api_key_encrypted:
         return False, "no_api_key"
     if not decrypt_value(account.api_key_encrypted):
-        # Something *is* stored but will not decrypt. That is almost always
-        # CREDENTIAL_ENCRYPTION_KEY having changed (or differing between the web
-        # process and the worker), and it is worth saying out loud: reported as
-        # a generic "no usable sender" the operator goes hunting for a missing
-        # API key that is actually sitting right there in the database.
         return False, "api_key_unreadable"
     if not account.from_email:
         return False, "no_from_address"
-    if not check_room:
-        # Validation asks "can this mailbox send at all?", not "has it already
-        # used today's allowance?" -- with a per-mailbox default cap, every
-        # mailbox is routinely at its limit by the afternoon.
-        return True, None
-    await reset_daily_counter(account)
-    room = await account_room(account, default_limit)
-    if room == 0:
-        return False, "daily_limit_reached"
     return True, None
 
 
 def serialize_account(
     account: EmailAccount, *, stats: dict | None = None, default_limit: int | None = None
 ) -> dict:
-    """Account shape for the API. The API key itself is never returned.
+    """Brevo account shape for the API. Credentials are masked; sending caps live on campaigns.
 
-    ``default_limit`` is the per-mailbox default from Sending Rules; pass it to get
-    ``effective_daily_limit`` (what the app will really let this mailbox send).
+    Legacy per-account limit columns are intentionally not exposed as active
+    settings. Direct sends have no app-side cap.
     """
     api_key = decrypt_value(account.api_key_encrypted or "")
-    effective = effective_daily_limit(account, default_limit)
     return {
         "id": account.id,
         "name": account.name,
@@ -455,16 +540,10 @@ def serialize_account(
         "is_default": bool(account.is_default),
         "has_api_key": bool(account.api_key_encrypted),
         "api_key_masked": mask_api_key(account.api_key_encrypted) if api_key else "",
-        "daily_limit": account.daily_limit,
-        "daily_limit_unlimited": bool(getattr(account, "daily_limit_unlimited", True)),
-        # NULL remains unlimited unless this legacy row explicitly inherits a
-        # configured Sending Rules default.
-        "effective_daily_limit": effective,
-        "daily_limit_source": (
-            "account" if account.daily_limit is not None and int(account.daily_limit) > 0
-            else "none" if getattr(account, "daily_limit_unlimited", True) or effective is None
-            else "sending_rules"
-        ),
+        "daily_limit": None,
+        "daily_limit_unlimited": True,
+        "effective_daily_limit": None,
+        "daily_limit_source": "none",
         "sent_today": account.sent_today or 0,
         "total_sent": account.total_sent or 0,
         "track_opens": bool(account.track_opens),
@@ -596,7 +675,6 @@ async def create_account(
     from_email: str,
     api_key: str,
     reply_to: str | list[str] | None = None,
-    daily_limit: int | None = None,
     is_active: bool = True,
     is_default: bool = False,
     track_opens: bool = True,
@@ -614,7 +692,8 @@ async def create_account(
         api_key_encrypted=encrypt_value((api_key or "").strip()),
         is_active=is_active,
         is_default=is_default,
-        daily_limit=daily_limit,
+        daily_limit=None,
+        daily_limit_unlimited=True,
         track_opens=track_opens,
         track_clicks=track_clicks,
         webhook_token=_new_webhook_token(),
@@ -1050,7 +1129,7 @@ def _new_rfc_message_id(from_email: str | None) -> str:
 async def build_headers(
     db: AsyncSession,
     message: "Message",
-    account: EmailAccount | None,
+    account: EmailAccount | EmailMailbox | None,
     *,
     bulk: bool = False,
 ) -> dict:
@@ -1087,11 +1166,14 @@ async def build_headers(
     if bulk:
         address = (message.to_address or "").strip().lower()
         url = unsubscribe_url(address)
-        mailto = None
-        if account is not None:
-            reply = (account.reply_to or account.from_email or "").strip()
-            if reply:
-                mailto = f"mailto:{reply}?subject=unsubscribe"
+        reply = (
+            getattr(account, "reply_to", None)
+            or getattr(account, "from_email", None)
+            or getattr(account, "email_address", None)
+            or message.from_address
+            or ""
+        ).strip()
+        mailto = f"mailto:{reply}?subject=unsubscribe" if reply else None
         parts = [p for p in (f"<{mailto}>" if mailto else None, f"<{url}>" if url else None) if p]
         if parts:
             headers["List-Unsubscribe"] = ", ".join(parts)
@@ -1172,7 +1254,7 @@ async def render_email(
     subject: str | None,
     text_body: str | None,
     html_body: str | None,
-    account: EmailAccount | None = None,
+    account: EmailAccount | EmailMailbox | None = None,
     append_unsubscribe: bool = False,
 ) -> dict:
     """Render subject/text/html for one contact through the variable registry.
@@ -1199,7 +1281,7 @@ async def render_email(
         html = text_to_html(text or "")
 
     if append_unsubscribe and account is not None:
-        address = (account.reply_to or account.from_email or "").strip()
+        address = (getattr(account, "reply_to", None) or sender_email(account)).strip()
         text, html = apply_unsubscribe(text or "", html, address)
 
     return {"subject": rendered_subject, "text": text or "", "html": html or ""}
@@ -1212,7 +1294,7 @@ async def queue_email(
     subject: str | None,
     text_body: str | None,
     html_body: str | None = None,
-    account: EmailAccount | None = None,
+    account: EmailAccount | EmailMailbox | None = None,
     campaign_id: int | None = None,
     ads_campaign_id: int | None = None,
     followup: bool = False,
@@ -1251,9 +1333,9 @@ async def queue_email(
             refused["reason"] = problem  # so the caller can say WHY nothing was queued
         return None
 
-    account = account or await resolve_account(db, None)
+    account = account or await resolve_sender(db, None)
     if account is None:
-        logger.warning("EMAIL: no sender account configured; cannot queue for %s", contact.id)
+        logger.warning("EMAIL: no sender configured; cannot queue for %s", contact.id)
         return None
 
     # An HTML-only body must still produce a text part: it is the fallback every
@@ -1271,8 +1353,10 @@ async def queue_email(
         account=account, append_unsubscribe=bool(bulk),
     )
 
+    sender_id_value = sender_id(account)
+    account_email = sender_email(account)
     conversation = await get_or_create_conversation(
-        db, contact, channel="email", account_id=account.id
+        db, contact, channel="email", account_id=sender_id_value
     )
     if campaign_id is not None:
         from app.services.attribution import stamp_conversation
@@ -1290,7 +1374,7 @@ async def queue_email(
         campaign_id=campaign_id,
         ads_campaign_id=ads_campaign_id,
         channel="email",
-        rfc_message_id=_new_rfc_message_id(account.from_email),
+        rfc_message_id=_new_rfc_message_id(account_email),
         attachments=dump_attachments(cleaned_attachments),
         bulk_send=bool(bulk),
         cc_addresses=", ".join(clean_addresses(cc)) or None,
@@ -1299,11 +1383,11 @@ async def queue_email(
         body=rendered["text"],
         html_body=rendered["html"],
         subject=rendered["subject"][:500],
-        from_address=account.from_email,
+        from_address=account_email,
         to_address=address,
-        email_account_id=account.id,
+        email_account_id=sender_id_value,
         status=status,
-        provider="brevo",
+        provider=(account.provider if _sender_is_mailbox(account) else "brevo"),
         idempotency_key=idempotency_key or f"email-{contact.id}-{uuid.uuid4().hex[:12]}",
     )
     db.add(message)
@@ -1314,7 +1398,7 @@ async def queue_email(
     conversation.last_message_at = _now()
     conversation.subject = rendered["subject"][:500]
     if not conversation.email_account_id:
-        conversation.email_account_id = account.id
+        conversation.email_account_id = sender_id_value
 
     return message
 
@@ -1326,7 +1410,7 @@ async def send_now(
     subject: str | None,
     text_body: str | None,
     html_body: str | None = None,
-    account: EmailAccount | None = None,
+    account: EmailAccount | EmailMailbox | None = None,
     campaign_id: int | None = None,
     ads_campaign_id: int | None = None,
     is_auto_reply: bool = False,
@@ -1351,6 +1435,25 @@ async def send_now(
         return None, {"success": False, "error": "contact_not_emailable",
                       "skipped_reason": refused.get("reason")}
     result = await deliver(db, message)
+    if result.get("deferred"):
+        # A campaign rule/provider retry can defer a message without it being a
+        # terminal failure. Direct sends normally bypass these rules, but keep
+        # this branch for callers that deliberately ask for a deferred result.
+        message.status = "queued"
+        message.retry_at = _now() + timedelta(seconds=max(int(result.get("wait_seconds") or 60), 5))
+        message.last_error = str(result.get("error") or "Delivery was deferred.")[:2000]
+    elif not result.get("success"):
+        # Synchronous API sends do not pass through the Celery attempt handler.
+        # Persist their immediate provider failure here so it is always visible
+        # in Failed history with an actionable reason.
+        message.status = "failed"
+        message.failed_at = _now()
+        message.retry_at = None
+        message.last_error = str(result.get("error") or "The email provider did not accept this message.")[:2000]
+        await _note_email_event(
+            db, "failed", message, detail=message.last_error,
+        )
+    await db.flush()
     return message, result
 
 
@@ -1368,15 +1471,18 @@ async def _send_via_mailbox(
     the operator's Sent folder, and the thread behaves like a normal
     conversation.
 
-    Bulk campaign mail deliberately stays on Brevo: that is where the daily
-    ceilings, open/click tracking and List-Unsubscribe handling live.
+    A Gmail sender selected explicitly for a campaign or direct send is honored;
+    only the automatic From/Reply-To mailbox override is limited to one-to-one mail.
     """
     from app.services import mailbox_service
 
     contact = (
         await db.execute(select(Contact).where(Contact.id == message.contact_id))
     ).scalar_one_or_none()
-    headers = await build_headers(db, message, account, bulk=False)
+    message.email_account_id = sender_id(mailbox)
+    message.provider = mailbox.provider
+    message.from_address = mailbox.email_address
+    headers = await build_headers(db, message, account, bulk=bool(message.bulk_send))
     result = await mailbox_service.send_via_mailbox(
         db,
         mailbox,
@@ -1388,7 +1494,8 @@ async def _send_via_mailbox(
         in_reply_to=headers.get("In-Reply-To"),
         references=headers.get("References"),
         message_id=message.rfc_message_id,
-        from_name=(account.from_name if account else None) or None,
+        from_name=(getattr(account, "from_name", None) if account else None) or mailbox.name,
+        headers=headers,
         cc=clean_addresses(message.cc_addresses),
         bcc=clean_addresses(message.bcc_addresses),
         attachments=load_attachments(message.attachments),
@@ -1397,9 +1504,12 @@ async def _send_via_mailbox(
     if result.get("success"):
         message.provider = mailbox.provider
         message.provider_message_id = str(result.get("provider_message_id") or "")[:255] or None
-        # queue_email stamped the Brevo sender's From on the row; the message
-        # actually left from the mailbox, and the inbox should say so.
         message.from_address = mailbox.email_address
+        conversation = (
+            await db.execute(select(Conversation).where(Conversation.id == message.conversation_id))
+        ).scalar_one_or_none()
+        if conversation is not None:
+            conversation.email_account_id = message.email_account_id
         message.status = "sent"
         message.sent_at = _now()
         message.failed_at = None
@@ -1424,17 +1534,32 @@ async def _send_via_mailbox(
 
 
 async def deliver(db: AsyncSession, message: Message) -> dict:
-    """Perform the actual delivery for an already-claimed message row.
+    """Deliver through the explicitly selected Brevo or connected Gmail sender.
 
-    Order: the operator's own connected mailbox (one-to-one replies only), then
-    Brevo. Brevo account resolution is the message's account → the campaign's
-    primary → the campaign's fallback → the default account. A rejection that
-    looks permanent (invalid key, banned sender, blocked) falls through to the
-    next candidate; a transient error is reported so the caller can retry later.
+    A negative ``email_account_id`` selects a connected mailbox; a positive id
+    selects Brevo. Campaign fallback senders are considered only when configured.
+    For an ordinary one-to-one send, a matching connected mailbox can still be
+    used automatically when Gmail reply sending is enabled.
     """
-    account = await resolve_account(db, message.email_account_id)
+    sender = await resolve_sender(db, message.email_account_id)
+    explicit_mailbox = _sender_is_mailbox(sender) and bool(message.email_account_id)
+    explicit_mailbox_error: str | None = None
 
-    if settings.GMAIL_SEND_REPLIES:
+    # A chosen Gmail mailbox is a full sender for direct and campaign email,
+    # regardless of the separate one-to-one auto-reply preference.
+    if explicit_mailbox:
+        usable, why = await sender_is_usable(sender)
+        if not usable:
+            return {"success": False, "status_code": 400, "error": _no_sender_error([why or "unknown"])}
+        result = await _send_via_mailbox(db, sender, message, None)
+        if result.get("success"):
+            return result
+        explicit_mailbox_error = str(result.get("error") or "Gmail did not accept the message.")
+        # Honor a campaign's explicitly configured Brevo/Gmail fallback, but do
+        # not silently change sender for a one-off message.
+
+    account = sender if isinstance(sender, EmailAccount) else None
+    if account is not None and settings.GMAIL_SEND_REPLIES:
         from app.services import mailbox_service
 
         try:
@@ -1447,64 +1572,62 @@ async def deliver(db: AsyncSession, message: Message) -> dict:
             if result.get("success"):
                 return result
 
-    candidates: list[EmailAccount] = []
-    if account is not None:
-        candidates.append(account)
+    candidates: list = []
+    if isinstance(sender, EmailAccount):
+        candidates.append(sender)
+    elif sender is not None and not explicit_mailbox:
+        candidates.append(sender)
 
-    campaign_account: EmailAccount | None = None
+    campaign = None
     if message.campaign_id:
-        campaign = (
-            await db.execute(select(Campaign).where(Campaign.id == message.campaign_id))
-        ).scalar_one_or_none()
-        if campaign is not None:
-            campaign_account = await get_account(db, campaign.email_account_id) or campaign_account
-            if campaign.fallback_email_account_id:
-                fallback = await get_account(db, campaign.fallback_email_account_id)
-                if fallback is not None:
-                    candidates.append(fallback)
+        campaign = (await db.execute(
+            select(Campaign).where(Campaign.id == message.campaign_id)
+        )).scalar_one_or_none()
+    elif message.ads_campaign_id:
+        from app.models.ads import AdsCampaign
 
-    # The protective per-mailbox default governs outreach only. A reply to someone
-    # who wrote to us is never held back by a cap meant for cold sends; only an
-    # account's own explicit limit (as before) can stop it.
-    outreach = bool(message.bulk_send or message.campaign_id or message.ads_campaign_id)
-    default_limit = None
-    if outreach:
-        from app.services.sending_limits import default_mailbox_limit, get_sending_rules
+        campaign = (await db.execute(
+            select(AdsCampaign).where(AdsCampaign.id == message.ads_campaign_id)
+        )).scalar_one_or_none()
 
-        default_limit = default_mailbox_limit(await get_sending_rules(db))
+    fallback_id = getattr(campaign, "fallback_email_account_id", None) if campaign else None
+    if fallback_id:
+        fallback = await get_sender(db, fallback_id)
+        if fallback is not None and all(sender_id(fallback) != sender_id(item) for item in candidates):
+            candidates.append(fallback)
 
-    unusable: list[str] = []
+    errors: list[str] = [explicit_mailbox_error] if explicit_mailbox_error else []
     for candidate in candidates:
-        usable, why = await account_is_usable(candidate, default_limit=default_limit)
+        usable, why = await sender_is_usable(candidate)
         if not usable:
-            logger.info("EMAIL: account %s unusable (%s)", candidate.id, why)
-            unusable.append(why or "unknown")
+            errors.append(why or "unknown")
             continue
-
-        result = await _send_via_account(db, candidate, message)
+        if _sender_is_mailbox(candidate):
+            result = await _send_via_mailbox(db, candidate, message, None)
+        else:
+            result = await _send_via_account(db, candidate, message)
         if result.get("success") or not result.get("_try_next"):
             return result
+        errors.append(str(result.get("error") or "provider_rejected"))
 
-    if unusable and all(reason == "daily_limit_reached" for reason in unusable):
-        # Nothing is wrong with the sender; today's allowance is simply used up.
-        # The caller must hold the message for tomorrow, not burn its retries and
-        # mark it failed.
-        return {"success": False, "deferred": True, "error": _no_sender_error(unusable)}
-    return {"success": False, "error": _no_sender_error(unusable)}
+    return {"success": False, "error": _no_sender_error(errors)}
 
 
 #: What to tell the operator for each reason no sender could be used. Written as
 #: the next action, not as a diagnosis they have to translate.
 _SENDER_FIX = {
-    "account_disabled": "the sending account is switched off in Email Manager",
+    "account_disabled": "the Brevo sender is switched off in Email Manager",
+    "sender_disabled": "the sender is switched off in Email Manager",
     "no_api_key": "no Brevo API key is saved — add it in Email Manager",
     "api_key_unreadable": (
-        "the saved API key cannot be decrypted on this server — usually "
+        "the saved Brevo API key cannot be decrypted on this server — usually "
         "CREDENTIAL_ENCRYPTION_KEY changed or differs between the web app and "
         "the worker; re-save the key in Email Manager"
     ),
+    "mailbox_credential_missing_or_unreadable": (
+        "the saved Gmail credential is missing or unreadable — reconnect the mailbox"
+    ),
     "no_from_address": "the sending account has no From address",
-    "daily_limit_reached": "the account's daily limit for today is used up",
 }
 
 
@@ -1512,7 +1635,7 @@ def _no_sender_error(reasons: list[str]) -> str:
     """Explain *why* nothing could send, instead of one catch-all sentence."""
     if not reasons:
         return (
-            "No sending account is configured — add a Brevo account and API key "
+            "No email sender is configured — connect a Gmail mailbox or add a Brevo sender "
             "in Email Manager."
         )
     unique = list(dict.fromkeys(reasons))
@@ -1533,6 +1656,9 @@ async def _send_via_account(db: AsyncSession, account: EmailAccount, message: Me
     to_name = contact_display_name(contact) if contact else None
 
     headers = await build_headers(db, message, account, bulk=bool(message.bulk_send))
+    message.email_account_id = account.id
+    message.provider = "brevo"
+    message.from_address = account.from_email
     result = await brevo_send(
         api_key,
         to_email=message.to_address or (contact.email if contact else None) or "",
@@ -1555,6 +1681,11 @@ async def _send_via_account(db: AsyncSession, account: EmailAccount, message: Me
     )
 
     if result.get("success"):
+        conversation = (
+            await db.execute(select(Conversation).where(Conversation.id == message.conversation_id))
+        ).scalar_one_or_none()
+        if conversation is not None:
+            conversation.email_account_id = account.id
         message.email_account_id = account.id
         message.provider = "brevo"
         message.provider_message_id = (result.get("provider_message_id") or "")[:255] or None
@@ -1712,6 +1843,17 @@ async def apply_event(db: AsyncSession, event_type: str, data: dict) -> dict:
             )
 
     await db.flush()
+    if message is not None and event_type in ("bounce", "blocked", "spam", "error"):
+        # The campaign breaker evaluates the updated message and event records,
+        # so flush before checking. It is a campaign-local health safeguard,
+        # not a global send-rate limit.
+        from app.services import circuit_breaker
+
+        await circuit_breaker.check_after_event(
+            db,
+            campaign_id=message.campaign_id,
+            ads_campaign_id=message.ads_campaign_id,
+        )
     return {"applied": True, "message_id": message.id if message else None, "event": event_type}
 
 
@@ -1760,20 +1902,12 @@ async def _apply_bounce(db: AsyncSession, message: Message, event_type: str, dat
         ).scalar_one_or_none()
         if campaign is not None:
             campaign.messages_failed = (campaign.messages_failed or 0) + 1
-    # A bounce is what the circuit breaker watches for: this is where it learns of
-    # one, so a campaign that is hurting the sender stops as soon as the rate is over
-    # the limit instead of when somebody next looks.
-    from app.services import circuit_breaker
-
-    await circuit_breaker.check_after_event(
-        db, campaign_id=message.campaign_id, ads_campaign_id=message.ads_campaign_id
-    )
 
 
 async def send_composer_test(
     db: AsyncSession,
     *,
-    account: EmailAccount,
+    account: EmailAccount | EmailMailbox,
     to_address: str,
     subject: str | None,
     text_body: str | None,
@@ -1785,17 +1919,15 @@ async def send_composer_test(
 
     Deliberately does NOT create a Message/thread: a test must not look like
     outreach in the inbox, must not bump a campaign and must not teach the
-    suppression logic anything. It goes through the same Brevo provider call,
-    so what arrives is what a real recipient would get.
+    suppression logic anything. It uses the selected sender's real provider
+    path, so what arrives is what a real recipient would get.
     """
-    from app.providers.brevo import send_email as brevo_send
-
     address = normalize_email(to_address)
     if not address:
         return {"success": False, "error": "Enter a valid destination address"}
-    api_key = decrypt_value(account.api_key_encrypted or "")
-    if not api_key:
-        return {"success": False, "error": "This sender has no API key yet"}
+    usable, why = await sender_is_usable(account)
+    if not usable:
+        return {"success": False, "error": _no_sender_error([why or "unknown"])}
 
     if not (text_body or "").strip() and (html_body or "").strip():
         text_body = html_to_text(html_body)
@@ -1812,6 +1944,30 @@ async def send_composer_test(
         html = text_to_html(text)
 
     files = clean_attachments(attachments)
+    if _sender_is_mailbox(account):
+        from app.services import mailbox_service
+
+        result = await mailbox_service.send_via_mailbox(
+            db,
+            account,
+            to_address=address,
+            to_name=None,
+            subject=f"[TEST] {rendered_subject}"[:500],
+            text=text or " ",
+            html=html,
+            from_name=sender_name(account),
+            attachments=files,
+        )
+        if result.get("success"):
+            return {"success": True, "to": address, "provider": account.provider,
+                    "attachments": attachment_summary(dump_attachments(files))}
+        return {"success": False, "error": result.get("error") or "Gmail rejected the test email"}
+
+    api_key = decrypt_value(account.api_key_encrypted or "")
+    if not api_key:
+        return {"success": False, "error": "This sender has no readable Brevo API key"}
+    from app.providers.brevo import send_email as brevo_send
+
     result = await brevo_send(
         api_key,
         to_email=address,
@@ -2449,7 +2605,13 @@ async def _maybe_auto_reply(
     rule, text = await AutoReplyService(db).build_reply(contact, incoming.body, channel="email")
     if not rule or not text:
         return
-    account = await get_account(db, rule.email_account_id) or await resolve_account(db, None)
+    account = await resolve_sender(db, rule.email_account_id)
+    if rule.email_account_id is not None and account is None:
+        logger.error(
+            "EMAIL auto-reply rule %s references missing sender %s; skipping reply",
+            rule.id, rule.email_account_id,
+        )
+        return
     reply = await queue_email(
         db, contact,
         subject=(rule.subject or f"Re: {incoming.subject or ''}").strip() or None,

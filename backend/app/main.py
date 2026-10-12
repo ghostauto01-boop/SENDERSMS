@@ -251,9 +251,7 @@ async def _poll() -> int:
         # asleep (free tier) or Redis unreachable — otherwise campaigns stay
         # “running” with pending contacts forever.
         work += await _process_running_campaigns_inline()
-        # Bounce circuit breaker: pause any email campaign over the bounce limit.
-        # The webhook checks as events arrive; this is the backstop (and the
-        # no-worker fallback for the Celery beat task of the same name).
+        # Email campaign health backstop when no Celery worker is available.
         work += await _check_circuit_breakers_inline()
         # Sweep any queued messages that were rate-limited / deferred (or that
         # a dead broker left behind). Uses the same atomic claim as Celery so
@@ -552,13 +550,16 @@ async def _process_meeting_reminders() -> int:
 
 
 async def _check_circuit_breakers_inline() -> int:
-    """Run the circuit-breaker sweep when no Celery worker is awake to do it."""
+    """Campaign-local provider-health sweep for no-worker deployments."""
     try:
         from app.tasks.campaign_tasks import check_circuit_breakers_async
 
         tripped = await check_circuit_breakers_async()
-        for t in tripped:
-            logger.warning("CIRCUIT BREAKER (inline): paused %s %s: %s", t["kind"], t["id"], t.get("reason"))
+        for item in tripped:
+            logger.warning(
+                "CIRCUIT BREAKER (inline): paused %s %s: %s",
+                item["kind"], item["id"], item.get("reason"),
+            )
         return len(tripped)
     except Exception as exc:
         logger.warning("Circuit breaker sweep: %s", exc)
@@ -654,19 +655,6 @@ async def _process_scheduled() -> int:
             scheduled = due.scalars().all()
             if not scheduled:
                 return 0
-
-            # Respect sending limits / pacing. When the next slot is not open,
-            # leave the messages pending and try again on the next poll cycle —
-            # this is what spreads a big scheduled blast evenly through the day
-            # instead of firing it all at once.
-            from app.services.sending_limits import SendingGate
-            slot = await SendingGate(db).check()
-            if not slot["allowed"]:
-                logger.info(
-                    "SCHEDULED: rate limited (%s); deferring %s message(s)",
-                    slot["reason"], len(scheduled),
-                )
-                return len(scheduled)
 
             for sm in scheduled:
                 try:
@@ -862,7 +850,13 @@ async def _process_scheduled_email(db, sm) -> None:
         await db.flush()
         return
 
-    account = await email_service.get_account(db, sm.email_account_id)
+    account = await email_service.resolve_sender(db, sm.email_account_id)
+    if sm.email_account_id is not None and account is None:
+        sm.status = "failed"
+        sm.error = "The selected email sender no longer exists. Choose another sender and schedule again."
+        sm.executed_at = dt.now(tz.utc)
+        await db.flush()
+        return
     message = await email_service.queue_email(
         db, contact,
         subject=sm.subject or sm.body[:80],
@@ -894,7 +888,12 @@ async def _process_scheduled_email(db, sm) -> None:
         contact.last_emailed_at = dt.now(tz.utc)
     else:
         sm.status = "failed"
-        sm.error = str(result.get("error"))[:500]
+        sm.error = str(result.get("error") or "The email provider did not accept this message.")[:500]
+        message.status = "failed"
+        message.failed_at = dt.now(tz.utc)
+        message.retry_at = None
+        message.last_error = sm.error
+        await email_service._note_email_event(db, "failed", message, detail=message.last_error)
     await db.flush()
 
 
@@ -1006,16 +1005,6 @@ async def _poll_loop():
             logger.warning("Poll loop: %s", e)
             delay = float(settings.INLINE_POLL_INTERVAL)
 
-async def _apply_safe_sending_defaults() -> None:
-    """One-time: switch the protective sending rules on for a never-configured database."""
-    from app.services.sending_limits import apply_safe_defaults
-
-    async with async_session_factory() as db:
-        result = await apply_safe_defaults(db)
-        await db.commit()
-    logger.info("Sending rules safe-defaults step: %s", result)
-
-
 async def _repair_placeholder_phones() -> None:
     """Clear the invented ``email:<address>`` phone numbers older code stored (idempotent)."""
     from app.services.contact_repair import repair_placeholder_phones
@@ -1045,10 +1034,6 @@ async def lifespan(app: FastAPI):
                 logger.error("init_db failed (%s): %s", kind, msg)
             else:
                 logger.warning("init_db: %s", e)
-        try:
-            await asyncio.wait_for(_apply_safe_sending_defaults(), timeout=20)
-        except Exception as e:
-            logger.warning("safe sending defaults: %s", e)
         try:
             await asyncio.wait_for(_repair_placeholder_phones(), timeout=30)
         except Exception as e:

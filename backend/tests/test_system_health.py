@@ -81,7 +81,7 @@ async def test_system_health_surfaces_due_stale_and_failed_jobs(api_client, api_
 
 
 @pytest.mark.asyncio
-async def test_brevo_health_shows_account_status_and_explicit_unlimited_limit(
+async def test_brevo_health_shows_account_status_without_sender_level_limits(
     api_client, api_db
 ):
     from tests.campaign_factory import make_account
@@ -100,6 +100,6 @@ async def test_brevo_health_shows_account_status_and_explicit_unlimited_limit(
     sender = body["accounts"][0]
     assert sender["id"] == account.id
     assert sender["status"] == "connected"
-    assert sender["daily_limit"] is None
-    assert sender["daily_limit_unlimited"] is True
+    assert "daily_limit" not in sender
+    assert "daily_limit_unlimited" not in sender
     assert "api_key" not in sender

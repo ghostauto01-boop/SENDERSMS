@@ -150,6 +150,7 @@ async def create_followup(
     channel = (data.channel or "sms").lower()
     if channel not in ("sms", "email"):
         raise HTTPException(status_code=422, detail="channel must be 'sms' or 'email'")
+    email_sender_id = data.email_account_id
     if channel == "email":
         if contact.is_email_opted_out:
             raise HTTPException(status_code=400, detail="Contact has opted out of email")
@@ -157,6 +158,19 @@ async def create_followup(
             raise HTTPException(status_code=400, detail="Contact has no email address")
         if not (data.subject or "").strip():
             raise HTTPException(status_code=422, detail="An email follow-up needs a subject")
+        from app.services import email_service
+
+        sender = (
+            await email_service.get_sender(db, data.email_account_id)
+            if data.email_account_id is not None
+            else await email_service.get_default_sender(db)
+        )
+        if data.email_account_id is not None and sender is None:
+            raise HTTPException(status_code=404, detail="Selected email sender not found")
+        # A follow-up can be prepared before a provider is connected. Keep the
+        # sender unset so delivery can resolve the current default when it runs.
+        if sender is not None:
+            email_sender_id = email_service.sender_id(sender)
     elif contact.is_opted_out:
         raise HTTPException(status_code=400, detail="Cannot create a follow-up for an opted-out contact")
 
@@ -171,7 +185,7 @@ async def create_followup(
         message_text=data.message_text,
         channel=channel,
         subject=(data.subject or "").strip() or None,
-        email_account_id=data.email_account_id,
+        email_account_id=email_sender_id,
         notify_on_due=data.notify_on_due,
         max_attempts=data.max_attempts,
     )

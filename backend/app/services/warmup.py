@@ -1,14 +1,11 @@
-"""The warm-up ramp: a new sending domain earns its volume.
+"""Informational warm-up guidance for newly authenticated sending domains.
 
-A mailbox with no sending history that suddenly sends hundreds a day is what spam filters are built
-to catch. The ramp starts at about 5 a day and reaches about 25 a day by week four:
+The displayed ramp starts around 5/day and reaches 25/day by week four. It is
+advisory only; this module does not gate delivery. Any app-side sending limits
+are selected per campaign, while provider-imposed quotas still apply.
 
-    days 1-7   5/day        days 8-14   10/day        days 15-21   18/day        day 22 on   25/day
-
-The clock starts when the domain first becomes authenticated (``SendingDomain.warmup_started_at``).
-A mailbox whose domain has no clock (not registered, or not yet authenticated) is not ramped by this
-module -- the per-mailbox default in Sending Rules still applies to it.
-"""
+The clock starts when the domain first becomes authenticated
+(``SendingDomain.warmup_started_at``)."""
 
 from __future__ import annotations
 

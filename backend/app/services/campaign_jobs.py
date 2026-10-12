@@ -157,17 +157,6 @@ async def _next_wakeup(db: AsyncSession, campaign: AdsCampaign, result: dict) ->
             next_day = (local_now + timedelta(days=1)).replace(hour=0, minute=1, second=0, microsecond=0)
             return next_day.astimezone(timezone.utc)
 
-    # Respect the global Sending Rules window/caps without keeping a worker busy.
-    if not campaign.test_mode:
-        try:
-            from app.services.sending_limits import gate_for_campaign
-
-            gate = await (await gate_for_campaign(db, campaign)).check()
-            if not gate.get("allowed"):
-                return now + timedelta(seconds=max(int(gate.get("wait_seconds") or 60), 5))
-        except Exception as exc:  # noqa: BLE001
-            logger.info("Could not calculate send-gate wakeup for campaign %s: %s", campaign.id, exc)
-
     mode = (campaign.drip_mode or "off").lower()
     if mode in ("interval", "batch", "smart"):
         interval = max(int(campaign.drip_interval_minutes or 0), 1)

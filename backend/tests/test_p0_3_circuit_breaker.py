@@ -370,3 +370,12 @@ async def test_stopping_a_campaign_cancels_its_queued_mail(api_client, api_db):
     for row in rows:
         await api_db.refresh(row)
         assert row.status == "cancelled"
+
+
+def test_circuit_breaker_sweep_is_scheduled_as_a_webhook_backstop():
+    from app.tasks.celery_app import celery_app
+
+    celery_app.loader.import_default_modules()
+    entry = celery_app.conf.beat_schedule["check-circuit-breakers"]
+    assert entry["task"] in celery_app.tasks
+    assert entry["schedule"] <= timedelta(minutes=10)
