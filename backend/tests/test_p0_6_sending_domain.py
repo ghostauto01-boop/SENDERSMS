@@ -387,68 +387,31 @@ async def _domain(db, address, *, status="authenticated", days_ago=None):
 
 
 @pytest.mark.asyncio
-async def test_a_warming_mailbox_is_capped_below_its_explicit_daily_limit(api_db):
-    """The mailbox is configured for 30/day; on day 3 of warm-up it may send 5."""
-    from app.services import sending_limits
+async def test_warmup_and_legacy_sender_limits_do_not_restrict_sending(api_db):
+    """Warm-up remains advisory; every actual pacing rule is chosen on a campaign."""
+    from app.services.email_service import effective_daily_limit
+    from app.services.sending_limits import SendingGate
 
     account = await make_account(api_db, default=True, daily_limit=30)
     await _domain(api_db, account.from_email, days_ago=3)
-    rules = {**await sending_limits.get_sending_rules(api_db), "email_daily_per_mailbox": 30,
-             "enable_daily_limit": True}
 
-    capacity = await sending_limits.email_capacity(api_db, rules)
-
-    assert capacity["daily_cap"] == 5
-    assert capacity["accounts"][0]["warmup_cap"] == 5 and capacity["accounts"][0]["daily_cap"] == 5
-
-
-@pytest.mark.asyncio
-async def test_week_four_and_beyond_is_25_and_an_unregistered_domain_is_not_ramped(api_db):
-    from app.services import sending_limits
-
-    warmed = await make_account(api_db, default=True)
-    plain = await make_account(api_db, daily_limit=30)
-    await _domain(api_db, warmed.from_email, days_ago=30)
-    rules = {**await sending_limits.get_sending_rules(api_db), "email_daily_per_mailbox": 30,
-             "enable_daily_limit": True}
-
-    capacity = await sending_limits.email_capacity(api_db, rules)
-
-    caps = {a["id"]: a["daily_cap"] for a in capacity["accounts"]}
-    assert caps[warmed.id] == 25 and caps[plain.id] == 30
-    assert capacity["daily_cap"] == 55
-
-
-@pytest.mark.asyncio
-async def test_the_gate_enforces_the_warm_up_cap_for_a_mailbox(api_db, sending_clock):
-    from app.models.conversation import Message  # noqa: F401
-    from app.services.sending_limits import SendingGate
-    from tests.campaign_factory import seed_email_messages
-
-    from zoneinfo import ZoneInfo
-
-    account = await make_account(api_db, default=True)
-    await _domain(api_db, account.from_email, days_ago=2)
-    # Five sends this morning (the clock is pinned to Wednesday noon, Lagos): the ramp allows 5 a day.
-    morning = datetime(2026, 9, 2, 9, 30, tzinfo=ZoneInfo("Africa/Lagos"))
-    await seed_email_messages(api_db, campaign_id=1, account_id=account.id, sent=5, sent_at=morning)
-
+    assert effective_daily_limit(account, default_limit=5) is None
     check = await SendingGate(api_db, channel="email", account_id=account.id).check()
-
-    assert check["allowed"] is False
-    assert "daily limit" in check["reason"] and "warm-up" in check["reason"]
+    assert check["allowed"] is True
+    assert check["reason"] is None
 
 
 @pytest.mark.asyncio
-async def test_validate_says_where_the_warm_up_is_and_projects_with_it(api_client, api_db):
+async def test_campaign_projection_uses_only_campaign_controls_not_mailbox_warmup(api_client, api_db):
     account = await make_account(api_db, default=True)
     await _domain(api_db, account.from_email, days_ago=1)
     campaign = await make_campaign(api_db, status="draft", channel="email", n=20, email_account_id=account.id)
 
     report = (await api_client.post(f"/api/v1/campaigns/{campaign.id}/validate")).json()
 
-    assert any("warm-up" in w.lower() and "5" in w for w in report["warnings"]), report["warnings"]
-    assert report["projection"]["daily_cap"] == 5
+    assert not any("warm-up" in w.lower() for w in report["warnings"]), report["warnings"]
+    assert report["projection"]["campaign_only"] is True
+    assert report["projection"]["daily_limit"] is None
 
 
 # --------------------------------------------------------------------------

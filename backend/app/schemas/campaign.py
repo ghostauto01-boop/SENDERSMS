@@ -27,8 +27,8 @@ def _require_future(value: Optional[datetime]) -> Optional[datetime]:
 class CampaignCreate(BaseModel):
     name: str = Field(..., max_length=255)
     description: Optional[str] = None
-    #: "sms" (default) or "email" — the classic campaign engine is now
-    #: channel-aware; an email campaign is delivered through Brevo.
+    #: "sms" (default) or "email" — an email campaign can use a Brevo sender
+    #: or any connected Gmail mailbox.
     channel: str = "sms"
     list_id: Optional[int] = None
     template_id: Optional[int] = None
@@ -40,8 +40,18 @@ class CampaignCreate(BaseModel):
     # Optional future launch time. NULL = send when started manually.
     scheduled_start_at: Optional[datetime] = None
 
+    # --- Optional campaign-scoped pacing (NULL means unrestricted) -------
+    daily_limit: Optional[int] = Field(default=None, ge=1)
+    hourly_limit: Optional[int] = Field(default=None, ge=1)
+    per_minute_limit: Optional[int] = Field(default=None, ge=1)
+    min_delay: Optional[int] = Field(default=None, ge=0)
+    max_delay: Optional[int] = Field(default=None, ge=0)
+    send_start_hour: Optional[int] = Field(default=None, ge=0, le=23)
+    send_end_hour: Optional[int] = Field(default=None, ge=0, le=23)
+    allow_weekends: bool = True
+
     # --- Email channel -------------------------------------------------
-    #: Brevo sender this campaign goes through (NULL = the default sender).
+    #: Unified sender id: positive Brevo, negative connected mailbox (NULL = default).
     email_account_id: Optional[int] = None
     #: Used automatically when the primary sender rejects a send.
     fallback_email_account_id: Optional[int] = None
@@ -64,13 +74,13 @@ class CampaignUpdate(BaseModel):
     # Editable after creation too, otherwise the UI silently drops them on PUT.
     sequence_id: Optional[int] = None
     gateway_setting_id: Optional[int] = None
-    daily_limit: Optional[int] = None
-    hourly_limit: Optional[int] = None
-    per_minute_limit: Optional[int] = None
-    min_delay: Optional[int] = None
-    max_delay: Optional[int] = None
-    send_start_hour: Optional[int] = None
-    send_end_hour: Optional[int] = None
+    daily_limit: Optional[int] = Field(default=None, ge=1)
+    hourly_limit: Optional[int] = Field(default=None, ge=1)
+    per_minute_limit: Optional[int] = Field(default=None, ge=1)
+    min_delay: Optional[int] = Field(default=None, ge=0)
+    max_delay: Optional[int] = Field(default=None, ge=0)
+    send_start_hour: Optional[int] = Field(default=None, ge=0, le=23)
+    send_end_hour: Optional[int] = Field(default=None, ge=0, le=23)
     allow_weekends: Optional[bool] = None
     scheduled_start_at: Optional[datetime] = None
     #: Only changeable while the campaign has no messages queued.

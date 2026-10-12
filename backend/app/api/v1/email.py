@@ -7,10 +7,11 @@ Email Manager page has one obvious place for everything it needs.
 
 What lives here:
 
-* ``/accounts``       — the many Brevo API keys (add, test, default, disable)
+* ``/accounts``       — Brevo API keys (add, test, default, disable)
+* ``/senders``        — unified Brevo and connected Gmail sender picker
 * ``/send``           — one-off / bulk / scheduled email from the UI
 * ``/preview``        — render a subject + body for a real contact
-* ``/history``        — every email message, with retry
+* ``/history``        — sent and failed email history, failure reasons and retry
 * ``/inbox/*``        — the two-way email inbox threads
 * ``/suppression``    — the email do-not-contact list
 * ``/events``         — raw Brevo webhook events
@@ -71,7 +72,7 @@ def _iso(value: Optional[datetime]) -> Optional[str]:
 
 
 def _message_dict(message: Message, contact: Optional[Contact] = None,
-                  account: Optional[EmailAccount] = None) -> dict:
+                  account: object | None = None) -> dict:
     return {
         "id": message.id,
         "conversation_id": message.conversation_id,
@@ -115,9 +116,13 @@ def _message_dict(message: Message, contact: Optional[Contact] = None,
     }
 
 
-async def _accounts_by_id(db: AsyncSession) -> dict[int, EmailAccount]:
-    rows = (await db.execute(select(EmailAccount))).scalars().all()
-    return {a.id: a for a in rows}
+async def _accounts_by_id(db: AsyncSession) -> dict[int, object]:
+    """Resolve Brevo (+) and Gmail mailbox (-) IDs for history labels."""
+    from app.services import mailbox_service
+
+    accounts = (await db.execute(select(EmailAccount))).scalars().all()
+    mailboxes = await mailbox_service.list_mailboxes(db, include_inactive=True)
+    return {a.id: a for a in accounts} | {-m.id: m for m in mailboxes}
 
 
 # ===========================================================================
@@ -131,18 +136,25 @@ async def list_accounts(
     cu: User = Depends(get_current_user),
 ):
     """Every saved Brevo key, with its usage. The keys themselves are masked."""
-    from app.services.sending_limits import default_mailbox_limit, get_sending_rules
-
-    default_limit = default_mailbox_limit(await get_sending_rules(db))
     accounts = await email_service.list_accounts(db)
     items = []
     for account in accounts:
         await email_service.reset_daily_counter(account)
         stats = await email_service.account_stats(db, account.id)
         items.append(
-            email_service.serialize_account(account, stats=stats, default_limit=default_limit)
+            email_service.serialize_account(account, stats=stats)
         )
     await db.flush()
+    return {"total": len(items), "items": items}
+
+
+@router.get("/senders")
+async def list_unified_senders(
+    db: AsyncSession = Depends(get_db),
+    cu: User = Depends(get_current_user),
+):
+    """Selectable senders across Brevo API accounts and connected Gmail mailboxes."""
+    items = await email_service.list_senders(db)
     return {"total": len(items), "items": items}
 
 
@@ -152,15 +164,10 @@ async def email_health(
     cu: User = Depends(get_current_user),
 ):
     """Stored Brevo health per sender; POST /accounts/{id}/test performs a live check."""
-    from app.services.sending_limits import default_mailbox_limit, get_sending_rules
-
-    default_limit = default_mailbox_limit(await get_sending_rules(db))
     accounts = await email_service.list_accounts(db)
     items = []
     for account in accounts:
-        usable, reason = await email_service.account_is_usable(
-            account, default_limit=default_limit, check_room=False
-        )
+        usable, reason = await email_service.account_is_usable(account, check_room=False)
         status_value = (
             "disabled" if not account.is_active else
             "error" if account.connection_status == "error" or not usable else
@@ -185,8 +192,6 @@ async def email_health(
             "last_error": account.last_error,
             "issue": reason,
             "action": action,
-            "daily_limit": email_service.effective_daily_limit(account, default_limit),
-            "daily_limit_unlimited": bool(getattr(account, "daily_limit_unlimited", True)),
         })
     return {
         "ok": any(item["is_active"] for item in items) and all(
@@ -216,7 +221,6 @@ async def create_account(
         from_email=data.from_email,
         api_key=data.api_key or "",
         reply_to=data.reply_to,
-        daily_limit=data.daily_limit,
         is_active=data.is_active,
         is_default=data.is_default,
         track_opens=data.track_opens,
@@ -240,10 +244,6 @@ async def update_account(
         raise HTTPException(404, "Email account not found")
 
     updates = data.model_dump(exclude_unset=True)
-    # Keep NULL as a persistent user choice instead of falling back to the
-    # deprecated 30/day Sending Rules default on the next account read.
-    if "daily_limit" in updates:
-        account.daily_limit_unlimited = updates["daily_limit"] is None
     api_key = updates.pop("api_key", None)
     if "reply_to" in updates:
         from app.services.email_service import normalize_reply_to_addresses
@@ -606,9 +606,7 @@ async def composer_test_send(
     cu: User = Depends(get_current_user),
 ):
     """Mail what is in the composer to one address, before it goes to a list."""
-    account = await email_service.get_account(db, data.email_account_id)
-    if account is None:
-        account = await email_service.get_default_account(db)
+    account = await email_service.resolve_sender(db, data.email_account_id)
     if account is None:
         raise HTTPException(400, "No email sender configured yet")
 
@@ -682,15 +680,11 @@ async def overview(
     """Everything the Email Manager landing tab shows, in one round trip."""
     totals = await email_service.email_totals(db, days=days, account_id=account_id)
 
-    from app.services.sending_limits import default_mailbox_limit, get_sending_rules
-
-    default_limit = default_mailbox_limit(await get_sending_rules(db))
     accounts = []
     for account in await email_service.list_accounts(db):
         stats = await email_service.account_stats(db, account.id)
-        accounts.append(
-            email_service.serialize_account(account, stats=stats, default_limit=default_limit)
-        )
+        accounts.append(email_service.serialize_account(account, stats=stats))
+    senders = await email_service.list_senders(db)
 
     unread = (
         await db.execute(
@@ -736,7 +730,8 @@ async def overview(
         "totals": totals,
         "series": totals.get("series", []),
         "accounts": accounts,
-        "default_account_id": next((a["id"] for a in accounts if a["is_default"]), None),
+        "senders": senders,
+        "default_account_id": next((a["id"] for a in senders if a["is_default"]), None),
         "unread_conversations": unread,
         "suppressed_total": suppressed,
         "recent_campaigns": [
@@ -783,17 +778,7 @@ async def reference(
     cu: User = Depends(get_current_user),
 ):
     """Pick-list data for the email UI (senders, templates, lists, counts)."""
-    accounts = [
-        {
-            "id": a.id,
-            "name": a.name,
-            "from_email": a.from_email,
-            "from_name": a.from_name,
-            "is_default": bool(a.is_default),
-            "is_active": bool(a.is_active),
-        }
-        for a in await email_service.list_accounts(db)
-    ]
+    accounts = await email_service.list_senders(db)
     templates = (
         await db.execute(
             select(Template)
@@ -926,15 +911,13 @@ async def send_email(
     bulk = data.list_id is not None or bool(
         template is not None and getattr(template, "include_unsubscribe", True)
     )
-    account = await email_service.get_account(db, data.email_account_id)
-    if account is None:
-        account = await email_service.get_default_account(db)
+    account = await email_service.resolve_sender(db, data.email_account_id)
     if account is None:
         raise HTTPException(
             400,
-            "No email sender configured yet. Add a Brevo API key and From address on the "
-            "Senders tab first.",
+            "No email sender configured yet. Connect a Gmail mailbox or add a Brevo sender.",
         )
+    account_id = email_service.sender_id(account)
     if data.schedule_at:
         scheduled_at = _parse_schedule_at(data.schedule_at)
         target_contact_id = data.contact_id
@@ -958,7 +941,7 @@ async def send_email(
             channel="email",
             subject=subject,
             html_body=html,
-            email_account_id=account.id,
+            email_account_id=account_id,
             schedule_at=scheduled_at,
             status="pending",
         )
@@ -970,7 +953,7 @@ async def send_email(
             "scheduled": True,
             "scheduled_message_id": scheduled.id,
             "schedule_at": _iso(scheduled.schedule_at),
-            "email_account_id": account.id,
+            "email_account_id": account_id,
         }
 
     targets: list[Contact] = []
@@ -1049,7 +1032,7 @@ async def send_email(
         "failed": failed,
         "total": len(targets),
         "message_ids": message_ids,
-        "email_account_id": account.id,
+        "email_account_id": account_id,
         **skip_summary(skipped_details),
         "message": summary_sentence(sent, skipped_details),
     }
@@ -1070,7 +1053,11 @@ async def history(
     """Every email message (in and out), newest first."""
     query = select(Message).where(Message.channel == "email")
     if status_filter:
-        query = query.where(Message.status == status_filter)
+        statuses = [value.strip() for value in status_filter.split(",") if value.strip()]
+        if len(statuses) == 1:
+            query = query.where(Message.status == statuses[0])
+        elif statuses:
+            query = query.where(Message.status.in_(statuses))
     if direction in ("incoming", "outgoing"):
         query = query.where(Message.direction == direction)
     if account_id:
@@ -1118,7 +1105,7 @@ async def retry_message(
     db: AsyncSession = Depends(get_db),
     cu: User = Depends(get_current_user),
 ):
-    """Re-queue a failed email and try Brevo again."""
+    """Re-queue a failed email and retry its selected Gmail or Brevo sender."""
     message = (
         await db.execute(select(Message).where(Message.id == message_id))
     ).scalar_one_or_none()
@@ -1432,11 +1419,14 @@ async def reply(
     if not (subject or "").strip():
         subject = f"Re: {conversation.subject or ''}".strip()
 
-    account = await email_service.get_account(db, data.email_account_id)
+    requested_sender_id = (
+        data.email_account_id
+        if data.email_account_id is not None
+        else conversation.email_account_id
+    )
+    account = await email_service.resolve_sender(db, requested_sender_id)
     if account is None:
-        account = await email_service.get_account(db, conversation.email_account_id)
-    if account is None:
-        account = await email_service.get_default_account(db)
+        raise HTTPException(400, "The selected email sender no longer exists")
 
     latest_inbound = (
         await db.execute(

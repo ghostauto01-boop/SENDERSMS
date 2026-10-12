@@ -245,14 +245,21 @@ async def test_a_default_is_never_applied_to_an_update(monkeypatch):
     assert capture.calls[0]["body"] == {"city": "Accra"}
 
 
-def test_the_create_campaign_tool_offers_no_knob_the_engine_ignores():
-    """The classic engine stores a campaign's daily_limit / min_delay but never reads them (only
-    Settings -> Sending Rules apply), so a tool offering them offered a safety setting that did nothing."""
+def test_campaign_tools_expose_campaign_scoped_pacing_and_unified_email_senders():
+    """The controls shown to the assistant must match what each campaign enforces."""
     from app.mcp.registry import TOOLS_BY_NAME
 
-    names = {p.name for p in TOOLS_BY_NAME["create_campaign"].params}
-    assert not names & {"daily_limit", "min_delay", "max_delay", "hourly_limit"}
-    assert "Sending Rules" in TOOLS_BY_NAME["create_campaign"].description
+    for tool_name in ("create_campaign", "update_campaign"):
+        names = {p.name for p in TOOLS_BY_NAME[tool_name].params}
+        assert {"daily_limit", "hourly_limit", "per_minute_limit", "min_delay", "max_delay",
+                "send_start_hour", "send_end_hour", "allow_weekends"} <= names
+        description = TOOLS_BY_NAME[tool_name].description
+        assert "campaign" in description.lower()
+        assert "Sending Rules" not in description
+
+    senders = TOOLS_BY_NAME["list_email_accounts"]
+    assert senders.path == "/api/v1/email/senders"
+    assert "Gmail" in senders.description and "Brevo" in senders.description
 
 
 @pytest.mark.asyncio

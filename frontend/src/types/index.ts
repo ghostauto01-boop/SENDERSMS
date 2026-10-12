@@ -100,6 +100,14 @@ export interface Campaign {
   html_body?: string | null;
   track_opens?: boolean | null;
   track_clicks?: boolean | null;
+  daily_limit?: number | null;
+  hourly_limit?: number | null;
+  per_minute_limit?: number | null;
+  min_delay?: number | null;
+  max_delay?: number | null;
+  send_start_hour?: number | null;
+  send_end_hour?: number | null;
+  allow_weekends?: boolean;
   created_at: string;
   updated_at: string;
 }

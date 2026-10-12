@@ -287,7 +287,7 @@ async def test_every_step_is_renderable(db, monkeypatch):
     routes = {
         "/settings", "/settings?tab=gmail", "/send", "/email-manager",
         "/email-manager?section=Replies",
-        "/contacts", "/dashboard", "/overview", "/setup", None,
+        "/contacts", "/dashboard", "/overview", "/campaigns", "/setup", None,
     }
     assert guide["steps"], "the guide must never be empty"
     for step in guide["steps"]:

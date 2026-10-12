@@ -573,7 +573,7 @@ async def test_imap_mailbox_cannot_create_filters_and_says_why(db):
 
 
 # ==========================================================================
-# 5. Replies leave through the mailbox, campaigns stay on Brevo
+# 5. Replies use the connected mailbox; campaigns follow their selected sender
 # ==========================================================================
 
 
@@ -616,8 +616,8 @@ async def test_one_to_one_reply_leaves_through_the_connected_mailbox(db, monkeyp
 
 
 @pytest.mark.asyncio
-async def test_bulk_campaign_mail_stays_on_brevo(db, monkeypatch):
-    """Campaigns need Brevo's quotas, tracking and List-Unsubscribe handling."""
+async def test_bulk_campaign_does_not_auto_switch_from_brevo_to_gmail(db, monkeypatch):
+    """A Brevo selection stays selected; campaigns can explicitly choose Gmail too."""
     contact = await _contact(db)
     account = await _account(db, from_email="me@gmail.com")
     conversation = await email_service.get_or_create_conversation(db, contact, channel="email")

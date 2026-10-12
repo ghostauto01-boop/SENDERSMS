@@ -119,7 +119,6 @@ function defaultGet(url: string): Promise<{ data: any }> {
       });
     }
     if (url === "/settings/compliance") return Promise.resolve({ data: {} });
-    if (url === "/settings/sending-rules") return Promise.resolve({ data: {} });
     if (url === "/settings/gateway") return Promise.resolve({ data: { configured: false, sim_number: 1 } });
     if (url === "/settings/gateway/webhooks") return Promise.resolve({ data: { configured: false, webhooks: [] } });
     if (url === "/settings/notifications/muted-senders") {

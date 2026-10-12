@@ -1,7 +1,7 @@
 import { useState } from "react";
 import toast from "react-hot-toast";
 import { Send } from "lucide-react";
-import emailApi, { EmailAccount } from "../api/email";
+import emailApi, { EmailSender } from "../api/email";
 import { Field, fmtDate } from "../pages/ads/ui";
 import RichEmailEditor, { AttachmentPayload } from "./RichEmailEditor";
 
@@ -16,7 +16,7 @@ export default function EmailSendPanel({
   onSent,
 }: {
   reference: any;
-  accounts: EmailAccount[];
+  accounts: EmailSender[];
   onSent?: () => void;
 }) {
   const [form, setForm] = useState<any>({
@@ -221,9 +221,9 @@ export default function EmailSendPanel({
                   ? ` (${accounts.find((a: any) => a.id === reference.default_account_id)?.name || ""})`
                   : ""}
               </option>
-              {accounts.map((a: EmailAccount) => (
+              {accounts.map((a: EmailSender) => (
                 <option key={a.id} value={a.id} disabled={!a.is_active}>
-                  {a.name} — {a.from_email}
+                  {a.name} ({a.sender_type === "gmail" ? "Gmail" : "Brevo"}) — {a.from_email}
                   {a.is_active ? "" : " (off)"}
                 </option>
               ))}
@@ -239,7 +239,7 @@ export default function EmailSendPanel({
           </Field>
         </div>
 
-        {/* Brevo's editor has the same button: mail this to yourself first. */}
+        {/* Preview the current composition through the selected sender. */}
         <div className="flex flex-col sm:flex-row sm:items-end gap-2 pt-2 border-t border-gray-100 dark:border-gray-800">
           <Field label="Send a test to (optional)">
             <input

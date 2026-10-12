@@ -119,30 +119,6 @@ async def launch_due_campaigns_async() -> list[int]:
         return started
 
 
-@celery_app.task
-def check_circuit_breakers():
-    """Beat entrypoint: pause any email campaign whose bounce rate is over the limit.
-
-    The bounce webhook already checks as events arrive; this sweep is the backstop
-    for a missed webhook and for failures that never produce one.
-    """
-    loop = asyncio.get_event_loop()
-    if loop.is_closed():
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-    return loop.run_until_complete(check_circuit_breakers_async())
-
-
-async def check_circuit_breakers_async() -> list[dict]:
-    """The sweep itself, shared by the Celery task and the inline poller."""
-    from app.services import circuit_breaker
-
-    async with async_session_factory() as db:
-        tripped = await circuit_breaker.check_all(db)
-        await db.commit()
-    return tripped
-
-
 async def republish_queued(
     db, *, campaign_id: int | None = None, ads_campaign_id: int | None = None, limit: int = 1000
 ) -> int:
@@ -180,6 +156,26 @@ def launch_due_campaigns():
     loop.run_until_complete(launch_due_campaigns_async())
 
 
+@celery_app.task
+def check_circuit_breakers():
+    """Sweep email campaigns for bounce/complaint risk as a webhook backstop."""
+    loop = asyncio.get_event_loop()
+    if loop.is_closed():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    return loop.run_until_complete(check_circuit_breakers_async())
+
+
+async def check_circuit_breakers_async() -> list[dict]:
+    """Check and persist every active email campaign's provider health."""
+    from app.services import circuit_breaker
+
+    async with async_session_factory() as db:
+        tripped = await circuit_breaker.check_all(db)
+        await db.commit()
+    return tripped
+
+
 async def process_campaign_batch_async(
     campaign_id: int, *, send_inline: bool = False, batch_size: int = 50
 ) -> int:
@@ -197,16 +193,11 @@ async def process_campaign_batch_async(
         if not campaign or campaign.status != "running":
             return 0
 
-        # How many messages the sending rules allow out right now. Without this a
-        # campaign released its whole audience in 50-contact batches, one every
-        # couple of minutes, whatever the daily cap or the sending window said:
-        # the rules were only consulted per message, long after the 525 messages
-        # had been created. ``None`` means no cap applies; zero means "not now"
-        # (window closed, weekend, or today's allowance is already used), and the
-        # campaign stays ``running`` -- waiting is not completing.
-        from app.services.sending_limits import gate_for_campaign
+        # Campaign-specific limits are optional. ``None`` means the campaign is
+        # unrestricted; zero means wait for its own window/cap to reopen.
+        from app.services.campaign_sending import CampaignSendingGate
 
-        room = await (await gate_for_campaign(db, campaign)).room()
+        room = await CampaignSendingGate(db, campaign).room()
         limit = batch_size
         if room is not None:
             if room <= 0:
@@ -609,14 +600,21 @@ async def _send_template_message(
             if template is not None:
                 subject = subject or template.subject
                 html_body = html_body or template.html_body
-        account = await email_service.get_account(db, campaign.email_account_id)
-        if account is None:
-            account = await email_service.get_default_account(db)
+        account = await email_service.resolve_sender(db, campaign.email_account_id)
         if account is None:
             cc.status = "failed"
             cc.last_error = "No email sender configured"
             logger.error("Campaign %s has no email sender; skipping contact %s", campaign.id, contact.id)
             return
+        usable, sender_issue = await email_service.sender_is_usable(account)
+        if not usable:
+            cc.status = "failed"
+            cc.last_error = f"Email sender cannot send ({sender_issue or 'unknown'})."
+            logger.error("Campaign %s has unusable email sender: %s", campaign.id, sender_issue)
+            return
+        sender_address = email_service.sender_email(account)
+        sender_id = email_service.sender_id(account)
+        mailbox_sender = email_service._sender_is_mailbox(account)
         if subject:
             subject = await render_for_contact(db, subject, contact)
         if html_body:
@@ -632,7 +630,8 @@ async def _send_template_message(
         # Gmail/Yahoo bulk-sender rules ask for: the List-Unsubscribe headers for
         # the machines (added in build_headers) and one button for the reader.
         body, html_body = email_service.apply_unsubscribe(
-            body or "", html_body, (account.reply_to or account.from_email or "").strip()
+            body or "", html_body,
+            (getattr(account, "reply_to", None) or sender_address or "").strip(),
         )
 
     # Create message
@@ -675,12 +674,12 @@ async def _send_template_message(
             body=body,
             html_body=html_body,
             subject=subject[:500],
-            from_address=account.from_email,
+            from_address=sender_address,
             to_address=(contact.email or "").strip().lower() or None,
-            email_account_id=account.id,
+            email_account_id=sender_id,
             char_count=len(body or ""),
             status="queued",
-            provider="brevo",
+            provider=(account.provider if mailbox_sender else "brevo"),
             # Attachments ride along with the campaign (campaign first, then the
             # template it uses) and this is bulk mail, so it carries the
             # List-Unsubscribe headers Gmail/Yahoo require.
@@ -689,12 +688,12 @@ async def _send_template_message(
                 or email_service.load_attachments(getattr(template, "attachments", None))
             ),
             bulk_send=True,
-            rfc_message_id=email_service._new_rfc_message_id(account.from_email),
+            rfc_message_id=email_service._new_rfc_message_id(sender_address),
             idempotency_key=idempotency_key,
         )
         conversation.subject = subject[:500]
         if not conversation.email_account_id:
-            conversation.email_account_id = account.id
+            conversation.email_account_id = sender_id
     else:
         from app.utils.phone import count_sms_segments
         char_count, segment_count = count_sms_segments(body)
@@ -934,9 +933,9 @@ async def process_followup_async(followup_id: int, *, send_inline: bool = False)
                     # consent is checked (never the SMS opt-out flag).
                     from app.services import email_service
 
-                    account = await email_service.get_account(db, followup.email_account_id)
-                    if account is None:
-                        account = await email_service.get_default_account(db)
+                    account = await email_service.resolve_sender(db, followup.email_account_id)
+                    if followup.email_account_id is not None and account is None:
+                        raise ValueError("Selected email sender no longer exists")
                     message, send_result = await email_service.send_now(
                         db, contact,
                         subject=followup.subject or "Follow-up",
@@ -947,7 +946,7 @@ async def process_followup_async(followup_id: int, *, send_inline: bool = False)
                     if message is None:
                         raise ValueError("Contact cannot receive email")
                     if not send_result.get("success"):
-                        raise ValueError(send_result.get("error") or "Brevo rejected the email")
+                        raise ValueError(send_result.get("error") or "The email sender rejected the message")
                 else:
                     from app.services.sms_service import SMSService
 

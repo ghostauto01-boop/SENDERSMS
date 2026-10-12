@@ -198,9 +198,14 @@ class AutomationService:
                     email_account_id=getattr(automation, "email_account_id", None),
                 ))
             else:
-                account = await email_service.get_account(
-                    self.db, getattr(automation, "email_account_id", None)
-                ) or await email_service.get_default_account(self.db)
+                selected_sender_id = getattr(automation, "email_account_id", None)
+                account = await email_service.resolve_sender(self.db, selected_sender_id)
+                if selected_sender_id is not None and account is None:
+                    logger.error(
+                        "AUTOMATION: email sender %s no longer exists; skipping email action",
+                        selected_sender_id,
+                    )
+                    return
                 await email_service.queue_email(
                     self.db, contact, subject=subject, text_body=rendered, account=account
                 )

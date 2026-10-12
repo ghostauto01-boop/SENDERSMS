@@ -365,7 +365,7 @@ class CreativeIn(BaseModel):
     status: str = "active"
     template_id: Optional[int] = None
     # Email channel: subject + HTML variant + optional per-creative sender
-    # (so an A/B test can compare two Brevo accounts/domains).
+    # (so an A/B test can compare sender providers or domains).
     subject: Optional[str] = Field(default=None, max_length=500)
     html_body: Optional[str] = None
     email_account_id: Optional[int] = None

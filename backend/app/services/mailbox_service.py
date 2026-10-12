@@ -718,12 +718,14 @@ async def send_via_mailbox(
     cc: list[str] | None = None,
     bcc: list[str] | None = None,
     attachments: list[dict] | None = None,
+    headers: dict | None = None,
 ) -> dict:
     """Send one message from the connected mailbox itself.
 
-    Used for one-to-one replies when the operator has connected the mailbox that
-    owns the From address. Brevo stays in charge of bulk campaigns, where its
-    tracking, quotas and List-Unsubscribe handling are what you want.
+    Used whenever a connected mailbox is the selected email sender (including
+    direct sends and campaigns), and for one-to-one replies routed through the
+    mailbox that owns the From address. Bulk sending from Gmail is allowed when
+    explicitly selected; Brevo is not a requirement.
     """
     raw, recipients = gmail_provider.build_rfc822(
         from_address=mailbox.email_address,
@@ -736,7 +738,7 @@ async def send_via_mailbox(
         in_reply_to=in_reply_to,
         references=references,
         message_id=message_id,
-        cc=cc, bcc=bcc, attachments=attachments,
+        cc=cc, bcc=bcc, attachments=attachments, headers=headers,
     )
 
     if mailbox.provider == "gmail_api":
@@ -762,8 +764,8 @@ async def mailbox_for_outgoing(db: AsyncSession, message: Message,
 
     Three conditions, all deliberate:
 
-    * it is **not** bulk mail — campaigns keep Brevo's tracking, quotas and
-      List-Unsubscribe handling;
+    * it is **not** bulk mail — this automatic override only reroutes one-to-one
+      replies; a campaign can still explicitly select a Gmail sender;
     * the operator has not switched reply-sending off for that mailbox;
     * a connected, active mailbox owns the From or Reply-To address the message
       would otherwise use.

@@ -27,7 +27,7 @@ import { Empty, Field, Modal, Stat, Toggle, fmtDate } from "../pages/ads/ui";
  *
  * This tab answers one complaint with two halves:
  *
- * 1. **"The reply landed in my spam folder."** Campaigns leave through Brevo.
+ * 1. **"The reply landed in my spam folder."** The app can reply from this authenticated mailbox; select it for campaign sends when desired.
  *    When the From/Reply-To is a freemail address (`@gmail.com`), Brevo cannot
  *    authenticate it — it does not control that domain's SPF or DKIM — so DMARC
  *    fails and Gmail treats the whole thread as spoofed. The prospect still sees
@@ -134,7 +134,7 @@ function ConnectModal({ close, connected }: { close: () => void; connected: () =
             checked={form.send_replies}
             onChange={(v) => setForm({ ...form, send_replies: v })}
             label="Send one-to-one replies from this mailbox"
-            hint="Keeps the thread authenticated. Campaigns still go out through Brevo."
+            hint="Keeps one-to-one replies authenticated. Select this Gmail sender on a send or campaign to use it for outreach too."
           />
           <Toggle
             checked={form.import_all}
@@ -320,7 +320,7 @@ function MailboxRow({
           checked={mailbox.send_replies}
           onChange={(v) => patch({ send_replies: v } as any)}
           label="Send one-to-one replies from here"
-          hint="Campaigns stay on Brevo; personal replies leave from this mailbox."
+          hint="Controls one-to-one reply routing. Select this Gmail sender on a send or campaign to use it for outreach too."
         />
         <Toggle
           checked={mailbox.import_all}

@@ -42,7 +42,7 @@ import {
   YAxis,
 } from "recharts";
 import api from "../api/client";
-import emailApi, { EmailAccount, EmailMessage } from "../api/email";
+import emailApi, { EmailAccount, EmailMessage, EmailSender } from "../api/email";
 import adsApi, { AdsCampaign } from "../api/ads";
 import CampaignBuilder from "./ads/CampaignBuilder";
 import CampaignDetail from "./ads/CampaignDetail";
@@ -103,7 +103,6 @@ const emptyAccount = {
   from_email: "",
   api_key: "",
   reply_to: "",
-  daily_limit: "" as string | number,
   is_active: true,
   is_default: false,
   track_opens: true,
@@ -139,6 +138,7 @@ export default function EmailManagerPage() {
   const [adsOverview, setAdsOverview] = useState<any>(null);
   const [emailOverview, setEmailOverview] = useState<any>(null);
   const [accounts, setAccounts] = useState<EmailAccount[]>([]);
+  const [senders, setSenders] = useState<EmailSender[]>([]);
   const [adsReference, setAdsReference] = useState<any>(null);
   const [emailReference, setEmailReference] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -150,16 +150,18 @@ export default function EmailManagerPage() {
 
   const load = useCallback(async () => {
     try {
-      const [c, ao, eo, a] = await Promise.all([
+      const [c, ao, eo, a, s] = await Promise.all([
         adsApi.listCampaigns({ per_page: 100, channel: "email" }),
         adsApi.overview({ channel: "email" }),
         emailApi.overview({ days: 30 }),
         emailApi.listAccounts(),
+        emailApi.listSenders(),
       ]);
       setCampaigns(c.items);
       setAdsOverview(ao);
       setEmailOverview(eo);
       setAccounts(a.items);
+      setSenders(s.items);
     } catch {
       toast.error("Could not load the Email Manager");
     } finally {
@@ -196,7 +198,7 @@ export default function EmailManagerPage() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-sm font-medium text-primary-600 mb-1 flex items-center gap-1">
-            <Mail size={15} /> EMAIL CHANNEL · BREVO · <Sparkles size={13} /> ADVANCED
+            <Mail size={15} /> EMAIL CHANNEL · GMAIL + BREVO · <Sparkles size={13} /> ADVANCED
           </p>
           <h1 className="text-2xl sm:text-3xl font-bold">Email Manager</h1>
           <p className="text-gray-500 mt-1">
@@ -220,19 +222,23 @@ export default function EmailManagerPage() {
         </div>
       </div>
 
-      {!accounts.length && (
+      {!senders.length && (
         <div className="card border-l-4 border-warning-400">
           <h3 className="font-semibold flex items-center gap-2">
-            <KeyRound size={17} /> Connect Brevo to start sending email
+            <KeyRound size={17} /> Connect an email sender to start sending
           </h3>
           <p className="text-sm text-gray-500 mt-1">
-            Create an API key at brevo.com (SMTP &amp; API → API keys), then paste it here with the
-            From name and From address. You can add as many keys as you like — if one gets burned
-            or rate-limited, add another and keep sending.
+            Add a Brevo API sender here, or connect a Gmail mailbox from the Replies tab. Either
+            sender can be selected for direct email and campaigns.
           </p>
-          <button className="btn-primary mt-3" onClick={() => setAccountModal({})}>
-            <Plus size={17} className="mr-1" /> Add my first sender
-          </button>
+          <div className="flex flex-wrap gap-2 mt-3">
+            <button className="btn-primary" onClick={() => setAccountModal({})}>
+              <Plus size={17} className="mr-1" /> Add Brevo sender
+            </button>
+            <button className="btn-secondary" onClick={() => setSection("Replies")}>
+              <Inbox size={17} className="mr-1" /> Connect Gmail
+            </button>
+          </div>
         </div>
       )}
 
@@ -256,7 +262,7 @@ export default function EmailManagerPage() {
         <ManagerOverview
           ads={adsOverview}
           email={emailOverview}
-          accounts={accounts}
+          accounts={senders}
           campaigns={campaigns}
           onOpen={setOpenId}
           onCreate={() => setCreating(true)}
@@ -271,7 +277,7 @@ export default function EmailManagerPage() {
           setQuery={setQuery}
           statusFilter={statusFilter}
           setStatusFilter={setStatusFilter}
-          accounts={accounts}
+          accounts={senders}
           onOpen={setOpenId}
           reload={load}
           create={() => setCreating(true)}
@@ -296,19 +302,19 @@ export default function EmailManagerPage() {
           onAdd={() => setAccountModal({})}
         />
       )}
-      {section === "Quick Send" && <SendTab reference={emailReference} accounts={accounts} />}
+      {section === "Quick Send" && <SendTab reference={emailReference} accounts={senders} />}
       {section === "Templates" && <TemplatesTab reference={emailReference} />}
       {section === "Replies" && <MailboxRepliesTab banner={replyBanner} />}
       {section === "Deliverability" && <DeliverabilityTab accounts={accounts} />}
       {section === "Suppression" && <EmailSuppressionPanel />}
-      {section === "Activity" && <ActivityTab accounts={accounts} />}
+      {section === "Activity" && <ActivityTab accounts={senders} />}
 
       {creating && (
         <CampaignBuilder
           objectives={adsReference?.objectives || []}
           channel="email"
-          emailAccounts={accounts}
-          defaultEmailAccountId={emailOverview?.default_account_id ?? null}
+          emailAccounts={senders}
+          defaultEmailAccountId={emailReference?.default_account_id ?? adsReference?.default_email_account_id ?? null}
           close={() => setCreating(false)}
           saved={(id) => {
             setCreating(false);
@@ -425,7 +431,7 @@ function ManagerOverview({ ads, email, accounts, campaigns, onOpen, onCreate, on
           </div>
           {accounts.length ? (
             <div className="space-y-3">
-              {accounts.map((a: EmailAccount) => (
+              {accounts.map((a: EmailSender) => (
                 <div key={a.id} className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
                     <p className="font-medium truncate flex items-center gap-2">
@@ -433,14 +439,16 @@ function ManagerOverview({ ads, email, accounts, campaigns, onOpen, onCreate, on
                       {a.is_default && <span className="badge-blue">default</span>}
                     </p>
                     <p className="text-xs text-gray-500 truncate">
-                      {a.from_name} &lt;{a.from_email}&gt;
-                      {a.daily_limit ? ` · ${a.sent_today}/${a.daily_limit} today` : ` · ${a.sent_today} today`}
+                      {a.provider === "brevo" ? "Brevo" : "Gmail"} · {a.from_email}
+                      {a.sent_today != null ? ` · ${a.sent_today} sent today` : ""}
                     </p>
                   </div>
                   {a.connection_status === "error" ? (
-                    <span className="badge-red">key error</span>
+                    <span className="badge-red">connection error</span>
+                  ) : a.is_active && a.connection_status === "connected" ? (
+                    <span className="badge-green">connected</span>
                   ) : a.is_active ? (
-                    <span className="badge-green">active</span>
+                    <span className="badge-yellow">check sender</span>
                   ) : (
                     <span className="badge-gray">off</span>
                   )}
@@ -450,7 +458,7 @@ function ManagerOverview({ ads, email, accounts, campaigns, onOpen, onCreate, on
           ) : (
             <Empty
               title="No senders yet"
-              body="Add a Brevo API key to start sending."
+              body="Connect Gmail from Replies or add a Brevo API sender."
               action={
                 <button className="btn-primary" onClick={onAddSender}>
                   <Plus size={16} className="mr-1" /> Add sender
@@ -497,7 +505,7 @@ function EmailCampaignRow({
   reload,
 }: {
   campaign: AdsCampaign;
-  accounts: EmailAccount[];
+  accounts: EmailSender[];
   onOpen: (id: number) => void;
   reload?: () => void;
 }) {
@@ -1192,8 +1200,8 @@ function SendersTab({ accounts, reload, onEdit, onAdd }: any) {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-gray-500">
-          Each sender is its own Brevo API key. A campaign can pick any of them, and the default is
-          used when it does not.
+          Brevo API keys are managed here. Connected Gmail mailboxes also appear in sender pickers;
+          connect them under Replies. Each campaign can choose Gmail or Brevo.
         </p>
         <button className="btn-primary" onClick={onAdd}>
           <Plus size={16} className="mr-1" /> Add sender
@@ -1218,10 +1226,7 @@ function SendersTab({ accounts, reload, onEdit, onAdd }: any) {
                   {account.from_name} &lt;{account.from_email}&gt;
                 </p>
                 <p className="text-xs text-gray-400">
-                  key {account.api_key_masked || "—"} ·{" "}
-                  {account.daily_limit
-                    ? `${account.sent_today}/${account.daily_limit} today`
-                    : `${account.sent_today} sent today`}
+                  key {account.api_key_masked || "—"} · {account.sent_today} sent today
                 </p>
               </div>
               {account.connection_status === "error" ? (
@@ -1351,7 +1356,6 @@ function AccountModal({
           ...account,
           api_key: "",
           reply_to: account.reply_to_addresses?.join(", ") || account.reply_to || "",
-          daily_limit: account.daily_limit ?? "",
         }
       : {}),
   });
@@ -1416,7 +1420,6 @@ function AccountModal({
       from_name: (form.from_name || form.name).trim(),
       from_email: form.from_email.trim(),
       reply_to: form.reply_to?.trim() || null,
-      daily_limit: form.daily_limit === "" ? null : Number(form.daily_limit),
       is_active: !!form.is_active,
       is_default: !!form.is_default,
       track_opens: !!form.track_opens,
@@ -1560,27 +1563,15 @@ function AccountModal({
           </div>
         )}
 
-        <div className="grid sm:grid-cols-2 gap-3">
-          <Field label="Reply-to addresses (optional)">
-            <input
-              className="input"
-              value={form.reply_to}
-              onChange={(e) => set("reply_to", e.target.value)}
-              placeholder="replies@yourdomain.com, team@yourdomain.com"
-            />
-            <p className="mt-1 text-xs text-gray-500">Use one address or separate up to 10 addresses with commas. Replies route to the connected mailbox for each address.</p>
-          </Field>
-          <Field label="Daily limit (optional)">
-            <input
-              className="input"
-              type="number"
-              min={0}
-              value={form.daily_limit}
-              onChange={(e) => set("daily_limit", e.target.value)}
-              placeholder="Leave blank for no app-side cap"
-            />
-          </Field>
-        </div>
+        <Field label="Reply-to addresses (optional)">
+          <input
+            className="input"
+            value={form.reply_to}
+            onChange={(e) => set("reply_to", e.target.value)}
+            placeholder="replies@yourdomain.com, team@yourdomain.com"
+          />
+          <p className="mt-1 text-xs text-gray-500">Use one address or separate up to 10 addresses with commas. Replies route to the connected mailbox for each address.</p>
+        </Field>
 
         <div className="flex flex-wrap gap-4 text-sm">
           <label className="flex items-center gap-2">
@@ -1958,22 +1949,25 @@ function DeliverabilityTab({ accounts }: { accounts: EmailAccount[] }) {
 /* ========================================================================== */
 
 function ActivityTab({ accounts }: any) {
-  const [tab, setTab] = useState<"events" | "history" | "campaigns">("events");
+  const [tab, setTab] = useState<"events" | "sent" | "failed" | "campaigns">("events");
   const [events, setEvents] = useState<any[]>([]);
-  const [history, setHistory] = useState<EmailMessage[]>([]);
+  const [sentHistory, setSentHistory] = useState<EmailMessage[]>([]);
+  const [failedHistory, setFailedHistory] = useState<EmailMessage[]>([]);
   const [campaignLog, setCampaignLog] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [e, h, a] = await Promise.all([
+      const [e, sent, failed, a] = await Promise.all([
         emailApi.events({ per_page: 100 }),
-        emailApi.history({ per_page: 100 }),
+        emailApi.history({ per_page: 100, status: "sent,delivered", direction: "outgoing" }),
+        emailApi.history({ per_page: 100, status: "failed", direction: "outgoing" }),
         adsApi.activity("email"),
       ]);
       setEvents(e.items);
-      setHistory(h.items);
+      setSentHistory(sent.items);
+      setFailedHistory(failed.items);
       setCampaignLog(a.items);
     } catch {
       toast.error("Could not load email activity");
@@ -1996,7 +1990,8 @@ function ActivityTab({ accounts }: any) {
     }
   };
 
-  const accountName = (id?: number | null) => accounts.find((a: EmailAccount) => a.id === id)?.name || "—";
+  const accountName = (id?: number | null) => accounts.find((a: EmailSender) => a.id === id)?.name || "—";
+  const selectedHistory = tab === "sent" ? sentHistory : failedHistory;
 
   return (
     <div className="space-y-4">
@@ -2009,10 +2004,16 @@ function ActivityTab({ accounts }: any) {
             <Activity size={15} className="mr-1" /> Events
           </button>
           <button
-            className={tab === "history" ? "btn-primary text-sm" : "btn-secondary text-sm"}
-            onClick={() => setTab("history")}
+            className={tab === "sent" ? "btn-primary text-sm" : "btn-secondary text-sm"}
+            onClick={() => setTab("sent")}
           >
-            <Mail size={15} className="mr-1" /> Messages
+            <CheckCircle2 size={15} className="mr-1" /> Sent
+          </button>
+          <button
+            className={tab === "failed" ? "btn-primary text-sm" : "btn-secondary text-sm"}
+            onClick={() => setTab("failed")}
+          >
+            <XCircle size={15} className="mr-1" /> Failed
           </button>
           <button
             className={tab === "campaigns" ? "btn-primary text-sm" : "btn-secondary text-sm"}
@@ -2070,11 +2071,14 @@ function ActivityTab({ accounts }: any) {
             ))}
           </div>
         )
-      ) : history.length === 0 ? (
-        <Empty title="No email messages yet" body="Sends and replies both show up here." />
+      ) : selectedHistory.length === 0 ? (
+        <Empty
+          title={tab === "sent" ? "No sent emails yet" : "No failed emails"}
+          body={tab === "sent" ? "Accepted and delivered emails will appear here." : "Emails that could not be sent, with their failure reasons, will appear here."}
+        />
       ) : (
         <div className="card divide-y divide-gray-100 dark:divide-gray-800">
-          {history.map((m) => (
+          {selectedHistory.map((m) => (
             <div key={m.id} className="py-2 flex items-start justify-between gap-3 text-sm">
               <div className="min-w-0">
                 <p className="font-medium truncate flex items-center gap-2">
@@ -2089,13 +2093,16 @@ function ActivityTab({ accounts }: any) {
                   {m.click_count > 0 && <span className="badge-green">{m.click_count}x clicked</span>}
                 </p>
                 <p className="text-xs text-gray-500 truncate">
-                  {m.direction === "incoming" ? m.from_address : m.to_address} ·{" "}
-                  {m.email_account_name || accountName(m.email_account_id)}
-                  {m.last_error ? ` · ${m.last_error}` : ""}
+                  {m.to_address} · {m.email_account_name || accountName(m.email_account_id)}
                   {(m.attachments?.length || 0) > 0
                     ? ` · ${m.attachments!.length} attachment(s)`
                     : ""}
                 </p>
+                {tab === "failed" && (
+                  <p className="text-xs text-danger-600 dark:text-danger-400 mt-1 break-words">
+                    <strong>Failure reason:</strong> {m.last_error || "No failure reason was recorded."}
+                  </p>
+                )}
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <span className="text-xs text-gray-400">{fmtDate(m.created_at)}</span>

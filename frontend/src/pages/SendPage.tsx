@@ -29,12 +29,12 @@ function SendPageInner() {
 
   useEffect(() => {
     if (!isEmail) return;
-    Promise.all([emailApi.reference(), emailApi.listAccounts()])
-      .then(([ref, acc]) => {
+    emailApi.reference()
+      .then((ref) => {
         setEmailRef(ref);
-        setEmailAccounts(acc.items);
+        setEmailAccounts(ref.accounts || []);
       })
-      .catch(() => toast.error("Could not load your Brevo senders"));
+      .catch(() => toast.error("Could not load your email senders"));
   }, [isEmail]);
 
   if (isEmail) {

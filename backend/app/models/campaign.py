@@ -54,11 +54,9 @@ class Campaign(Base):
     gateway_setting_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("gateway_settings.id"), nullable=True)
 
     # ---- Email channel -------------------------------------------------
-    #: Brevo sender this campaign sends through. NULL falls back to the
-    #: default EmailAccount at send time.
+    #: Unified Brevo (+) or connected-mailbox (-) sender id; NULL uses the active default.
     email_account_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
-    #: Used automatically when the primary account rejects the send (burned /
-    #: banned / over quota), so a campaign keeps going without a rebuild.
+    #: Optional unified sender tried automatically if the primary provider rejects the send.
     fallback_email_account_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     subject: Mapped[str | None] = mapped_column(String(500), nullable=True)
     #: Rich body for email campaigns (template_id / message_body still work).
@@ -68,7 +66,7 @@ class Campaign(Base):
     #: JSON list of attachments (base64) sent with every email in this campaign.
     attachments: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    # Sending rules
+    # Optional campaign-scoped sending controls; NULL means unrestricted.
     daily_limit: Mapped[int | None] = mapped_column(Integer, nullable=True)
     hourly_limit: Mapped[int | None] = mapped_column(Integer, nullable=True)
     per_minute_limit: Mapped[int | None] = mapped_column(Integer, nullable=True)

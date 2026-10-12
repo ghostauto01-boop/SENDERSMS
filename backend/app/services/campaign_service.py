@@ -104,17 +104,12 @@ class CampaignService:
         """Return an error string when an EMAIL campaign has no usable sender."""
         from app.services import email_service
 
-        account = await email_service.get_account(self.db, campaign.email_account_id)
+        account = await email_service.resolve_sender(self.db, campaign.email_account_id)
         if account is None:
-            account = await email_service.get_default_account(self.db)
-        if account is None:
-            return (
-                "No email sender configured. Add a Brevo API key and From address on the "
-                "Email Senders page, then choose it for this campaign."
-            )
-        usable, why = await email_service.account_is_usable(account, check_room=False)
+            return "No email sender configured. Connect a Gmail mailbox or add a Brevo sender first."
+        usable, why = await email_service.sender_is_usable(account)
         if not usable:
-            return f"Email sender '{account.name}' cannot send right now ({why})."
+            return f"Email sender '{email_service.sender_name(account)}' cannot send right now ({why})."
         if not (campaign.subject or "").strip():
             # A subject can also come from the chosen template; if none is set
             # anywhere the email would arrive with "(no subject)".
@@ -178,6 +173,14 @@ class CampaignService:
             message_body=(data.get("message_body") or "").strip() or None,
             sequence_id=data.get("sequence_id"),
             gateway_setting_id=data.get("gateway_setting_id"),
+            daily_limit=data.get("daily_limit"),
+            hourly_limit=data.get("hourly_limit"),
+            per_minute_limit=data.get("per_minute_limit"),
+            min_delay=data.get("min_delay"),
+            max_delay=data.get("max_delay"),
+            send_start_hour=data.get("send_start_hour"),
+            send_end_hour=data.get("send_end_hour"),
+            allow_weekends=data.get("allow_weekends", True),
             email_account_id=data.get("email_account_id"),
             fallback_email_account_id=data.get("fallback_email_account_id"),
             attachments=data.get("attachments"),
@@ -359,13 +362,11 @@ class CampaignService:
         )
 
     async def _analyse_audience(self, campaign: Campaign, check: CampaignCheck) -> None:
-        """Who would actually be messaged, and how long that takes under the sending rules.
+        """Who would actually be messaged, and how long campaign controls project.
 
         Uses the same eligibility rules the send path applies, so the numbers in a
         validation report are the numbers the campaign will really produce.
         """
-        from app.services import sending_limits
-
         channel = campaign.channel or "sms"
         contacts = await self._members(campaign)
         if channel == "email":
@@ -413,19 +414,10 @@ class CampaignService:
                 f"({', '.join(f'{n} {r}' for r, n in sorted(skipped.items()))})."
             )
 
-        account_ids = None
-        if channel == "email":
-            from app.services import email_service
+        from app.services.campaign_sending import project_campaign
 
-            account = await email_service.get_account(self.db, campaign.email_account_id)
-            account = account or await email_service.get_default_account(self.db)
-            account_ids = [account.id] if account else None
-        check.projection = await sending_limits.project_send(
-            self.db, channel=channel, sendable=len(eligible), account_ids=account_ids,
-        )
-        warning = sending_limits.projection_warning(check.projection)
-        if warning:
-            check.warnings.append(warning)
+        check.projection = project_campaign(campaign, len(eligible), channel=channel)
+        check.warnings.extend(check.projection.get("warnings") or [])
 
     async def validate_report(self, campaign_id: int) -> dict:
         """Check a campaign and report. **Changes nothing**, however often it is called.
