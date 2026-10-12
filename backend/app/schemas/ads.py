@@ -155,7 +155,7 @@ class CampaignOut(BaseModel):
     description: Optional[str]
     objective: str
     status: str
-    #: Why it is paused (an automatic pause by the circuit breaker always says why).
+    #: Why it is paused (written by whichever operator paused it).
     paused_reason: Optional[str] = None
     paused_at: Optional[datetime] = None
     channel: str = "sms"

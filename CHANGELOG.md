@@ -1,3 +1,45 @@
+## Unreleased — the bounce circuit breaker is gone; a high bounce rate is now a notification
+
+An email campaign above 2% bounces used to **pause itself**, and putting it back on
+needed `acknowledge_breaker=true`. That is the wrong trade: a campaign that stops
+itself halfway down its list costs more than the bounces it avoids — every good
+contact queued behind the bad addresses simply never hears from you, and the only
+person who could fix the list finds out whenever they happen to look.
+
+- **Nothing stops a campaign because of a bounce rate any more.**
+  `services/circuit_breaker.py` is deleted. So is every trace of the automatic
+  pause: the 409 `BREAKER_TRIPPED`, the `acknowledge_breaker` query parameter on
+  `POST /campaigns/{id}/start`, `POST /campaigns/{id}/resume`, the Ads Manager's
+  `/launch` and `/resume`, the same parameter on the `start_campaign` and
+  `resume_campaign` MCP tools, the "Resume anyway?" confirmation in both UIs, the
+  `held_by_circuit_breaker` key on the Ads bulk action, and
+  `campaigns.breaker_reset_at` / `ads_campaigns.breaker_reset_at` (the columns are
+  left in place; schema repair is additive-only, so nothing is dropped).
+- **Already paused by the old breaker?** Those campaigns stay paused until a
+  person resumes them — the app will not silently start sending mail to real
+  people. Resuming needs no acknowledgement any more, and it clears the stale
+  `Circuit breaker: …` reason.
+- **A high bounce rate is reported instead.** New `services/bounce_watch.py` reads
+  the same rolling window per campaign, in both campaign systems, and when the
+  numbers pass the same thresholds it emits an in-app notification **and** a
+  browser push: `⚠️ High bounce rate: <campaign>` — "Bounce rate 5.0% (5 of 100
+  sends in the last 7 days; 5 bounced) is above the 2.0% limit. The campaign is
+  still sending — verify the list to bring it down." It taps through to the
+  campaign list. One alert per campaign per `bounce_alert_cooldown_hours` (6), so
+  a list that bounces on every send does not produce a notification per bounce.
+- **Renamed settings** (`sending_rules`): `breaker_enabled` →
+  `bounce_alert_enabled`, `breaker_bounce_pct` → `bounce_alert_bounce_pct`,
+  `breaker_complaint_pct` → `bounce_alert_complaint_pct`, `breaker_min_sample` →
+  `bounce_alert_min_sample`, `breaker_window_hours` →
+  `bounce_alert_window_hours`. The old keys are still read as a fallback, so an
+  install that tuned them keeps its thresholds.
+- **Celery beat** entry `check-circuit-breakers` is now `watch-bounce-rates`
+  (`app.tasks.campaign_tasks.watch_bounce_rates`), same 5-minute schedule, and
+  the no-worker inline sweep in `main.py` reports instead of pausing.
+- **Tests.** `test_p0_3_circuit_breaker.py` (22) is replaced by
+  `test_bounce_watch.py` (24). Every one of them asserts two things together: the
+  operator is told, **and the campaign is still running**.
+
 ## Unreleased — the SMS inbox works on PostgreSQL again (503 / empty chat list)
 
 The deployed SMS inbox answered every request with

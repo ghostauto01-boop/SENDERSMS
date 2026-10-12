@@ -72,10 +72,10 @@ const ITEMS = [
   }),
   campaign({
     id: 4,
-    name: "Tripped one",
+    name: "Paused one",
     status: "paused",
     messages_sent: 40,
-    paused_reason: "Circuit breaker: bounce rate 5.0% (3 of 60) is above 2.0%",
+    paused_reason: "Paused manually — bounce rate 5.0% (3 of 60)",
   }),
 ];
 
@@ -163,40 +163,28 @@ describe("CampaignsPage lifecycle", () => {
     await waitFor(() => expect(apiDelete).toHaveBeenCalledWith("/campaigns/2"));
   });
 
-  it("explains a paused campaign, including an automatic pause", async () => {
+  it("explains why a campaign is paused", async () => {
     await renderPage();
     expect(within(rowOf("Held one")).getByText(/Scheduled launch on hold/)).toBeInTheDocument();
-    expect(within(rowOf("Tripped one")).getByText(/Circuit breaker: bounce rate 5.0%/)).toBeInTheDocument();
-    expect(within(rowOf("Tripped one")).getByText("Resume")).toBeInTheDocument();
+    expect(within(rowOf("Paused one")).getByText(/bounce rate 5.0%/)).toBeInTheDocument();
+    expect(within(rowOf("Paused one")).getByText("Resume")).toBeInTheDocument();
   });
 
   it("only offers delete on a paused campaign that was paused before it sent", async () => {
     await renderPage();
     expect(within(rowOf("Held one")).queryByTitle("Delete campaign")).not.toBeNull();
-    expect(within(rowOf("Tripped one")).queryByTitle("Delete campaign")).toBeNull();
+    expect(within(rowOf("Paused one")).queryByTitle("Delete campaign")).toBeNull();
   });
 
-  it("resuming after a circuit-breaker pause asks first, then acknowledges it", async () => {
+  it("a campaign paused mid-send resumes with one call and no acknowledgement", async () => {
     const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    confirmSpy.mockClear(); // the spy is shared with earlier tests in this file
     await renderPage();
 
-    fireEvent.click(within(rowOf("Tripped one")).getByText("Resume"));
+    fireEvent.click(within(rowOf("Paused one")).getByText("Resume"));
 
-    await waitFor(() =>
-      expect(apiPost).toHaveBeenCalledWith("/campaigns/4/resume", null, {
-        params: { acknowledge_breaker: true },
-      }),
-    );
-    expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining("Circuit breaker"));
-  });
-
-  it("declining the circuit-breaker prompt resumes nothing", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(false);
-    await renderPage();
-
-    fireEvent.click(within(rowOf("Tripped one")).getByText("Resume"));
-
-    expect(apiPost).not.toHaveBeenCalledWith("/campaigns/4/resume", expect.anything(), expect.anything());
+    await waitFor(() => expect(apiPost).toHaveBeenCalledWith("/campaigns/4/resume"));
+    expect(confirmSpy).not.toHaveBeenCalled();
   });
 
   it("a manual pause resumes without any ceremony", async () => {
@@ -206,7 +194,7 @@ describe("CampaignsPage lifecycle", () => {
 
     fireEvent.click(within(rowOf("Held one")).getByText("Resume"));
 
-    await waitFor(() => expect(apiPost).toHaveBeenCalledWith("/campaigns/3/resume", null, undefined));
+    await waitFor(() => expect(apiPost).toHaveBeenCalledWith("/campaigns/3/resume"));
     expect(confirmSpy).not.toHaveBeenCalled();
   });
 });

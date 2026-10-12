@@ -182,11 +182,9 @@ export default function CampaignDetail({
               <button
                 className="btn-primary btn-sm"
                 onClick={() => {
-                  // A pause by the bounce circuit breaker is not undone by a reflex click:
-                  // read why it paused, then resume deliberately.
-                  const tripped = (detail.paused_reason || "").startsWith("Circuit breaker");
-                  if (tripped && !confirm(`${detail.paused_reason}\n\nResume anyway? Fix the list first (verify the addresses).`)) return;
-                  act(() => adsApi.resume(campaignId, tripped), "Resumed");
+                  // Nothing to acknowledge: a high bounce rate is reported as a
+                  // notification, so resuming is just resuming.
+                  act(() => adsApi.resume(campaignId), "Resumed");
                 }}
               >
                 <Play size={15} className="mr-1" /> Resume

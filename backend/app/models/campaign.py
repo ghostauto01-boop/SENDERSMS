@@ -28,14 +28,11 @@ class Campaign(Base):
     #: while ``scheduled`` has never sent anything and holds no contact rows, so
     #: resuming it must put the schedule back rather than start sending.
     paused_from: Mapped[str | None] = mapped_column(String(20), nullable=True)
-    #: When it was paused, and why. ``paused_reason`` is what the circuit breaker
-    #: writes ("bounce rate 5.0% ...") so an auto-pause is never a mystery.
+    #: When it was paused, and why. Only people pause campaigns: the bounce
+    #: watchdog reports a high bounce rate as a notification instead of stopping
+    #: anything, so every value here was written by an operator.
     paused_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     paused_reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    #: Start of the circuit breaker's rolling window. Set when an operator resumes
-    #: a campaign the breaker paused, so the bounces that tripped it are not judged
-    #: again the moment it runs.
-    breaker_reset_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     #: "sms" or "email" — which channel this campaign sends on. Existing rows
     #: default to "sms", so nothing about the current behaviour changes.

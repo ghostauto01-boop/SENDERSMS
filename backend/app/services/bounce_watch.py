@@ -1,29 +1,29 @@
-"""The bounce circuit breaker.
+"""Bounce-rate watchdog for email campaigns: it reports, it never stops one.
 
-WHY THIS EXISTS
----------------
-A campaign that is hurting the sender's reputation has to stop on its own. The
-QA sweep found a live campaign with a 45% failure rate and 525 contacts still
-queued: nothing in the product would ever have paused it, and by the time a
-person looked, the damage to the sending domain was done.
+WHY THE CIRCUIT BREAKER IS GONE
+-------------------------------
+This module replaces the *bounce circuit breaker*, which read the same numbers
+and ended them with a ``pause``: an email campaign above 2% bounces was stopped
+mid-run, and putting it back on needed an explicit ``acknowledge_breaker=true``.
+That is the wrong trade. A campaign that halts itself halfway down its list is
+worse than one that keeps going with a dozen bad addresses -- every good contact
+queued behind them simply never hears from you, and the only person who could
+fix the list finds out whenever they happen to look.
 
-The breaker watches each email campaign over a *rolling* window -- both campaign
-systems, the classic ``campaigns`` and the Ads Manager's ``ads_campaigns`` -- and
-pauses it when
+So the breaker is gone: every automatic pause, the ``paused_reason`` it wrote,
+the 409 ``BREAKER_TRIPPED`` and the ``acknowledge_breaker`` escape hatch with
+it. What is left is a watchdog with the same eyes and no hands. It measures the
+same rolling window per campaign, in both campaign systems (the classic
+``campaigns`` and the Ads Manager's ``ads_campaigns``), and when the numbers
+pass the same thresholds it *says so* -- an in-app notification plus a browser
+push, which is the point, because the person who can fix the list is not sitting
+on the campaign page.
 
-* more than ``breaker_bounce_pct`` (default 2%) of its recent sends bounced or
-  were refused by the provider, or
-* spam complaints exceed ``breaker_complaint_pct`` (default 0.10%).
+Nothing here pauses, stops, deletes or blocks a campaign, and no acknowledgement
+is ever required to resume one.
 
-Two guards keep it honest. A *minimum sample* (``breaker_min_sample``, 20): one
-bounce in five sends is "20%" and also meaningless, so nothing trips below it.
-And it only ever pauses; it never stops or deletes -- a person decides what
-happens next, and resuming after a trip needs an explicit acknowledgement
-(``acknowledge_breaker=true``) that also restarts the window, so the same old
-bounces cannot re-pause the campaign the instant it resumes.
-
-The reason is written on the campaign (``paused_reason``) so an automatic pause
-is never a mystery.
+It also never nags: one alert per campaign per ``bounce_alert_cooldown_hours``
+(6 by default), however many bounces land in between.
 """
 
 from __future__ import annotations
@@ -39,9 +39,9 @@ from app.models.conversation import Message
 
 logger = logging.getLogger(__name__)
 
-#: Every automatic pause starts with this, which is how a breaker pause is told
-#: apart from a person pausing a campaign.
-BREAKER_PREFIX = "Circuit breaker"
+#: The ``NotificationEvent.event_type`` written for every alert. The in-app
+#: notification centre and the frontend's ``notificationDisplay`` key off it.
+ALERT_EVENT = "bounce_rate_alert"
 
 #: ``failed`` messages whose last_error starts with this never reached the
 #: provider (we refused to send), so they say nothing about deliverability.
@@ -51,43 +51,6 @@ _NOT_SENT_PREFIX = "Filtered before send"
 def _utcnow() -> datetime:
     """The clock. A seam so tests can pin it."""
     return datetime.now(timezone.utc)
-
-
-def is_breaker_pause(campaign) -> bool:
-    """True when ``campaign`` is paused *by the breaker* (not by a person)."""
-    return (
-        getattr(campaign, "status", None) == "paused"
-        and (getattr(campaign, "paused_reason", None) or "").startswith(BREAKER_PREFIX)
-    )
-
-
-def acknowledge(campaign, now: Optional[datetime] = None) -> None:
-    """Record that a person has seen the trip and chosen to continue.
-
-    Moves the start of the rolling window to now: judging the very same bounces
-    again would re-pause the campaign immediately. A fresh sample must build up
-    (and pass) before the breaker can trip again.
-    """
-    campaign.breaker_reset_at = now or _utcnow()
-
-
-def _since(rules: dict, campaign, now: datetime) -> datetime:
-    since = now - timedelta(hours=int(rules["breaker_window_hours"]))
-    reset = getattr(campaign, "breaker_reset_at", None)
-    if reset is not None:
-        if reset.tzinfo is None:
-            reset = reset.replace(tzinfo=timezone.utc)
-        since = max(since, reset)
-    return since
-
-
-def _filter(campaign_id: Optional[int], ads_campaign_id: Optional[int]) -> list:
-    clauses = [Message.direction == "outgoing", Message.channel == "email"]
-    if campaign_id is not None:
-        clauses.append(Message.campaign_id == campaign_id)
-    if ads_campaign_id is not None:
-        clauses.append(Message.ads_campaign_id == ads_campaign_id)
-    return clauses
 
 
 async def campaign_health(
@@ -152,16 +115,25 @@ async def campaign_health(
     }
 
 
+def _filter(campaign_id: Optional[int], ads_campaign_id: Optional[int]) -> list:
+    clauses = [Message.direction == "outgoing", Message.channel == "email"]
+    if campaign_id is not None:
+        clauses.append(Message.campaign_id == campaign_id)
+    if ads_campaign_id is not None:
+        clauses.append(Message.ads_campaign_id == ads_campaign_id)
+    return clauses
+
+
 def _span(hours: int) -> str:
     return f"{hours} hours" if hours < 48 else f"{round(hours / 24)} days"
 
 
 def verdict(health: dict, rules: dict) -> Optional[str]:
-    """The reason to trip, or None. Pure: numbers in, sentence out."""
-    min_sample = int(rules["breaker_min_sample"])
+    """The sentence to tell the operator, or None. Pure: numbers in, words out."""
+    min_sample = int(rules["bounce_alert_min_sample"])
     reasons: list[str] = []
 
-    bounce_limit = float(rules["breaker_bounce_pct"])
+    bounce_limit = float(rules["bounce_alert_bounce_pct"])
     if health["attempts"] >= min_sample and health["bounce_rate_pct"] > bounce_limit:
         bad = health["bounced"] + health["rejected"]
         detail = []
@@ -171,11 +143,11 @@ def verdict(health: dict, rules: dict) -> Optional[str]:
             detail.append(f"{health['bounced']} bounced")
         reasons.append(
             f"bounce rate {health['bounce_rate_pct']:.1f}% ({bad} of {health['attempts']} sends "
-            f"in the last {_span(int(rules['breaker_window_hours']))}; {', '.join(detail)}) "
+            f"in the last {_span(int(rules['bounce_alert_window_hours']))}; {', '.join(detail)}) "
             f"is above the {bounce_limit:.1f}% limit"
         )
 
-    complaint_limit = float(rules["breaker_complaint_pct"])
+    complaint_limit = float(rules["bounce_alert_complaint_pct"])
     if health["sent"] >= min_sample and health["complaint_rate_pct"] > complaint_limit:
         reasons.append(
             f"spam complaint rate {health['complaint_rate_pct']:.2f}% "
@@ -185,7 +157,8 @@ def verdict(health: dict, rules: dict) -> Optional[str]:
 
     if not reasons:
         return None
-    return f"{BREAKER_PREFIX}: " + "; ".join(reasons) + "."
+    sentence = "; ".join(reasons)
+    return sentence[0].upper() + sentence[1:] + "."
 
 
 async def _load(db: AsyncSession, campaign_id: Optional[int], ads_campaign_id: Optional[int]):
@@ -207,22 +180,51 @@ async def _load(db: AsyncSession, campaign_id: Optional[int], ads_campaign_id: O
     return None, None
 
 
-#: A campaign is "sending" in these statuses; only a sending campaign is paused.
+#: A campaign is "sending" in these statuses; only a sending campaign is watched.
 _SENDING = {"campaign": "running", "ads": "active"}
 
+#: Where a tap on the alert lands: the page that lists the campaign.
+_ALERT_URL = {"campaign": "/campaigns", "ads": "/sms-manager"}
 
-async def check_and_trip(
+
+async def _alerted_recently(
+    db: AsyncSession, kind: str, campaign_id: int, since: datetime
+) -> bool:
+    """True when this campaign already has an alert inside the cooldown.
+
+    A campaign with a bad list bounces on every send. Without this the watchdog
+    would fire a notification per bounce and bury the notification centre -- the
+    opposite of useful.
+    """
+    from app.models.notification import NotificationEvent
+    from app.services.push_service import BROWSER_PROVIDER
+
+    found = (
+        await db.execute(
+            select(NotificationEvent.id).where(
+                NotificationEvent.event_type == ALERT_EVENT,
+                NotificationEvent.provider == BROWSER_PROVIDER,
+                NotificationEvent.reference_id == campaign_id,
+                NotificationEvent.reference_type == kind,
+                NotificationEvent.created_at >= since,
+            ).limit(1)
+        )
+    ).scalar_one_or_none()
+    return found is not None
+
+
+async def check_and_alert(
     db: AsyncSession,
     *,
     campaign_id: Optional[int] = None,
     ads_campaign_id: Optional[int] = None,
     now: Optional[datetime] = None,
 ) -> Optional[dict]:
-    """Judge one campaign and pause it if it is over the limit.
+    """Judge one campaign and notify when it is over the limit. It never pauses.
 
-    Returns None when there is nothing to judge (the breaker is off, the campaign
-    is not an email campaign, or it is not sending); otherwise the health numbers
-    with ``tripped`` true/false.
+    Returns None when there is nothing to judge (the watchdog is off, the
+    campaign is not an email campaign, or it is not sending); otherwise the
+    health numbers with ``alerted`` true/false and, when it alerted, ``reason``.
     """
     from app.services.sending_limits import get_sending_rules
 
@@ -230,7 +232,7 @@ async def check_and_trip(
     if campaign is None:
         return None
     rules = await get_sending_rules(db)
-    if not rules["breaker_enabled"]:
+    if not rules["bounce_alert_enabled"]:
         return None
     if (campaign.channel or "sms") != "email":
         return None
@@ -242,43 +244,51 @@ async def check_and_trip(
         db,
         campaign_id=campaign.id if kind == "campaign" else None,
         ads_campaign_id=campaign.id if kind == "ads" else None,
-        since=_since(rules, campaign, now),
+        since=now - timedelta(hours=int(rules["bounce_alert_window_hours"])),
         now=now,
     )
     reason = verdict(health, rules)
-    outcome = {"kind": kind, "id": campaign.id, "name": campaign.name, "tripped": False, **health}
+    outcome = {
+        "kind": kind,
+        "id": campaign.id,
+        "name": campaign.name,
+        "alerted": False,
+        **health,
+    }
     if reason is None:
         return outcome
 
-    await _pause(db, kind, campaign, reason, now)
-    logger.warning("CIRCUIT BREAKER: paused %s %s (%s): %s", kind, campaign.id, campaign.name, reason)
-    outcome.update(tripped=True, reason=reason)
+    cooldown = timedelta(hours=int(rules["bounce_alert_cooldown_hours"]))
+    if await _alerted_recently(db, kind, campaign.id, now - cooldown):
+        outcome["reason"] = reason
+        outcome["suppressed"] = True
+        return outcome
+
+    await _notify(db, kind, campaign, reason)
+    logger.warning("BOUNCE WATCH: alerted on %s %s (%s): %s", kind, campaign.id, campaign.name, reason)
+    outcome.update(alerted=True, reason=reason)
     return outcome
 
 
-async def _pause(db: AsyncSession, kind: str, campaign, reason: str, now: datetime) -> None:
-    if kind == "campaign":
-        from app.services.campaign_service import CampaignService
+async def _notify(db: AsyncSession, kind: str, campaign, reason: str) -> None:
+    from app.services.push_service import notify_bounce_rate
 
-        await CampaignService(db).pause_campaign(campaign.id, reason=reason)
-        return
-    from app.services import ads_service
-
-    campaign.status = "paused"
-    campaign.paused_reason = reason[:500]
-    campaign.paused_at = now
-    ads_service.log_activity(
-        db, "campaign_paused", campaign_id=campaign.id, actor="circuit-breaker", detail=reason[:500]
+    await notify_bounce_rate(
+        db,
+        campaign_name=campaign.name,
+        detail=reason,
+        campaign_id=campaign.id,
+        url=_ALERT_URL[kind],
+        reference_type=kind,
     )
-    await db.flush()
 
 
 async def check_all(db: AsyncSession, now: Optional[datetime] = None) -> list[dict]:
-    """Sweep every sending email campaign in both systems. Returns the ones paused."""
+    """Sweep every sending email campaign in both systems. Returns the alerts."""
     from app.models.ads import AdsCampaign
     from app.models.campaign import Campaign
 
-    tripped: list[dict] = []
+    alerts: list[dict] = []
     classic = (
         await db.execute(
             select(Campaign.id).where(Campaign.status == "running", Campaign.channel == "email")
@@ -292,14 +302,14 @@ async def check_all(db: AsyncSession, now: Optional[datetime] = None) -> list[di
         )
     ).scalars().all()
     for cid in classic:
-        outcome = await check_and_trip(db, campaign_id=cid, now=now)
-        if outcome and outcome["tripped"]:
-            tripped.append(outcome)
+        outcome = await check_and_alert(db, campaign_id=cid, now=now)
+        if outcome and outcome["alerted"]:
+            alerts.append(outcome)
     for aid in ads:
-        outcome = await check_and_trip(db, ads_campaign_id=aid, now=now)
-        if outcome and outcome["tripped"]:
-            tripped.append(outcome)
-    return tripped
+        outcome = await check_and_alert(db, ads_campaign_id=aid, now=now)
+        if outcome and outcome["alerted"]:
+            alerts.append(outcome)
+    return alerts
 
 
 async def check_after_event(
@@ -310,39 +320,8 @@ async def check_after_event(
         return
     try:
         if campaign_id is not None:
-            await check_and_trip(db, campaign_id=campaign_id)
+            await check_and_alert(db, campaign_id=campaign_id)
         if ads_campaign_id is not None:
-            await check_and_trip(db, ads_campaign_id=ads_campaign_id)
-    except Exception as exc:  # noqa: BLE001 — a breaker fault must not lose a webhook
-        logger.error("circuit breaker check failed: %s", exc)
-
-
-async def summary(db: AsyncSession, rules: Optional[dict] = None) -> dict:
-    """The breaker's settings and every campaign it is currently holding."""
-    from app.models.ads import AdsCampaign
-    from app.models.campaign import Campaign
-    from app.services.sending_limits import get_sending_rules
-
-    rules = rules or await get_sending_rules(db)
-    held: list[dict] = []
-    for kind, model in (("campaign", Campaign), ("ads", AdsCampaign)):
-        rows = (
-            await db.execute(
-                select(model).where(
-                    model.status == "paused", model.paused_reason.like(f"{BREAKER_PREFIX}%")
-                )
-            )
-        ).scalars().all()
-        for row in rows:
-            held.append({
-                "kind": kind, "id": row.id, "name": row.name, "reason": row.paused_reason,
-                "paused_at": row.paused_at.isoformat() if row.paused_at else None,
-            })
-    return {
-        "enabled": bool(rules["breaker_enabled"]),
-        "bounce_pct_limit": rules["breaker_bounce_pct"],
-        "complaint_pct_limit": rules["breaker_complaint_pct"],
-        "min_sample": rules["breaker_min_sample"],
-        "window_hours": rules["breaker_window_hours"],
-        "tripped": held,
-    }
+            await check_and_alert(db, ads_campaign_id=ads_campaign_id)
+    except Exception as exc:  # noqa: BLE001 — a watchdog fault must not lose a webhook
+        logger.error("bounce watch check failed: %s", exc)

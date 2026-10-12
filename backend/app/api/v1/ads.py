@@ -103,29 +103,12 @@ async def _require_email_sender(db: AsyncSession, campaign: AdsCampaign) -> None
         raise HTTPException(400, f"Email sender '{email_service.sender_name(account)}' cannot send ({why}).")
 
 
-def _breaker_conflict(campaign: AdsCampaign) -> HTTPException:
-    """409 for a campaign the bounce circuit breaker paused and nobody has acknowledged."""
-    return HTTPException(
-        status_code=409,
-        detail={
-            "code": "BREAKER_TRIPPED",
-            "message": (
-                f"This campaign was paused automatically. {campaign.paused_reason or ''} Fix the "
-                "list first (verify the addresses), then repeat with acknowledge_breaker=true "
-                "to resume anyway."
-            ),
-            "hint": "Repeat the request with acknowledge_breaker=true to resume anyway.",
-            "paused_reason": campaign.paused_reason,
-        },
-    )
+def _clear_pause(campaign: AdsCampaign) -> None:
+    """Forget why it was paused.
 
-
-def _clear_pause(campaign: AdsCampaign, *, acknowledged_breaker: bool) -> None:
-    """Forget why it was paused; after a breaker trip, also restart the rolling window."""
-    if acknowledged_breaker:
-        from app.services import circuit_breaker
-
-        circuit_breaker.acknowledge(campaign)
+    Nothing here has to be acknowledged first: an automatic pause is not a thing
+    any more, so a resume is just a resume.
+    """
     campaign.paused_reason = None
     campaign.paused_at = None
 
@@ -436,11 +419,6 @@ async def update_campaign(
         current_status = campaign.status
         try:
             if target_status in ("active", "scheduled"):
-                from app.services import circuit_breaker
-
-                breaker_paused = circuit_breaker.is_breaker_pause(campaign)
-                if breaker_paused:
-                    raise _breaker_conflict(campaign)
                 if target_status == "scheduled" and (
                     campaign.start_date is None or svc.as_utc(campaign.start_date) <= svc.now_utc()
                 ):
@@ -458,7 +436,7 @@ async def update_campaign(
                             },
                         )
                     if campaign.paused_reason:
-                        _clear_pause(campaign, acknowledged_breaker=False)
+                        _clear_pause(campaign)
                 elif current_status == "scheduled" and target_status == "active":
                     if campaign.start_date and svc.as_utc(campaign.start_date) > svc.now_utc():
                         raise HTTPException(409, "This campaign is scheduled to start later.")
@@ -572,25 +550,15 @@ async def simulate(
 async def launch(
     campaign_id: int,
     background_tasks: BackgroundTasks,
-    acknowledge_breaker: bool = Query(
-        False, description="Only needed to relaunch a campaign the circuit breaker paused."
-    ),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
     """Atomically assign the audience and activate the campaign, exactly once."""
     campaign = await _get_campaign(db, campaign_id, for_update=True)
-    from app.services import circuit_breaker
-
-    breaker_paused = circuit_breaker.is_breaker_pause(campaign)
-    if breaker_paused and not acknowledge_breaker:
-        # Launch re-activates a paused campaign, so it must not be a way around
-        # the acknowledgement that resume requires.
-        raise _breaker_conflict(campaign)
     try:
         result = await svc.launch(db, campaign, actor=user.username)
         if result["ok"] and campaign.status in ("active", "scheduled") and campaign.paused_reason:
-            _clear_pause(campaign, acknowledged_breaker=breaker_paused)
+            _clear_pause(campaign)
         if not result["ok"]:
             # Preserve the existing string ``detail`` response while saving the
             # structured checks in the campaign and validation endpoint.
@@ -636,20 +604,12 @@ async def pause(
 async def resume(
     campaign_id: int,
     background_tasks: BackgroundTasks,
-    acknowledge_breaker: bool = Query(
-        False, description="Required to resume a campaign the bounce circuit breaker paused."
-    ),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
     campaign = await _get_campaign(db, campaign_id)
     if campaign.status != "paused":
         raise HTTPException(409, "Only a paused campaign can be resumed")
-    from app.services import circuit_breaker
-
-    breaker_paused = circuit_breaker.is_breaker_pause(campaign)
-    if breaker_paused and not acknowledge_breaker:
-        raise _breaker_conflict(campaign)
     resume_state = (
         "scheduled"
         if campaign.start_date and svc.as_utc(campaign.start_date) > svc.now_utc()
@@ -661,7 +621,7 @@ async def resume(
         )
     except ValueError as exc:
         raise HTTPException(409, str(exc)) from exc
-    _clear_pause(campaign, acknowledged_breaker=breaker_paused)
+    _clear_pause(campaign)
     from app.services.campaign_jobs import schedule_campaign_job
 
     job = await schedule_campaign_job(
@@ -2867,7 +2827,6 @@ async def bulk_campaigns(
         (await db.execute(select(AdsCampaign).where(AdsCampaign.id.in_(data.ids)))).scalars().all()
     )
     changed = 0
-    held_by_breaker: list[int] = []
     for campaign in rows:
         if data.action == "pause" and campaign.status in ("active", "scheduled"):
             svc.transition_campaign(
@@ -2876,16 +2835,10 @@ async def bulk_campaigns(
             campaign.paused_reason = "Paused manually"
             campaign.paused_at = svc.now_utc()
         elif data.action == "resume" and campaign.status == "paused":
-            from app.services import circuit_breaker
-
-            if circuit_breaker.is_breaker_pause(campaign):
-                # A bulk click is not the deliberate acknowledgement a trip needs.
-                held_by_breaker.append(campaign.id)
-                continue
             svc.transition_campaign(
                 db, campaign, "active", reason="Resumed from bulk action", actor=user.username
             )
-            _clear_pause(campaign, acknowledged_breaker=False)
+            _clear_pause(campaign)
         elif data.action == "archive":
             try:
                 svc.transition_campaign(
@@ -2899,7 +2852,7 @@ async def bulk_campaigns(
             continue
         changed += 1
     await db.commit()
-    return {"changed": changed, "held_by_circuit_breaker": held_by_breaker}
+    return {"changed": changed}
 
 
 @router.post("/creatives/bulk")

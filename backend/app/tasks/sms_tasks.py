@@ -63,8 +63,8 @@ async def _send_one(mid, final_on_failure=False, rate_wait_cap=_INLINE_RATE_WAIT
         is_email = (m.channel or "sms") == "email"
 
         # A campaign that was paused or stopped after this message was created
-        # must not send it. (A breaker trip that kept sending the 25 messages
-        # already in flight would be a poor breaker.)
+        # must not send it. (A pause that kept sending the 25 messages already in
+        # flight would be a poor pause.)
         hold = await _campaign_hold(db, m)
         if hold == "stopped":
             m.status = "cancelled"
