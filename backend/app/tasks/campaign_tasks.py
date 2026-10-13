@@ -604,7 +604,13 @@ async def _send_template_message(
             if template is not None:
                 subject = subject or template.subject
                 html_body = html_body or template.html_body
-        account = await email_service.resolve_sender(db, campaign.email_account_id)
+        # Multi-sender pool (optional): the contact's pinned sender wins,
+        # then the pool rotation, then the legacy single sender.
+        account = await email_service.resolve_campaign_sender(
+            db, campaign,
+            key=cc.id or contact.id,
+            pinned_sender_id=getattr(cc, "email_account_id", None),
+        )
         if account is None:
             cc.status = "failed"
             cc.last_error = "No email sender configured"
@@ -616,6 +622,8 @@ async def _send_template_message(
             cc.last_error = f"Email sender cannot send ({sender_issue or 'unknown'})."
             logger.error("Campaign %s has unusable email sender: %s", campaign.id, sender_issue)
             return
+        if getattr(cc, "email_account_id", None) is None:
+            cc.email_account_id = email_service.sender_id(account)
         sender_address = email_service.sender_email(account)
         sender_id = email_service.sender_id(account)
         mailbox_sender = email_service._sender_is_mailbox(account)
@@ -630,12 +638,18 @@ async def _send_template_message(
         # the oldest spam signals there is.
         if not (body or "").strip() and (html_body or "").strip():
             body = email_service.html_to_text(html_body)
+        if not (body or "").strip() and not (html_body or "").strip():
+            # Never queue a message whose only content would be the footer.
+            cc.status = "failed"
+            cc.last_error = "Email body is empty"
+            logger.error("Campaign %s has an empty email body; skipping contact %s", campaign.id, contact.id)
+            return
         # Campaign mail is bulk mail, so it carries the one-click unsubscribe the
         # Gmail/Yahoo bulk-sender rules ask for: the List-Unsubscribe headers for
-        # the machines (added in build_headers) and one button for the reader.
+        # the machines (added in build_headers) and one footer button for the
+        # reader — signed for the RECIPIENT, not the sender's reply-to.
         body, html_body = email_service.apply_unsubscribe(
-            body or "", html_body,
-            (getattr(account, "reply_to", None) or sender_address or "").strip(),
+            body or "", html_body, (contact.email or "").strip(),
         )
 
     # Create message

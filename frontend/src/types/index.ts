@@ -96,6 +96,10 @@ export interface Campaign {
   channel?: string | null;
   email_account_id?: number | null;
   fallback_email_account_id?: number | null;
+  /** Optional multi-sender pool (unified sender ids); empty = single sender. */
+  email_account_ids?: number[] | null;
+  sender_distribution?: string;
+  email_sender_weights?: Record<string, number> | null;
   subject?: string | null;
   html_body?: string | null;
   track_opens?: boolean | null;

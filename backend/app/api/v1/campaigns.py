@@ -164,6 +164,12 @@ async def create_campaign(
         fallback_id = payload.get("fallback_email_account_id")
         if fallback_id is not None and await email_service.get_sender(db, fallback_id) is None:
             raise HTTPException(status_code=404, detail="Selected fallback email sender not found")
+        # Multi-sender pool (optional): every member must be a real sender.
+        pool = email_service.normalize_sender_ids(payload.get("email_account_ids"))
+        for pool_id in pool:
+            if await email_service.get_sender(db, pool_id) is None:
+                raise HTTPException(status_code=404, detail="Selected email sender not found")
+        payload["email_account_ids"] = pool or None
     service = CampaignService(db)
     campaign = await service.create_campaign(payload)
     return _campaign_out(campaign)
@@ -217,6 +223,12 @@ async def update_campaign(
             sender_id = update_data.get(key)
             if sender_id is not None and await email_service.get_sender(db, sender_id) is None:
                 raise HTTPException(status_code=404, detail=f"Selected {label} not found")
+        if "email_account_ids" in update_data:
+            pool = email_service.normalize_sender_ids(update_data.get("email_account_ids"))
+            for pool_id in pool:
+                if await email_service.get_sender(db, pool_id) is None:
+                    raise HTTPException(status_code=404, detail="Selected email sender not found")
+            update_data["email_account_ids"] = pool or None
 
     # Writing a message and picking a template are mutually exclusive choices.
     # Setting one clears the other, otherwise a campaign edited from template to
@@ -863,6 +875,9 @@ async def duplicate_campaign(
         attachments=original.attachments,
         email_account_id=original.email_account_id,
         fallback_email_account_id=original.fallback_email_account_id,
+        email_account_ids=original.email_account_ids,
+        sender_distribution=original.sender_distribution or "round_robin",
+        email_sender_weights=original.email_sender_weights,
         track_opens=original.track_opens,
         track_clicks=original.track_clicks,
         sequence_id=original.sequence_id,

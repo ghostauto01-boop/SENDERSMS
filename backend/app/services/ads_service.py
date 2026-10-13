@@ -778,6 +778,30 @@ async def assign_contacts(
     cursor = 0
     assigned = 0
 
+    # Multi-sender pool (optional, email only): pin each contact to a sender
+    # exactly like the creative split above, offset by the assignments the
+    # campaign already has so adding a second set keeps the split even. A
+    # per-creative sender override still wins over the pool for its contacts.
+    from app.services import email_service as _email_service
+
+    sender_pool = (
+        _email_service.campaign_sender_pool(campaign)
+        if (campaign.channel or "sms") == "email"
+        else []
+    )
+    sender_offset = 0
+    if len(sender_pool) > 1 and not dry_run:
+        sender_offset = int(
+            (
+                await db.execute(
+                    select(func.count())
+                    .select_from(AdsAssignment)
+                    .where(AdsAssignment.campaign_id == campaign.id)
+                )
+            ).scalar()
+            or 0
+        )
+
     for creative, take in zip(creatives, counts):
         chunk = pool[cursor : cursor + take]
         cursor += take
@@ -786,6 +810,16 @@ async def assign_contacts(
             continue
         version = await ensure_version(db, creative)
         for contact in chunk:
+            pinned_sender = creative.email_account_id or (
+                _email_service.pick_sender_id(
+                    sender_pool,
+                    key=sender_offset + assigned,
+                    distribution=getattr(campaign, "sender_distribution", None),
+                    weights=getattr(campaign, "email_sender_weights", None),
+                )
+                if len(sender_pool) > 1
+                else None
+            )
             db.add(
                 AdsAssignment(
                     campaign_id=campaign.id,
@@ -797,6 +831,7 @@ async def assign_contacts(
                     assignment_method=(ads_set.split_mode or "equal"),
                     experiment_group=creative.name,
                     send_status="pending",
+                    email_account_id=pinned_sender,
                 )
             )
             assigned += 1
@@ -1319,7 +1354,10 @@ async def dispatch_campaign(
         content = await _creative_content(db, assignment, campaign)
         body, creative = content["body"], content["creative"]
         slim_body = (body or "").strip()
-        if creative is None or not slim_body:
+        # An email creative may legitimately be HTML-only; its text part is
+        # derived below. SMS still requires a text body.
+        has_copy = bool(slim_body) or (email_campaign and bool((content["html_body"] or "").strip()))
+        if creative is None or not has_copy:
             # A paused creative must NOT be dropped: put the contact back so it
             # resumes if the creative is re-activated.
             assignment.send_status = "pending"
@@ -1345,6 +1383,10 @@ async def dispatch_campaign(
             )
             if content["html_body"]:
                 rendered_html = await render_for_contact(db, content["html_body"], contact)
+            if not (rendered or "").strip() and (rendered_html or "").strip():
+                from app.services.email_service import html_to_text as _html_to_text
+
+                rendered = _html_to_text(rendered_html)
 
         if campaign.test_mode:
             # Simulated send: nothing leaves the server, no credits consumed.
@@ -1430,8 +1472,14 @@ async def dispatch_campaign(
             # edit of the contact never rewrites what was sent.
             from app.services import email_service
 
-            sender = await email_service.resolve_sender(
-                db, creative.email_account_id or campaign.email_account_id
+            # Sender priority: the contact's pinned pool sender, then a
+            # per-creative override, then the campaign pool (skipping any
+            # member that can no longer send), then single/default.
+            sender = await email_service.resolve_campaign_sender(
+                db, campaign,
+                key=assignment.id,
+                pinned_sender_id=getattr(assignment, "email_account_id", None),
+                creative_sender_id=creative.email_account_id,
             )
             usable, sender_issue = await email_service.sender_is_usable(sender)
             if not usable:
@@ -1440,10 +1488,21 @@ async def dispatch_campaign(
                 assignment.next_attempt_at = now_utc() + timedelta(minutes=30)
                 skip(assignment.skip_reason)
                 continue
+            if getattr(assignment, "email_account_id", None) is None:
+                assignment.email_account_id = email_service.sender_id(sender)
             sender_address = email_service.sender_email(sender)
+            if not (rendered or "").strip() and not (rendered_html or "").strip():
+                # Never queue a message whose only content would be the
+                # unsubscribe footer.
+                assignment.send_status = "pending"
+                assignment.skip_reason = "empty_body"
+                assignment.next_attempt_at = now_utc() + timedelta(minutes=30)
+                skip("empty_body")
+                continue
+            # Footer-only unsubscribe, signed for the RECIPIENT (this used to
+            # pass the sender's reply-to, so the link unsubscribed the sender).
             rendered, rendered_html = email_service.apply_unsubscribe(
-                rendered, rendered_html,
-                (getattr(sender, "reply_to", None) or sender_address).strip(),
+                rendered, rendered_html, (contact.email or "").strip(),
             )
             message = Message(
                 conversation_id=conversation.id,
@@ -2049,9 +2108,34 @@ async def send_adhoc_sms(
             campaign = (
                 await db.execute(select(AdsCampaign).where(AdsCampaign.id == campaign_id))
             ).scalar_one_or_none()
+        # Follow-ups stay on the sender the contact was assigned (pool pin),
+        # so a thread never changes From address mid-conversation.
+        pinned_sender_id = None
+        assignment_key: int | str = contact.id
+        if campaign is not None:
+            assignment = (
+                await db.execute(
+                    select(AdsAssignment)
+                    .where(
+                        AdsAssignment.campaign_id == campaign.id,
+                        AdsAssignment.contact_id == contact.id,
+                    )
+                    .order_by(AdsAssignment.id)
+                    .limit(1)
+                )
+            ).scalars().first()
+            if assignment is not None:
+                pinned_sender_id = getattr(assignment, "email_account_id", None)
+                assignment_key = assignment.id
         selected_sender_id = campaign.email_account_id if campaign else None
-        sender = await email_service.resolve_sender(db, selected_sender_id)
-        if selected_sender_id is not None and sender is None:
+        sender = (
+            await email_service.resolve_campaign_sender(
+                db, campaign, key=assignment_key, pinned_sender_id=pinned_sender_id
+            )
+            if campaign is not None
+            else await email_service.resolve_sender(db, None)
+        )
+        if (selected_sender_id is not None or pinned_sender_id is not None) and sender is None:
             logger.error("Ads campaign %s references missing email sender %s", campaign_id, selected_sender_id)
             return None
         message = await email_service.queue_email(
@@ -3083,6 +3167,9 @@ async def duplicate_campaign(
         channel=campaign.channel or "sms",
         email_account_id=campaign.email_account_id,
         fallback_email_account_id=campaign.fallback_email_account_id,
+        email_account_ids=campaign.email_account_ids,
+        sender_distribution=campaign.sender_distribution or "round_robin",
+        email_sender_weights=campaign.email_sender_weights,
         subject=campaign.subject,
         track_opens=campaign.track_opens if campaign.track_opens is not None else True,
         track_clicks=campaign.track_clicks if campaign.track_clicks is not None else True,

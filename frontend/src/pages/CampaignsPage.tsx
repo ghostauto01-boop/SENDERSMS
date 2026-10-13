@@ -13,6 +13,7 @@ import { useChannel } from "../hooks/useChannel";
 import ChannelSwitch from "../components/ChannelSwitch";
 import emailApi, { EmailSender } from "../api/email";
 import RichEmailEditor, { AttachmentPayload } from "../components/RichEmailEditor";
+import SenderPoolPicker, { senderPoolFromCampaign, SenderPoolValue } from "../components/SenderPoolPicker";
 import { inboxLabelFor, inboxLink } from "../utils/inboxRoute";
 
 const statusBadge = (status: string) => {
@@ -511,6 +512,7 @@ function CampaignModal({
       ? String((campaign as any).fallback_email_account_id)
       : ""
   );
+  const [senderPool, setSenderPool] = useState<SenderPoolValue>(() => senderPoolFromCampaign(campaign as any));
   const [dailyLimit, setDailyLimit] = useState((campaign as any)?.daily_limit?.toString() ?? "");
   const [hourlyLimit, setHourlyLimit] = useState((campaign as any)?.hourly_limit?.toString() ?? "");
   const [perMinuteLimit, setPerMinuteLimit] = useState((campaign as any)?.per_minute_limit?.toString() ?? "");
@@ -606,6 +608,11 @@ function CampaignModal({
             attachments: attachments.length ? attachments : null,
             email_account_id: emailAccountId ? Number(emailAccountId) : null,
             fallback_email_account_id: fallbackAccountId ? Number(fallbackAccountId) : null,
+            // Optional multi-sender pool: empty = single sender above.
+            email_account_ids: senderPool.ids.length ? senderPool.ids : null,
+            sender_distribution: senderPool.distribution,
+            email_sender_weights:
+              senderPool.distribution === "weighted" ? senderPool.weights : null,
           }
         : { channel: "sms" }),
     };
@@ -810,6 +817,12 @@ function CampaignModal({
                   </select>
                 </div>
               </div>
+              <SenderPoolPicker
+                accounts={emailAccounts}
+                value={senderPool}
+                onChange={setSenderPool}
+                primaryId={emailAccountId || null}
+              />
             </>
           )}
 

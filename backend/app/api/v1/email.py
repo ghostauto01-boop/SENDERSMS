@@ -1160,6 +1160,10 @@ async def list_conversations(
     contact_id: Optional[int] = Query(
         default=None, description="Only this contact's thread (an inbox deep link)"
     ),
+    account_id: Optional[int] = Query(
+        default=None,
+        description="Only threads sent from this unified sender (multi-inbox view)",
+    ),
     db: AsyncSession = Depends(get_db),
     cu: User = Depends(get_current_user),
 ):
@@ -1191,6 +1195,8 @@ async def list_conversations(
         )
     if contact_id:
         query = query.where(Conversation.contact_id == contact_id)
+    if account_id:
+        query = query.where(Conversation.email_account_id == account_id)
     if search:
         like = f"%{search.strip()}%"
         contact_ids = (

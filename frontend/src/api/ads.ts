@@ -49,6 +49,9 @@ export type AdsCampaign = {
   channel?: string;
   email_account_id?: number | null;
   fallback_email_account_id?: number | null;
+  email_account_ids?: number[] | null;
+  sender_distribution?: string;
+  email_sender_weights?: Record<string, number> | null;
   subject?: string | null;
   track_opens?: boolean;
   track_clicks?: boolean;

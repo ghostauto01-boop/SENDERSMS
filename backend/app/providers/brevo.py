@@ -132,8 +132,17 @@ async def send_email(
         payload["htmlContent"] = html
     if text:
         payload["textContent"] = text
-    if not html and not text:
-        payload["textContent"] = " "
+    if not (html or "").strip() and not (text or "").strip():
+        # Never put a blank email on the wire. This used to substitute a
+        # single space, which is how a rendering bug upstream became
+        # "recipients got an empty email" instead of a loud failure.
+        return {"success": False, "error": "Email body is empty — refusing to send a blank email"}
+    # Lengths only, never the copy itself: proves at the provider boundary
+    # that a body was included, alongside the subject/recipient counts.
+    logger.debug(
+        "BREVO: send to=%d subject_len=%d text_len=%d html_len=%d",
+        len(recipients), len(subject or ""), len(text or ""), len(html or ""),
+    )
     if cc:
         copied = _parse_recipients(cc)
         if copied:
