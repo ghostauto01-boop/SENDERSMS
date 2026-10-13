@@ -91,6 +91,22 @@ async def _require_email_sender(db: AsyncSession, campaign: AdsCampaign) -> None
     """Require a configured account/key; domain authentication is not a launch gate."""
     from app.services import email_service
 
+    # A multi-sender pool counts: one usable pool member is enough to launch
+    # (the dispatcher skips unusable members in rotation order).
+    pool = email_service.campaign_sender_pool(campaign)
+    if len(pool) > 1 or getattr(campaign, "email_account_ids", None):
+        for pool_id in pool:
+            member = await email_service.get_sender(db, pool_id)
+            if member is None:
+                raise HTTPException(404, "Selected email sender not found")
+            usable, _why = await email_service.sender_is_usable(member)
+            if usable:
+                return
+        raise HTTPException(
+            400,
+            "None of the selected email senders can send. Reconnect or enable "
+            "at least one sender in the pool.",
+        )
     account = await email_service.resolve_sender(db, campaign.email_account_id)
     if account is None:
         raise HTTPException(

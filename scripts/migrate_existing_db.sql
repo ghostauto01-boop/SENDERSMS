@@ -465,3 +465,17 @@ ALTER TABLE ads_followup_steps ADD COLUMN IF NOT EXISTS template_id INTEGER;
 ALTER TABLE ads_followup_steps ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE;
 ALTER TABLE ads_followup_steps ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP WITH TIME ZONE;
 CREATE INDEX IF NOT EXISTS ix_ads_followup_steps_campaign_id ON ads_followup_steps (campaign_id);
+
+-- Email rendering fix + OPTIONAL multi-sender pools. The app also adds these
+-- columns at startup (schema_repair); this is the same DDL for a hand-run
+-- migration. JSON columns hold the unified sender-id pool / weight map.
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS email_account_ids JSON;
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS sender_distribution VARCHAR(20) NOT NULL DEFAULT 'round_robin';
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS email_sender_weights JSON;
+ALTER TABLE campaign_contacts ADD COLUMN IF NOT EXISTS email_account_id INTEGER;
+CREATE INDEX IF NOT EXISTS ix_campaign_contacts_email_account_id ON campaign_contacts (email_account_id);
+ALTER TABLE ads_campaigns ADD COLUMN IF NOT EXISTS email_account_ids JSON;
+ALTER TABLE ads_campaigns ADD COLUMN IF NOT EXISTS sender_distribution VARCHAR(20) NOT NULL DEFAULT 'round_robin';
+ALTER TABLE ads_campaigns ADD COLUMN IF NOT EXISTS email_sender_weights JSON;
+ALTER TABLE ads_assignments ADD COLUMN IF NOT EXISTS email_account_id INTEGER;
+CREATE INDEX IF NOT EXISTS ix_ads_assignments_email_account_id ON ads_assignments (email_account_id);

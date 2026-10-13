@@ -351,6 +351,8 @@ const emailApi = {
     /** Deep links: scope the list to one campaign or one person. */
     campaign_id?: number;
     contact_id?: number;
+    /** Multi-inbox: only threads sent from this unified sender. */
+    account_id?: number;
   }): Promise<InboxPage> =>
     (await api.get("/email/inbox/conversations", { params })).data,
   conversation: async (

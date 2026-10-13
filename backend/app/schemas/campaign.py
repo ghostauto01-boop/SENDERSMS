@@ -8,6 +8,20 @@ from typing import Optional
 from pydantic import BaseModel, Field, field_validator
 
 
+SENDER_DISTRIBUTIONS = ("round_robin", "weighted", "random")
+
+
+def _clean_sender_distribution(value):
+    if value is None:
+        return "round_robin"
+    mode = str(value).strip().lower()
+    if mode not in SENDER_DISTRIBUTIONS:
+        raise ValueError(
+            f"sender_distribution must be one of: {', '.join(SENDER_DISTRIBUTIONS)}"
+        )
+    return mode
+
+
 def _require_future(value: Optional[datetime]) -> Optional[datetime]:
     """Reject launch times in the past.
 
@@ -55,6 +69,9 @@ class CampaignCreate(BaseModel):
     email_account_id: Optional[int] = None
     #: Used automatically when the primary sender rejects a send.
     fallback_email_account_id: Optional[int] = None
+    email_account_ids: Optional[list[int]] = None
+    sender_distribution: str = "round_robin"
+    email_sender_weights: Optional[dict] = None
     subject: Optional[str] = Field(default=None, max_length=500)
     html_body: Optional[str] = None
     #: [{"name": "...", "content_base64": "..."}] attached to every email.
@@ -63,6 +80,7 @@ class CampaignCreate(BaseModel):
     track_clicks: bool = True
 
     _check_future = field_validator("scheduled_start_at")(_require_future)
+    _check_distribution = field_validator("sender_distribution")(_clean_sender_distribution)
 
 
 class CampaignUpdate(BaseModel):
@@ -87,6 +105,9 @@ class CampaignUpdate(BaseModel):
     channel: Optional[str] = None
     email_account_id: Optional[int] = None
     fallback_email_account_id: Optional[int] = None
+    email_account_ids: Optional[list[int]] = None
+    sender_distribution: Optional[str] = None
+    email_sender_weights: Optional[dict] = None
     subject: Optional[str] = Field(default=None, max_length=500)
     html_body: Optional[str] = None
     attachments: Optional[list[dict]] = None
@@ -94,6 +115,7 @@ class CampaignUpdate(BaseModel):
     track_clicks: Optional[bool] = None
 
     _check_future = field_validator("scheduled_start_at")(_require_future)
+    _check_distribution = field_validator("sender_distribution")(_clean_sender_distribution)
 
 
 class CampaignOut(BaseModel):
@@ -113,6 +135,9 @@ class CampaignOut(BaseModel):
     channel: str = "sms"
     email_account_id: Optional[int] = None
     fallback_email_account_id: Optional[int] = None
+    email_account_ids: Optional[list[int]] = None
+    sender_distribution: str = "round_robin"
+    email_sender_weights: Optional[dict] = None
     subject: Optional[str] = None
     html_body: Optional[str] = None
     attachments: Optional[list[dict]] = None

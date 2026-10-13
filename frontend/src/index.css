@@ -14,6 +14,41 @@
  *  3. native-app behaviour on a phone — safe areas, no rubber-band bounce,
  *     44px touch targets, no input zoom on iOS.
  */
+/* ---------------------------------------------------------------------------
+   Email inbox colour tokens. The app's dark mode is a `.dark` class set from
+   `prefers-color-scheme` (see MainLayout), so these follow it; the media
+   query below also covers any surface rendered before that class is set.
+   Dark values are the high-contrast grey scheme: #e0e0e0 text and a LIGHT
+   blue (#66b3ff, ≥4.5:1 on the dark surfaces) — never brand-blue #2563eb
+   body/link text on a dark-blue background, which was ~2:1 and unreadable.
+   --------------------------------------------------------------------------- */
+:root {
+  --email-text-primary: #111827;
+  --email-text-secondary: #4b5563;
+  --email-bg-primary: #ffffff;
+  --email-bg-secondary: #f5f5f5;
+  --email-link: #1d4ed8;
+  --email-border: #e5e7eb;
+}
+.dark {
+  --email-text-primary: #e0e0e0;
+  --email-text-secondary: #b0b0b0;
+  --email-bg-primary: #141b28;
+  --email-bg-secondary: #1c2637;
+  --email-link: #66b3ff;
+  --email-border: #374357;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    --email-text-primary: #e0e0e0;
+    --email-text-secondary: #b0b0b0;
+    --email-bg-primary: #141b28;
+    --email-bg-secondary: #1c2637;
+    --email-link: #66b3ff;
+    --email-border: #374357;
+  }
+}
+
 @layer base {
   html {
     -webkit-text-size-adjust: 100%;
@@ -172,6 +207,46 @@
   .chip-active {
     @apply chip bg-primary-600 border-primary-600 text-white hover:text-white
            hover:border-primary-600 shadow-sm shadow-primary-600/25;
+  }
+
+  /* Email inbox, on the tokens above (light + dark, WCAG AA ≥ 4.5:1). */
+  .email-inbox {
+    background-color: var(--email-bg-primary);
+    color: var(--email-text-primary);
+  }
+  .email-list-item {
+    background-color: var(--email-bg-secondary);
+    color: var(--email-text-primary);
+    border-color: var(--email-border);
+  }
+  .email-subject {
+    color: var(--email-text-primary);
+    font-weight: 600;
+  }
+  .email-from {
+    color: var(--email-text-secondary);
+    font-size: 0.875rem;
+  }
+  .email-body-preview {
+    color: var(--email-text-secondary);
+  }
+  .email-inbox a,
+  .email-body-content a {
+    color: var(--email-link);
+  }
+  /* Sender HTML arrives with its own (light-mode) colours. In dark mode its
+     text inherits the readable foreground and its links take the light-blue
+     token, instead of dark-blue text disappearing into the surface. */
+  .email-body-content {
+    color: var(--email-text-primary);
+    background-color: var(--email-bg-secondary);
+    overflow-wrap: anywhere;
+  }
+  .dark .email-body-content :where(p, div, span, li, td, th, h1, h2, h3, h4, h5, h6, blockquote, font) {
+    color: inherit !important;
+  }
+  .dark .email-body-content a {
+    color: var(--email-link) !important;
   }
 }
 

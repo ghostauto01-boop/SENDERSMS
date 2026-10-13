@@ -5,7 +5,7 @@ Campaign and CampaignContact models.
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -55,6 +55,18 @@ class Campaign(Base):
     email_account_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     #: Optional unified sender tried automatically if the primary provider rejects the send.
     fallback_email_account_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    #: OPTIONAL multi-sender pool: unified sender ids (positive Brevo,
+    #: negative Gmail mailbox) across which contacts are distributed so one
+    #: From address does not take the whole campaign's volume/reputation hit.
+    #: NULL/empty = legacy single-sender behaviour (``email_account_id``).
+    email_account_ids: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    #: round_robin | weighted | random — how the pool above is distributed.
+    sender_distribution: Mapped[str] = mapped_column(
+        String(20), default="round_robin", nullable=False
+    )
+    #: Optional {unified_sender_id: weight} map for "weighted", mirroring
+    #: creative allocations. NULL = equal weights.
+    email_sender_weights: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     subject: Mapped[str | None] = mapped_column(String(500), nullable=True)
     #: Rich body for email campaigns (template_id / message_body still work).
     html_body: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -124,6 +136,11 @@ class CampaignContact(Base):
         String(50), default="pending", nullable=False, index=True
     )  # pending, queued, sent, delivered, failed, replied, opted_out
     sequence_step: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    #: Sender this contact was pinned to from the campaign's multi-sender
+    #: pool (unified id), assigned like a creative so the whole thread —
+    #: initial send and follow-ups — stays on one From address. NULL = the
+    #: campaign's single/default sender decides at send time.
+    email_account_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     next_action_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
 
     # Message tracking

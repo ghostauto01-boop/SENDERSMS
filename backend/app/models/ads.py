@@ -21,6 +21,7 @@ from typing import Optional
 from uuid import uuid4
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     DateTime,
     Float,
@@ -99,6 +100,18 @@ class AdsCampaign(Base):
     email_account_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     #: Optional unified sender tried automatically if the primary provider rejects the send.
     fallback_email_account_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    #: OPTIONAL multi-sender pool (unified sender ids: positive Brevo,
+    #: negative Gmail mailbox). Contacts are distributed across it — see
+    #: ``AdsAssignment.email_account_id`` — so one From address does not take
+    #: the whole campaign's volume. NULL/empty = legacy single sender.
+    email_account_ids: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    #: round_robin | weighted | random — how the pool above is distributed.
+    sender_distribution: Mapped[str] = mapped_column(
+        String(20), default="round_robin", nullable=False
+    )
+    #: Optional {unified_sender_id: weight} map for "weighted", mirroring
+    #: creative allocations. NULL = equal weights.
+    email_sender_weights: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     #: Subject used by creatives that do not set their own.
     subject: Mapped[str | None] = mapped_column(String(500), nullable=True)
     track_opens: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
@@ -434,6 +447,12 @@ class AdsAssignment(Base):
     )
     #: Normalized phone captured at assignment time (dedupe + audit trail).
     phone_number: Mapped[str | None] = mapped_column(String(30), nullable=True, index=True)
+
+    #: Sender this contact was pinned to from the campaign's multi-sender
+    #: pool (unified id) — assigned exactly like ``creative_id`` is, so a
+    #: contact keeps one From address. NULL = single/default sender, or a
+    #: per-creative sender override, decides at dispatch time.
+    email_account_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
 
     #: equal | percentage | weighted | random | manual
     assignment_method: Mapped[str] = mapped_column(String(20), default="equal", nullable=False)

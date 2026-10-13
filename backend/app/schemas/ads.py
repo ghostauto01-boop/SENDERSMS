@@ -57,6 +57,20 @@ def _clean_drip_mode(v):
     return mode
 
 
+SENDER_DISTRIBUTIONS = ("round_robin", "weighted", "random")
+
+
+def _clean_sender_distribution(v):
+    if v is None:
+        return "round_robin"
+    mode = str(v).strip().lower()
+    if mode not in SENDER_DISTRIBUTIONS:
+        raise ValueError(
+            f"sender_distribution must be one of: {', '.join(SENDER_DISTRIBUTIONS)}"
+        )
+    return mode
+
+
 class CampaignIn(BaseModel):
     name: str = Field(..., max_length=255)
     description: Optional[str] = None
@@ -83,6 +97,9 @@ class CampaignIn(BaseModel):
     # --- Email sender selection (multi-API) -----------------------------
     email_account_id: Optional[int] = None
     fallback_email_account_id: Optional[int] = None
+    email_account_ids: Optional[list[int]] = None
+    sender_distribution: str = "round_robin"
+    email_sender_weights: Optional[dict] = None
     subject: Optional[str] = Field(default=None, max_length=500)
     track_opens: bool = True
     track_clicks: bool = True
@@ -100,6 +117,11 @@ class CampaignIn(BaseModel):
     @classmethod
     def _validate_drip_mode(cls, v):
         return _clean_drip_mode(v)
+
+    @field_validator("sender_distribution")
+    @classmethod
+    def _validate_sender_distribution(cls, v):
+        return _clean_sender_distribution(v)
 
 
 class CampaignPatch(BaseModel):
@@ -127,6 +149,9 @@ class CampaignPatch(BaseModel):
     # --- Email sender selection (multi-API) -----------------------------
     email_account_id: Optional[int] = None
     fallback_email_account_id: Optional[int] = None
+    email_account_ids: Optional[list[int]] = None
+    sender_distribution: Optional[str] = None
+    email_sender_weights: Optional[dict] = None
     subject: Optional[str] = None
     track_opens: Optional[bool] = None
     track_clicks: Optional[bool] = None
@@ -145,6 +170,11 @@ class CampaignPatch(BaseModel):
     def _validate_drip_mode(cls, v):
         return _clean_drip_mode(v)
 
+    @field_validator("sender_distribution")
+    @classmethod
+    def _validate_sender_distribution(cls, v):
+        return _clean_sender_distribution(v)
+
 
 class CampaignOut(BaseModel):
     id: int
@@ -161,6 +191,9 @@ class CampaignOut(BaseModel):
     channel: str = "sms"
     email_account_id: Optional[int] = None
     fallback_email_account_id: Optional[int] = None
+    email_account_ids: Optional[list[int]] = None
+    sender_distribution: str = "round_robin"
+    email_sender_weights: Optional[dict] = None
     subject: Optional[str] = None
     track_opens: bool = True
     track_clicks: bool = True
@@ -208,6 +241,8 @@ class CampaignOut(BaseModel):
         "optimize_action", mode="before",
     )(_fill_optimize_default)
 
+
+    _fill_sender = field_validator("sender_distribution", mode="before")(lambda v: v or "round_robin")
     model_config = {"from_attributes": True}
 
 

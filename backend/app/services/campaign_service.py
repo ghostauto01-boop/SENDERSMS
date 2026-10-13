@@ -167,6 +167,9 @@ class CampaignService:
             allow_weekends=data.get("allow_weekends", True),
             email_account_id=data.get("email_account_id"),
             fallback_email_account_id=data.get("fallback_email_account_id"),
+            email_account_ids=data.get("email_account_ids"),
+            sender_distribution=data.get("sender_distribution") or "round_robin",
+            email_sender_weights=data.get("email_sender_weights"),
             attachments=data.get("attachments"),
             subject=(data.get("subject") or "").strip() or None,
             html_body=data.get("html_body"),
@@ -642,16 +645,39 @@ class CampaignService:
 
             eligible = [c for c in contacts if not contact_is_blocked_from_send(c)]
 
+        # Multi-sender pool (optional): pin each new contact to a sender
+        # exactly like a creative assignment, offset by the contacts already
+        # present so a second populate call keeps the split even.
+        from app.services import email_service as _email_service
+
+        pool = (
+            _email_service.campaign_sender_pool(campaign)
+            if (campaign.channel or "sms") == "email"
+            else []
+        )
+        pinned_so_far = len(existing) if len(pool) > 1 else 0
+
         added = 0
         for contact in eligible:
             if contact.id in existing:
                 continue
+            pinned = (
+                _email_service.pick_sender_id(
+                    pool,
+                    key=pinned_so_far + added,
+                    distribution=getattr(campaign, "sender_distribution", None),
+                    weights=getattr(campaign, "email_sender_weights", None),
+                )
+                if len(pool) > 1
+                else None
+            )
             self.db.add(
                 CampaignContact(
                     campaign_id=campaign.id,
                     contact_id=contact.id,
                     status="pending",
                     sequence_step=0,
+                    email_account_id=pinned,
                 )
             )
             added += 1

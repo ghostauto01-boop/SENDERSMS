@@ -312,7 +312,7 @@ function MessageCard({
 
       {expanded && (
         <div className="px-3.5 pb-3.5 animate-fade-in">
-          <div className="rounded-xl bg-gray-50 dark:bg-gray-900/40 p-3.5 text-sm text-gray-800 dark:text-gray-100">
+          <div className="email-body-content rounded-xl p-3.5 text-sm">
             {message.html_body ? (
               <div
                 className="prose prose-sm max-w-none dark:prose-invert break-anywhere
@@ -367,6 +367,9 @@ export default function EmailInboxPage() {
   const [showCc, setShowCc] = useState(false);
   const [sending, setSending] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
+  /** Multi-inbox: "" = every sender, otherwise one unified sender id. */
+  const [senderFilter, setSenderFilter] = useState("");
+  const [senders, setSenders] = useState<{ id: number; name: string; from_email: string }[]>([]);
   const [showContactInfo, setShowContactInfo] = useState(false);
   const [showBooking, setShowBooking] = useState(false);
   const [editingMeetingId, setEditingMeetingId] = useState<number | null>(null);
@@ -412,6 +415,7 @@ export default function EmailInboxPage() {
           replied_only: view === "replied" || undefined,
           campaign_id: campaignFilter ? Number(campaignFilter) : undefined,
           contact_id: contactFilter ? Number(contactFilter) : undefined,
+          account_id: senderFilter ? Number(senderFilter) : undefined,
           per_page: 50,
         });
         setConversations(data.items);
@@ -423,8 +427,16 @@ export default function EmailInboxPage() {
         setLoading(false);
       }
     },
-    [status, search, view, campaignFilter, contactFilter]
+    [status, search, view, campaignFilter, contactFilter, senderFilter]
   );
+
+  // The senders behind the multi-inbox filter (Brevo accounts + mailboxes).
+  useEffect(() => {
+    emailApi
+      .listSenders()
+      .then((data) => setSenders(data.items || []))
+      .catch(() => setSenders([]));
+  }, []);
 
   useEffect(() => {
     load();
@@ -575,7 +587,7 @@ export default function EmailInboxPage() {
   const contactHasPhone = hasSmsPhone(contact?.phone_number);
 
   return (
-    <div className="max-w-7xl mx-auto">
+    <div className="email-inbox max-w-7xl mx-auto rounded-2xl">
       {/* ---------- Header: title, count, mailbox links ---------- */}
       <div className={`flex flex-wrap items-start justify-between gap-3 mb-4 ${openId ? "hidden lg:flex" : ""}`}>
         <div className="min-w-0">
@@ -711,6 +723,22 @@ export default function EmailInboxPage() {
               )}
             </div>
 
+            {senders.length > 1 && (
+              <select
+                className="input py-1.5 text-sm"
+                value={senderFilter}
+                onChange={(e) => setSenderFilter(e.target.value)}
+                aria-label="Filter inbox by sender"
+              >
+                <option value="">All senders (every inbox)</option>
+                {senders.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} — {s.from_email}
+                  </option>
+                ))}
+              </select>
+            )}
+
             {/* On a phone six filter chips do not fit: the active one plus a
                 picker. On sm+ they are a scrollable row. */}
             <div className="sm:hidden">
@@ -800,7 +828,7 @@ export default function EmailInboxPage() {
                   <button
                     key={c.id}
                     onClick={() => open(c.id)}
-                    className={`stagger-item w-full text-left px-3 py-3 flex gap-3 items-start transition-colors ${
+                    className={`email-list-item stagger-item w-full text-left px-3 py-3 flex gap-3 items-start transition-colors ${
                       active
                         ? "bg-primary-50 dark:bg-primary-950/30"
                         : "hover:bg-gray-50 dark:hover:bg-gray-700/30"
@@ -833,11 +861,11 @@ export default function EmailInboxPage() {
                           {when(c.last_message_at)}
                         </span>
                       </span>
-                      <span className="block text-xs text-gray-600 dark:text-gray-400 truncate mt-0.5">
-                        <span className={unread ? "font-semibold text-gray-800 dark:text-gray-200" : ""}>
+                      <span className="email-body-preview block text-xs truncate mt-0.5">
+                        <span className={`email-subject ${unread ? "font-semibold" : ""}`}>
                           {c.subject || "(no subject)"}
                         </span>
-                        {c.preview ? <span className="text-gray-400"> — {c.preview}</span> : null}
+                        {c.preview ? <span> — {c.preview}</span> : null}
                       </span>
                       <span className="flex items-center gap-1.5 mt-1 flex-wrap">
                         {unread && <span className="badge-blue">{c.unread_count} new</span>}

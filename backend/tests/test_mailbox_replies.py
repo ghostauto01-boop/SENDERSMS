@@ -133,9 +133,11 @@ async def test_bulk_email_carries_a_button_not_a_paragraph(db):
         account=account, append_unsubscribe=True,
     )
     assert rendered["html"].count(">Unsubscribe</a>") == 1
-    assert "/api/v1/email/unsubscribe?e=hello%40acme-leads.io" in rendered["html"]
-    assert rendered["text"].strip().endswith("Unsubscribe: https://app.example.test/api/v1/email/unsubscribe?e=hello%40acme-leads.io&t=" +
-                                             email_service._unsubscribe_token("hello@acme-leads.io"))
+    # The signed token names the RECIPIENT (prospect@acme.com) — it used to
+    # name the sender's own address, so the link unsubscribed the sender.
+    assert "/api/v1/email/unsubscribe?e=prospect%40acme.com" in rendered["html"]
+    assert rendered["text"].strip().endswith("Unsubscribe: https://app.example.test/api/v1/email/unsubscribe?e=prospect%40acme.com&t=" +
+                                             email_service._unsubscribe_token("prospect@acme.com"))
     # The old wording must be gone for good — it read as a legal paragraph.
     for phrase in ("click here", "no longer wish", "will no longer", "If you'd prefer"):
         assert phrase.lower() not in rendered["html"].lower()

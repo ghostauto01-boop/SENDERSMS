@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import adsApi from "../../api/ads";
 import { Field, Modal, fromLocalInput, toLocalInput } from "./ui";
+import SenderPoolPicker, { senderPoolFromCampaign, SenderPoolValue } from "../../components/SenderPoolPicker";
 
 /**
  * Create / edit a campaign. Every field here maps to a real backend setting --
@@ -57,6 +58,7 @@ export default function CampaignBuilder({
     optimize_action: "shift",
     email_account_id: "",
     fallback_email_account_id: "",
+    sender_pool: senderPoolFromCampaign(campaign),
     subject: "",
     track_opens: true,
     track_clicks: true,
@@ -76,6 +78,7 @@ export default function CampaignBuilder({
         max_per_contact_per_week: campaign.max_per_contact_per_week ?? "",
         email_account_id: campaign.email_account_id ?? "",
         fallback_email_account_id: campaign.fallback_email_account_id ?? "",
+        sender_pool: senderPoolFromCampaign(campaign),
         subject: campaign.subject ?? "",
         track_opens: campaign.track_opens ?? true,
         track_clicks: campaign.track_clicks ?? true,
@@ -125,6 +128,11 @@ export default function CampaignBuilder({
       payload.fallback_email_account_id = form.fallback_email_account_id
         ? Number(form.fallback_email_account_id)
         : null;
+      // Optional multi-sender pool: empty = single sender above.
+      payload.email_account_ids = form.sender_pool?.ids?.length ? form.sender_pool.ids : null;
+      payload.sender_distribution = form.sender_pool?.distribution || "round_robin";
+      payload.email_sender_weights =
+        form.sender_pool?.distribution === "weighted" ? form.sender_pool.weights : null;
       payload.subject = form.subject?.trim() || null;
       payload.track_opens = !!form.track_opens;
       payload.track_clicks = !!form.track_clicks;
@@ -235,6 +243,12 @@ export default function CampaignBuilder({
                     </select>
                   </Field>
                 </div>
+                <SenderPoolPicker
+                  accounts={emailAccounts}
+                  value={(form.sender_pool as SenderPoolValue) || senderPoolFromCampaign(null)}
+                  onChange={(next) => set("sender_pool", next)}
+                  primaryId={form.email_account_id || null}
+                />
                 <Field
                   label="Campaign subject"
                   hint="Used by creatives that do not set their own subject. Supports {{variables}}."

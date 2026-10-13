@@ -453,6 +453,180 @@ async def resolve_sender(db: AsyncSession, sender_id: int | None):
     return await get_default_sender(db)
 
 
+# ---------------------------------------------------------------------------
+# Multi-sender pools (OPTIONAL — every campaign works without one)
+# ---------------------------------------------------------------------------
+#: How a campaign's sender pool is spread across its contacts.
+SENDER_DISTRIBUTIONS = ("round_robin", "weighted", "random")
+
+
+def normalize_sender_ids(raw, *, primary: int | None = None) -> list[int]:
+    """Coerce a stored/API sender pool into a clean list of unified ids.
+
+    Accepts the JSON list the models store, a JSON string (rows written by
+    hand), or a comma string. Zeroes, junk and duplicates are dropped and the
+    campaign's legacy single sender is folded in first when it is not already
+    there — a pool *extends* the primary sender, it does not replace it.
+    """
+    values: list = []
+    if isinstance(raw, str):
+        raw = raw.strip()
+        if raw:
+            try:
+                parsed = json.loads(raw)
+                values = parsed if isinstance(parsed, list) else [parsed]
+            except (TypeError, ValueError):
+                values = raw.split(",")
+    elif isinstance(raw, (list, tuple)):
+        values = list(raw)
+    ids: list[int] = []
+    for value in ([primary] if primary else []) + values:
+        try:
+            sender = int(value)
+        except (TypeError, ValueError):
+            continue
+        if sender != 0 and sender not in ids:
+            ids.append(sender)
+    return ids
+
+
+def campaign_sender_pool(campaign) -> list[int]:
+    """The effective pool for a campaign row (classic or Ads), possibly []."""
+    if campaign is None:
+        return []
+    return normalize_sender_ids(
+        getattr(campaign, "email_account_ids", None),
+        primary=getattr(campaign, "email_account_id", None),
+    )
+
+
+def sender_weights_map(raw, pool: list[int]) -> dict[int, float]:
+    """``{sender_id: weight}`` for the pool; missing senders weigh 1."""
+    weights: dict[int, float] = {}
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except (TypeError, ValueError):
+            raw = None
+    if isinstance(raw, dict):
+        for key, value in raw.items():
+            try:
+                weights[int(key)] = max(float(value), 0.0)
+            except (TypeError, ValueError):
+                continue
+    return {sender: weights.get(sender, 1.0) for sender in pool}
+
+
+def pick_sender_id(
+    pool: list[int],
+    *,
+    key: int | str,
+    distribution: str | None = "round_robin",
+    weights: dict | None = None,
+) -> int | None:
+    """Which pool member *key* (assignment/contact id) is pinned to.
+
+    Deterministic for every strategy, so a retry, a follow-up or a worker
+    restart always lands on the same sender for the same contact — nobody
+    gets the same campaign twice from two different From addresses.
+
+    * ``round_robin`` — contacts in order split as evenly as possible.
+    * ``weighted`` — like creative allocations: weights carve the sequence
+      into proportional runs.
+    * ``random`` — a stable hash of the key ("random-looking", reproducible).
+    """
+    if not pool:
+        return None
+    if len(pool) == 1:
+        return pool[0]
+    mode = (distribution or "round_robin").lower()
+    if mode == "random":
+        import hashlib
+
+        digest = hashlib.sha256(f"sender-pool:{key}".encode()).digest()
+        return pool[int.from_bytes(digest[:8], "big") % len(pool)]
+    numeric = key if isinstance(key, int) else sum(
+        (i + 1) * ord(ch) for i, ch in enumerate(str(key))
+    )
+    if mode == "weighted":
+        weight_map = sender_weights_map(weights, pool)
+        total = sum(weight_map.values())
+        if total > 0:
+            # Interleaved weighted round-robin: build one period of the
+            # schedule with a largest-deficit walk (so 75/25 reads
+            # A A A B A A A B, not 75 A's then 25 B's — the second would
+            # burn the first sender before the second is ever used), then
+            # repeat it. Weights are scaled to a period of at most 100.
+            scale = 100.0 / total if total > 100 else 1.0
+            scaled = {s: max(1, round(w * scale)) for s, w in weight_map.items() if w > 0}
+            if not scaled:
+                return pool[numeric % len(pool)]
+            period_total = sum(scaled.values())
+            counts = dict.fromkeys(scaled, 0)
+            pattern: list[int] = []
+            for slot in range(period_total):
+                chosen = max(
+                    scaled,
+                    key=lambda s: ((slot + 1) * scaled[s] / period_total) - counts[s],
+                )
+                counts[chosen] += 1
+                pattern.append(chosen)
+            return pattern[numeric % len(pattern)]
+    return pool[numeric % len(pool)]
+
+
+def sender_assignment_counts(pool: list[int], total: int, **pick_kwargs) -> dict[int, int]:
+    """How many of the next *total* contacts each pool member would get."""
+    counts = {sender: 0 for sender in pool}
+    for index in range(max(total, 0)):
+        chosen = pick_sender_id(pool, key=index, **pick_kwargs)
+        if chosen is not None:
+            counts[chosen] = counts.get(chosen, 0) + 1
+    return counts
+
+
+async def resolve_campaign_sender(
+    db: AsyncSession,
+    campaign,
+    *,
+    key: int | str = 0,
+    pinned_sender_id: int | None = None,
+    creative_sender_id: int | None = None,
+):
+    """Pick the sender for one campaign contact, pool-aware.
+
+    Priority: the contact's pinned sender → a per-creative override → the
+    campaign's multi-sender pool → the campaign's single sender → the
+    default sender. With a pool, an unusable member (disabled, burned key)
+    is skipped in favour of the next pool member in rotation order, so one
+    dead sender degrades the pool instead of stalling the campaign; with no
+    pool the legacy single-sender behaviour is unchanged.
+    """
+    explicit = pinned_sender_id or creative_sender_id
+    if explicit:
+        return await get_sender(db, explicit)
+    pool = campaign_sender_pool(campaign)
+    if len(pool) > 1 or (pool and getattr(campaign, "email_account_ids", None)):
+        start = pick_sender_id(
+            pool,
+            key=key,
+            distribution=getattr(campaign, "sender_distribution", None),
+            weights=getattr(campaign, "email_sender_weights", None),
+        )
+        if start is None:
+            return None
+        ordered = pool[pool.index(start):] + pool[:pool.index(start)]
+        for candidate_id in ordered:
+            candidate = await get_sender(db, candidate_id)
+            if candidate is None:
+                continue
+            usable, _why = await sender_is_usable(candidate)
+            if usable:
+                return candidate
+        return None
+    return await resolve_sender(db, getattr(campaign, "email_account_id", None))
+
+
 async def sender_is_usable(sender) -> tuple[bool, str | None]:
     if sender is None:
         return False, "no_sender_configured"
@@ -1193,9 +1367,10 @@ async def build_headers(
 #: it (see ``looks_like_unsubscribe``), it is simply no longer advertised in a
 #: paragraph.
 _UNSUBSCRIBE_BUTTON = (
-    '<div style="margin-top:32px;text-align:center">'
+    '<div class="email-footer" style="margin-top:32px;padding-top:16px;'
+    'border-top:1px solid #e5e7eb;text-align:center">'
     '<a href="{url}" target="_blank" rel="noopener" style="display:inline-block;'
-    'padding:8px 18px;border:1px solid #d1d5db;border-radius:8px;background:#ffffff;'
+    'padding:6px 14px;border:1px solid #e5e7eb;border-radius:6px;background:#f3f4f6;'
     'color:#6b7280;font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,Helvetica,'
     'Arial,sans-serif;font-size:12px;line-height:18px;text-decoration:none">'
     'Unsubscribe</a></div>'
@@ -1203,8 +1378,29 @@ _UNSUBSCRIBE_BUTTON = (
 
 
 def unsubscribe_button_html(url: str) -> str:
-    """The one-button unsubscribe block appended to bulk HTML mail."""
+    """The footer-only unsubscribe block appended to bulk HTML mail.
+
+    Deliberately a footer, never part of the message body: small (12px),
+    grey-on-grey, separated from the copy by a hairline — present for the
+    reader (and for Gmail/Yahoo bulk-sender rules) without making the mail
+    read as a newsletter blast.
+    """
     return _UNSUBSCRIBE_BUTTON.format(url=url)
+
+
+def _append_html_footer(html: str, footer: str) -> str:
+    """Insert *footer* inside ``</body>`` when there is one, else append it.
+
+    Appending after ``</html>`` (what a bare ``html + footer`` does to the
+    shell :func:`text_to_html` produces) puts the footer outside the
+    document; some clients drop everything out there, button included.
+    """
+    lowered = html.lower()
+    for closing in ("</body>", "</html>"):
+        idx = lowered.rfind(closing)
+        if idx != -1:
+            return html[:idx] + footer + html[idx:]
+    return html + footer
 
 
 def unsubscribe_line_text(url: str) -> str:
@@ -1229,10 +1425,34 @@ def apply_unsubscribe(
     url = unsubscribe_url(address or "")
     if not url:
         return text or "", html
-    return (
-        unsubscribe_line_text(url) if (text or "").strip() else f"Unsubscribe: {url}",
-        (html or "") + unsubscribe_button_html(url) if html else html,
+    body_text = text or ""
+    # Idempotent: a retry/re-render must never stack a second footer.
+    if url in body_text and html and url in html:
+        return body_text, html
+    # The body ALWAYS survives. The previous implementation returned
+    # ``unsubscribe_line_text(url)`` *instead of* the text whenever a body
+    # existed (a missing ``body_text +``), so every bulk email Brevo sent
+    # contained nothing but the unsubscribe line — the blank-email bug.
+    new_text = (
+        body_text.rstrip() + unsubscribe_line_text(url)
+        if body_text.strip()
+        else f"Unsubscribe: {url}"
     )
+    if (html or "").strip():
+        new_html = html if url in html else _append_html_footer(html, unsubscribe_button_html(url))
+    elif body_text.strip():
+        # Plain-text-only copy still gets a real HTML part with the footer
+        # button in it, rather than an HTML part holding only the button.
+        new_html = _append_html_footer(text_to_html(body_text), unsubscribe_button_html(url))
+    else:
+        new_html = html
+    if url in body_text:  # text already carried the line; only the HTML needed it
+        new_text = body_text
+    logger.debug(
+        "EMAIL: unsubscribe footer applied recipient=%s text_len=%d html_len=%d",
+        bool(address), len(new_text), len(new_html or ""),
+    )
+    return new_text, new_html
 
 
 def _unsubscribe_footer(account: EmailAccount | None) -> str:
@@ -1281,9 +1501,18 @@ async def render_email(
         html = text_to_html(text or "")
 
     if append_unsubscribe and account is not None:
-        address = (getattr(account, "reply_to", None) or sender_email(account)).strip()
-        text, html = apply_unsubscribe(text or "", html, address)
+        # The signed token must name the RECIPIENT. This used to pass the
+        # account's reply-to/From address, so the link (a) unsubscribed the
+        # sender's own address when clicked and (b) disagreed with the
+        # List-Unsubscribe header, which is built from the recipient.
+        text, html = apply_unsubscribe(text or "", html, (contact.email or "").strip())
 
+    # Lengths only, never copy: enough to prove in the logs that a body was
+    # read and rendered, without writing personal mail to disk.
+    logger.debug(
+        "EMAIL: rendered contact=%s subject_len=%d text_len=%d html_len=%d",
+        contact.id, len(rendered_subject), len(text or ""), len(html or ""),
+    )
     return {"subject": rendered_subject, "text": text or "", "html": html or ""}
 
 

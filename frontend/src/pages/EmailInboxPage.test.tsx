@@ -6,6 +6,7 @@ import EmailInboxPage from "./EmailInboxPage";
 const { emailApi, apiGet } = vi.hoisted(() => ({
   emailApi: {
     conversations: vi.fn(),
+    listSenders: vi.fn(),
     conversation: vi.fn(),
     markRead: vi.fn(),
     messageEvents: vi.fn(),
@@ -104,6 +105,12 @@ function renderEmailInbox(url = "/email-inbox") {
 beforeEach(() => {
   vi.clearAllMocks();
   emailApi.conversations.mockResolvedValue(conversationList);
+  emailApi.listSenders.mockResolvedValue({
+    items: [
+      { id: 1, name: "Main sender", from_email: "main@acme.io" },
+      { id: 2, name: "Backup sender", from_email: "backup@acme.io" },
+    ],
+  });
   emailApi.conversation.mockResolvedValue(contactDetail);
   emailApi.markRead.mockResolvedValue({ success: true });
   emailApi.messageEvents.mockResolvedValue({ events: [] });
@@ -114,6 +121,19 @@ beforeEach(() => {
       return Promise.resolve({ data: { items: [meeting] } });
     }
     return Promise.reject(new Error(`Unmocked GET ${url}`));
+  });
+});
+
+describe("EmailInboxPage — multi-sender inbox filter", () => {
+  it("filters threads to one sender's inbox", async () => {
+    renderEmailInbox();
+    const select = await screen.findByLabelText("Filter inbox by sender");
+    fireEvent.change(select, { target: { value: "2" } });
+    await waitFor(() =>
+      expect(emailApi.conversations).toHaveBeenCalledWith(
+        expect.objectContaining({ account_id: 2 })
+      )
+    );
   });
 });
 
