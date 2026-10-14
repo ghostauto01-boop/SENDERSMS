@@ -139,8 +139,12 @@ describe("InboxPage — WhatsApp-style inbox", () => {
     await waitFor(() => expect(screen.getByPlaceholderText("Type a message")).toBeInTheDocument());
 
     const ta = screen.getByPlaceholderText("Type a message") as HTMLTextAreaElement;
-    // Mobile-friendly attributes
+    // Mobile-friendly attributes. 16px (text-base) stops iOS zooming the page
+    // when the keyboard opens, which was scrolling the thread to the top.
     expect(ta.getAttribute("enterkeyhint")).toBe("send");
+    expect(ta.className).toContain("text-base");
+    expect(document.querySelector("[data-chat-scroll]")).toBeTruthy();
+    expect(document.documentElement.classList.contains("chat-lock")).toBe(true);
 
     fireEvent.change(ta, { target: { value: "Sounds great!" } });
     expect(ta.value).toBe("Sounds great!");

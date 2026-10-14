@@ -113,8 +113,11 @@ export default function InboxPage() {
     return campaignOptions.find((c) => c.kind === kind && c.id === id) || { id, kind, name: `Campaign #${id}`, status: "" };
   }, [campaignId, adsCampaignId, campaignOptions]);
 
-  const chatEndRef = useRef<HTMLDivElement>(null);
+  const shellRef = useRef<HTMLDivElement>(null);
+  const chatScrollRef = useRef<HTMLDivElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
+  // Keep the view pinned to the newest message unless the user scrolled up.
+  const nearBottomRef = useRef(true);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -220,9 +223,16 @@ export default function InboxPage() {
       .catch(() => { if (!cancelled) setContactMeetings([]); });
     return () => { cancelled = true; };
   }, [selected?.id]);  
+  // Scroll the message list itself. scrollIntoView walks up to the document
+  // and, with the keyboard open, jumps the thread to the top of the page.
+  const pinChatToBottom = useCallback(() => {
+    const el = chatScrollRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, []);
   useEffect(() => {
-    if (selected && nearBottomRef.current) chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, selected?.id]);
+    if (selected && nearBottomRef.current) pinChatToBottom();
+  }, [messages, selected?.id, pinChatToBottom]);
 
   // Live refresh while the tab is visible; a background tab stops polling so
   // it does not keep the database awake all day. (Coming back refreshes at once.)
@@ -234,10 +244,50 @@ export default function InboxPage() {
     if (!ta) return;
     ta.style.height = "auto";
     ta.style.height = Math.min(ta.scrollHeight, 120) + "px";
-  }, [replyText]);
+    if (nearBottomRef.current) pinChatToBottom();
+  }, [replyText, pinChatToBottom]);
 
-  // Keep the view pinned to the newest message unless the user scrolled up.
-  const nearBottomRef = useRef(true);
+  // Size the shell to the visible viewport (keyboard included) and stop the
+  // document from scrolling while this full-screen chat is mounted.
+  useEffect(() => {
+    const root = document.documentElement;
+    const body = document.body;
+    root.classList.add("chat-lock");
+    body.classList.add("chat-lock");
+    const apply = () => {
+      const shell = shellRef.current;
+      const viewport = window.visualViewport;
+      if (shell && viewport) {
+        shell.style.height = `${Math.round(viewport.height)}px`;
+        shell.style.top = `${Math.round(viewport.offsetTop)}px`;
+      }
+      const focused = taRef.current && document.activeElement === taRef.current;
+      if (nearBottomRef.current || focused) pinChatToBottom();
+    };
+    apply();
+    const viewport = window.visualViewport;
+    viewport?.addEventListener("resize", apply);
+    viewport?.addEventListener("scroll", apply);
+    window.addEventListener("resize", apply);
+    return () => {
+      root.classList.remove("chat-lock");
+      body.classList.remove("chat-lock");
+      viewport?.removeEventListener("resize", apply);
+      viewport?.removeEventListener("scroll", apply);
+      window.removeEventListener("resize", apply);
+      const shell = shellRef.current;
+      if (shell) {
+        shell.style.height = "";
+        shell.style.top = "";
+      }
+    };
+  }, [pinChatToBottom]);
+
+  const onComposerFocus = () => {
+    nearBottomRef.current = true;
+    requestAnimationFrame(() => pinChatToBottom());
+  };
+
   const onChatScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const el = e.currentTarget;
     nearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
@@ -447,12 +497,12 @@ export default function InboxPage() {
 
   /* ================================================================ */
   return (
-    <div className="app-shell w-full bg-gray-900 flex flex-col">
+    <div ref={shellRef} className="app-shell w-full bg-gray-900 flex flex-col">
       {/* WhatsApp Web container */}
-      <div className="flex flex-1 overflow-hidden bg-white dark:bg-gray-900">
+      <div className="flex flex-1 min-h-0 overflow-hidden bg-white dark:bg-gray-900">
 
         {/* ============ LEFT — Conversation list ============ */}
-        <div className={`${selected ? "hidden md:flex" : "flex"} w-full md:w-[420px] lg:w-[420px] flex-shrink-0 flex-col border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900`}>
+        <div className={`${selected ? "hidden md:flex" : "flex"} w-full md:w-[420px] lg:w-[420px] flex-shrink-0 min-h-0 flex-col border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900`}>
           {/* List header (59px, like WhatsApp) */}
           <div className="h-[59px] bg-gray-100 dark:bg-gray-800 flex items-center justify-between px-3 md:px-4 flex-shrink-0 relative">
             <div className="flex items-center gap-2.5 min-w-0">
@@ -748,7 +798,7 @@ export default function InboxPage() {
         </div>
 
         {/* ============ RIGHT — Chat pane ============ */}
-        <div className="flex-1 flex flex-col bg-gray-100 dark:bg-gray-950 relative overflow-hidden">
+        <div className="flex-1 flex flex-col min-h-0 bg-gray-100 dark:bg-gray-950 relative overflow-hidden">
 
           {/* DEBUG VIEW */}
           {debugData ? (
@@ -1015,7 +1065,9 @@ export default function InboxPage() {
 
               {/* Messages area — WhatsApp wallpaper */}
               <div
-                className="flex-1 overflow-y-auto wa-scrollbar px-2 md:px-[6%] lg:px-[9%] py-3 relative"
+                ref={chatScrollRef}
+                data-chat-scroll=""
+                className="chat-scroll flex-1 min-h-0 overflow-y-auto wa-scrollbar px-2 md:px-[6%] lg:px-[9%] py-3 relative"
                 onScroll={onChatScroll}
                 style={{ backgroundColor: "#eff3f9", backgroundImage: CHAT_BG }}
               >
@@ -1104,7 +1156,7 @@ export default function InboxPage() {
                       </div>
                     );
                   })}
-                  <div ref={chatEndRef} className="h-2" />
+                  <div className="h-2" />
                 </div>
               </div>
 
@@ -1155,11 +1207,12 @@ export default function InboxPage() {
                 <div className="flex-1 bg-white dark:bg-gray-700 rounded-[8px] flex items-end gap-2 px-2.5 py-1 shadow-sm min-h-[42px]">
                   <textarea
                     ref={taRef}
-                    className="flex-1 bg-transparent border-none outline-none resize-none py-[9px] text-[15px] leading-5 placeholder:text-gray-500 dark:placeholder:text-gray-400 text-gray-900 dark:text-gray-200 max-h-[120px]"
+                    className="flex-1 bg-transparent border-none outline-none resize-none py-[9px] text-base leading-5 placeholder:text-gray-500 dark:placeholder:text-gray-400 text-gray-900 dark:text-gray-200 max-h-[120px]"
                     placeholder="Type a message"
                     rows={1}
                     value={replyText}
                     onChange={e => setReplyText(e.target.value)}
+                    onFocus={onComposerFocus}
                     onKeyDown={e => {
                       if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendReply(); }
                     }}

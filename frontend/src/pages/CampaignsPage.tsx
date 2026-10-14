@@ -14,6 +14,7 @@ import ChannelSwitch from "../components/ChannelSwitch";
 import emailApi, { EmailSender } from "../api/email";
 import RichEmailEditor, { AttachmentPayload } from "../components/RichEmailEditor";
 import SenderPoolPicker, { senderPoolFromCampaign, SenderPoolValue } from "../components/SenderPoolPicker";
+import { optionalSenderId, senderIdToForm, senderOptionLabel } from "../utils/senders";
 import { inboxLabelFor, inboxLink } from "../utils/inboxRoute";
 
 const statusBadge = (status: string) => {
@@ -505,12 +506,10 @@ function CampaignModal({
   const [subject, setSubject] = useState((campaign as any)?.subject ?? "");
   const [htmlBody, setHtmlBody] = useState((campaign as any)?.html_body ?? "");
   const [emailAccountId, setEmailAccountId] = useState(
-    (campaign as any)?.email_account_id ? String((campaign as any).email_account_id) : ""
+    senderIdToForm((campaign as any)?.email_account_id)
   );
   const [fallbackAccountId, setFallbackAccountId] = useState(
-    (campaign as any)?.fallback_email_account_id
-      ? String((campaign as any).fallback_email_account_id)
-      : ""
+    senderIdToForm((campaign as any)?.fallback_email_account_id)
   );
   const [senderPool, setSenderPool] = useState<SenderPoolValue>(() => senderPoolFromCampaign(campaign as any));
   const [dailyLimit, setDailyLimit] = useState((campaign as any)?.daily_limit?.toString() ?? "");
@@ -606,8 +605,8 @@ function CampaignModal({
             subject: subject.trim(),
             html_body: htmlBody.trim() || null,
             attachments: attachments.length ? attachments : null,
-            email_account_id: emailAccountId ? Number(emailAccountId) : null,
-            fallback_email_account_id: fallbackAccountId ? Number(fallbackAccountId) : null,
+            email_account_id: optionalSenderId(emailAccountId),
+            fallback_email_account_id: optionalSenderId(fallbackAccountId),
             // Optional multi-sender pool: empty = single sender above.
             email_account_ids: senderPool.ids.length ? senderPool.ids : null,
             sender_distribution: senderPool.distribution,
@@ -791,7 +790,7 @@ function CampaignModal({
                     <option value="">Default sender</option>
                     {emailAccounts.map((a) => (
                       <option key={a.id} value={a.id} disabled={!a.is_active}>
-                        {a.name} ({a.sender_type === "gmail" ? "Gmail" : "Brevo"}) — {a.from_email}
+                        {senderOptionLabel(a)}
                         {a.is_active ? "" : " (off)"}
                       </option>
                     ))}
@@ -811,7 +810,7 @@ function CampaignModal({
                         value={a.id}
                         disabled={String(a.id) === emailAccountId || !a.is_active}
                       >
-                        {a.name} ({a.sender_type === "gmail" ? "Gmail" : "Brevo"})
+                        {senderOptionLabel(a)}
                       </option>
                     ))}
                   </select>

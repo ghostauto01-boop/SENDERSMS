@@ -1388,7 +1388,7 @@ async def reply(
     db: AsyncSession = Depends(get_db),
     cu: User = Depends(get_current_user),
 ):
-    """Reply inside an email thread, from the same sender the thread started on."""
+    """Reply inside an email thread, from a connected Gmail mailbox."""
     conversation = (
         await db.execute(
             select(Conversation).where(
@@ -1455,6 +1455,7 @@ async def reply(
         cc=data.cc,
         bcc=data.bcc,
         recipient_address=reply_address,
+        as_reply=True,
     )
     if message is None:
         raise HTTPException(400, "This contact cannot be emailed (opted out or suppressed)")

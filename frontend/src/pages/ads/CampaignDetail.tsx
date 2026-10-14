@@ -35,6 +35,7 @@ import TemplatePicker from "../../components/TemplatePicker";
 import ContactPicker from "../../components/ContactPicker";
 import RichEmailEditor from "../../components/RichEmailEditor";
 import { smsCount } from "../../utils/sms";
+import { senderOptionLabel } from "../../utils/senders";
 import { Badge, Bar, Empty, Field, Metric, Modal, Stat, Tabs, Toggle, WinnerBadge, fmtDate } from "./ui";
 import CampaignBuilder from "./CampaignBuilder";
 
@@ -1708,7 +1709,7 @@ function CreativeEditor({
                 <option value="">Campaign sender</option>
                 {emailAccounts.map((a: any) => (
                   <option key={a.id} value={a.id} disabled={!a.is_active}>
-                    {a.name} ({a.sender_type === "gmail" ? "Gmail" : "Brevo"}) — {a.from_email}
+                    {senderOptionLabel(a)}
                   </option>
                 ))}
               </select>

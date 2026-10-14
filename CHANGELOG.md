@@ -1,3 +1,9 @@
+## Unreleased — replies leave from Gmail, Brevo mail leaves from @brevosend.com
+
+- Inbox replies and auto-replies send through a connected Gmail (Gmail API preferred). If that mailbox fails, another connected Gmail is tried. Brevo is not a silent fallback while a Gmail is connected. A reply still leaves through Brevo, using the relay envelope, only when no mailbox is connected.
+- Brevo campaign and composer sends use a listed `@*.brevosend.com` address as From when the key has one, and the operator's own address as Reply-To. The saved From is not rewritten. A Brevo 400 about the sender refreshes the verified list and retries once. A campaign pool whose member is rejected tries the other members; a one-off explicit selection does not rotate onto an unrelated sender.
+- The SMS inbox composer stays pinned to the visible keyboard. The page no longer scrolls the thread to the top while a reply is typed, on mobile or desktop.
+
 ## Unreleased — the bounce circuit breaker is gone; a high bounce rate is now a notification
 
 An email campaign above 2% bounces used to **pause itself**, and putting it back on

@@ -293,6 +293,8 @@ ALTER TABLE contacts ALTER COLUMN country DROP DEFAULT;
 -- Multiple reply-to targets: the legacy reply_to column stays as the primary
 -- address sent to Brevo; this JSON column keeps every routing address.
 ALTER TABLE email_accounts ADD COLUMN IF NOT EXISTS reply_to_addresses TEXT;
+ALTER TABLE email_accounts ADD COLUMN IF NOT EXISTS brevo_from_email VARCHAR(255);
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS send_from_mailbox BOOLEAN NOT NULL DEFAULT FALSE;
 UPDATE email_accounts
 SET reply_to_addresses = json_build_array(reply_to)::text
 WHERE reply_to IS NOT NULL AND reply_to_addresses IS NULL;

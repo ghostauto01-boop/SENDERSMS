@@ -31,6 +31,9 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_BASE = "https://api.brevo.com/v3"
 TIMEOUT = 30.0
+# Shared-IP mail leaves From this domain. The account number is not documented,
+# so callers may only use an address Brevo itself has listed.
+BREVO_RELAY_DOMAIN = "brevosend.com"
 
 
 def _base() -> str:
@@ -43,6 +46,94 @@ def _base() -> str:
     import os
 
     return os.getenv("BREVO_API_BASE") or DEFAULT_BASE
+
+
+def is_brevo_relay_address(address: str | None) -> bool:
+    """True when the address is one Brevo stamps on shared-IP mail.
+
+    The shape is ``local@<account>.brevosend.com``. The account number is not
+    a documented field, so we only recognise the domain — never invent it.
+    """
+    domain = (address or "").strip().lower().rsplit("@", 1)[-1]
+    return domain == BREVO_RELAY_DOMAIN or domain.endswith(f".{BREVO_RELAY_DOMAIN}")
+
+
+def _active_sender_emails(senders: list[dict] | None) -> list[str]:
+    emails: list[str] = []
+    for item in senders or []:
+        if not isinstance(item, dict) or item.get("active") is False:
+            continue
+        email = str(item.get("email") or "").strip()
+        if email and "@" in email:
+            emails.append(email)
+    return emails
+
+
+def pick_brevo_relay_address(senders: list[dict] | None, *, hint: str | None = None) -> str | None:
+    """A verified ``@*.brevosend.com`` address, preferring the same local part."""
+    relays = [email for email in _active_sender_emails(senders) if is_brevo_relay_address(email)]
+    if not relays:
+        return None
+    hint_local = (hint or "").strip().lower().split("@", 1)[0]
+    if hint_local:
+        for email in relays:
+            if email.split("@", 1)[0].lower() == hint_local:
+                return email
+    return relays[0]
+
+
+def pick_verified_from(senders: list[dict] | None, configured: str) -> str:
+    """The From Brevo will accept for this key.
+
+    Prefer a listed ``@*.brevosend.com`` sender when the account has one.
+    Otherwise keep the configured address if Brevo has verified it, else the
+    first active verified sender. An empty lookup returns ``configured`` so a
+    failed sender list never rewrites a send that would have worked.
+    """
+    configured = (configured or "").strip()
+    active = _active_sender_emails(senders)
+    if not active:
+        return configured
+    relay = pick_brevo_relay_address(senders, hint=configured)
+    if relay:
+        return relay
+    by_lower = {email.lower(): email for email in active}
+    if configured.lower() in by_lower:
+        return by_lower[configured.lower()]
+    return active[0]
+
+
+def sender_rejected(result: dict | None) -> bool:
+    """True when Brevo refused the From address, not the recipient.
+
+    A 400 about the sender is retried once against the verified list. A 400
+    about the recipient must not be, or a bad address would look like a sender
+    outage and the next account would be tried for nothing.
+    """
+    if not isinstance(result, dict) or int(result.get("status_code") or 0) != 400:
+        return False
+    text = str(result.get("error") or "").lower()
+    if not text:
+        return False
+    about_sender = any(
+        word in text
+        for word in (
+            "sender",
+            "from address",
+            "from email",
+            "unverified",
+            "not valid",
+            "not authorized",
+            "permission",
+            "domain",
+        )
+    )
+    about_recipient = any(
+        word in text for word in ("recipient", "to address", "invalid to", "blacklisted")
+    )
+    if about_recipient and not about_sender:
+        return False
+    return about_sender
 
 
 def _headers(api_key: str) -> dict:

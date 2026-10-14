@@ -187,8 +187,11 @@ Email Manager → **Replies** shows which are open:
   it pulls INBOX *and* Spam, keeps only mail that answers something this app sent,
   threads it onto the right conversation, and moves the ones Gmail filed as Spam
   back to the inbox. One-to-one replies you write in the app then leave **from that
-  same mailbox**, which is what stops the next reply being treated as spoofed.
-  Campaigns stay on Brevo. Connect as many Gmail inboxes as you want — the consent
+  Gmail account through the Gmail API**, not from Brevo — even when the thread
+  started on a Brevo sender. Campaigns stay on the sender you selected. On a
+  shared-IP Brevo account the visible From is the listed `@*.brevosend.com`
+  address; your own address is Reply-To, so answers still land in the connected
+  mailbox. Connect as many Gmail inboxes as you want — the consent
   screen always shows Google's account chooser, so each one is another click. An
   IMAP **app password** still works for anybody who would rather not create a
   Google Cloud project; it is the fallback, not the recommendation. The whole

@@ -9,10 +9,13 @@
  * sender that mailed the contact, and the Email Inbox can be filtered per
  * sender.
  */
+import { senderOptionLabel } from "../utils/senders";
+
 export type SenderLike = {
   id: number;
   name: string;
   from_email: string;
+  sends_as?: string | null;
   is_active?: boolean;
   sender_type?: string;
   provider?: string;
@@ -149,8 +152,7 @@ export default function SenderPoolPicker({
                       onChange={(e) => toggle(a.id, e.target.checked)}
                     />
                     <span className="truncate text-gray-700 dark:text-gray-200">
-                      {a.name} ({a.sender_type === "gmail" || a.provider === "gmail" ? "Gmail" : "Brevo"}) —{" "}
-                      {a.from_email}
+                      {senderOptionLabel(a)}
                       {primaryId != null && String(a.id) === String(primaryId) ? " · primary" : ""}
                       {a.is_active ? "" : " (off)"}
                     </span>

@@ -43,6 +43,7 @@ import {
 } from "recharts";
 import api from "../api/client";
 import emailApi, { EmailAccount, EmailMessage, EmailSender } from "../api/email";
+import { isBrevoRelay, senderOptionLabel } from "../utils/senders";
 import adsApi, { AdsCampaign } from "../api/ads";
 import CampaignBuilder from "./ads/CampaignBuilder";
 import CampaignDetail from "./ads/CampaignDetail";
@@ -439,7 +440,7 @@ function ManagerOverview({ ads, email, accounts, campaigns, onOpen, onCreate, on
                       {a.is_default && <span className="badge-blue">default</span>}
                     </p>
                     <p className="text-xs text-gray-500 truncate">
-                      {a.provider === "brevo" ? "Brevo" : "Gmail"} · {a.from_email}
+                      {senderOptionLabel(a)}
                       {a.sent_today != null ? ` · ${a.sent_today} sent today` : ""}
                     </p>
                   </div>
@@ -1224,6 +1225,9 @@ function SendersTab({ accounts, reload, onEdit, onAdd }: any) {
                 </h3>
                 <p className="text-sm text-gray-500 truncate">
                   {account.from_name} &lt;{account.from_email}&gt;
+                  {account.sends_as && account.sends_as !== account.from_email
+                    ? ` · sends as ${account.sends_as}`
+                    : ""}
                 </p>
                 <p className="text-xs text-gray-400">
                   key {account.api_key_masked || "—"} · {account.sent_today} sent today
@@ -1395,10 +1399,28 @@ function AccountModal({
           })()
         : { success: false, error: "Paste the API key first", senders: [], domains: [] };
 
-      setSenders((result.senders || []).filter((s: any) => s.email));
+      const listed = (result.senders || []).filter((s: any) => s.email);
+      setSenders(listed);
       setDomains(result.domains || []);
-      if (result.error) setProbeNote(result.error);
-      else if (!(result.senders || []).length) {
+      const relays = listed.filter((s: any) => isBrevoRelay(s.email));
+      const personals = listed.filter((s: any) => !isBrevoRelay(s.email));
+      if (relays.length && personals.length) {
+        setForm((current: any) => ({
+          ...current,
+          from_email: relays[0].email,
+          from_name: current.from_name?.trim()
+            ? current.from_name
+            : relays[0].name || personals[0].name || current.from_name,
+          reply_to:
+            current.reply_to?.trim() && !isBrevoRelay(current.reply_to)
+              ? current.reply_to
+              : personals[0].email,
+        }));
+        setProbeNote(
+          `Mail leaves from ${relays[0].email}. Replies come back to ${personals[0].email}.`
+        );
+      } else if (result.error) setProbeNote(result.error);
+      else if (!listed.length) {
         setProbeNote("Brevo has no verified sender under this key yet.");
       }
     } catch (err: any) {
@@ -1503,16 +1525,28 @@ function AccountModal({
         {senders.length > 0 && (
           <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-3 space-y-2">
             <p className="text-xs font-medium text-gray-600 dark:text-gray-300">
-              Addresses Brevo has already verified — pick one and mail leaves from a warm sender:
+              Addresses Brevo has already verified. A @brevosend.com address is the From;
+              your own address is Reply-To, so answers still land in your inbox.
             </p>
             {senders.map((s: any) => {
+              const relay = isBrevoRelay(s.email);
               const chosen = form.from_email.trim().toLowerCase() === (s.email || "").toLowerCase();
               return (
                 <button
                   type="button"
                   key={s.email}
                   onClick={() => {
-                    set("from_email", s.email);
+                    const relays = senders.filter((item: any) => isBrevoRelay(item.email));
+                    const personals = senders.filter((item: any) => !isBrevoRelay(item.email));
+                    if (relay) {
+                      set("from_email", s.email);
+                      if (!form.reply_to?.trim() && personals[0]) set("reply_to", personals[0].email);
+                    } else if (relays[0]) {
+                      set("from_email", relays[0].email);
+                      set("reply_to", s.email);
+                    } else {
+                      set("from_email", s.email);
+                    }
                     if (s.name && !form.from_name.trim()) set("from_name", s.name);
                   }}
                   className={`w-full flex items-center justify-between gap-2 text-left text-sm px-2 py-1.5 rounded ${
@@ -1524,7 +1558,9 @@ function AccountModal({
                     {s.name ? <span className="text-gray-400"> · {s.name}</span> : null}
                   </span>
                   <span className="flex items-center gap-1 shrink-0">
-                    {s.recommended ? (
+                    {relay ? (
+                      <span className="badge-green">sends as</span>
+                    ) : s.recommended ? (
                       <span className="badge-green">warm</span>
                     ) : s.domain_verified ? (
                       <span className="badge-yellow">verified</span>

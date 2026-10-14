@@ -61,6 +61,10 @@ class EmailAccount(Base):
 
     from_name: Mapped[str] = mapped_column(String(150), nullable=False)
     from_email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    #: The @brevosend.com address Brevo actually puts on the wire for this key,
+    #: when we have discovered one. The operator's own address stays in
+    #: ``from_email`` / ``reply_to`` so replies still land in their mailbox.
+    brevo_from_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     # `reply_to` remains the legacy/ESP-primary address for compatibility.
     # Every configured reply target is stored in this JSON array as well.
     reply_to: Mapped[str | None] = mapped_column(String(255), nullable=True)
