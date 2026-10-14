@@ -4,6 +4,7 @@ import { MessageSquareReply, Plus, Trash2, Pencil, FlaskConical } from "lucide-r
 import { useChannel } from "../hooks/useChannel";
 import ChannelSwitch from "../components/ChannelSwitch";
 import emailApi, { EmailSender } from "../api/email";
+import { optionalSenderId, senderIdToForm, senderOptionLabel } from "../utils/senders";
 
 interface AutoReplyRule {
   id: number;
@@ -67,7 +68,7 @@ function RuleModal({
           stop_on_match: rule.stop_on_match,
           channel: (rule.channel as "sms" | "email") || channel,
           subject: rule.subject || "",
-          email_account_id: rule.email_account_id ? String(rule.email_account_id) : "",
+          email_account_id: senderIdToForm(rule.email_account_id),
         }
       : { ...EMPTY, channel },
   );
@@ -97,7 +98,7 @@ function RuleModal({
       const payload = {
         ...form,
         keywords: needsKeywords ? form.keywords : null,
-        email_account_id: form.email_account_id ? Number(form.email_account_id) : null,
+        email_account_id: optionalSenderId(form.email_account_id),
       };
       if (rule) await api.put(`/autoreply/${rule.id}`, payload);
       else await api.post("/autoreply/", payload);
@@ -131,6 +132,9 @@ function RuleModal({
               </div>
               <div>
                 <label className="label">Send the reply from</label>
+                <p className="text-[11px] text-gray-400 -mt-1 mb-1">
+                  A connected Gmail sends the reply. This choice is used only when no Gmail mailbox is connected.
+                </p>
                 <select
                   className="input text-base sm:text-sm"
                   value={form.email_account_id}
@@ -139,7 +143,7 @@ function RuleModal({
                   <option value="">Default email sender</option>
                   {accounts.map((a) => (
                     <option key={a.id} value={a.id} disabled={!a.is_active}>
-                      {a.name} ({a.sender_type === "gmail" ? "Gmail" : "Brevo"}) — {a.from_email}
+                      {senderOptionLabel(a)}
                     </option>
                   ))}
                 </select>

@@ -588,7 +588,8 @@ async def test_one_to_one_reply_leaves_through_the_connected_mailbox(db, monkeyp
         conversation_id=conversation.id, contact_id=contact.id, channel="email",
         direction="outgoing", to_address=contact.email, from_address=account.reply_to,
         subject="Re: Quick question", body="Thursday works.", status="queued",
-        bulk_send=False, idempotency_key=f"test-{uuid.uuid4().hex[:16]}",
+        bulk_send=False, send_from_mailbox=True,
+        idempotency_key=f"test-{uuid.uuid4().hex[:16]}",
     )
     db.add(reply)
     await db.flush()
@@ -649,13 +650,15 @@ async def test_bulk_campaign_does_not_auto_switch_from_brevo_to_gmail(db, monkey
 
 @pytest.mark.asyncio
 async def test_a_broken_mailbox_falls_back_to_brevo(db, monkeypatch):
+    """A connected Gmail that rejects a reply is the error. Brevo is not a fallback."""
     contact = await _contact(db)
-    account = await _account(db, from_email="me@gmail.com")
+    await _account(db, from_email="me@gmail.com")
     conversation = await email_service.get_or_create_conversation(db, contact, channel="email")
     reply = Message(
         conversation_id=conversation.id, contact_id=contact.id, channel="email",
         direction="outgoing", to_address=contact.email, subject="Re: x", body="Hi",
-        status="queued", bulk_send=False, idempotency_key=f"test-{uuid.uuid4().hex[:16]}",
+        status="queued", bulk_send=False, send_from_mailbox=True,
+        idempotency_key=f"test-{uuid.uuid4().hex[:16]}",
     )
     db.add(reply)
     await db.flush()
@@ -693,9 +696,10 @@ async def test_a_broken_mailbox_falls_back_to_brevo(db, monkeypatch):
     monkeypatch.setattr("app.providers.brevo.httpx.AsyncClient", FakeClient)
 
     result = await email_service.deliver(db, reply)
-    assert result["success"] is True
-    assert brevo_calls, "the message should have fallen through to Brevo"
-    assert reply.provider == "brevo"
+    assert result["success"] is False
+    assert "Brevo" in result["error"]
+    assert brevo_calls == []
+    assert reply.provider != "brevo"
 
 
 # ==========================================================================

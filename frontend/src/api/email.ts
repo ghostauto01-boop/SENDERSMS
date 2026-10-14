@@ -14,6 +14,8 @@ export type EmailAccount = {
   provider: string;
   from_name: string;
   from_email: string;
+  /** @brevosend.com address Brevo actually puts on the wire, when known. */
+  sends_as?: string | null;
   reply_to?: string | null;
   reply_to_addresses?: string[];
   is_active: boolean;
@@ -48,6 +50,8 @@ export type EmailSender = {
   sender_type: "brevo" | "gmail";
   from_name: string;
   from_email: string;
+  sends_as?: string | null;
+  reply_to?: string | null;
   is_active: boolean;
   is_default: boolean;
   connection_status?: string | null;

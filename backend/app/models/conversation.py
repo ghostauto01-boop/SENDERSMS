@@ -158,6 +158,9 @@ class Message(Base):
     # per-contact cooldown, and to make automated traffic distinguishable from
     # something a human actually typed.
     is_auto_reply: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    #: Operator reply composed in the inbox. Delivered from a connected Gmail
+    #: mailbox (Gmail API) rather than from the Brevo sender the thread started on.
+    send_from_mailbox: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # Keyless AI classification of inbound replies (positive/negative/neutral,
     # intent such as wrong_number / interested / opt_out). Stored at receive

@@ -369,7 +369,7 @@ export default function EmailInboxPage() {
   const [filterOpen, setFilterOpen] = useState(false);
   /** Multi-inbox: "" = every sender, otherwise one unified sender id. */
   const [senderFilter, setSenderFilter] = useState("");
-  const [senders, setSenders] = useState<{ id: number; name: string; from_email: string }[]>([]);
+  const [senders, setSenders] = useState<{ id: number; name: string; from_email: string; sender_type?: string }[]>([]);
   const [showContactInfo, setShowContactInfo] = useState(false);
   const [showBooking, setShowBooking] = useState(false);
   const [editingMeetingId, setEditingMeetingId] = useState<number | null>(null);
@@ -1147,7 +1147,9 @@ export default function EmailInboxPage() {
                           Cc
                         </button>
                         <span className="text-[11px] text-gray-400 hidden sm:inline">
-                          sent from {detail.conversation.email_account_name || "the default sender"}
+                          {senders.some((s) => s.sender_type === "gmail")
+                            ? `reply sends from ${senders.filter((s) => s.sender_type === "gmail").map((s) => s.from_email).join(", ")}`
+                            : `sent from ${detail.conversation.email_account_name || "the default sender"}`}
                         </span>
                       </div>
                     </div>

@@ -25,6 +25,7 @@ import json
 import logging
 import re
 import secrets
+import time
 import uuid
 from datetime import date, datetime, time, timedelta, timezone
 from typing import Iterable, Optional
@@ -389,6 +390,12 @@ async def list_senders(db: AsyncSession, *, include_inactive: bool = True) -> li
             "sender_type": "brevo",
             "from_name": account.from_name,
             "from_email": account.from_email,
+            "sends_as": getattr(account, "brevo_from_email", None) or None,
+            "reply_to": (
+                account_reply_to_addresses(account)[0]
+                if account_reply_to_addresses(account)
+                else None
+            ),
             "is_active": bool(account.is_active),
             "is_default": bool(account.is_default),
             "connection_status": account.connection_status,
@@ -708,6 +715,7 @@ def serialize_account(
         "provider": account.provider,
         "from_name": account.from_name,
         "from_email": account.from_email,
+        "sends_as": getattr(account, "brevo_from_email", None) or None,
         "reply_to": account_reply_to_addresses(account)[0] if account_reply_to_addresses(account) else None,
         "reply_to_addresses": account_reply_to_addresses(account),
         "is_active": bool(account.is_active),
@@ -1528,6 +1536,7 @@ async def queue_email(
     ads_campaign_id: int | None = None,
     followup: bool = False,
     is_auto_reply: bool = False,
+    as_reply: bool = False,
     status: str = "queued",
     idempotency_key: str | None = None,
     scheduled_message_id: int | None = None,
@@ -1618,6 +1627,10 @@ async def queue_email(
         status=status,
         provider=(account.provider if _sender_is_mailbox(account) else "brevo"),
         idempotency_key=idempotency_key or f"email-{contact.id}-{uuid.uuid4().hex[:12]}",
+        is_auto_reply=bool(is_auto_reply),
+        # Inbox replies and autoresponses leave from a connected Gmail. A
+        # campaign follow-up is neither, even when its subject starts with Re:.
+        send_from_mailbox=bool(as_reply or is_auto_reply),
     )
     db.add(message)
     await db.flush()
@@ -1643,6 +1656,7 @@ async def send_now(
     campaign_id: int | None = None,
     ads_campaign_id: int | None = None,
     is_auto_reply: bool = False,
+    as_reply: bool = False,
     attachments: list[dict] | None = None,
     bulk: bool = False,
     cc: list[str] | str | None = None,
@@ -1656,7 +1670,7 @@ async def send_now(
         db, contact,
         subject=subject, text_body=text_body, html_body=html_body,
         account=account, campaign_id=campaign_id, ads_campaign_id=ads_campaign_id,
-        is_auto_reply=is_auto_reply, attachments=attachments, bulk=bulk,
+        is_auto_reply=is_auto_reply, as_reply=as_reply, attachments=attachments, bulk=bulk,
         cc=cc, bcc=bcc, recipient_address=recipient_address, outreach=outreach,
         refused=refused,
     )
@@ -1756,77 +1770,229 @@ async def _send_via_mailbox(
                 "provider_message_id": message.provider_message_id}
 
     logger.warning(
-        "EMAIL: mailbox %s send failed (%s); falling back to Brevo",
+        "EMAIL: mailbox %s send failed (%s)",
         mailbox.email_address, result.get("error"),
     )
     return {**result, "_try_next": True}
 
 
-async def deliver(db: AsyncSession, message: Message) -> dict:
-    """Deliver through the explicitly selected Brevo or connected Gmail sender.
+def wants_mailbox_reply(message: Message) -> bool:
+    """Inbox replies and autoresponses leave from a connected Gmail.
 
-    A negative ``email_account_id`` selects a connected mailbox; a positive id
-    selects Brevo. Campaign fallback senders are considered only when configured.
-    For an ordinary one-to-one send, a matching connected mailbox can still be
-    used automatically when Gmail reply sending is enabled.
+    Campaign mail — including a follow-up whose subject is ``Re:`` — stays on
+    the campaign sender. A composed Brevo send is not a reply just because its
+    From or Reply-To happens to match a mailbox.
     """
-    sender = await resolve_sender(db, message.email_account_id)
-    explicit_mailbox = _sender_is_mailbox(sender) and bool(message.email_account_id)
-    explicit_mailbox_error: str | None = None
+    if message.bulk_send or message.campaign_id or message.ads_campaign_id:
+        return False
+    return bool(getattr(message, "send_from_mailbox", False) or message.is_auto_reply)
 
-    # A chosen Gmail mailbox is a full sender for direct and campaign email,
-    # regardless of the separate one-to-one auto-reply preference.
-    if explicit_mailbox:
-        usable, why = await sender_is_usable(sender)
-        if not usable:
-            return {"success": False, "status_code": 400, "error": _no_sender_error([why or "unknown"])}
-        result = await _send_via_mailbox(db, sender, message, None)
-        if result.get("success"):
-            return result
-        explicit_mailbox_error = str(result.get("error") or "Gmail did not accept the message.")
-        # Honor a campaign's explicitly configured Brevo/Gmail fallback, but do
-        # not silently change sender for a one-off message.
 
+_VERIFIED_SENDER_CACHE: dict[int, tuple[float, list[dict]]] = {}
+_VERIFIED_SENDER_TTL = 300.0
+_VERIFIED_SENDER_MISS_TTL = 60.0
+
+
+async def verified_senders_for(account: EmailAccount, *, refresh: bool = False) -> list[dict]:
+    """Verified From addresses for this Brevo key. Empty when the lookup fails.
+
+    A failed GET must not change the send. Tests that only fake POST, and a
+    Brevo outage, both keep the stored From rather than raising.
+    """
+    from app.providers import brevo as brevo_provider
+
+    account_id = int(account.id)
+    now = datetime.now(timezone.utc).timestamp()
+    if not refresh:
+        cached = _VERIFIED_SENDER_CACHE.get(account_id)
+        if cached and cached[0] > now:
+            return cached[1]
+    api_key = decrypt_value(account.api_key_encrypted or "")
+    if not api_key:
+        return []
+    try:
+        result = await brevo_provider.list_senders(api_key)
+    except Exception as exc:  # noqa: BLE001 — the lookup is optional
+        logger.info("EMAIL: sender list unavailable for account %s (%s)", account_id, exc)
+        _VERIFIED_SENDER_CACHE[account_id] = (now + _VERIFIED_SENDER_MISS_TTL, [])
+        return []
+    if not isinstance(result, dict) or not result.get("success"):
+        _VERIFIED_SENDER_CACHE[account_id] = (now + _VERIFIED_SENDER_MISS_TTL, [])
+        return []
+    senders = [item for item in (result.get("senders") or []) if isinstance(item, dict)]
+    _VERIFIED_SENDER_CACHE[account_id] = (now + _VERIFIED_SENDER_TTL, senders)
+    return senders
+
+
+async def operator_reply_address(db: AsyncSession, account: EmailAccount) -> str | None:
+    """Where a human reply to a Brevo send should land.
+
+    ``@*.brevosend.com`` is the wire From, not an inbox. Prefer the saved
+    Reply-To, then the stored personal From, then a connected mailbox.
+    """
+    from app.providers.brevo import is_brevo_relay_address
+    from app.services import mailbox_service
+
+    for value in (*account_reply_to_addresses(account), (account.from_email or "").strip()):
+        clean = (value or "").strip()
+        if clean and "@" in clean and not is_brevo_relay_address(clean):
+            return clean
+    for mailbox in await mailbox_service.list_mailboxes(db):
+        address = (mailbox.email_address or "").strip()
+        if address and not is_brevo_relay_address(address):
+            return address
+    return None
+
+
+async def brevo_envelope(
+    db: AsyncSession, account: EmailAccount, *, refresh: bool = False
+) -> tuple[str, str | None]:
+    """From / Reply-To actually handed to Brevo.
+
+    From is a listed ``@*.brevosend.com`` address when this key has one.
+    Otherwise it stays the stored From. The stored ``from_email`` is never
+    rewritten — the relay address is cached on ``brevo_from_email`` instead.
+    """
+    from app.providers.brevo import is_brevo_relay_address, pick_verified_from
+
+    configured = (account.from_email or "").strip()
+    senders = await verified_senders_for(account, refresh=refresh)
+    from_email = pick_verified_from(senders, configured) if senders else configured
+    if (
+        is_brevo_relay_address(from_email)
+        and from_email != (getattr(account, "brevo_from_email", None) or "")
+    ):
+        account.brevo_from_email = from_email
+    reply_to = await operator_reply_address(db, account)
+    if reply_to and is_brevo_relay_address(reply_to):
+        reply_to = None
+    return from_email or configured, reply_to
+
+
+def _append_sender(candidates: list, item) -> None:
+    if item is None:
+        return
+    sid = sender_id(item)
+    if sid is None or any(sender_id(existing) == sid for existing in candidates):
+        return
+    candidates.append(item)
+
+
+async def _campaign_for_message(db: AsyncSession, message: Message):
+    if message.campaign_id:
+        return (
+            await db.execute(select(Campaign).where(Campaign.id == message.campaign_id))
+        ).scalar_one_or_none()
+    if message.ads_campaign_id:
+        from app.models.ads import AdsCampaign
+
+        return (
+            await db.execute(select(AdsCampaign).where(AdsCampaign.id == message.ads_campaign_id))
+        ).scalar_one_or_none()
+    return None
+
+
+async def _deliver_via_gmail_reply(db: AsyncSession, message: Message, sender) -> dict | None:
+    """Send an inbox reply from connected Gmail.
+
+    Returns None only when no mailbox is connected, so the caller can still
+    send through Brevo. A connected mailbox that fails is tried once more on
+    another Gmail, then the Gmail error is returned — never a Brevo fallback.
+    """
+    from app.services import mailbox_service
+
+    if not settings.GMAIL_SEND_REPLIES:
+        return None
+    preferred = sender if _sender_is_mailbox(sender) and sender.is_active else None
     account = sender if isinstance(sender, EmailAccount) else None
-    if account is not None and settings.GMAIL_SEND_REPLIES:
-        from app.services import mailbox_service
-
-        try:
-            mailbox = await mailbox_service.mailbox_for_outgoing(db, message, account)
-        except Exception as exc:  # noqa: BLE001 — a mailbox problem must never block a send
-            logger.warning("EMAIL: mailbox lookup failed (%s)", exc)
-            mailbox = None
-        if mailbox is not None:
+    mailbox = preferred or await mailbox_service.mailbox_for_reply(db, message, account)
+    if mailbox is None:
+        return None
+    tried: set[int] = set()
+    last_error = "Gmail did not accept the reply."
+    while mailbox is not None and len(tried) < 4:
+        tried.add(int(mailbox.id))
+        usable, why = await sender_is_usable(mailbox)
+        if not usable:
+            last_error = why or last_error
+        else:
             result = await _send_via_mailbox(db, mailbox, message, account)
             if result.get("success"):
                 return result
+            last_error = str(result.get("error") or last_error)
+        mailbox = await mailbox_service.mailbox_for_reply(
+            db, message, account, exclude_ids=tried,
+        )
+    return {
+        "success": False,
+        "error": (
+            f"Gmail did not accept the reply ({last_error}). "
+            "Reconnect the mailbox under Settings → Gmail replies. "
+            "The reply was not sent through Brevo."
+        ),
+    }
+
+
+async def deliver(db: AsyncSession, message: Message) -> dict:
+    """Deliver through the selected Brevo sender or a connected Gmail.
+
+    Inbox replies (``send_from_mailbox`` / ``is_auto_reply``) leave from a
+    connected Gmail API mailbox. Campaign and composer sends stay on the
+    sender that was selected. A campaign pool whose member is rejected tries
+    the fallback and the other pool members; a one-off explicit selection does
+    not rotate onto an unrelated sender.
+    """
+    sender = await resolve_sender(db, message.email_account_id)
+    explicit_mailbox = _sender_is_mailbox(sender) and bool(message.email_account_id)
+
+    if wants_mailbox_reply(message):
+        reply_result = await _deliver_via_gmail_reply(db, message, sender)
+        if reply_result is not None:
+            return reply_result
+
+    explicit_mailbox_error: str | None = None
+    pooled = bool(message.campaign_id or message.ads_campaign_id)
+    # A flagged reply with Gmail sending on was already attempted above. With
+    # that setting off, an explicitly selected mailbox is still honored.
+    reply_already_routed = wants_mailbox_reply(message) and settings.GMAIL_SEND_REPLIES
+    if explicit_mailbox and not reply_already_routed:
+        usable, why = await sender_is_usable(sender)
+        if not usable:
+            explicit_mailbox_error = why or "unknown"
+            if not pooled:
+                return {
+                    "success": False,
+                    "status_code": 400,
+                    "error": _no_sender_error([explicit_mailbox_error]),
+                }
+        else:
+            result = await _send_via_mailbox(db, sender, message, None)
+            if result.get("success"):
+                return result
+            explicit_mailbox_error = str(result.get("error") or "Gmail did not accept the message.")
+            if not pooled:
+                return {"success": False, "error": _no_sender_error([explicit_mailbox_error])}
 
     candidates: list = []
     if isinstance(sender, EmailAccount):
-        candidates.append(sender)
+        _append_sender(candidates, sender)
     elif sender is not None and not explicit_mailbox:
-        candidates.append(sender)
+        _append_sender(candidates, sender)
 
-    campaign = None
-    if message.campaign_id:
-        campaign = (await db.execute(
-            select(Campaign).where(Campaign.id == message.campaign_id)
-        )).scalar_one_or_none()
-    elif message.ads_campaign_id:
-        from app.models.ads import AdsCampaign
+    if pooled:
+        campaign = await _campaign_for_message(db, message)
+        fallback_id = getattr(campaign, "fallback_email_account_id", None) if campaign else None
+        if fallback_id:
+            _append_sender(candidates, await get_sender(db, fallback_id))
+        if campaign is not None:
+            for pool_id in campaign_sender_pool(campaign):
+                _append_sender(candidates, await get_sender(db, pool_id))
 
-        campaign = (await db.execute(
-            select(AdsCampaign).where(AdsCampaign.id == message.ads_campaign_id)
-        )).scalar_one_or_none()
-
-    fallback_id = getattr(campaign, "fallback_email_account_id", None) if campaign else None
-    if fallback_id:
-        fallback = await get_sender(db, fallback_id)
-        if fallback is not None and all(sender_id(fallback) != sender_id(item) for item in candidates):
-            candidates.append(fallback)
-
+    failed_mailbox_id = sender_id(sender) if explicit_mailbox and explicit_mailbox_error else None
     errors: list[str] = [explicit_mailbox_error] if explicit_mailbox_error else []
     for candidate in candidates:
+        if failed_mailbox_id is not None and sender_id(candidate) == failed_mailbox_id:
+            continue
         usable, why = await sender_is_usable(candidate)
         if not usable:
             errors.append(why or "unknown")
@@ -1873,7 +2039,7 @@ def _no_sender_error(reasons: list[str]) -> str:
 
 
 async def _send_via_account(db: AsyncSession, account: EmailAccount, message: Message) -> dict:
-    from app.providers.brevo import send_email as brevo_send
+    from app.providers.brevo import send_email as brevo_send, sender_rejected
 
     api_key = decrypt_value(account.api_key_encrypted or "")
     if not api_key:
@@ -1885,19 +2051,14 @@ async def _send_via_account(db: AsyncSession, account: EmailAccount, message: Me
     to_name = contact_display_name(contact) if contact else None
 
     headers = await build_headers(db, message, account, bulk=bool(message.bulk_send))
-    message.email_account_id = account.id
-    message.provider = "brevo"
-    message.from_address = account.from_email
-    result = await brevo_send(
-        api_key,
+    from_email, reply_to = await brevo_envelope(db, account)
+    send_kwargs = dict(
         to_email=message.to_address or (contact.email if contact else None) or "",
         to_name=to_name,
         subject=message.subject or "",
         html=message.html_body,
         text=message.body,
-        from_email=account.from_email,
         from_name=account.from_name,
-        reply_to=account.reply_to,
         tags=[t for t in (f"campaign-{message.campaign_id}" if message.campaign_id else None,
                           f"ads-{message.ads_campaign_id}" if message.ads_campaign_id else None,
                           "channel-email") if t],
@@ -1908,6 +2069,22 @@ async def _send_via_account(db: AsyncSession, account: EmailAccount, message: Me
         cc=clean_addresses(message.cc_addresses),
         bcc=clean_addresses(message.bcc_addresses),
     )
+    result = await brevo_send(
+        api_key, from_email=from_email, reply_to=reply_to, **send_kwargs,
+    )
+    if sender_rejected(result):
+        refreshed_from, refreshed_reply = await brevo_envelope(db, account, refresh=True)
+        if refreshed_from and refreshed_from.lower() != (from_email or "").lower():
+            logger.info(
+                "EMAIL: Brevo rejected From %s; retrying as %s", from_email, refreshed_from,
+            )
+            from_email, reply_to = refreshed_from, refreshed_reply
+            result = await brevo_send(
+                api_key, from_email=from_email, reply_to=reply_to, **send_kwargs,
+            )
+    message.email_account_id = account.id
+    message.provider = "brevo"
+    message.from_address = from_email
 
     if result.get("success"):
         conversation = (
@@ -1926,7 +2103,10 @@ async def _send_via_account(db: AsyncSession, account: EmailAccount, message: Me
         account.sent_today = (account.sent_today or 0) + 1
         account.total_sent = (account.total_sent or 0) + 1
         account.connection_status = "connected"
-        await _note_email_event(db, "sent", message, account=account, detail="accepted by Brevo")
+        detail = f"accepted by Brevo as {from_email}"
+        if reply_to and reply_to.lower() != (from_email or "").lower():
+            detail += f"; replies to {reply_to}"
+        await _note_email_event(db, "sent", message, account=account, detail=detail[:500])
         await db.flush()
         return result
 
@@ -2195,8 +2375,9 @@ async def send_composer_test(
     api_key = decrypt_value(account.api_key_encrypted or "")
     if not api_key:
         return {"success": False, "error": "This sender has no readable Brevo API key"}
-    from app.providers.brevo import send_email as brevo_send
+    from app.providers.brevo import send_email as brevo_send, sender_rejected
 
+    from_email, reply_to = await brevo_envelope(db, account)
     result = await brevo_send(
         api_key,
         to_email=address,
@@ -2204,14 +2385,32 @@ async def send_composer_test(
         subject=f"[TEST] {rendered_subject}"[:500],
         html=html,
         text=text or " ",
-        from_email=account.from_email,
+        from_email=from_email,
         from_name=account.from_name,
-        reply_to=account.reply_to,
+        reply_to=reply_to,
         tags=["composer-test"],
         track_opens=bool(account.track_opens),
         track_clicks=bool(account.track_clicks),
         attachments=files,
     )
+    if sender_rejected(result):
+        refreshed_from, refreshed_reply = await brevo_envelope(db, account, refresh=True)
+        if refreshed_from and refreshed_from.lower() != (from_email or "").lower():
+            result = await brevo_send(
+                api_key,
+                to_email=address,
+                to_name=None,
+                subject=f"[TEST] {rendered_subject}"[:500],
+                html=html,
+                text=text or " ",
+                from_email=refreshed_from,
+                from_name=account.from_name,
+                reply_to=refreshed_reply,
+                tags=["composer-test"],
+                track_opens=bool(account.track_opens),
+                track_clicks=bool(account.track_clicks),
+                attachments=files,
+            )
     if result.get("success"):
         return {"success": True, "to": address, "attachments": attachment_summary(
             dump_attachments(files)
@@ -2609,6 +2808,9 @@ async def process_inbound_email(db: AsyncSession, payload: dict) -> dict:
             # whether the operator can answer from inside the app.
             provider=str(item.get("_provider") or "brevo")[:20] or "brevo",
             provider_message_id=provider_id,
+            email_account_id=(
+                -int(item["_mailbox_id"]) if item.get("_mailbox_id") else None
+            ),
             in_reply_to=in_reply_to,
             attachments=dump_attachments(parse_inbound_attachments(item)),
             idempotency_key=idem[:255],
@@ -2876,27 +3078,47 @@ async def send_test_email(
     api_key = decrypt_value(account.api_key_encrypted or "")
     if not api_key:
         return {"success": False, "error": "This account has no API key yet"}
+    from app.providers.brevo import sender_rejected
+
+    from_email, reply_to = await brevo_envelope(db, account)
+    identity = f"from {from_email}"
+    if reply_to and reply_to.lower() != from_email.lower():
+        identity += f", replies to {reply_to}"
+    body = (
+        f"This is a test email sent through your Brevo sender “{account.name}” "
+        f"({identity}). If you received it, the API key and sender are working. "
+        "Campaign mail leaves from the Brevo address; replies you write leave from "
+        "a connected Gmail."
+    )
     result = await brevo_send(
         api_key,
         to_email=address,
         to_name=None,
         subject=subject or f"Test email from {account.name}",
-        html=text_to_html(
-            f"This is a test email sent through your Brevo sender “{account.name}” "
-            f"({account.from_email}) from the app. If you received it, the API key, "
-            "sender address and domain are all working."
-        ),
-        text=(
-            f"This is a test email sent through your Brevo sender “{account.name}” "
-            f"({account.from_email}). If you received it, the API key, sender address "
-            "and domain are all working."
-        ),
-        from_email=account.from_email,
+        html=text_to_html(body),
+        text=body,
+        from_email=from_email,
         from_name=account.from_name,
-        reply_to=account.reply_to,
+        reply_to=reply_to,
         track_opens=False,
         track_clicks=False,
     )
+    if sender_rejected(result):
+        refreshed_from, refreshed_reply = await brevo_envelope(db, account, refresh=True)
+        if refreshed_from and refreshed_from.lower() != (from_email or "").lower():
+            result = await brevo_send(
+                api_key,
+                to_email=address,
+                to_name=None,
+                subject=subject or f"Test email from {account.name}",
+                html=text_to_html(body),
+                text=body,
+                from_email=refreshed_from,
+                from_name=account.from_name,
+                reply_to=refreshed_reply,
+                track_opens=False,
+                track_clicks=False,
+            )
     account.connection_status = "connected" if result.get("success") else "error"
     account.last_tested_at = _now()
     account.last_error = None if result.get("success") else str(result.get("error"))[:2000]

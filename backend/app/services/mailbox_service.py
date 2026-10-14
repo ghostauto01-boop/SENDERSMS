@@ -608,6 +608,8 @@ async def sync_mailbox(db: AsyncSession, mailbox: EmailMailbox) -> dict:
     if wanted:
         from app.services.email_service import process_inbound_email
 
+        for item in wanted:
+            item["_mailbox_id"] = mailbox.id
         result = await process_inbound_email(db, {"items": wanted})
         stored = int(result.get("stored") or 0)
     summary["stored"] = stored
@@ -760,36 +762,95 @@ async def send_via_mailbox(
 
 async def mailbox_for_outgoing(db: AsyncSession, message: Message,
                                account: EmailAccount | None) -> EmailMailbox | None:
-    """Should this outgoing message leave through a connected mailbox instead?
+    """No longer reroutes a Brevo send just because an address matches a mailbox.
 
-    Three conditions, all deliberate:
-
-    * it is **not** bulk mail — this automatic override only reroutes one-to-one
-      replies; a campaign can still explicitly select a Gmail sender;
-    * the operator has not switched reply-sending off for that mailbox;
-    * a connected, active mailbox owns the From or Reply-To address the message
-      would otherwise use.
+    That override sent composed Brevo mail through Gmail, and then fell back to
+    Brevo when Gmail failed — the opposite of both "send from the selected
+    sender" and "replies leave from Gmail". Inbox replies use
+    :func:`mailbox_for_reply` instead, and only when the message is flagged.
     """
-    if message.bulk_send:
-        return None
-    if account is None:
-        return None
-    from app.services.email_service import account_reply_to_addresses
-
-    candidates = {
-        (account.from_email or "").strip().lower(),
-        *[value.strip().lower() for value in account_reply_to_addresses(account)],
-        (message.from_address or "").strip().lower(),
-    }
-    candidates.discard("")
-    if not candidates:
-        return None
-    for mailbox in await list_mailboxes(db):
-        if not mailbox.send_replies:
-            continue
-        if (mailbox.email_address or "").strip().lower() in candidates:
-            return mailbox
     return None
+
+
+def _mailbox_rank(mailbox: EmailMailbox) -> tuple:
+    """Gmail API before IMAP, then a stable id."""
+    return (0 if mailbox.provider == "gmail_api" else 1, mailbox.id)
+
+
+async def mailbox_for_reply(
+    db: AsyncSession,
+    message: Message,
+    account: EmailAccount | None = None,
+    *,
+    exclude_ids: set[int] | None = None,
+) -> EmailMailbox | None:
+    """The connected mailbox an inbox reply should leave from.
+
+    Order: an address match (Reply-To, stored From, or the inbound To), the
+    mailbox that imported the inbound, then any active mailbox with
+    ``send_replies``. Gmail API is preferred over IMAP at each step.
+    """
+    excluded = {int(item) for item in (exclude_ids or set())}
+    mailboxes = [
+        mailbox for mailbox in await list_mailboxes(db)
+        if mailbox.is_active and mailbox.send_replies and mailbox.id not in excluded
+        and (mailbox.email_address or "").strip()
+    ]
+    if not mailboxes:
+        return None
+
+    addresses: set[str] = set()
+    if account is not None:
+        from app.services.email_service import account_reply_to_addresses
+
+        addresses.update(
+            value.strip().lower()
+            for value in account_reply_to_addresses(account)
+            if value
+        )
+        if account.from_email:
+            addresses.add(account.from_email.strip().lower())
+    imported_ids: list[int] = []
+    if message.conversation_id:
+        rows = (
+            await db.execute(
+                select(Message.to_address, Message.email_account_id)
+                .where(
+                    Message.conversation_id == message.conversation_id,
+                    Message.direction == "incoming",
+                    Message.channel == "email",
+                )
+                .order_by(Message.created_at.desc(), Message.id.desc())
+                .limit(8)
+            )
+        ).all()
+        for to_address, account_id in rows:
+            if to_address:
+                addresses.add(str(to_address).strip().lower())
+            if account_id and int(account_id) < 0:
+                imported_ids.append(abs(int(account_id)))
+
+    def first_match(predicate) -> EmailMailbox | None:
+        matches = [mailbox for mailbox in mailboxes if predicate(mailbox)]
+        if not matches:
+            return None
+        return sorted(matches, key=_mailbox_rank)[0]
+
+    matched = first_match(
+        lambda mailbox: (mailbox.email_address or "").strip().lower() in addresses
+    )
+    if matched is not None:
+        return matched
+    imported = first_match(lambda mailbox: mailbox.id in imported_ids and mailbox.provider == "gmail_api")
+    if imported is not None:
+        return imported
+    api = first_match(lambda mailbox: mailbox.provider == "gmail_api")
+    if api is not None:
+        return api
+    imported_any = first_match(lambda mailbox: mailbox.id in imported_ids)
+    if imported_any is not None:
+        return imported_any
+    return sorted(mailboxes, key=_mailbox_rank)[0]
 
 
 # ---------------------------------------------------------------------------
@@ -812,6 +873,7 @@ async def reply_routing_report(db: AsyncSession) -> dict:
     connected = [m for m in mailboxes if m.is_active]
 
     findings: list[dict] = []
+    from app.providers.brevo import is_brevo_relay_address
     from app.services.email_service import account_reply_to_addresses
 
     for account in accounts:
@@ -821,26 +883,52 @@ async def reply_routing_report(db: AsyncSession) -> dict:
         for label, value in [("From", account.from_email)] + [
             ("Reply-To", address) for address in reply_addresses
         ]:
+            mailbox_for_value = next(
+                (
+                    mailbox for mailbox in connected
+                    if (mailbox.email_address or "").strip().lower() == (value or "").strip().lower()
+                ),
+                None,
+            )
             if is_freemail(value):
-                findings.append({
-                    "severity": "high",
-                    "where": f"Sender '{account.name}' — {label}",
-                    "value": value,
-                    "problem": (
-                        f"{label} is a free webmail address, but the mail is actually sent by "
-                        "Brevo. Gmail cannot verify a gmail.com/yahoo.com From on mail Brevo "
-                        "signed, so DMARC fails and the whole thread is treated as spoofed — "
-                        "which is why the prospect's reply lands in your Spam folder, not theirs."
-                    ),
-                    "fix": (
-                        "Connect that mailbox below so replies are read (and sent) from it "
-                        "directly, or send from an address on a domain Brevo has authenticated "
-                        "with SPF/DKIM and set Reply-To to a Brevo inbound address on the same "
-                        "domain."
-                    ),
-                })
-        if account.reply_to and account.from_email and \
-                (account.reply_to.split("@")[-1] != account.from_email.split("@")[-1]):
+                if label == "Reply-To" and mailbox_for_value is not None:
+                    findings.append({
+                        "severity": "info",
+                        "where": f"Sender '{account.name}' — {label}",
+                        "value": value,
+                        "problem": (
+                            "Reply-To is your Gmail address, and that mailbox is connected. "
+                            "Replies you write leave from it through the Gmail API. Campaign "
+                            "mail still leaves through Brevo."
+                        ),
+                        "fix": "No change needed for replies. Keep this address as Reply-To so prospect answers land here.",
+                    })
+                else:
+                    findings.append({
+                        "severity": "high",
+                        "where": f"Sender '{account.name}' — {label}",
+                        "value": value,
+                        "problem": (
+                            f"{label} is a free webmail address, but the mail is actually sent by "
+                            "Brevo. Gmail cannot verify a gmail.com/yahoo.com From on mail Brevo "
+                            "signed, so DMARC fails and the whole thread is treated as spoofed — "
+                            "which is why the prospect's reply lands in your Spam folder, not theirs."
+                        ),
+                        "fix": (
+                            "Connect that mailbox below so replies are read (and sent) from it "
+                            "directly. Campaign mail should leave from the @brevosend.com address "
+                            "Brevo lists for the key, with this Gmail address as Reply-To."
+                        ),
+                    })
+        relay_from = is_brevo_relay_address(account.from_email) or is_brevo_relay_address(
+            getattr(account, "brevo_from_email", None)
+        )
+        if (
+            account.reply_to and account.from_email
+            and account.reply_to.split("@")[-1].lower() != account.from_email.split("@")[-1].lower()
+            and not relay_from
+            and not is_brevo_relay_address(account.reply_to)
+        ):
             findings.append({
                 "severity": "medium",
                 "where": f"Sender '{account.name}'",

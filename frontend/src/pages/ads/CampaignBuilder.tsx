@@ -3,6 +3,7 @@ import toast from "react-hot-toast";
 import adsApi from "../../api/ads";
 import { Field, Modal, fromLocalInput, toLocalInput } from "./ui";
 import SenderPoolPicker, { senderPoolFromCampaign, SenderPoolValue } from "../../components/SenderPoolPicker";
+import { optionalSenderId, senderOptionLabel } from "../../utils/senders";
 
 /**
  * Create / edit a campaign. Every field here maps to a real backend setting --
@@ -124,10 +125,8 @@ export default function CampaignBuilder({
       optimize_action: form.optimize_action || "shift",
     };
     if (isEmail) {
-      payload.email_account_id = form.email_account_id ? Number(form.email_account_id) : null;
-      payload.fallback_email_account_id = form.fallback_email_account_id
-        ? Number(form.fallback_email_account_id)
-        : null;
+      payload.email_account_id = optionalSenderId(form.email_account_id);
+      payload.fallback_email_account_id = optionalSenderId(form.fallback_email_account_id);
       // Optional multi-sender pool: empty = single sender above.
       payload.email_account_ids = form.sender_pool?.ids?.length ? form.sender_pool.ids : null;
       payload.sender_distribution = form.sender_pool?.distribution || "round_robin";
@@ -216,7 +215,7 @@ export default function CampaignBuilder({
                       <option value="">Default sender</option>
                       {emailAccounts.map((a) => (
                         <option key={a.id} value={a.id} disabled={!a.is_active}>
-                          {a.name} ({a.sender_type === "gmail" ? "Gmail" : "Brevo"}) — {a.from_email}
+                          {senderOptionLabel(a)}
                         </option>
                       ))}
                     </select>
@@ -237,7 +236,7 @@ export default function CampaignBuilder({
                           value={a.id}
                           disabled={!a.is_active || String(a.id) === String(form.email_account_id)}
                         >
-                          {a.name} ({a.sender_type === "gmail" ? "Gmail" : "Brevo"}) — {a.from_email}
+                          {senderOptionLabel(a)}
                         </option>
                       ))}
                     </select>

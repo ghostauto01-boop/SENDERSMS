@@ -2,6 +2,7 @@ import { useState } from "react";
 import toast from "react-hot-toast";
 import { Send } from "lucide-react";
 import emailApi, { EmailSender } from "../api/email";
+import { optionalSenderId, senderOptionLabel } from "../utils/senders";
 import { Field, fmtDate } from "../pages/ads/ui";
 import RichEmailEditor, { AttachmentPayload } from "./RichEmailEditor";
 
@@ -55,7 +56,7 @@ export default function EmailSendPanel({
         html_body: form.html_body || null,
         // Ignored when a template supplies its own attachments.
         attachments: attachments.length ? attachments : null,
-        email_account_id: form.email_account_id ? Number(form.email_account_id) : null,
+        email_account_id: optionalSenderId(form.email_account_id),
         template_id: form.template_id ? Number(form.template_id) : null,
         // Blank stays blank; the server normalises and drops typos.
         cc: form.cc.trim() ? form.cc.split(/[,;\s]+/).filter(Boolean) : null,
@@ -92,7 +93,7 @@ export default function EmailSendPanel({
         body: form.body,
         html_body: form.html_body || null,
         attachments: attachments.length ? attachments : null,
-        email_account_id: form.email_account_id ? Number(form.email_account_id) : null,
+        email_account_id: optionalSenderId(form.email_account_id),
         template_id: form.template_id ? Number(form.template_id) : null,
         contact_id: form.mode === "contact" && form.contact_id ? Number(form.contact_id) : null,
       });
@@ -223,7 +224,7 @@ export default function EmailSendPanel({
               </option>
               {accounts.map((a: EmailSender) => (
                 <option key={a.id} value={a.id} disabled={!a.is_active}>
-                  {a.name} ({a.sender_type === "gmail" ? "Gmail" : "Brevo"}) — {a.from_email}
+                  {senderOptionLabel(a)}
                   {a.is_active ? "" : " (off)"}
                 </option>
               ))}
