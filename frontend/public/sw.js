@@ -10,7 +10,7 @@
  *
  * Bump VERSION on any change here: it evicts every old cache on activate.
  */
-const VERSION = "sms-sender-v7";
+const VERSION = "sendsms-v8";
 const ASSET_CACHE = `${VERSION}-assets`;
 const SHELL_CACHE = `${VERSION}-shell`;
 
@@ -85,12 +85,12 @@ self.addEventListener("push", (e) => {
   try {
     d = e.data ? e.data.json() : {};
   } catch {
-    d = { title: "SMS SENDER", body: e.data ? e.data.text() : "" };
+    d = { title: "SendSMS", body: e.data ? e.data.text() : "" };
   }
   // title carries the kind and the sender ("📧 New email from Ada Obi"), body
   // carries the subject and the first line of the message — so a reply is
   // readable from a locked phone screen without opening the app.
-  const title = d.title || "SMS SENDER";
+  const title = d.title || "SendSMS";
   e.waitUntil(
     self.registration.showNotification(title, {
       body: d.body || "",

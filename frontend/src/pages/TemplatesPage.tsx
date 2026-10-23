@@ -84,7 +84,7 @@ export default function TemplatesPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold">
+          <h1 className="page-title">
             Templates
             <span className="ml-2 align-middle">
               <ChannelSwitch size="sm" />

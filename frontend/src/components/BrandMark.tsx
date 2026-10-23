@@ -10,13 +10,13 @@ export default function BrandMark({ className = 'w-8 h-8' }: { className?: strin
       viewBox="0 0 64 64"
       className={className}
       role="img"
-      aria-label="SMS SENDER"
+      aria-label="SendSMS"
       xmlns="http://www.w3.org/2000/svg"
     >
       <defs>
         <linearGradient id="brandmark-bg" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#2563eb" />
-          <stop offset="1" stopColor="#4f46e5" />
+          <stop offset="0" stopColor="#2a684e" />
+          <stop offset="1" stopColor="#08251a" />
         </linearGradient>
       </defs>
       <rect width="64" height="64" rx="14" fill="url(#brandmark-bg)" />
@@ -26,7 +26,7 @@ export default function BrandMark({ className = 'w-8 h-8' }: { className?: strin
       />
       <path
         d="M40.6 20.7 20.9 30.4l7.4 1.7 1.6 7.4 9.7-19.7z"
-        fill="#2563eb"
+        fill="#8fc7a8"
         transform="rotate(-6 32 30)"
       />
     </svg>

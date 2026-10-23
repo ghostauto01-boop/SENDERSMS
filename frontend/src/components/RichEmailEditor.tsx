@@ -156,14 +156,14 @@ export default function RichEmailEditor({
     const label = window.prompt("Button label", "Book a call") || "Click here";
     // Inline styles only: mail clients strip <style> blocks and classes.
     insertHtmlBlock(
-      `<p style="margin:18px 0"><a href="${url}" style="background:#2563eb;color:#ffffff;` +
+      `<p style="margin:18px 0"><a href="${url}" style="background:#123c2b;color:#ffffff;` +
         `padding:12px 22px;border-radius:6px;text-decoration:none;display:inline-block;` +
         `font-weight:600">${label}</a></p>`,
       `${label}: ${url}`
     );
   };
 
-  const addDivider = () => insertHtmlBlock('<hr style="border:none;border-top:1px solid #e3e9f2;margin:20px 0">', "----------");
+  const addDivider = () => insertHtmlBlock('<hr style="border:none;border-top:1px solid #e7e8e4;margin:20px 0">', "----------");
 
   const addTable = () => {
     const rows = [
@@ -177,8 +177,8 @@ export default function RichEmailEditor({
           `<tr>${row
             .map((cell) =>
               index === 0
-                ? `<th style="border:1px solid #e3e9f2;padding:8px;text-align:left">${cell}</th>`
-                : `<td style="border:1px solid #e3e9f2;padding:8px">${cell}</td>`
+                ? `<th style="border:1px solid #e7e8e4;padding:8px;text-align:left">${cell}</th>`
+                : `<td style="border:1px solid #e7e8e4;padding:8px">${cell}</td>`
             )
             .join("")}</tr>`
       )

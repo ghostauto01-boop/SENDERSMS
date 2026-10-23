@@ -19,7 +19,8 @@ A production-ready, self-hosted SMS outreach platform built for Nigerian busines
 - **Dashboard** — Real-time metrics (contacts, messages, deliveries, replies), charts
 - **Contacts** — CRUD, search, filter, bulk actions, CSV import/export
 - **Lists** — Group contacts, manage memberships
-- **Campaigns** — Create, validate, start, pause, resume, stop, duplicate
+- **Campaigns** — Created inside SMS Manager or Email Manager ("Bulk Sends"): create, validate, schedule, start, pause, resume, stop, duplicate, edit — every campaign stays editable
+- **Invoices** — Naira and dollar invoicing with a shareable public payment page, Paystack collection, payment history, reminders, notifications and revenue analytics
 - **Sequence Builder** — Visual automation (Send SMS → Wait → Condition → Stop)
 - **Follow-ups** — Due today, overdue, upcoming, completed views
 - **Inbox** — Full SMS conversation threads with reply, stop/resume sequence
@@ -31,12 +32,45 @@ A production-ready, self-hosted SMS outreach platform built for Nigerian busines
 
 ## Table of Contents
 
+0. [Invoices and Paystack](#0-invoices-and-paystack-optional-but-this-is-how-you-get-paid)
 1. [Local Development](#local-development)
 2. [Docker Deployment](#docker-deployment)
 3. [Render Deployment](#render-deployment)
 4. [SMS-Gate.app Setup](#sms-gateapp-setup)
 5. [Production Checklist](#production-checklist)
 6. [Troubleshooting](#troubleshooting)
+
+---
+
+## 0. Invoices and Paystack (optional, but this is how you get paid)
+
+Invoices work without any configuration — you can write, send and print them,
+and record bank-transfer or cash payments by hand. Online card / transfer / USSD
+collection needs a Paystack account.
+
+1. Sign in, open **Settings → Payments** (the same card lives at **Invoices → Paystack**).
+2. Paste your **public key** (`pk_test_…` / `pk_live_…`) and **secret key**
+   (`sk_test_…` / `sk_live_…`). Save.
+3. Copy the **webhook URL** the card shows and add it in the Paystack dashboard
+   under *Settings → API Keys & Webhooks* as
+   `https://<your-domain>/api/v1/invoices/paystack/webhook`.
+4. Press **Test Paystack connection** — it calls the balance endpoint, so a wrong
+   or test-mode-only key is reported before a customer ever sees a checkout.
+5. Fill in your business name, address and logo, then create an invoice and press
+   **Collect with Paystack** (or **Copy link** and send it yourself).
+
+Notes that matter operationally:
+
+- Every customer link is `/i/<token>` and needs no login. **Rotate link** in the
+  invoice menu invalidates the old token instantly.
+- The webhook is the authoritative confirmation; the return page verifies the
+  reference as well, so a closed tab still results in a paid invoice.
+- The secret key is encrypted at rest with `CREDENTIAL_ENCRYPTION_KEY` and is
+  never returned to the browser (the UI only sees a masked value).
+- `PAYSTACK_PUBLIC_KEY` / `PAYSTACK_SECRET_KEY` env vars are fallbacks; anything
+  saved in the UI wins.
+- Set `PUBLIC_BASE_URL` in production. Without it the links are built from the
+  incoming request, which is fine for one hostname and wrong behind several.
 
 ---
 

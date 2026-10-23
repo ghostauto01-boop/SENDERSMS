@@ -118,8 +118,25 @@ function ScheduleModal({
   );
 }
 
-export default function CampaignsPage() {
-  const { channel } = useChannel();
+/**
+ * Classic campaigns (list, schedule, pause, duplicate, edit, replies, leads).
+ *
+ * This is no longer a destination of its own: the Campaigns tab is gone, and
+ * the same, fully editable list is rendered inside SMS Manager and Email
+ * Manager, scoped to that manager's channel. Existing deep links such as
+ * ``/campaigns?campaign=12`` still work because the page is mounted there.
+ */
+export default function CampaignsPage({
+  embedded = false,
+  fixedChannel,
+}: {
+  /** Rendered as a panel inside a manager: no page heading, no channel switch. */
+  embedded?: boolean;
+  /** Pin the list to one channel instead of following the app-wide switch. */
+  fixedChannel?: "sms" | "email";
+} = {}) {
+  const { channel: activeChannel } = useChannel();
+  const channel = fixedChannel ?? activeChannel;
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -255,20 +272,36 @@ export default function CampaignsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-3">
-          Campaigns
-          <ChannelSwitch size="sm" />
-        </h1>
-        <div className="flex gap-2">
-          <Link to="/overview" className="btn-secondary btn-sm" title="All campaigns and inbox activity in one view">
-            <Activity size={14} className="mr-1" /> Overview
-          </Link>
-          <button onClick={() => setShowCreate(true)} className="btn-primary btn-sm">
-            <Plus size={14} className="mr-1" /> New Campaign
-          </button>
+      {embedded ? (
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div>
+            <h2 className="text-base font-semibold">Bulk campaigns</h2>
+            <p className="text-[11px] text-gray-400 mt-0.5">
+              {channel === "email" ? "Email" : "SMS"} blasts to a list or segment. Every campaign stays editable — schedule, pause, duplicate or stop it.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={() => setShowCreate(true)} className="btn-primary btn-sm">
+              <Plus size={14} className="mr-1" /> New campaign
+            </button>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <h1 className="page-title flex items-center gap-2.5">
+            Campaigns
+            <ChannelSwitch size="sm" />
+          </h1>
+          <div className="flex gap-2">
+            <Link to="/overview" className="btn-secondary btn-sm" title="All campaigns and inbox activity in one view">
+              <Activity size={14} className="mr-1" /> Overview
+            </Link>
+            <button onClick={() => setShowCreate(true)} className="btn-primary btn-sm">
+              <Plus size={14} className="mr-1" /> New Campaign
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="space-y-3">
         {loading ? (

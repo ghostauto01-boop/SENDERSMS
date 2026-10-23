@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
     # --- Application ---
-    APP_NAME: str = "SMS SENDER"
+    APP_NAME: str = "SendSMS"
     APP_ENV: str = "development"
     LOG_LEVEL: str = "INFO"
     DEFAULT_TIMEZONE: str = "Africa/Lagos"
@@ -113,6 +113,12 @@ class Settings(BaseSettings):
     # When the backend cannot reach the handset (same Wi-Fi only), the UI
     # falls back to direct tel: dialling on the user's own phone.
     CALLGATE_ALLOW_DIRECT_DIAL_FALLBACK: bool = True
+
+    # --- Paystack (invoice collection) ---
+    # Optional env fallbacks. The same two keys can be saved from Settings ->
+    # Payments, which takes precedence; a database value is encrypted at rest.
+    PAYSTACK_PUBLIC_KEY: Optional[str] = None
+    PAYSTACK_SECRET_KEY: Optional[str] = None
 
     # --- OneSignal ---
     ONESIGNAL_APP_ID: Optional[str] = None

@@ -63,7 +63,7 @@ export default function AudiencesPage() {
     <div className="space-y-5 max-w-6xl mx-auto">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold">Audiences</h1>
+          <h1 className="page-title">Audiences</h1>
           <p className="text-gray-500 mt-1">
             Build reusable audiences from your lists and contacts, then attach them to any campaign.
           </p>

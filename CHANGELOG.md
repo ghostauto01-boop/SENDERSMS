@@ -1,3 +1,43 @@
+## Unreleased — the forest redesign, an invoice studio, and campaigns move into the managers
+
+- **New look.** The whole app is re-skinned to the reference design: a warm grey
+  canvas with one big rounded white shell, a white sidebar whose only coloured row
+  is the mint pill on the current page, emerald brand marks, a dark-forest
+  gradient hero card beside white cards, rounded bars that grow from the baseline
+  with a hatched "no data" state, and muted status pills (olive, mint,
+  dusty rose). Palette, radii, shadows and motion live in `tailwind.config.js`; the
+  components (`card`, `chip`, `segment`, `stat-hero`, `nav-item`, `search-pill`…)
+  live in `index.css`, so every page adopts it without a second stylesheet.
+- **Gentle motion everywhere.** Short, springy entrances (`fade-up`, `pop-in`,
+  `sheet-in`), staggered lists, animated counters on the dashboard, and a single
+  transition timing function (`ease-gentle`). Everything is switched off by
+  `prefers-reduced-motion`.
+- **The Campaign tab is gone.** Campaigns are created and edited inside **SMS
+  Manager** and **Email Manager** ("Bulk Sends"), scoped to that channel. Every
+  existing campaign remains fully editable — schedule, reschedule, pause, resume,
+  stop, duplicate, edit, inspect replies and leads. `/campaigns` redirects to the
+  SMS manager, so old bookmarks keep working.
+- **Invoices (`/invoices`).** A complete studio: NGN/USD (and GHS, ZAR, KES, XOF,
+  EGP), line items with discount and tax, live totals, drafts, send by email or
+  share a private link, Paystack collection, manual payments (bank transfer,
+  cash), reminders, void/duplicate/rotate-link, print, an activity log, payment
+  history, in-app notifications and revenue analytics.
+- **Public invoice page (`/i/<token>`).** No login: the document, the amount due,
+  a Pay button that opens a server-initialised Paystack checkout, and an instant
+  "paid" confirmation when Paystack sends the customer back. The webhook stays
+  the authoritative confirmation.
+- **Paystack keys live in the UI.** Settings → Payments (also linked from the
+  invoice page): business identity, prefix, defaults, public key, secret key
+  (write-only, encrypted at rest, three-state save) and channel selection, with a
+  "Test Paystack connection" button and the exact webhook URL to register.
+- Backend: `models/invoice.py`, `services/invoice_service.py`,
+  `api/v1/invoices.py` (and `GET /invoices/payments`), plus 13 tests covering
+  totals, edits, manual and webhook payments, the public flow, duplication and the
+  JSON contract the frontend reads.
+- Rebranding: the name, PWA manifest, icons, service worker and theme colour now
+  read "SendSMS" in forest green; the manifest is served from the built file, so
+  the brand lives in one place.
+
 ## Unreleased — replies leave from Gmail, Brevo mail leaves from @brevosend.com
 
 - Inbox replies and auto-replies send through a connected Gmail (Gmail API preferred). If that mailbox fails, another connected Gmail is tried. Brevo is not a silent fallback while a Gmail is connected. A reply still leaves through Brevo, using the relay envelope, only when no mailbox is connected.

@@ -220,7 +220,7 @@ export default function FollowUpsPage() {
     <div className="space-y-4 pb-20 lg:pb-0">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-3">
+          <h1 className="page-title flex items-center gap-2.5">
             Follow-ups
             <ChannelSwitch size="sm" />
           </h1>

@@ -1,5 +1,5 @@
 """FastAPI — webhook auto-register, status poll, scheduled, PWA, SPA."""
-import os, logging, time, uuid, traceback
+import json, os, logging, time, uuid, traceback
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, BackgroundTasks, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
@@ -1349,7 +1349,7 @@ async def health_db():
     code = 200 if result.get("ok") else 503
     return JSONResponse(result, status_code=code, headers={"Cache-Control": "no-store"})
 
-from app.api.v1 import validator, ads, auth, calendar, calls, contacts, lists, campaigns, sequences, followups, inbox, overview, templates, analytics, settings as settings_api, webhooks, dashboard, send, autoreply, automations, ai, variables, campaign_followups, notifications, email as email_api, mailbox as mailbox_api, guide as guide_api, mcp as mcp_api, system as system_api
+from app.api.v1 import validator, ads, auth, calendar, calls, contacts, lists, campaigns, sequences, followups, inbox, overview, templates, analytics, settings as settings_api, webhooks, dashboard, send, autoreply, automations, ai, variables, campaign_followups, notifications, email as email_api, mailbox as mailbox_api, guide as guide_api, mcp as mcp_api, system as system_api, invoices as invoices_api
 app.include_router(auth.router, prefix="/api/v1/auth")
 app.include_router(dashboard.router, prefix="/api/v1/dashboard")
 app.include_router(contacts.router, prefix="/api/v1/contacts")
@@ -1379,6 +1379,8 @@ app.include_router(ads.router, prefix="/api/v1/ads")
 # Phone calls via CallGate (same handset as SMS-Gate).
 app.include_router(calls.router, prefix="/api/v1/calls")
 app.include_router(notifications.router, prefix="/api/v1/notifications")
+# Invoice studio + Paystack collection (public pay page and webhook included).
+app.include_router(invoices_api.router, prefix="/api/v1/invoices")
 # Email channel (Brevo): senders, one-off sends, the email inbox and its stats.
 # The SMS routes above are untouched -- this is a parallel, additive surface.
 app.include_router(email_api.router, prefix="/api/v1/email")
@@ -1405,16 +1407,60 @@ app.include_router(mcp_api.public_router)
 PUBLIC_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "public")
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist")
 
+# The manifest is served from the built file when it exists, so the brand
+# colours and icon list live in ONE place (frontend/public/manifest.json)
+# instead of being duplicated here with stale values.
+_MANIFEST_FALLBACK = {
+    "name": "SendSMS",
+    "short_name": "SendSMS",
+    "description": "Nigerian SMS, email and invoice workspace",
+    "start_url": "/",
+    "scope": "/",
+    "display": "standalone",
+    "orientation": "portrait-primary",
+    "background_color": "#ececea",
+    "theme_color": "#123c2b",
+    "icons": [
+        {"src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+        {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+        {"src": "/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable"},
+        {"src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"},
+    ],
+}
+
+
 @app.get("/manifest.json")
-async def m(): return JSONResponse({"name":"SMS SENDER","short_name":"SMS SENDER","start_url":"/","display":"standalone","orientation":"portrait-primary","background_color":"#111827","theme_color":"#2563eb","icons":[{"src":"/icon-192.png","sizes":"192x192","type":"image/png","purpose":"any maskable"},{"src":"/icon-512.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}]})
+async def m():
+    path = os.path.join(PUBLIC_DIR, "manifest.json")
+    if os.path.isfile(path):
+        try:
+            with open(path, "r", encoding="utf-8") as fh:
+                return JSONResponse(json.load(fh))
+        except (OSError, ValueError):
+            pass
+    return JSONResponse(_MANIFEST_FALLBACK)
+
+
+def _public_file(name: str, media_type: str):
+    """Serve one file from frontend/public, or an honest 404."""
+    path = os.path.join(PUBLIC_DIR, name)
+    return FileResponse(path, media_type=media_type) if os.path.isfile(path) else Response("", 404)
+
+
 @app.get("/sw.js")
-async def sw(): p=os.path.join(PUBLIC_DIR,"sw.js"); return FileResponse(p,media_type="application/javascript") if os.path.isfile(p) else Response("",404)
+async def sw(): return _public_file("sw.js", "application/javascript")
 @app.get("/icon-192.png")
-async def i1(): p=os.path.join(PUBLIC_DIR,"icon-192.png"); return FileResponse(p,media_type="image/png") if os.path.isfile(p) else Response("",404)
+async def i1(): return _public_file("icon-192.png", "image/png")
 @app.get("/icon-512.png")
-async def i2(): p=os.path.join(PUBLIC_DIR,"icon-512.png"); return FileResponse(p,media_type="image/png") if os.path.isfile(p) else Response("",404)
+async def i2(): return _public_file("icon-512.png", "image/png")
+@app.get("/icon-maskable-192.png")
+async def im1(): return _public_file("icon-maskable-192.png", "image/png")
+@app.get("/icon-maskable-512.png")
+async def im2(): return _public_file("icon-maskable-512.png", "image/png")
+@app.get("/apple-touch-icon.png")
+async def apple_icon(): return _public_file("apple-touch-icon.png", "image/png")
 @app.get("/favicon.svg")
-async def fv(): p=os.path.join(PUBLIC_DIR,"favicon.svg"); return FileResponse(p,media_type="image/svg+xml") if os.path.isfile(p) else Response("",404)
+async def fv(): return _public_file("favicon.svg", "image/svg+xml")
 
 if os.path.isdir(FRONTEND_DIR):
     ad=os.path.join(FRONTEND_DIR,"assets")
@@ -1435,4 +1481,4 @@ else:
         # page is only for someone opening the root by hand.
         if fp.startswith(("api/", "docs", "manifest", "sw.js", "icon-", "favicon")):
             return JSONResponse({"detail": "Not Found"}, 404)
-        return HTMLResponse("<h1>SMS SENDER API</h1>")
+        return HTMLResponse("<h1>SendSMS API</h1>")

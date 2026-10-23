@@ -13,7 +13,7 @@ import { displayName, startCall, openWhatsappForCall } from "../utils/call";
 import { contactInitials } from "../utils/contact";
 
 const avatarColor = (name: string) => {
-  const colors = ["bg-primary-600", "bg-primary-700", "bg-primary-800", "bg-[#34B7F1]", "bg-warning-400", "bg-accent-500", "bg-primary-400", "bg-warning-400"];
+  const colors = ["bg-primary-600", "bg-primary-700", "bg-primary-800", "bg-accent-500", "bg-warning-400", "bg-accent-500", "bg-primary-400", "bg-warning-400"];
   let h = 0; for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % colors.length;
   return colors[h];
 };
@@ -156,7 +156,7 @@ export default function PhonePage() {
   return (
     <div className="space-y-4 max-w-3xl mx-auto">
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
+        <h1 className="page-title flex items-center gap-2">
           <Phone size={22} className="text-primary-600" /> Phone
         </h1>
         {gw && (

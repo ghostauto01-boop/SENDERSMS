@@ -13,7 +13,6 @@ const OverviewPage = lazy(() => import("./pages/OverviewPage"));
 const ContactsPage = lazy(() => import("./pages/ContactsPage"));
 const ValidatorPage = lazy(() => import("./pages/ValidatorPage"));
 const ListsPage = lazy(() => import("./pages/ListsPage"));
-const CampaignsPage = lazy(() => import("./pages/CampaignsPage"));
 const SMSManagerPage = lazy(() => import("./pages/SMSManagerPage"));
 const EmailManagerPage = lazy(() => import("./pages/EmailManagerPage"));
 const EmailInboxPage = lazy(() => import("./pages/EmailInboxPage"));
@@ -34,6 +33,8 @@ const CalendarPage = lazy(() => import("./pages/CalendarPage"));
 const AudiencesPage = lazy(() => import("./pages/AudiencesPage"));
 const PhonePage = lazy(() => import("./pages/PhonePage"));
 const NotificationsPage = lazy(() => import("./pages/NotificationsPage"));
+const InvoicePage = lazy(() => import("./pages/InvoicePage"));
+const PublicInvoicePage = lazy(() => import("./pages/PublicInvoicePage"));
 const SetupPage = lazy(() => import("./pages/SetupPage"));
 
 function PageSpinner() {
@@ -68,6 +69,15 @@ function AppRoutes() {
     <Suspense fallback={<PageSpinner />}>
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      {/* The public invoice page a customer receives. No shell, no login. */}
+      <Route
+        path="/i/:token"
+        element={
+          <Suspense fallback={<PageSpinner />}>
+            <PublicInvoicePage />
+          </Suspense>
+        }
+      />
       {/* The inbox is a full-screen WhatsApp-style app of its own, so it
           renders outside the dashboard shell (no sidebar / top header). */}
       <Route
@@ -95,13 +105,13 @@ function AppRoutes() {
         }
       >
         <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/invoices" element={<InvoicePage />} />
         <Route path="/overview" element={<OverviewPage />} />
         <Route path="/contacts" element={<ContactsPage />} />
         <Route path="/validator" element={<ValidatorPage />} />
         <Route path="/phone" element={<PhonePage />} />
         <Route path="/lists" element={<ListsPage />} />
         <Route path="/audiences" element={<AudiencesPage />} />
-        <Route path="/campaigns" element={<CampaignsPage />} />
         <Route path="/sms-manager" element={<SMSManagerPage />} />
         <Route path="/email-manager" element={<EmailManagerPage />} />
         <Route path="/email-inbox" element={<EmailInboxPage />} />
@@ -124,6 +134,10 @@ function AppRoutes() {
             catch-all and every one of those links opened the Dashboard. */}
         <Route path="/notifications" element={<NotificationsPage />} />
       </Route>
+      {/* Classic campaigns no longer have a page of their own: they are created
+          inside SMS Manager or Email Manager. Old bookmarks still land in the
+          right place instead of a 404. */}
+      <Route path="/campaigns" element={<Navigate to="/sms-manager" replace />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
     </Suspense>

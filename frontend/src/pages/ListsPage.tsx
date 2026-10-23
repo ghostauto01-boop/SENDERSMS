@@ -494,7 +494,7 @@ export default function ListsPage() {
     <div className="space-y-4 pb-20 lg:pb-0">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold">Contact Lists</h1>
+          <h1 className="page-title">Contact Lists</h1>
           <p className="text-sm text-gray-500 mt-0.5">
             Create a list, then add or remove contacts at any time — even lists with thousands of
             members stay fast (rows are paged, actions run on the server).

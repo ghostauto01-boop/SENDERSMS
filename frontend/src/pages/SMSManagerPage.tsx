@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import {
+  ListChecks,
   Activity,
   BarChart3,
   CalendarDays,
@@ -23,6 +24,7 @@ import {
 } from "lucide-react";
 import adsApi, { AdsCampaign } from "../api/ads";
 import CampaignBuilder from "./ads/CampaignBuilder";
+import CampaignsPage from "./CampaignsPage";
 import CampaignDetail from "./ads/CampaignDetail";
 import { Badge, Empty, Field, Metric, Modal, Stat, fmtDate, fmtDay, fromLocalInput } from "./ads/ui";
 
@@ -38,6 +40,7 @@ import { Badge, Empty, Field, Metric, Modal, Stat, fmtDate, fmtDay, fromLocalInp
 const SECTIONS = [
   { key: "Overview", icon: LayoutGrid },
   { key: "Campaigns", icon: Megaphone },
+  { key: "Bulk Sends", icon: ListChecks },
   { key: "Audience", icon: Users },
   { key: "Automation", icon: Wand2 },
   { key: "Follow-Ups", icon: Clock3 },
@@ -92,11 +95,11 @@ export default function SMSManagerPage() {
     <div className="space-y-5 max-w-6xl mx-auto">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-medium text-primary-600 mb-1 flex items-center gap-1">
-            <Sparkles size={15} /> ADVANCED
+          <p className="eyebrow flex items-center gap-1.5">
+            <Sparkles size={12} /> SMS studio
           </p>
-          <h1 className="text-2xl sm:text-3xl font-bold">SMS Ads Manager</h1>
-          <p className="text-gray-500 mt-1">
+          <h1 className="page-title mt-1">SMS Manager</h1>
+          <p className="page-subtitle">
             Campaigns, SMS sets, creatives, A/B testing, drip budgets, follow-ups and analytics.
           </p>
         </div>
@@ -105,18 +108,14 @@ export default function SMSManagerPage() {
         </button>
       </div>
 
-      <div className="flex gap-1 overflow-x-auto scrollbar-none border-b border-gray-200 dark:border-gray-700">
+      <div className="flex gap-1.5 overflow-x-auto scrollbar-none pb-1 -mx-1 px-1">
         {SECTIONS.map(({ key, icon: Icon }) => (
           <button
             key={key}
             onClick={() => setSection(key)}
-            className={`px-3 py-3 text-sm whitespace-nowrap border-b-2 flex items-center gap-1.5 ${
-              section === key
-                ? "border-primary-600 text-primary-600 font-medium"
-                : "border-transparent text-gray-500"
-            }`}
+            className={`chip shrink-0 ${section === key ? "chip-active" : ""}`}
           >
-            <Icon size={15} /> {key}
+            <Icon size={13} /> {key}
           </button>
         ))}
       </div>
@@ -140,6 +139,7 @@ export default function SMSManagerPage() {
               create={() => setCreating(true)}
             />
           )}
+          {section === "Bulk Sends" && <CampaignsPage embedded fixedChannel="sms" />}
           {section === "Audience" && <AudienceSection reference={reference} campaigns={campaigns} />}
           {section === "Automation" && <AutomationSection campaigns={campaigns} onOpen={setOpenId} />}
           {section === "Follow-Ups" && <FollowUpsSection />}

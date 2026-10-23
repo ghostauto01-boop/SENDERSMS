@@ -23,7 +23,7 @@ const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 const TYPE_STYLE: Record<string, { chip: string; dot: string; label: string }> = {
   meeting: { chip: "bg-primary-100 text-primary-800", dot: "bg-primary-600", label: "Meeting" },
-  call: { chip: "bg-primary-50 text-primary-600", dot: "bg-[#34B7F1]", label: "Call" },
+  call: { chip: "bg-primary-50 text-primary-600", dot: "bg-accent-500", label: "Call" },
   follow_up: { chip: "bg-warning-200 text-warning-700", dot: "bg-warning-500", label: "Follow-up" },
   reminder: { chip: "bg-warning-100 text-warning-700", dot: "bg-warning-400", label: "Reminder" },
   task: { chip: "bg-accent-100 text-accent-600", dot: "bg-accent-600", label: "Task" },
@@ -234,7 +234,7 @@ export default function CalendarPage() {
       <div className="flex flex-col gap-2.5">
         <div className="flex items-center justify-between gap-2">
           <div>
-            <h1 className="text-[22px] font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <h1 className="page-title flex items-center gap-2">
               <span className="w-8 h-8 rounded-full bg-primary-600 flex items-center justify-center text-white">
                 <CalendarIcon size={16} />
               </span>
