@@ -86,12 +86,12 @@ vi.mock("../api/ads", () => {
   return { default: api, adsApi: api };
 });
 
-describe("SMS Ads Manager", () => {
+describe("SMS Manager", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("shows the overview with real campaign metrics", async () => {
     render(<SMSManagerPage />);
-    expect(await screen.findByText("SMS Ads Manager")).toBeInTheDocument();
+    expect(await screen.findByText("SMS Manager")).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText("Active campaigns")).toBeInTheDocument());
     // Campaign card from the "Running now" list.
     expect(await screen.findByText("Lagos outreach")).toBeInTheDocument();
@@ -101,7 +101,7 @@ describe("SMS Ads Manager", () => {
   it("navigates to the campaigns section and filters", async () => {
     const user = userEvent.setup();
     render(<SMSManagerPage />);
-    await screen.findByText("SMS Ads Manager");
+    await screen.findByText("SMS Manager");
     await user.click(screen.getByRole("button", { name: /Campaigns/i }));
     const search = await screen.findByPlaceholderText("Search campaigns…");
     await user.type(search, "nothing-matches");
@@ -111,7 +111,7 @@ describe("SMS Ads Manager", () => {
   it("shows the suppression section explaining send-time checks", async () => {
     const user = userEvent.setup();
     render(<SMSManagerPage />);
-    await screen.findByText("SMS Ads Manager");
+    await screen.findByText("SMS Manager");
     await user.click(screen.getByRole("button", { name: /Suppression/i }));
     expect(await screen.findByText(/blocked at send time/i)).toBeInTheDocument();
   });

@@ -7,6 +7,7 @@ import {
   Activity,
   Bell,
   CheckCircle,
+  CreditCard,
   Eye,
   EyeOff,
   Inbox,
@@ -29,11 +30,12 @@ import emailApi, { EmailAccount } from "../api/email";
 import McpConnectors from "../components/McpConnectors";
 import GoogleOAuthSetupCard from "../components/GoogleOAuthSetupCard";
 import MailboxRepliesTab from "../components/MailboxRepliesTab";
+import PaystackSettingsCard from "../components/invoices/PaystackSettingsCard";
 
-type Tab = "gateway" | "calls" | "notifications" | "compliance" | "access" | "email" | "ai" | "gmail";
+type Tab = "gateway" | "calls" | "notifications" | "compliance" | "access" | "email" | "ai" | "gmail" | "payments";
 
 const TAB_IDS: Tab[] = [
-  "access", "gateway", "email", "gmail", "ai", "calls", "notifications", "compliance",
+  "access", "gateway", "payments", "email", "gmail", "ai", "calls", "notifications", "compliance",
 ];
 
 /**
@@ -70,6 +72,7 @@ export default function SettingsPage() {
   const tabs = [
     { id: "access" as Tab, label: "Site access", icon: Lock },
     { id: "gateway" as Tab, label: "SMS Gateway", icon: Wifi },
+    { id: "payments" as Tab, label: "Payments (Paystack)", icon: CreditCard },
     { id: "email" as Tab, label: "Email (Brevo)", icon: Mail },
     { id: "gmail" as Tab, label: "Gmail replies", icon: Inbox },
     { id: "ai" as Tab, label: "AI (MCP)", icon: Sparkles },
@@ -79,12 +82,33 @@ export default function SettingsPage() {
   ];
 
   return (
-    <div className="space-y-4"><h1 className="text-xl sm:text-2xl font-bold">Settings</h1>
-      <div className="flex gap-2 flex-wrap">{tabs.map(t => (<button key={t.id} onClick={() => setTab(t.id)}
-        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium ${tab===t.id?"bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300":"text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"}`}><t.icon size={14}/>{t.label}</button>))}</div>
+    <div className="space-y-4">
+      <div>
+        <p className="eyebrow">Workspace</p>
+        <h1 className="page-title mt-1">Settings</h1>
+        <p className="page-subtitle">Gateway, channels, payments, notifications and access — all in one place.</p>
+      </div>
+      <div className="flex gap-1.5 overflow-x-auto scrollbar-none pb-1 -mx-1 px-1">{tabs.map(t => (<button key={t.id} onClick={() => setTab(t.id)}
+        className={`chip shrink-0 ${tab===t.id ? "chip-active" : ""}`}><t.icon size={13}/>{t.label}</button>))}</div>
       {loading ? (<div className="card p-6"><div className="skeleton h-8 w-48 mb-4"/><div className="space-y-3">{[...Array(3)].map((_,i)=>(<div key={i} className="skeleton h-10 w-full"/>))}</div></div>)
-      : (<>{tab==="access"&&<AccessTab />}{tab==="gateway"&&<GatewayTab />}{tab==="calls"&&<CallsTab />}{tab==="email"&&<EmailTab />}{tab==="gmail"&&<GmailTab />}{tab==="ai"&&<McpTab />}{tab==="notifications"&&<NotifsTab provs={notifs} onUpdate={load}/>}{tab==="compliance"&&<CompTab s={comp} onUpdate={load}/>}</>)}
+      : (<>{tab==="access"&&<AccessTab />}{tab==="gateway"&&<GatewayTab />}{tab==="payments"&&<PaymentsTab />}{tab==="calls"&&<CallsTab />}{tab==="email"&&<EmailTab />}{tab==="gmail"&&<GmailTab />}{tab==="ai"&&<McpTab />}{tab==="notifications"&&<NotifsTab provs={notifs} onUpdate={load}/>}{tab==="compliance"&&<CompTab s={comp} onUpdate={load}/>}</>)}
     </div>);
+}
+
+function PaymentsTab() {
+  return (
+    <div className="space-y-4">
+      <div className="rounded-2xl bg-primary-50 dark:bg-primary-950/40 px-4 py-3 text-xs text-primary-900 dark:text-primary-200">
+        <p className="font-semibold mb-1">This is where the invoice studio gets paid.</p>
+        <p>
+          Paste your Paystack public and secret keys below, save, then press
+          “Test Paystack connection”. The same fields are reachable from Invoices → Paystack.
+          Your secret key is encrypted on the server and never sent back to the browser.
+        </p>
+      </div>
+      <PaystackSettingsCard />
+    </div>
+  );
 }
 
 function AccessTab() {

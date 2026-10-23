@@ -36,6 +36,28 @@ curl -s -b cookies.txt https://your-app/api/v1/guide/summary   # progress only
 missing — the mailbox and the AI connectors are deliberately not part of that,
 because they are things you add after your first campaign, not before it.
 
+## Invoices — write it, send it, get paid
+
+**Invoices** (`/invoices`) is a full invoice studio, next to the SMS and email
+channels:
+
+- **Naira or dollars** (plus GHS, ZAR, KES, XOF and EGP), every amount stored as
+  integer minor units so no total is ever off by a kobo.
+- Line items, discount, tax, notes, terms and a footer; live totals as you type.
+- **Collect through your own Paystack.** Keys go in **Settings → Payments** (or
+  the invoice page's Paystack button); the secret is encrypted at rest and never
+  sent back to the browser.
+- Every invoice has a **private customer link** (`/i/<token>`, no login) with the
+  document, a Pay button and a receipt. Rotate the link to revoke it.
+- **Reminders**, a **payment history** per invoice and across all of them, an
+  activity log (created, sent, viewed, paid…), in-app notifications when money
+  lands, and revenue analytics (invoiced vs collected, top customers, ageing).
+- Campaigns are no longer a separate tab: bulk sends live inside **SMS Manager**
+  and **Email Manager**, and every campaign stays editable.
+
+Full deployment notes, including the Paystack webhook URL, are in
+[DEPLOY.md](DEPLOY.md#0-invoices-and-paystack-optional-but-this-is-how-you-get-paid).
+
 ## Contacts can be phone-only, email-only, or both
 
 A contact needs a phone number **or** an email address — not both. Email-only

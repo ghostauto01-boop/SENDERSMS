@@ -243,7 +243,7 @@ export default function SetupPage() {
           <p className="text-sm font-medium text-primary-600 mb-1 flex items-center gap-1">
             <GraduationCap size={15} /> TUTORIAL · LIVE STATUS
           </p>
-          <h1 className="text-2xl sm:text-3xl font-bold">Set up everything</h1>
+          <h1 className="page-title">Set up everything</h1>
           <p className="text-gray-500 mt-1 max-w-2xl">
             Six sections, in the order that matters. Each step says whether it is done, what the
             server can see right now, and exactly what to paste where.

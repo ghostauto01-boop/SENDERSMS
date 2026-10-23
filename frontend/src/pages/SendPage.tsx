@@ -41,7 +41,7 @@ function SendPageInner() {
     return (
       <div className="space-y-4 pb-20 lg:pb-0">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-[22px] font-bold text-gray-900 dark:text-white flex items-center gap-2">
+          <h1 className="page-title flex items-center gap-2">
             <span className="w-8 h-8 rounded-full bg-primary-500 flex items-center justify-center text-white">
               <Send size={16} />
             </span>
@@ -283,7 +283,7 @@ function SmsSendPage() {
   return (
     <div className="space-y-3 pb-20 lg:pb-0">
       <div className="flex items-center justify-between">
-        <h1 className="text-[22px] font-bold text-gray-900 dark:text-white flex items-center gap-2">
+        <h1 className="page-title flex items-center gap-2">
           <span className="w-8 h-8 rounded-full bg-primary-600 flex items-center justify-center text-white"><Send size={16}/></span>
           Send SMS
         </h1>

@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, Outlet, useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 import { useAuth } from "../hooks/useAuth";
 import {
-  LayoutDashboard, Users, List, Megaphone, GitBranch, Sparkles,
+  LayoutDashboard, Users, List, GitBranch, Sparkles,
   Inbox, Send, Clock, FileText, BarChart3, Settings, MessageSquareReply,
   Zap, Moon, Sun, Menu, X, LogOut, Search, Braces, Repeat, Calendar, Target,
   Activity, Phone, Mail, MailOpen, GraduationCap, MoreHorizontal, ShieldCheck, Briefcase,
+  ReceiptText, Download, ArrowUpRight, Smartphone,
 } from "lucide-react";
 import BrandMark from "../components/BrandMark";
 import ChannelSwitch from "../components/ChannelSwitch";
@@ -13,17 +15,19 @@ import NotificationBell from "../components/NotificationBell";
 import guideApi from "../api/guide";
 
 /**
- * The app shell.
+ * The app shell — the "forest & parchment" workspace.
  *
- * MOBILE FIRST, because this is a phone app that also happens to run on a
- * desktop: the sidebar is a drawer on small screens, and the five destinations
- * you actually use all day (Overview, Send, SMS inbox, Email inbox, Contacts)
- * sit in a thumb-reachable bottom bar with safe-area padding for notched
- * phones. Everything else lives behind "More", which opens the same drawer, so
- * no page ever became less reachable by adding the bar.
+ * On a desktop it is a white, softly rounded device frame floating on the warm
+ * parchment canvas: a tinted navigation rail on the left, a barely-there grey
+ * content surface on the right, and one sage pill marking the page you are on.
+ * On a phone the rail becomes the familiar drawer and a thumb-reachable bottom
+ * bar keeps the five all-day destinations one tap away.
  *
- * Page changes animate once, briefly (see `.page-enter`), keyed on the route so
- * a re-render never replays it.
+ * The design rules that matter here:
+ *  * the active item is the ONLY coloured row in the rail;
+ *  * the user chip in the header is the only "profile" surface, so pages can
+ *    stay about their work;
+ *  * every movement is short, springy and disabled for reduced-motion users.
  */
 
 interface NavItem {
@@ -32,57 +36,108 @@ interface NavItem {
   icon: typeof Activity;
 }
 
-const OVERVIEW: NavItem[] = [
-  { to: "/overview", label: "Overview", icon: Activity },
+const MENU: NavItem[] = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/setup", label: "Setup Guide", icon: GraduationCap },
-];
-
-const WORK: NavItem[] = [
-  { to: "/send", label: "Send", icon: Send },
+  { to: "/invoices", label: "Invoices", icon: ReceiptText },
   { to: "/contacts", label: "Contacts", icon: Users },
-  { to: "/validator", label: "Validator", icon: ShieldCheck },
-  { to: "/phone", label: "Phone", icon: Phone },
-  { to: "/lists", label: "Lists", icon: List },
-  { to: "/audiences", label: "Audiences", icon: Target },
-  { to: "/campaigns", label: "Campaigns", icon: Megaphone },
+  { to: "/send", label: "Send", icon: Send },
+  { to: "/analytics", label: "Analytics", icon: BarChart3 },
 ];
 
 const CHANNELS: NavItem[] = [
   { to: "/sms-manager", label: "SMS Manager", icon: Sparkles },
   { to: "/email-manager", label: "Email Manager", icon: Mail },
-  { to: "/email-inbox", label: "Email Inbox", icon: MailOpen },
   { to: "/sms-inbox", label: "SMS Inbox", icon: Inbox },
-  // Only the people who wrote back, for SMS or email (pick one on the page).
+  { to: "/email-inbox", label: "Email Inbox", icon: MailOpen },
+];
+
+const AUDIENCE: NavItem[] = [
   { to: "/conversations", label: "Conversations", icon: MessageSquareReply },
-  // Prospects you marked as interested, from either channel.
   { to: "/opportunities", label: "Opportunity", icon: Briefcase },
+  { to: "/lists", label: "Lists", icon: List },
+  { to: "/audiences", label: "Audiences", icon: Target },
   { to: "/calendar", label: "Calendar", icon: Calendar },
+  { to: "/templates", label: "Templates", icon: FileText },
 ];
 
 const AUTOMATION: NavItem[] = [
   { to: "/sequences", label: "Sequences", icon: GitBranch },
-  { to: "/auto-reply", label: "Auto-Reply", icon: MessageSquareReply },
   { to: "/automations", label: "Automations", icon: Zap },
-  { to: "/campaign-follow-ups", label: "Follow-up", icon: Repeat },
+  { to: "/auto-reply", label: "Auto-Reply", icon: MessageSquareReply },
   { to: "/follow-ups", label: "Follow-ups", icon: Clock },
+  { to: "/campaign-follow-ups", label: "Campaign follow-ups", icon: Repeat },
 ];
 
-const CONTENT: NavItem[] = [
+const TOOLS: NavItem[] = [
+  { to: "/validator", label: "Validator", icon: ShieldCheck },
+  { to: "/phone", label: "Phone", icon: Phone },
   { to: "/variables", label: "Variables", icon: Braces },
-  { to: "/templates", label: "Templates", icon: FileText },
-  { to: "/analytics", label: "Analytics", icon: BarChart3 },
+  { to: "/overview", label: "Overview", icon: Activity },
+];
+
+const GENERAL: NavItem[] = [
+  { to: "/setup", label: "Setup guide", icon: GraduationCap },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
-//: Thumb-bar destinations. Five is the most that stays comfortable on a phone.
+//: Thumb-bar destinations. Six is the most that stays comfortable on a phone.
 const TAB_BAR: NavItem[] = [
-  { to: "/overview", label: "Overview", icon: Activity },
+  { to: "/dashboard", label: "Home", icon: LayoutDashboard },
+  { to: "/invoices", label: "Invoices", icon: ReceiptText },
   { to: "/send", label: "Send", icon: Send },
   { to: "/inbox", label: "SMS", icon: Inbox },
-  { to: "/email-inbox", label: "Email", icon: MailOpen },
   { to: "/contacts", label: "Contacts", icon: Users },
 ];
+
+function PromoCard() {
+  const [installEvent, setInstallEvent] = useState<any>(null);
+
+  useEffect(() => {
+    const handler = (event: Event) => {
+      // Keep the browser's prompt for the moment the user asks to install.
+      event.preventDefault();
+      setInstallEvent(event);
+    };
+    window.addEventListener("beforeinstallprompt", handler);
+    return () => window.removeEventListener("beforeinstallprompt", handler);
+  }, []);
+
+  const install = async () => {
+    if (!installEvent) {
+      toast("Open your browser menu and choose “Add to Home Screen”.", { icon: "📲" });
+      return;
+    }
+    await installEvent.prompt();
+    const choice = await installEvent.userChoice;
+    if (choice?.outcome === "accepted") toast.success("Installing SendSMS…");
+    setInstallEvent(null);
+  };
+
+  return (
+    <div className="promo-card p-4">
+      <div className="relative z-10">
+        <div className="w-9 h-9 rounded-full bg-white/10 ring-1 ring-white/20 flex items-center justify-center mb-6">
+          <Download size={15} className="text-white/80" />
+        </div>
+        <p className="text-[15px] font-semibold leading-tight tracking-tight">
+          Download our
+          <br />
+          mobile app
+        </p>
+        <p className="text-[10.5px] text-white/55 mt-1">Smart access to all features.</p>
+        <button
+          onClick={install}
+          className="mt-4 w-full rounded-xl bg-white text-primary-950 text-[12px] font-semibold py-2.5
+                     flex items-center justify-center gap-1.5 transition-all duration-200 ease-gentle
+                     hover:bg-primary-50 active:scale-[0.98]"
+        >
+          <Smartphone size={13} />
+          Install app
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function MainLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -104,38 +159,46 @@ export default function MainLayout() {
     return () => window.removeEventListener("setup-guide-updated", load);
   }, []);
 
+  // The refresh is a light-first design. Dark mode remains available from the
+  // header, but the OS preference no longer makes a first visit dark.
   const [dark, setDark] = useState(() => {
-    if (typeof window !== "undefined") {
-      return (
-        localStorage.getItem("theme") === "dark" ||
-        (!localStorage.getItem("theme") &&
-          window.matchMedia("(prefers-color-scheme: dark)").matches)
-      );
-    }
+    if (typeof window !== "undefined") return localStorage.getItem("theme") === "dark";
     return false;
   });
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
 
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", dark);
+  }, [dark]);
+
   const toggleDark = () => {
-    const newDark = !dark;
-    setDark(newDark);
-    localStorage.setItem("theme", newDark ? "dark" : "light");
-    document.documentElement.classList.toggle("dark", newDark);
+    const next = !dark;
+    setDark(next);
+    localStorage.setItem("theme", next ? "dark" : "light");
   };
 
-  // Init dark mode
-  if (typeof document !== "undefined") {
-    document.documentElement.classList.toggle("dark", dark);
-  }
-
-  // Close the drawer whenever the route changes, and scroll to the top so a
-  // new page never opens half-way down the previous one.
+  // Close the drawer whenever the route changes, and scroll content to the top
+  // so a new page never opens half-way down the previous one.
   useEffect(() => {
     setSidebarOpen(false);
     setSearch("");
+    document.getElementById("workspace-main")?.scrollTo({ top: 0 });
   }, [location.pathname]);
+
+  // ⌘K / Ctrl-K focuses search — the small keyboard courtesy people expect
+  // from a desktop app.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        searchRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   const handleLogout = async () => {
     await logout();
@@ -162,215 +225,235 @@ export default function MainLayout() {
 
   /**
    * The sidebar highlights exactly one item: the most specific match.
-   *
-   * "/email-inbox?view=replied" and "/email-inbox" both match the Conversations
-   * page by pathname, and lighting up both would make it look like two places —
-   * so the longest matching item wins and the other stays quiet. The thumb bar
-   * keeps the loose pathname check below, because its Email tab should stay lit
-   * on either of the two email pages.
+   * /sms-inbox and /inbox are the same screen under two paths, so the longest
+   * matching item wins and the other stays quiet.
    */
+  const allItems = useMemo(
+    () => [...MENU, ...CHANNELS, ...AUDIENCE, ...AUTOMATION, ...TOOLS, ...GENERAL],
+    []
+  );
   const activeItem = useMemo(() => {
-    const items = [...OVERVIEW, ...WORK, ...CHANNELS, ...AUTOMATION, ...CONTENT];
+    const aliases: Record<string, string> = { "/inbox": "/sms-inbox" };
+    const path = aliases[location.pathname] || location.pathname;
     return (
-      items
-        .filter((item) => matches(item.to))
+      [...allItems.map((i) => ({ ...i, to: aliases[i.to] || i.to }))]
+        .filter((item) => path === item.to || path.startsWith(`${item.to}/`))
         .sort((a, b) => b.to.length - a.to.length)[0]?.to ?? null
     );
-  }, [location.pathname, location.search]);
+  }, [location.pathname, location.search, allItems]);
 
   const isActive = (to: string) => to === activeItem;
 
   const groups = useMemo(
     () => [
-      { title: "Start here", items: OVERVIEW },
-      { title: "Audience & sending", items: WORK },
+      { title: "Menu", items: MENU },
       { title: "Channels", items: CHANNELS },
+      { title: "Audience & content", items: AUDIENCE },
       { title: "Automation", items: AUTOMATION },
-      { title: "Content & insights", items: CONTENT },
+      { title: "Tools", items: TOOLS },
+      { title: "General", items: GENERAL },
     ],
     []
   );
 
   const setupBadge = (to: string) =>
-    to === "/setup" && setupBlocking ? <span className="badge-red">{setupBlocking}</span> : null;
+    to === "/setup" && setupBlocking ? <span className="nav-badge">{setupBlocking}</span> : null;
 
-  return (
-    <div className="min-h-[100dvh] flex bg-canvas dark:bg-canvas-dark">
-      {/* Mobile sidebar backdrop */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-gray-900/50 backdrop-blur-sm lg:hidden animate-fade-in"
+  const initials = (user?.display_name || user?.username || "A").slice(0, 1).toUpperCase();
+  const displayName = user?.display_name || user?.username || "Administrator";
+
+  const nav = (
+    <>
+      <div className="flex items-center justify-between px-5 pt-6 pb-5 shrink-0">
+        <Link to="/dashboard" className="flex items-center gap-2.5 group">
+          <BrandMark className="w-9 h-9 shrink-0 rounded-[13px] shadow-sm transition-transform duration-300 ease-spring group-hover:scale-105" />
+          <span className="font-semibold text-[19px] text-primary-950 dark:text-white tracking-[-0.04em] lowercase">
+            sendsms
+          </span>
+        </Link>
+        <button
+          className="lg:hidden icon-btn"
           onClick={() => setSidebarOpen(false)}
-        />
-      )}
+          aria-label="Close menu"
+        >
+          <X size={17} />
+        </button>
+      </div>
 
-      {/* Sidebar */}
-      <aside
-        className={`
-          fixed top-0 left-0 z-50 h-full w-72 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700/70
-          transform transition-transform duration-200 ease-gentle flex flex-col
-          shrink-0 lg:translate-x-0 lg:sticky lg:top-0 lg:h-dvh lg:z-auto
-          ${sidebarOpen ? "translate-x-0 shadow-pop" : "-translate-x-full"}
-        `}
-      >
-        <div className="flex items-center justify-between h-16 px-4 border-b border-gray-100 dark:border-gray-700/70 shrink-0">
-          <Link to="/dashboard" className="flex items-center gap-2.5 group">
-            <BrandMark className="w-9 h-9 shrink-0 rounded-xl transition-transform duration-200 ease-gentle group-hover:scale-105" />
-            <span className="font-bold text-lg text-gray-900 dark:text-white tracking-tight">
-              SMS SENDER
-            </span>
-          </Link>
-          <button
-            className="lg:hidden p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"
-            onClick={() => setSidebarOpen(false)}
-            aria-label="Close menu"
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        <nav className="p-3 space-y-4 overflow-y-auto flex-1 pb-tabbar lg:pb-3">
-          {groups.map((group) => (
-            <div key={group.title}>
-              <p className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-gray-400">
-                {group.title}
-              </p>
-              <div className="space-y-0.5">
-                {group.items.map((item) => (
+      <nav className="px-3 pb-2 overflow-y-auto flex-1 scrollbar-none space-y-5" aria-label="Main">
+        {groups.map((group) => (
+          <div key={group.title}>
+            <p className="px-3.5 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-400/90 dark:text-gray-500">
+              {group.title}
+            </p>
+            <div className="space-y-0.5">
+              {group.items.map((item) => {
+                const active = isActive(item.to);
+                return (
                   <Link
                     key={item.to}
                     to={item.to}
-                    className={`
-                      flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium
-                      transition-all duration-150 ease-gentle
-                      ${
-                        isActive(item.to)
-                          ? "bg-primary-50 dark:bg-primary-950/40 text-primary-700 dark:text-primary-300 shadow-sm"
-                          : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700/60 hover:text-gray-900 dark:hover:text-gray-100"
-                      }
-                    `}
+                    aria-current={active ? "page" : undefined}
+                    className={`nav-item ${active ? "nav-item-active" : ""}`}
                   >
-                    <item.icon size={18} className="shrink-0" />
-                    <span className="flex-1">{item.label}</span>
+                    <item.icon
+                      size={17}
+                      strokeWidth={active ? 2.1 : 1.8}
+                      className={active ? "text-primary-900 dark:text-primary-200" : ""}
+                    />
+                    <span className="flex-1 truncate">{item.label}</span>
                     {setupBadge(item.to)}
                   </Link>
-                ))}
-              </div>
-            </div>
-          ))}
-        </nav>
-
-        <div className="p-3 border-t border-gray-100 dark:border-gray-700/70 shrink-0 hidden lg:block">
-          <div className="rounded-xl bg-gray-50 dark:bg-gray-900/50 p-3 flex items-center gap-3">
-            <span className="w-9 h-9 rounded-full brand-gradient text-white text-xs font-semibold flex items-center justify-center shrink-0">
-              {(user?.display_name || user?.username || "A").slice(0, 1).toUpperCase()}
-            </span>
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">
-                {user?.display_name || user?.username || "Administrator"}
-              </p>
-              <p className="text-[11px] text-gray-400">Signed in</p>
+                );
+              })}
             </div>
           </div>
-        </div>
-      </aside>
+        ))}
+      </nav>
 
-      {/* Main content */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Top header */}
-        <header className="sticky top-0 z-30 h-16 bg-white/90 dark:bg-gray-800/90 backdrop-blur border-b border-gray-200 dark:border-gray-700/70 flex items-center gap-2 px-3 sm:px-4 lg:px-6 safe-top">
-          <button
-            className="lg:hidden p-2 rounded-xl text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-            onClick={() => setSidebarOpen(true)}
-            aria-label="Open menu"
-          >
-            <Menu size={20} />
-          </button>
+      <div className="p-3.5 pt-2 shrink-0 space-y-2">
+        <PromoCard />
+        <button
+          onClick={handleLogout}
+          className="nav-item w-full text-gray-500 hover:text-danger-600"
+        >
+          <LogOut size={17} strokeWidth={1.8} />
+          <span>Log out</span>
+          <ArrowUpRight size={14} className="ml-auto opacity-40" />
+        </button>
+      </div>
+    </>
+  );
 
-          <form onSubmit={onSearch} className="flex-1 max-w-md hidden sm:block">
-            <div className="relative">
-              <Search
-                size={16}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-              />
-              <input
-                ref={searchRef}
-                type="search"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search contacts…"
-                aria-label="Search contacts"
-                className="input pl-9 py-2"
-              />
-            </div>
-          </form>
+  return (
+    <div className="min-h-[100dvh] bg-canvas dark:bg-canvas-dark lg:h-[100dvh] lg:p-5 xl:p-6 lg:overflow-hidden">
+      <div className="workspace-frame mx-auto flex w-full max-w-[1720px] min-h-[100dvh] lg:h-full lg:min-h-0">
+        {/* Mobile sidebar backdrop */}
+        {sidebarOpen && (
+          <div
+            className="fixed inset-0 z-40 bg-primary-950/35 backdrop-blur-sm lg:hidden animate-fade-in"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
 
-          <div className="flex-1 sm:hidden" />
+        {/* Navigation rail */}
+        <aside
+          className={`
+            workspace-sidebar fixed top-0 left-0 z-50 h-[100dvh] w-[276px] flex flex-col shrink-0
+            transform transition-transform duration-300 ease-gentle
+            lg:static lg:translate-x-0 lg:h-full lg:z-auto
+            ${sidebarOpen ? "translate-x-0 shadow-pop" : "-translate-x-full"}
+          `}
+        >
+          {nav}
+        </aside>
 
-          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-            {/* One switch for the whole app: SMS or Email. */}
-            <div className="hidden md:block mr-1">
-              <ChannelSwitch navigateManagers={location.pathname !== "/overview"} />
-            </div>
-            <Link
-              to="/email-inbox"
-              className="p-2 rounded-xl text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors md:hidden"
-              aria-label="Email inbox"
+        {/* Workspace */}
+        <div className="workspace-content flex-1 flex flex-col min-w-0 lg:rounded-r-[2.5rem]">
+          <header className="shrink-0 flex items-center gap-2 px-3 sm:px-4 lg:px-6 pt-3 lg:pt-4 safe-top">
+            <button
+              className="lg:hidden icon-btn"
+              onClick={() => setSidebarOpen(true)}
+              aria-label="Open menu"
             >
-              <MailOpen size={18} />
+              <Menu size={18} />
+            </button>
+
+            <Link to="/dashboard" className="lg:hidden flex items-center gap-2 mr-1">
+              <BrandMark className="w-8 h-8 rounded-xl" />
             </Link>
-            <NotificationBell />
-            <button
-              onClick={toggleDark}
-              className="p-2 rounded-xl text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-              title="Toggle dark mode"
-              aria-label="Toggle dark mode"
-            >
-              {dark ? <Sun size={18} /> : <Moon size={18} />}
-            </button>
-            <button
-              onClick={handleLogout}
-              className="p-2 rounded-xl text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-              title="Log out"
-              aria-label="Log out"
-            >
-              <LogOut size={18} />
-            </button>
-          </div>
-        </header>
 
-        {/* Page content */}
-        <main key={location.pathname} className="flex-1 min-w-0 p-3 sm:p-4 lg:p-6 page-enter pb-tabbar">
-          <Outlet />
-        </main>
+            <form onSubmit={onSearch} className="hidden md:block flex-1 max-w-[320px]">
+              <div className="search-pill">
+                <Search size={16} className="text-gray-400 shrink-0" />
+                <input
+                  ref={searchRef}
+                  type="search"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search contacts, phone, email…"
+                  aria-label="Search contacts"
+                />
+                <kbd className="hidden lg:inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] text-gray-400">
+                  ⌘K
+                </kbd>
+              </div>
+            </form>
+
+            <div className="flex-1 md:hidden" />
+
+            <div className="ml-auto flex items-center gap-1.5 sm:gap-2 shrink-0">
+              <div className="hidden md:block">
+                <ChannelSwitch navigateManagers={location.pathname !== "/overview"} />
+              </div>
+              <NotificationBell />
+              <button
+                onClick={toggleDark}
+                className="icon-btn hidden sm:flex"
+                title="Toggle dark mode"
+                aria-label="Toggle dark mode"
+              >
+                {dark ? <Sun size={17} /> : <Moon size={17} />}
+              </button>
+              <Link to="/settings" className="user-chip" aria-label="Account settings">
+                <span className="avatar w-8 h-8 text-xs">{initials}</span>
+                <span className="hidden sm:block leading-tight pr-0.5">
+                  <span className="block text-[12.5px] font-semibold text-gray-800 dark:text-gray-100 max-w-[130px] truncate">
+                    {displayName}
+                  </span>
+                  <span className="block text-[10px] text-gray-400 max-w-[130px] truncate">
+                    Operator account
+                  </span>
+                </span>
+              </Link>
+              <button
+                onClick={handleLogout}
+                className="icon-btn hidden lg:flex"
+                title="Log out"
+                aria-label="Log out"
+              >
+                <LogOut size={16} />
+              </button>
+            </div>
+          </header>
+
+          {/* Page content — the only scroll container on desktop. */}
+          <main
+            id="workspace-main"
+            key={location.pathname}
+            className="flex-1 min-w-0 px-3 sm:px-4 lg:px-6 pt-4 lg:pt-5 pb-tabbar page-enter lg:overflow-y-auto wa-scrollbar"
+          >
+            <Outlet />
+          </main>
+        </div>
       </div>
 
       {/* Thumb bar — phones and small tablets only. */}
       <nav
-        className="fixed bottom-0 left-0 right-0 z-40 lg:hidden bg-white/95 dark:bg-gray-800/95 backdrop-blur border-t border-gray-200 dark:border-gray-700/70 safe-bottom"
+        className="fixed bottom-0 left-0 right-0 z-40 lg:hidden bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border-t border-gray-200/70 dark:border-gray-700/70 safe-bottom"
         aria-label="Primary"
       >
         <div className="grid grid-cols-6">
           {TAB_BAR.map((item) => {
-            // Pathname only: the Email tab covers the inbox and its
-            // Conversations page, and the SMS tab covers /inbox and its chats.
-            const active = matches(item.to);
+            const aliases: Record<string, string> = { "/inbox": "/sms-inbox" };
+            const path = aliases[location.pathname] || location.pathname;
+            const active = path === aliases[item.to] || path.startsWith(`${item.to}/`);
             return (
               <Link
                 key={item.to}
                 to={item.to}
-                className={`flex flex-col items-center justify-center gap-0.5 py-2 min-h-[56px] transition-colors ${
+                className={`flex flex-col items-center justify-center gap-0.5 py-2 min-h-[58px] transition-colors duration-200 ${
                   active
-                    ? "text-primary-600 dark:text-primary-400"
-                    : "text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+                    ? "text-primary-900 dark:text-primary-300"
+                    : "text-gray-400 dark:text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
                 }`}
               >
                 <span
-                  className={`px-3 py-1 rounded-full transition-all duration-200 ease-gentle ${
-                    active ? "bg-primary-50 dark:bg-primary-950/50" : ""
+                  className={`px-3 py-1 rounded-full transition-all duration-300 ease-spring ${
+                    active ? "bg-primary-100 dark:bg-primary-950/60 scale-105" : ""
                   }`}
                 >
-                  <item.icon size={19} />
+                  <item.icon size={18} strokeWidth={active ? 2.2 : 1.8} />
                 </span>
                 <span className="text-[10px] font-medium">{item.label}</span>
               </Link>
@@ -378,10 +461,10 @@ export default function MainLayout() {
           })}
           <button
             onClick={() => setSidebarOpen(true)}
-            className="flex flex-col items-center justify-center gap-0.5 py-2 min-h-[56px] text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
+            className="flex flex-col items-center justify-center gap-0.5 py-2 min-h-[58px] text-gray-400 dark:text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 transition-colors duration-200"
           >
             <span className="px-3 py-1">
-              <MoreHorizontal size={19} />
+              <MoreHorizontal size={18} strokeWidth={1.8} />
             </span>
             <span className="text-[10px] font-medium">More</span>
           </button>

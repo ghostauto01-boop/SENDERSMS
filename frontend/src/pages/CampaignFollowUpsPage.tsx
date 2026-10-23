@@ -276,7 +276,7 @@ export default function CampaignFollowUpsPage() {
   return (
     <div className="space-y-4 pb-20 lg:pb-0">
       <div>
-        <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
+        <h1 className="page-title flex items-center gap-2">
           <Clock size={22} className="text-primary-600" />
           Campaign Follow-ups
         </h1>

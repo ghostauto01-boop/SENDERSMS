@@ -31,6 +31,14 @@ from app.models.call import CallLog
 from app.models.push import PushSubscription
 from app.models.email import EmailAccount, EmailEvent, EmailSendLog, EmailSuppression
 from app.models.email_inbox import EmailContactAddress, EmailMailbox
+from app.models.invoice import (
+    INVOICE_CURRENCIES,
+    INVOICE_STATUSES,
+    Invoice,
+    InvoiceEvent,
+    InvoiceItem,
+    InvoicePayment,
+)
 from app.models.mcp import McpCall, McpToken
 from app.models.mcp_oauth import (
     McpConnection,
@@ -122,4 +130,10 @@ __all__ = [
     "McpOAuthClient",
     "McpOAuthCode",
     "McpOAuthToken",
+    "Invoice",
+    "InvoiceItem",
+    "InvoicePayment",
+    "InvoiceEvent",
+    "INVOICE_CURRENCIES",
+    "INVOICE_STATUSES",
 ]

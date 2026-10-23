@@ -489,11 +489,11 @@ export default function InboxPage() {
   const menuItems = [
     { to: "/dashboard", icon: Home, label: "Dashboard" },
     { to: "/contacts", icon: Users, label: "Contacts" },
-    { to: "/campaigns", icon: Megaphone, label: "Campaigns" },
+    { to: "/sms-manager", icon: Megaphone, label: "Campaigns" },
     { to: "/settings", icon: SettingsIcon, label: "Settings" },
   ];
 
-  const displayName = user?.display_name || user?.username || "SMS SENDER";
+  const displayName = user?.display_name || user?.username || "SendSMS";
 
   /* ================================================================ */
   return (
@@ -1069,7 +1069,7 @@ export default function InboxPage() {
                 data-chat-scroll=""
                 className="chat-scroll flex-1 min-h-0 overflow-y-auto wa-scrollbar px-2 md:px-[6%] lg:px-[9%] py-3 relative"
                 onScroll={onChatScroll}
-                style={{ backgroundColor: "#eff3f9", backgroundImage: CHAT_BG }}
+                style={{ backgroundColor: "#f2f3ef", backgroundImage: CHAT_BG }}
               >
                 <div className="absolute inset-0 bg-gray-950 opacity-0 dark:opacity-100 pointer-events-none" />
                 <div className="relative z-10 flex flex-col">
@@ -1239,7 +1239,7 @@ export default function InboxPage() {
               <div className="w-[200px] h-[200px] lg:w-[303px] lg:h-[303px] mx-auto mb-6 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center border border-gray-200 dark:border-gray-800 shadow-sm">
                 <MessageCircle size={110} className="text-gray-600 dark:text-gray-400 opacity-20" />
               </div>
-              <h3 className="text-[28px] font-light text-gray-600 dark:text-gray-200 tracking-tight">SMS SENDER</h3>
+              <h3 className="text-[28px] font-light text-gray-600 dark:text-gray-200 tracking-tight">SendSMS</h3>
               <p className="text-[13px] text-gray-500 dark:text-gray-400 mt-2 leading-5 text-center max-w-sm">
                 Select a chat to start messaging. Your messages are synced from your phone via SMS-Gate.
               </p>

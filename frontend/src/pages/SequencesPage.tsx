@@ -150,7 +150,7 @@ export default function SequencesPage() {
     <div className="space-y-4 pb-20 lg:pb-0">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold">Sequences</h1>
+          <h1 className="page-title">Sequences</h1>
           <p className="text-sm text-gray-500 mt-0.5">Automate messages and create visible follow-ups between steps.</p>
         </div>
         <button onClick={() => setShowCreate(true)} className="btn-primary btn-sm">

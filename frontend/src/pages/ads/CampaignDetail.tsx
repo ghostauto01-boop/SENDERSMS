@@ -126,7 +126,7 @@ export default function CampaignDetail({
             <button className="text-sm text-primary-600 mb-2 flex items-center gap-1" onClick={onClose}>
               <ArrowLeft size={15} /> {backLabel || (isEmail ? "Email Manager" : "SMS Ads Manager")}
             </button>
-            <h1 className="text-2xl font-bold break-words">{detail.name}</h1>
+            <h1 className="page-title break-words">{detail.name}</h1>
             <div className="flex flex-wrap items-center gap-2 mt-2">
               <Badge value={detail.status} />
               {detail.state && detail.state !== detail.status && <Badge value={detail.state} />}

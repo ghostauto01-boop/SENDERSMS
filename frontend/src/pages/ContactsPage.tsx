@@ -20,7 +20,7 @@ const LEAD_STATUSES = ["new","contacted","replied","interested","follow-up","mee
 const statusBadge = (s:string) => { const m:Record<string,string>={new:"bg-primary-50 text-primary-700",contacted:"bg-warning-100 text-warning-700",replied:"bg-primary-100 text-primary-700",interested:"bg-primary-100 text-primary-800", "follow-up":"bg-warning-200 text-warning-700",meeting:"bg-primary-50 text-primary-600",customer:"bg-primary-100 text-primary-700",not_interested:"bg-danger-100 text-danger-700",closed:"bg-gray-100 text-gray-600"}; return m[s]||"bg-gray-100 text-gray-600"; };
 
 const avatarColor = (name:string) => {
-  const colors = ["bg-primary-600","bg-primary-700","bg-primary-800","bg-[#34B7F1]","bg-warning-400","bg-accent-500","bg-primary-400","bg-warning-400","bg-primary-500","bg-primary-400"];
+  const colors = ["bg-primary-600","bg-primary-700","bg-primary-800","bg-[#3f8e67]","bg-warning-400","bg-accent-500","bg-primary-400","bg-warning-400","bg-primary-500","bg-primary-400"];
   let h=0; for(let i=0;i<name.length;i++) h=(h*31+name.charCodeAt(i))%colors.length;
   return colors[h];
 };
@@ -271,7 +271,7 @@ export default function ContactsPage() {
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Contacts</h1>
+            <h1 className="page-title">Contacts</h1>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{total.toLocaleString()} contacts · Manage, validate, and reach your audience</p>
           </div>
           <div className="grid grid-cols-2 sm:flex w-full sm:w-auto gap-2">
@@ -410,7 +410,7 @@ export default function ContactsPage() {
                       </>
                     ) : (
                       <>
-                        <Mail size={12} className="text-[#34B7F1] flex-shrink-0"/>
+                        <Mail size={12} className="text-[#3f8e67] flex-shrink-0"/>
                         <span className="font-medium truncate">{c.email || "No contact details"}</span>
                       </>
                     )}
@@ -533,7 +533,7 @@ export default function ContactsPage() {
                   <td className="px-3 py-3 text-[13px] font-medium text-gray-900 dark:text-gray-200">
                     {c.phone_number
                       ? c.phone_number
-                      : <span className="inline-flex items-center gap-1 text-[#34B7F1]"><Mail size={11}/>email only</span>}
+                      : <span className="inline-flex items-center gap-1 text-[#3f8e67]"><Mail size={11}/>email only</span>}
                   </td>
                   <td className="px-3 py-3 text-[13px] text-gray-500 dark:text-gray-400 max-w-[160px]">
                     <div className="truncate">{c.business_name||"—"}</div>
@@ -612,7 +612,7 @@ export default function ContactsPage() {
             </div>
 
             {/* chat preview bg */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-[120px]" style={{backgroundColor:"#eff3f9", backgroundImage:`url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23d1d7db' fill-opacity='0.2'%3E%3Cpath d='M20 20h10v10H20zM50 50h10v10H50z'/%3E%3C/g%3E%3C/svg%3E")`}}>
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-[120px]" style={{backgroundColor:"#f2f3ef", backgroundImage:`url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23d1d7db' fill-opacity='0.2'%3E%3Cpath d='M20 20h10v10H20zM50 50h10v10H50z'/%3E%3C/g%3E%3C/svg%3E")`}}>
               {quickContact && (
                 <div className="flex justify-center">
                   <div className="bg-warning-100 text-[11px] px-3 py-1.5 rounded-lg shadow-sm text-gray-600 text-center max-w-[90%]">

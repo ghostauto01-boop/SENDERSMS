@@ -122,7 +122,7 @@ export default function OverviewPage() {
   if (loading || (metrics !== null && metrics.channel !== channel)) {
     return (
       <div className="space-y-6">
-        <h1 className="text-xl sm:text-2xl font-bold">{channelLabel} Overview</h1>
+        <h1 className="page-title">{channelLabel} Overview</h1>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[...Array(8)].map((_, i) => (
             <div key={i} className="card p-4">
@@ -158,7 +158,7 @@ export default function OverviewPage() {
           <p className="text-sm font-medium text-primary-600 mb-1 flex items-center gap-1">
             <Activity size={15} /> {channelLabel.toUpperCase()} OVERVIEW
           </p>
-          <h1 className="text-2xl sm:text-3xl font-bold">{channelLabel} Overview</h1>
+          <h1 className="page-title">{channelLabel} Overview</h1>
           <p className="text-gray-500 mt-1 text-sm max-w-2xl">
             {isEmail
               ? "Email campaigns, delivery and inbox activity only — SMS activity has its own overview."
@@ -245,12 +245,12 @@ export default function OverviewPage() {
             <AreaChart data={metrics?.series || []}>
               <defs>
                 <linearGradient id="ovSent" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#4163f6" stopOpacity={0.35} />
-                  <stop offset="95%" stopColor="#4163f6" stopOpacity={0} />
+                  <stop offset="5%" stopColor="#1a4534" stopOpacity={0.35} />
+                  <stop offset="95%" stopColor="#1a4534" stopOpacity={0} />
                 </linearGradient>
                 <linearGradient id="ovReplies" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.4} />
-                  <stop offset="95%" stopColor="#4f46e5" stopOpacity={0} />
+                  <stop offset="5%" stopColor="#2a684e" stopOpacity={0.4} />
+                  <stop offset="95%" stopColor="#2a684e" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
@@ -261,8 +261,8 @@ export default function OverviewPage() {
                 labelFormatter={(d) => new Date(String(d)).toDateString()}
               />
               <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Area type="monotone" dataKey="sent" name={`${messageLabel} sent`} stroke="#4163f6" fill="url(#ovSent)" strokeWidth={2} />
-              <Area type="monotone" dataKey="replies" name={`${channelLabel} replies`} stroke="#4f46e5" fill="url(#ovReplies)" strokeWidth={2} />
+              <Area type="monotone" dataKey="sent" name={`${messageLabel} sent`} stroke="#1a4534" fill="url(#ovSent)" strokeWidth={2} />
+              <Area type="monotone" dataKey="replies" name={`${channelLabel} replies`} stroke="#2a684e" fill="url(#ovReplies)" strokeWidth={2} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -326,7 +326,7 @@ export default function OverviewPage() {
                 </button>
               ))}
             </div>
-            <Link to="/campaigns" className="btn-secondary btn-sm">Campaigns</Link>
+            <Link to="/sms-manager" className="btn-secondary btn-sm">Campaigns</Link>
             <Link to={isEmail ? "/email-manager" : "/sms-manager"} className="btn-secondary btn-sm hidden sm:inline-flex">
               <Sparkles size={13} className="mr-1" /> {channelLabel} Manager
             </Link>
@@ -344,7 +344,7 @@ export default function OverviewPage() {
                 ? "Switch to \"All\" to see drafts and finished campaigns."
                 : `Create your first ${channelLabel.toLowerCase()} campaign to start reaching contacts.`}
             </p>
-            <Link to="/campaigns" className="btn-primary btn-sm">Go to Campaigns</Link>
+            <Link to="/sms-manager" className="btn-primary btn-sm">Go to Campaigns</Link>
           </div>
         ) : (
           <div className="space-y-3">

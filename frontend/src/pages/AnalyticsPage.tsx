@@ -11,12 +11,12 @@ import {
   BarChart, Area, AreaChart,
 } from "recharts";
 
-const GREEN = "#2563eb";
-const BLUE = "#2563eb";
-const RED = "#ef4444";
-const AMBER = "#f59e0b";
-const PURPLE = "#4f46e5";
-const TEAL = "#4163f6";
+const GREEN = "#123c2b";
+const BLUE = "#123c2b";
+const RED = "#bf5167";
+const AMBER = "#c99a2a";
+const PURPLE = "#2a684e";
+const TEAL = "#1a4534";
 
 const fmtDate = (iso: string) => {
   try {
@@ -87,12 +87,12 @@ export default function AnalyticsPage() {
     { name: "Failed", value: analytics.failed },
     { name: "In flight / other", value: Math.max(0, analytics.sent - analytics.delivered - analytics.failed) },
   ].filter((d) => d.value > 0) : [];
-  const donutColors = [GREEN, RED, "#cdd7e5"];
+  const donutColors = [GREEN, RED, "#d6d8d3"];
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <h1 className="text-xl sm:text-2xl font-bold">Analytics</h1>
+        <h1 className="page-title">Analytics</h1>
         <select
           className="input py-1.5 w-auto text-sm"
           value={days}

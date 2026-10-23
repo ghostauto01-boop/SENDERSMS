@@ -3,14 +3,15 @@
 @tailwind utilities;
 
 /**
- * Global feel.
+ * Global feel — the "forest & parchment" refresh.
  *
  * Three rules hold the whole app together:
  *  1. one palette — every colour resolves from tailwind.config.js, so a button
- *     on the Contacts page and a button in the Email Inbox are the same blue;
- *  2. gentle motion — short, small transitions that make the app feel like one
- *     product, all of them switched off for anyone who asked their device for
- *     reduced motion;
+ *     on the Contacts page and a button in the Invoice studio are the same
+ *     forest green;
+ *  2. gentle, Apple-like motion — short spring transitions, one deliberate
+ *     entrance per page, everything switched off for anyone who asked their
+ *     device for reduced motion;
  *  3. native-app behaviour on a phone — safe areas, no rubber-band bounce,
  *     44px touch targets, no input zoom on iOS.
  */
@@ -18,34 +19,31 @@
    Email inbox colour tokens. The app's dark mode is a `.dark` class set from
    `prefers-color-scheme` (see MainLayout), so these follow it; the media
    query below also covers any surface rendered before that class is set.
-   Dark values are the high-contrast grey scheme: #e0e0e0 text and a LIGHT
-   blue (#66b3ff, ≥4.5:1 on the dark surfaces) — never brand-blue #2563eb
-   body/link text on a dark-blue background, which was ~2:1 and unreadable.
    --------------------------------------------------------------------------- */
 :root {
-  --email-text-primary: #111827;
-  --email-text-secondary: #4b5563;
+  --email-text-primary: #202823;
+  --email-text-secondary: #626c64;
   --email-bg-primary: #ffffff;
-  --email-bg-secondary: #f5f5f5;
-  --email-link: #1d4ed8;
-  --email-border: #e5e7eb;
+  --email-bg-secondary: #f7f8f5;
+  --email-link: #215440;
+  --email-border: #e7e8e4;
 }
 .dark {
-  --email-text-primary: #e0e0e0;
-  --email-text-secondary: #b0b0b0;
-  --email-bg-primary: #141b28;
-  --email-bg-secondary: #1c2637;
-  --email-link: #66b3ff;
-  --email-border: #374357;
+  --email-text-primary: #e6ece7;
+  --email-text-secondary: #aab4ac;
+  --email-bg-primary: #121c16;
+  --email-bg-secondary: #18241d;
+  --email-link: #8fc7a8;
+  --email-border: #2b3a30;
 }
 @media (prefers-color-scheme: dark) {
   :root:not(.light) {
-    --email-text-primary: #e0e0e0;
-    --email-text-secondary: #b0b0b0;
-    --email-bg-primary: #141b28;
-    --email-bg-secondary: #1c2637;
-    --email-link: #66b3ff;
-    --email-border: #374357;
+    --email-text-primary: #e6ece7;
+    --email-text-secondary: #aab4ac;
+    --email-bg-primary: #121c16;
+    --email-bg-secondary: #18241d;
+    --email-link: #8fc7a8;
+    --email-border: #2b3a30;
   }
 }
 
@@ -59,12 +57,13 @@
     @apply text-gray-900 dark:text-gray-100 antialiased;
     @apply bg-canvas dark:bg-canvas-dark;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
   }
 
   /* Every focus ring in the app is the same brand ring — including the ones
      Tailwind supplies, which would otherwise use the browser default. */
   :focus-visible {
-    @apply outline-none ring-2 ring-primary-500/70 ring-offset-1 ring-offset-white dark:ring-offset-gray-900;
+    @apply outline-none ring-2 ring-primary-500/60 ring-offset-1 ring-offset-white dark:ring-offset-gray-900;
   }
 
   /* Tighter, calmer headings. */
@@ -79,7 +78,7 @@
   /* One scrollbar look, everywhere. */
   * {
     scrollbar-width: thin;
-    scrollbar-color: rgba(100, 116, 139, 0.35) transparent;
+    scrollbar-color: rgba(98, 108, 100, 0.3) transparent;
   }
   *::-webkit-scrollbar {
     width: 8px;
@@ -89,11 +88,11 @@
     background: transparent;
   }
   *::-webkit-scrollbar-thumb {
-    background: rgba(100, 116, 139, 0.35);
+    background: rgba(98, 108, 100, 0.3);
     border-radius: 999px;
   }
   *::-webkit-scrollbar-thumb:hover {
-    background: rgba(100, 116, 139, 0.55);
+    background: rgba(98, 108, 100, 0.5);
   }
 }
 
@@ -102,18 +101,18 @@
     /* min-h-[44px] on touch screens matches the ~44px target both Apple and
        Google recommend; pointer:fine devices keep the compact height. */
     @apply inline-flex items-center justify-center gap-2 px-4 py-2 min-h-[44px] sm:min-h-0 rounded-xl
-           font-medium transition-all duration-150 ease-gentle
-           active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100
+           font-medium transition-all duration-200 ease-gentle
+           active:scale-[0.975] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100
            focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2;
   }
   .btn-primary {
-    @apply btn bg-primary-600 text-white shadow-sm shadow-primary-600/20
-           hover:bg-primary-700 hover:shadow-md hover:shadow-primary-600/20;
+    @apply btn bg-primary-900 text-white shadow-sm shadow-primary-950/20
+           hover:bg-primary-800 hover:shadow-md hover:shadow-primary-950/20 dark:bg-primary-700 dark:hover:bg-primary-600;
   }
   .btn-secondary {
     @apply btn bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200
            border border-gray-200 dark:border-gray-700 shadow-card
-           hover:bg-gray-50 dark:hover:bg-gray-700/70 hover:border-gray-300 dark:hover:border-gray-600;
+           hover:bg-white/80 dark:hover:bg-gray-700/70 hover:border-gray-300 dark:hover:border-gray-600;
   }
   .btn-danger {
     @apply btn bg-danger-600 text-white shadow-sm shadow-danger-600/20 hover:bg-danger-700;
@@ -122,7 +121,7 @@
     @apply btn bg-success-600 text-white shadow-sm shadow-success-600/20 hover:bg-success-700;
   }
   .btn-ghost {
-    @apply btn text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800;
+    @apply btn text-gray-600 dark:text-gray-400 hover:bg-gray-100/80 dark:hover:bg-gray-800;
   }
   .btn-sm {
     @apply px-3 py-1.5 text-sm min-h-[36px] sm:min-h-0 rounded-lg;
@@ -131,45 +130,45 @@
     /* text-base on phones: iOS Safari force-zooms the whole page when a focused
        input renders below 16px, which then leaves the layout scrolled sideways.
        sm:text-sm restores the tighter desktop scale. */
-    @apply w-full px-3 py-2.5 text-base sm:text-sm border border-gray-200 dark:border-gray-700
+    @apply w-full px-3.5 py-2.5 text-base sm:text-sm border border-gray-200 dark:border-gray-700
            rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
            placeholder:text-gray-400 dark:placeholder:text-gray-500
-           focus:ring-2 focus:ring-primary-500/60 focus:border-primary-500 outline-none
-           transition-all duration-150 ease-gentle;
+           focus:ring-2 focus:ring-primary-500/40 focus:border-primary-500 outline-none
+           transition-all duration-200 ease-gentle;
   }
   .label {
-    @apply block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1;
+    @apply block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5;
   }
   .card {
-    @apply bg-white dark:bg-gray-800 rounded-2xl shadow-card border border-gray-200/80 dark:border-gray-700/70;
+    @apply bg-white dark:bg-gray-800 rounded-3xl shadow-card border border-gray-200/70 dark:border-gray-700/70;
   }
   /* Cards that respond when you point at them (dashboards, pickers). */
   .card-hover {
-    @apply card transition-all duration-200 ease-gentle hover:shadow-raised hover:-translate-y-0.5;
+    @apply card transition-all duration-300 ease-gentle hover:shadow-raised hover:-translate-y-[3px];
   }
   .badge {
-    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium;
+    @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold leading-none;
   }
   /* Status colours are meanings, not decoration — the only places green, amber
-     and red appear. */
+     and red appear. All three are muted to sit beside the forest brand. */
   .badge-green {
-    @apply badge bg-success-50 text-success-700 dark:bg-success-950/60 dark:text-success-300;
+    @apply badge bg-success-100 text-success-700 dark:bg-success-950/70 dark:text-success-300;
   }
   .badge-red {
-    @apply badge bg-danger-50 text-danger-700 dark:bg-danger-950/60 dark:text-danger-300;
+    @apply badge bg-danger-100 text-danger-700 dark:bg-danger-950/70 dark:text-danger-300;
   }
   .badge-yellow {
-    @apply badge bg-warning-50 text-warning-700 dark:bg-warning-950/60 dark:text-warning-300;
+    @apply badge bg-warning-100 text-warning-700 dark:bg-warning-950/70 dark:text-warning-300;
   }
   .badge-blue {
-    @apply badge bg-primary-50 text-primary-700 dark:bg-primary-950/60 dark:text-primary-300;
+    @apply badge bg-primary-100 text-primary-800 dark:bg-primary-950/70 dark:text-primary-300;
   }
   .badge-gray {
-    @apply badge bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300;
+    @apply badge bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300;
   }
   .skeleton {
     /* Shimmer instead of a flat pulse: it reads as "loading", not "broken". */
-    @apply relative overflow-hidden bg-gray-200/80 dark:bg-gray-700/60 rounded;
+    @apply relative overflow-hidden bg-gray-200/70 dark:bg-gray-700/60 rounded-lg;
   }
   .skeleton::after {
     content: "";
@@ -193,20 +192,165 @@
   }
   /* Section heading used by the redesigned pages. */
   .page-title {
-    @apply text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white;
+    @apply text-[1.65rem] sm:text-[2rem] font-semibold tracking-[-0.03em] text-gray-900 dark:text-white;
   }
   .page-subtitle {
-    @apply text-sm text-gray-500 dark:text-gray-400 mt-1;
+    @apply text-sm sm:text-[0.95rem] text-gray-500 dark:text-gray-400 mt-1.5 leading-relaxed;
+  }
+  .eyebrow {
+    @apply text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-400 dark:text-gray-500;
   }
   .chip {
     @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium
            border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300
-           transition-all duration-150 ease-gentle hover:border-primary-300 hover:text-primary-700
+           transition-all duration-200 ease-gentle hover:border-primary-300 hover:text-primary-700
            dark:hover:text-primary-300 active:scale-[0.97];
   }
   .chip-active {
-    @apply chip bg-primary-600 border-primary-600 text-white hover:text-white
-           hover:border-primary-600 shadow-sm shadow-primary-600/25;
+    @apply chip bg-primary-900 border-primary-900 text-white hover:text-white
+           hover:border-primary-900 shadow-sm shadow-primary-950/20;
+  }
+
+  /* ------------------------------------------------------------------
+     The workspace shell (see MainLayout): a white rounded device frame
+     floating on the parchment canvas, with the nav rail tinted and the
+     content area a barely-there warm grey.
+     ------------------------------------------------------------------ */
+  .workspace-frame {
+    @apply bg-white dark:bg-surface-dark rounded-[2rem] lg:rounded-[2.5rem]
+           shadow-shell ring-1 ring-black/[0.04] dark:ring-white/10
+           overflow-hidden;
+  }
+  .workspace-sidebar {
+    background:
+      radial-gradient(120% 60% at 0% 0%, rgba(255, 255, 255, 0.9), transparent 60%),
+      #f4f4f1;
+  }
+  .dark .workspace-sidebar {
+    background:
+      radial-gradient(120% 60% at 0% 0%, rgba(255, 255, 255, 0.04), transparent 60%),
+      #101a14;
+  }
+  .workspace-content {
+    background:
+      radial-gradient(90% 50% at 100% 0%, rgba(255, 255, 255, 0.75), transparent 55%),
+      #f4f5f2;
+  }
+  .dark .workspace-content {
+    background:
+      radial-gradient(90% 50% at 100% 0%, rgba(60, 110, 85, 0.10), transparent 55%),
+      #0f1813;
+  }
+
+  /* Sidebar navigation: quiet by default, one sage pill for the current page. */
+  .nav-item {
+    @apply flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-[13.5px] font-medium
+           text-gray-500 dark:text-gray-400 transition-all duration-200 ease-gentle
+           hover:bg-white/70 hover:text-gray-900 dark:hover:bg-white/[0.04] dark:hover:text-gray-100
+           active:scale-[0.99];
+  }
+  .nav-item-active {
+    @apply bg-primary-100/80 text-primary-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]
+           hover:bg-primary-100/80 hover:text-primary-950;
+  }
+  .dark .nav-item-active {
+    @apply bg-primary-900/40 text-primary-100 shadow-none hover:bg-primary-900/40 hover:text-primary-100;
+  }
+  .nav-badge {
+    @apply ml-auto min-w-[20px] h-5 px-1.5 rounded-full bg-primary-900 text-white text-[10px]
+           font-semibold flex items-center justify-center;
+  }
+
+  /* The dark hero stat card from the reference. */
+  .stat-hero {
+    background:
+      radial-gradient(65% 120% at 85% 10%, rgba(96, 180, 133, 0.55) 0%, transparent 55%),
+      radial-gradient(100% 140% at 0% 0%, #1d5b3f 0%, #0d3322 62%, #08251a 100%);
+    @apply text-white rounded-3xl relative overflow-hidden;
+  }
+  .stat-hero::after {
+    content: "";
+    position: absolute;
+    inset: -40% -20% auto auto;
+    width: 220px;
+    height: 220px;
+    background: radial-gradient(circle, rgba(143, 199, 168, 0.20), transparent 65%);
+    pointer-events: none;
+  }
+  .glass-circle {
+    @apply w-9 h-9 rounded-full bg-white/15 ring-1 ring-white/25 backdrop-blur
+           flex items-center justify-center transition-transform duration-300 ease-spring
+           group-hover:rotate-45;
+  }
+  .stat-value {
+    @apply text-[2rem] sm:text-[2.35rem] font-semibold tracking-[-0.04em] leading-none;
+  }
+  .hatched-bar {
+    background-image: repeating-linear-gradient(
+      -45deg,
+      rgba(98, 108, 100, 0.16) 0,
+      rgba(98, 108, 100, 0.16) 1.5px,
+      transparent 1.5px,
+      transparent 7px
+    );
+    @apply rounded-full;
+  }
+  .promo-card {
+    background:
+      radial-gradient(120% 120% at 100% 0%, rgba(143, 199, 168, 0.28) 0%, transparent 48%),
+      radial-gradient(140% 90% at 0% 100%, #1d5b3f 0%, #0d3322 58%, #08251a 100%);
+    @apply text-white rounded-3xl relative overflow-hidden;
+  }
+  .promo-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(rgba(255, 255, 255, 0.10) 0.7px, transparent 0.7px);
+    background-size: 7px 7px;
+    opacity: 0.35;
+    pointer-events: none;
+  }
+  .user-chip {
+    @apply flex items-center gap-2.5 pl-1.5 pr-4 py-1.5 rounded-full bg-white dark:bg-gray-800
+           border border-gray-200/70 dark:border-gray-700/70 shadow-card
+           transition-all duration-200 ease-gentle hover:shadow-raised;
+  }
+  .avatar {
+    @apply rounded-full bg-primary-100 text-primary-900 font-semibold flex items-center justify-center
+           ring-2 ring-white dark:ring-gray-800 overflow-hidden shrink-0;
+  }
+  .search-pill {
+    @apply flex items-center gap-2 rounded-full bg-white dark:bg-gray-800 border border-gray-200/70
+           dark:border-gray-700/70 shadow-card px-4 py-2.5 transition-all duration-200 ease-gentle
+           focus-within:border-primary-300 focus-within:shadow-raised;
+  }
+  .search-pill input {
+    @apply bg-transparent border-0 outline-none text-base sm:text-sm w-full text-gray-800
+           dark:text-gray-100 placeholder:text-gray-400;
+  }
+  /* Rounded icon button used in the top bar. */
+  .icon-btn {
+    @apply w-10 h-10 rounded-full bg-white dark:bg-gray-800 border border-gray-200/70
+           dark:border-gray-700/70 shadow-card text-gray-500 dark:text-gray-400
+           flex items-center justify-center transition-all duration-200 ease-gentle
+           hover:text-primary-800 hover:shadow-raised active:scale-95;
+  }
+  .segment {
+    @apply inline-flex items-center gap-1 p-1 rounded-full bg-white dark:bg-gray-800
+           border border-gray-200/70 dark:border-gray-700/70 shadow-card;
+  }
+  .segment-item {
+    @apply px-3.5 py-1.5 rounded-full text-xs font-semibold text-gray-500
+           transition-all duration-200 ease-gentle hover:text-gray-800 dark:hover:text-gray-200;
+  }
+  .segment-item-active {
+    @apply bg-primary-900 text-white shadow-sm hover:text-white dark:bg-primary-700;
+  }
+  .stat-row {
+    @apply flex items-center justify-between gap-3 py-2;
+  }
+  .soft-divider {
+    @apply border-t border-gray-100 dark:border-gray-700/60;
   }
 
   /* Email inbox, on the tokens above (light + dark, WCAG AA ≥ 4.5:1). */
@@ -235,8 +379,7 @@
     color: var(--email-link);
   }
   /* Sender HTML arrives with its own (light-mode) colours. In dark mode its
-     text inherits the readable foreground and its links take the light-blue
-     token, instead of dark-blue text disappearing into the surface. */
+     text inherits the readable foreground and its links take the mint token. */
   .email-body-content {
     color: var(--email-text-primary);
     background-color: var(--email-bg-secondary);
@@ -334,26 +477,36 @@
     @apply animate-fade-up;
   }
   .stagger > .stagger-item:nth-child(1) { animation-delay: 0ms; }
-  .stagger > .stagger-item:nth-child(2) { animation-delay: 30ms; }
-  .stagger > .stagger-item:nth-child(3) { animation-delay: 60ms; }
-  .stagger > .stagger-item:nth-child(4) { animation-delay: 90ms; }
-  .stagger > .stagger-item:nth-child(5) { animation-delay: 120ms; }
-  .stagger > .stagger-item:nth-child(6) { animation-delay: 150ms; }
-  .stagger > .stagger-item:nth-child(7) { animation-delay: 180ms; }
-  .stagger > .stagger-item:nth-child(8) { animation-delay: 210ms; }
-  .stagger > .stagger-item:nth-child(n + 9) { animation-delay: 240ms; }
+  .stagger > .stagger-item:nth-child(2) { animation-delay: 35ms; }
+  .stagger > .stagger-item:nth-child(3) { animation-delay: 70ms; }
+  .stagger > .stagger-item:nth-child(4) { animation-delay: 105ms; }
+  .stagger > .stagger-item:nth-child(5) { animation-delay: 140ms; }
+  .stagger > .stagger-item:nth-child(6) { animation-delay: 175ms; }
+  .stagger > .stagger-item:nth-child(7) { animation-delay: 210ms; }
+  .stagger > .stagger-item:nth-child(8) { animation-delay: 245ms; }
+  .stagger > .stagger-item:nth-child(n + 9) { animation-delay: 280ms; }
 
   /* The brand gradient, in one place (login screen, empty states, avatars). */
   .brand-gradient {
-    background-image: linear-gradient(135deg, theme("colors.primary.600") 0%, theme("colors.accent.600") 100%);
+    background-image: linear-gradient(140deg, theme("colors.primary.700") 0%, theme("colors.primary.950") 100%);
   }
   .brand-gradient-text {
-    @apply bg-gradient-to-br from-primary-600 to-accent-600 bg-clip-text text-transparent;
+    @apply bg-gradient-to-br from-primary-800 to-primary-950 bg-clip-text text-transparent;
   }
 
   /* Horizontal scroll rows (chips, tabs) that stop at the edge on mobile. */
   .scroll-x {
     @apply flex gap-2 overflow-x-auto scrollbar-none px-1 py-0.5 -mx-1;
+  }
+
+  .animate-delay-75 { animation-delay: 75ms; }
+  .animate-delay-150 { animation-delay: 150ms; }
+  .animate-delay-300 { animation-delay: 300ms; }
+  .animate-delay-450 { animation-delay: 450ms; }
+
+  /* Chart bars grow from the baseline, like the reference analytics card. */
+  .bar-grow {
+    transform-origin: bottom;
   }
 }
 
@@ -388,12 +541,12 @@ body.chat-lock {
 .page-enter {
   /* Do not leave a transformed ancestor around fixed dialogs. Even a
      translateY(0) traps modal overlays inside the page instead of the viewport. */
-  animation: fade-in 240ms cubic-bezier(0.22, 1, 0.36, 1);
+  animation: fade-in 280ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* react-hot-toast, restyled onto the app's palette. */
 .toast-card {
-  @apply rounded-xl border border-gray-200/80 bg-white/95 text-gray-800 shadow-pop backdrop-blur
+  @apply rounded-2xl border border-gray-200/80 bg-white/95 text-gray-800 shadow-pop backdrop-blur
          dark:border-gray-700/70 dark:bg-gray-800/95 dark:text-gray-100;
   font-size: 0.875rem;
 }

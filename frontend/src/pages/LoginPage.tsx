@@ -108,11 +108,11 @@ export default function LoginPage() {
       <div className="relative w-full max-w-md animate-slide-up">
         <div className="text-center mb-7">
           <BrandMark className="w-16 h-16 mx-auto mb-4 rounded-2xl shadow-raised" />
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
-            SMS SENDER
+          <h1 className="page-title tracking-tight">
+            SendSMS
           </h1>
           <p className="text-gray-500 dark:text-gray-400 mt-1">
-            Nigerian SMS &amp; Email Outreach CRM
+            SMS, email and invoices — one calm workspace.
           </p>
         </div>
 

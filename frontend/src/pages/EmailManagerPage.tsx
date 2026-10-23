@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
 import {
+  ListChecks,
   Activity,
   BarChart3,
   CalendarDays,
@@ -46,6 +47,7 @@ import emailApi, { EmailAccount, EmailMessage, EmailSender } from "../api/email"
 import { isBrevoRelay, senderOptionLabel } from "../utils/senders";
 import adsApi, { AdsCampaign } from "../api/ads";
 import CampaignBuilder from "./ads/CampaignBuilder";
+import CampaignsPage from "./CampaignsPage";
 import CampaignDetail from "./ads/CampaignDetail";
 import EmailSuppressionPanel from "../components/EmailSuppressionPanel";
 import EmailSendPanel from "../components/EmailSendPanel";
@@ -82,6 +84,7 @@ import {
 const SECTIONS = [
   { key: "Overview", icon: LayoutGrid },
   { key: "Campaigns", icon: Megaphone },
+  { key: "Bulk Sends", icon: ListChecks },
   { key: "Audience", icon: Users },
   { key: "Automation", icon: Wand2 },
   { key: "Follow-Ups", icon: Clock3 },
@@ -198,13 +201,13 @@ export default function EmailManagerPage() {
     <div className="space-y-5 max-w-6xl mx-auto">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-medium text-primary-600 mb-1 flex items-center gap-1">
-            <Mail size={15} /> EMAIL CHANNEL · GMAIL + BREVO · <Sparkles size={13} /> ADVANCED
+          <p className="eyebrow flex items-center gap-1.5">
+            <Mail size={12} /> Email studio · Gmail + Brevo
           </p>
-          <h1 className="text-2xl sm:text-3xl font-bold">Email Manager</h1>
-          <p className="text-gray-500 mt-1">
-            Email campaigns, email sets, creatives, A/B testing, Andromeda, follow-ups and
-            analytics — plus senders, templates, replies and deliverability.
+          <h1 className="page-title mt-1">Email Manager</h1>
+          <p className="page-subtitle">
+            Campaigns, creatives, A/B testing, follow-ups and analytics — plus senders,
+            templates, replies and deliverability.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -243,18 +246,14 @@ export default function EmailManagerPage() {
         </div>
       )}
 
-      <div className="flex gap-1 overflow-x-auto scrollbar-none border-b border-gray-200 dark:border-gray-700">
+      <div className="flex gap-1.5 overflow-x-auto scrollbar-none pb-1 -mx-1 px-1">
         {SECTIONS.map(({ key, icon: Icon }) => (
           <button
             key={key}
             onClick={() => setSection(key)}
-            className={`px-3 py-3 text-sm whitespace-nowrap border-b-2 flex items-center gap-1.5 ${
-              section === key
-                ? "border-primary-600 text-primary-600 font-medium"
-                : "border-transparent text-gray-500"
-            }`}
+            className={`chip shrink-0 ${section === key ? "chip-active" : ""}`}
           >
-            <Icon size={15} /> {key}
+            <Icon size={13} /> {key}
           </button>
         ))}
       </div>
@@ -284,6 +283,7 @@ export default function EmailManagerPage() {
           create={() => setCreating(true)}
         />
       )}
+      {section === "Bulk Sends" && <CampaignsPage embedded fixedChannel="email" />}
       {section === "Audience" && (
         <ManagerAudience reference={adsReference} campaigns={campaigns} />
       )}
@@ -384,10 +384,10 @@ function ManagerOverview({ ads, email, accounts, campaigns, onOpen, onCreate, on
                 <XAxis dataKey="date" tick={{ fontSize: 11 }} />
                 <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
                 <Tooltip />
-                <Area type="monotone" dataKey="sent" name="Sent" stroke="#4f46e5" fill="#4f46e5" />
-                <Area type="monotone" dataKey="opened" name="Opens" stroke="#4163f6" fill="#0ea5e940" />
-                <Area type="monotone" dataKey="clicks" name="Clicks" stroke="#059669" fill="#059669" />
-                <Area type="monotone" dataKey="replies" name="Replies" stroke="#f59e0b" fill="#f59e0b" />
+                <Area type="monotone" dataKey="sent" name="Sent" stroke="#2a684e" fill="#2a684e" />
+                <Area type="monotone" dataKey="opened" name="Opens" stroke="#1a4534" fill="rgba(95,169,130,0.25)" />
+                <Area type="monotone" dataKey="clicks" name="Clicks" stroke="#2f7454" fill="#2f7454" />
+                <Area type="monotone" dataKey="replies" name="Replies" stroke="#c99a2a" fill="#c99a2a" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
