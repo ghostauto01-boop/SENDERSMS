@@ -11,12 +11,13 @@ import {
   BarChart, Area, AreaChart,
 } from "recharts";
 
-const GREEN = "#123c2b";
-const BLUE = "#123c2b";
-const RED = "#bf5167";
-const AMBER = "#c99a2a";
-const PURPLE = "#2a684e";
-const TEAL = "#1a4534";
+// Chart palette, taken from the app's own forest ramp (tailwind.config.js) so
+// a chart never introduces a colour the rest of the UI does not use.
+const FOREST = "#123c2b";   // primary-900 — the headline series
+const MOSS = "#2a684e";     // primary-600 — the second series
+const MINT = "#5fa982";     // accent-400 — the softer third
+const ROSE = "#bf5167";     // danger-500
+const SAND = "#d6d8d3";     // gray-300 — everything else
 
 const fmtDate = (iso: string) => {
   try {
@@ -87,7 +88,7 @@ export default function AnalyticsPage() {
     { name: "Failed", value: analytics.failed },
     { name: "In flight / other", value: Math.max(0, analytics.sent - analytics.delivered - analytics.failed) },
   ].filter((d) => d.value > 0) : [];
-  const donutColors = [GREEN, RED, "#d6d8d3"];
+  const donutColors = [FOREST, ROSE, SAND];
 
   return (
     <div className="space-y-6">
@@ -143,10 +144,10 @@ export default function AnalyticsPage() {
                     <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
                     <Tooltip />
                     <Legend wrapperStyle={{ fontSize: 12 }} />
-                    <Bar dataKey="sent" name="Sent" fill={BLUE} opacity={0.85} radius={[3, 3, 0, 0]} />
-                    <Bar dataKey="failed" name="Failed" fill={RED} radius={[3, 3, 0, 0]} />
-                    <Line type="monotone" dataKey="delivered" name="Delivered" stroke={GREEN} strokeWidth={2.5} dot={false} />
-                    <Line type="monotone" dataKey="replies" name="Replies" stroke={PURPLE} strokeWidth={2} dot={false} />
+                    <Bar dataKey="sent" name="Sent" fill={FOREST} opacity={0.9} radius={[3, 3, 0, 0]} />
+                    <Bar dataKey="failed" name="Failed" fill={ROSE} radius={[3, 3, 0, 0]} />
+                    <Line type="monotone" dataKey="delivered" name="Delivered" stroke={MOSS} strokeWidth={2.5} dot={false} />
+                    <Line type="monotone" dataKey="replies" name="Replies" stroke={MINT} strokeWidth={2} dot={false} />
                   </ComposedChart>
                 </ResponsiveContainer>
               </div>
@@ -188,7 +189,7 @@ export default function AnalyticsPage() {
                       <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
                       <YAxis type="category" dataKey="stage" tick={{ fontSize: 12 }} width={80} />
                       <Tooltip />
-                      <Bar dataKey="count" name="Contacts" fill={TEAL} radius={[0, 4, 4, 0]} />
+                      <Bar dataKey="count" name="Contacts" fill={FOREST} radius={[0, 4, 4, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -211,9 +212,9 @@ export default function AnalyticsPage() {
                     <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
                     <Tooltip />
                     <Legend wrapperStyle={{ fontSize: 12 }} />
-                    <Bar dataKey="sent" name="Sent" fill={BLUE} radius={[3, 3, 0, 0]} />
-                    <Bar dataKey="delivered" name="Delivered" fill={GREEN} radius={[3, 3, 0, 0]} />
-                    <Bar dataKey="replies" name="Replies" fill={PURPLE} radius={[3, 3, 0, 0]} />
+                    <Bar dataKey="sent" name="Sent" fill={FOREST} radius={[3, 3, 0, 0]} />
+                    <Bar dataKey="delivered" name="Delivered" fill={MOSS} radius={[3, 3, 0, 0]} />
+                    <Bar dataKey="replies" name="Replies" fill={MINT} radius={[3, 3, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -279,8 +280,8 @@ export default function AnalyticsPage() {
                     <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
                     <Tooltip />
                     <Legend wrapperStyle={{ fontSize: 12 }} />
-                    <Area type="monotone" dataKey="calls" name="Calls" stroke={GREEN} fill={GREEN} fillOpacity={0.2} />
-                    <Area type="monotone" dataKey="connected" name="Connected" stroke={BLUE} fill={BLUE} fillOpacity={0.2} />
+                    <Area type="monotone" dataKey="calls" name="Calls" stroke={FOREST} fill={FOREST} fillOpacity={0.18} />
+                    <Area type="monotone" dataKey="connected" name="Connected" stroke={MOSS} fill={MOSS} fillOpacity={0.18} />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>

@@ -23,7 +23,7 @@ const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 const TYPE_STYLE: Record<string, { chip: string; dot: string; label: string }> = {
   meeting: { chip: "bg-primary-100 text-primary-800", dot: "bg-primary-600", label: "Meeting" },
-  call: { chip: "bg-primary-50 text-primary-600", dot: "bg-[#3f8e67]", label: "Call" },
+  call: { chip: "bg-primary-50 text-primary-600", dot: "bg-accent-500", label: "Call" },
   follow_up: { chip: "bg-warning-200 text-warning-700", dot: "bg-warning-500", label: "Follow-up" },
   reminder: { chip: "bg-warning-100 text-warning-700", dot: "bg-warning-400", label: "Reminder" },
   task: { chip: "bg-accent-100 text-accent-600", dot: "bg-accent-600", label: "Task" },

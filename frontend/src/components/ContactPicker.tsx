@@ -32,7 +32,7 @@ export const contactName = (c: PickableContact) =>
 
 export const avatarColor = (name: string) => {
   const colors = [
-    "bg-primary-600", "bg-primary-700", "bg-primary-800", "bg-[#3f8e67]", "bg-warning-400",
+    "bg-primary-600", "bg-primary-700", "bg-primary-800", "bg-accent-500", "bg-warning-400",
     "bg-accent-500", "bg-primary-400", "bg-warning-400", "bg-primary-500", "bg-primary-400",
   ];
   let h = 0;

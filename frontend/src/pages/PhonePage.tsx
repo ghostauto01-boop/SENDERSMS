@@ -13,7 +13,7 @@ import { displayName, startCall, openWhatsappForCall } from "../utils/call";
 import { contactInitials } from "../utils/contact";
 
 const avatarColor = (name: string) => {
-  const colors = ["bg-primary-600", "bg-primary-700", "bg-primary-800", "bg-[#3f8e67]", "bg-warning-400", "bg-accent-500", "bg-primary-400", "bg-warning-400"];
+  const colors = ["bg-primary-600", "bg-primary-700", "bg-primary-800", "bg-accent-500", "bg-warning-400", "bg-accent-500", "bg-primary-400", "bg-warning-400"];
   let h = 0; for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % colors.length;
   return colors[h];
 };
