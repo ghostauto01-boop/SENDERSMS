@@ -2,6 +2,7 @@ import { Suspense, lazy } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./hooks/useAuth";
 import { ChannelProvider } from "./hooks/useChannel";
+import { ThemeProvider } from "./hooks/useTheme";
 import MainLayout from "./layouts/MainLayout";
 import LoginPage from "./pages/LoginPage";
 import DbStatusBanner from "./components/DbStatusBanner";
@@ -146,15 +147,17 @@ function AppRoutes() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      {/* SMS | Email is an app-wide choice: every channel-aware page reads it
-          from here instead of each page growing its own switch. */}
-      <ChannelProvider>
-        {/* One explained notice when the database itself is down, above every
-            page — instead of every widget failing on its own. */}
-        <DbStatusBanner />
-        <AppRoutes />
-      </ChannelProvider>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        {/* SMS | Email is an app-wide choice: every channel-aware page reads
+            it from here instead of each page growing its own switch. */}
+        <ChannelProvider>
+          {/* One explained notice when the database itself is down, above
+              every page — instead of every widget failing on its own. */}
+          <DbStatusBanner />
+          <AppRoutes />
+        </ChannelProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }

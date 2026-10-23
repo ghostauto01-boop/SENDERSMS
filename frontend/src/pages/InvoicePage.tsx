@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 import toast from "react-hot-toast";
 import {
-  AlertCircle, ArrowUpRight, Banknote, CalendarClock, CheckCircle2, ChevronLeft,
-  ChevronRight, CircleDollarSign, CreditCard, FileText, Loader2, Plus, ReceiptText,
+  AlertCircle, ArrowUpRight, Banknote, CheckCircle2, ChevronLeft,
+  ChevronRight, CircleDollarSign, CreditCard, FileText, Link2, Plus, ReceiptText,
   RefreshCw, Search, Settings2, TrendingUp, Users, Wallet, X, BarChart3, Clock3,
 } from "lucide-react";
 import invoicesApi, {
@@ -12,6 +12,7 @@ import invoicesApi, {
 import InvoiceEditor from "../components/invoices/InvoiceEditor";
 import InvoiceDetail from "../components/invoices/InvoiceDetail";
 import PaystackSettingsCard from "../components/invoices/PaystackSettingsCard";
+import PaymentLinkSheet from "../components/invoices/PaymentLinkSheet";
 import StatusPill from "../components/invoices/StatusPill";
 import { useVisiblePolling } from "../hooks/useVisiblePolling";
 import {
@@ -72,6 +73,9 @@ export default function InvoicePage() {
 
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<Invoice | null>(null);
+  const [linkOpen, setLinkOpen] = useState(false);
+  /** "all" shows everything; the other two narrow the shelf. */
+  const [kindFilter, setKindFilter] = useState<"" | "link" | "invoice">("");
   // `?invoice=<id>` opens one invoice straight away — that is how the dashboard,
   // notifications and copied links deep-link into the studio. Read through the
   // router so a search-only navigation (already on this page) still works.
@@ -109,7 +113,7 @@ export default function InvoicePage() {
 
   useEffect(() => {
     setPage(1);
-  }, [status, currency, debouncedQuery]);
+  }, [status, currency, debouncedQuery, kindFilter]);
 
   const loadList = useCallback(async () => {
     setLoading(true);
@@ -121,6 +125,7 @@ export default function InvoicePage() {
         status: status || undefined,
         currency: currency || undefined,
         q: debouncedQuery || undefined,
+        kind: kindFilter || undefined,
       });
       setItems(data.items);
       setTotal(data.total);
@@ -130,7 +135,7 @@ export default function InvoicePage() {
     } finally {
       setLoading(false);
     }
-  }, [page, status, currency, debouncedQuery]);
+  }, [page, status, currency, debouncedQuery, kindFilter]);
 
   useEffect(() => {
     loadList();
@@ -226,19 +231,28 @@ export default function InvoicePage() {
           <p className="eyebrow flex items-center gap-1.5">
             <ReceiptText size={12} /> Studio · Payments
           </p>
-          <h1 className="page-title mt-1.5">Invoices</h1>
+          <h1 className="page-title mt-1.5">Invoices &amp; links</h1>
           <p className="page-subtitle">
-            Write an invoice in Naira or dollars, send it, and get paid through Paystack.
+            Create a payment link in seconds, share it, and watch Paystack confirm the money.
+            Full invoices are still here when a client needs a document.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => setSettingsOpen(true)} className="btn-secondary">
+        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+          <button
+            onClick={() => setSettingsOpen(true)}
+            className="btn-secondary"
+            aria-label="Paystack settings"
+          >
             <Settings2 size={15} />
             <span className="hidden xs:inline">Paystack</span>
             <span className={`w-1.5 h-1.5 rounded-full ${paystackReady ? "bg-success-500" : "bg-warning-500"}`} />
           </button>
-          <button onClick={openNew} className="btn-primary">
-            <Plus size={16} /> New invoice
+          <button onClick={openNew} className="btn-secondary">
+            <Plus size={16} />
+            <span className="hidden xs:inline">New invoice</span>
+          </button>
+          <button onClick={() => setLinkOpen(true)} className="btn-primary">
+            <Link2 size={16} /> New link
           </button>
         </div>
       </div>
@@ -364,6 +378,21 @@ export default function InvoicePage() {
                 </div>
               </div>
               <div className="flex gap-1.5 overflow-x-auto scrollbar-none -mx-1 px-1">
+                {([
+                  ["", "Everything"],
+                  ["link", "Payment links"],
+                  ["invoice", "Invoices"],
+                ] as ["" | "link" | "invoice", string][]).map(([value, label]) => (
+                  <button
+                    key={value || "all"}
+                    onClick={() => setKindFilter(value)}
+                    className={`chip shrink-0 ${kindFilter === value ? "chip-active" : ""}`}
+                  >
+                    {value === "link" && <Link2 size={11} />}
+                    {label}
+                  </button>
+                ))}
+                <span className="w-px self-stretch bg-gray-200 dark:bg-gray-700 mx-1" aria-hidden />
                 {STATUS_FILTERS.map((filter) => (
                   <button
                     key={filter.value}
@@ -402,9 +431,14 @@ export default function InvoicePage() {
                     : "Bill a client, send them a payment link, and watch Paystack confirm the money here."}
                 </p>
                 {!debouncedQuery && !status && (
-                  <button onClick={openNew} className="btn-primary mt-4">
-                    <Plus size={15} /> Create an invoice
-                  </button>
+                  <div className="flex flex-col sm:flex-row gap-2 justify-center mt-4">
+                    <button onClick={() => setLinkOpen(true)} className="btn-primary">
+                      <Link2 size={15} /> Create a payment link
+                    </button>
+                    <button onClick={openNew} className="btn-secondary">
+                      <Plus size={15} /> New invoice
+                    </button>
+                  </div>
                 )}
               </div>
             ) : (
@@ -468,6 +502,14 @@ export default function InvoicePage() {
           page={paymentsPage}
           onPage={setPaymentsPage}
           onOpen={(id) => setOpenId(id)}
+        />
+      )}
+
+      {linkOpen && (
+        <PaymentLinkSheet
+          settings={settings}
+          onClose={() => setLinkOpen(false)}
+          onCreated={() => loadList()}
         />
       )}
 
@@ -543,15 +585,23 @@ function InvoiceRow({ invoice, onOpen }: { invoice: Invoice; onOpen: () => void 
             ? "bg-danger-50 text-danger-700 dark:bg-danger-950/50 dark:text-danger-300"
             : "bg-primary-50 text-primary-900 dark:bg-primary-950/60 dark:text-primary-200"}`}
       >
-        {initials(invoice.customer.name)}
+        {initials(invoice.kind === "link" ? invoice.link_title || invoice.customer.name : invoice.customer.name)}
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-sm font-semibold tracking-tight">{invoice.customer.name}</span>
+          <span className="text-sm font-semibold tracking-tight">
+            {invoice.kind === "link" ? invoice.link_title || invoice.customer.name : invoice.customer.name}
+          </span>
           <StatusPill status={invoice.status} />
+          {invoice.kind === "link" && (
+            <span className="badge-blue gap-1">
+              <Link2 size={9} /> Link
+            </span>
+          )}
         </div>
         <p className="text-[11px] text-gray-400 mt-0.5 truncate">
-          {invoice.number} · issued {formatDate(invoice.issue_date)}
+          {invoice.number} · {invoice.kind === "link" ? "payment link" : "invoice"} ·{" "}
+          {formatDate(invoice.issue_date)}
           {invoice.customer.email ? ` · ${invoice.customer.email}` : ""}
         </p>
       </div>
@@ -642,6 +692,18 @@ function AnalyticsTab({
     : null;
   const statuses = Object.entries(summary.by_status).filter(([, count]) => count > 0);
   const statusTotal = statuses.reduce((sum, [, count]) => sum + count, 0) || 1;
+  // Status is a meaning: paid is green, overdue is red, partial is amber.
+  // The chart uses the same vocabulary the pills do.
+  const statusColour: Record<string, string> = {
+    paid: "from-success-500 to-success-300",
+    partial: "from-warning-500 to-warning-300",
+    overdue: "from-danger-500 to-danger-300",
+    sent: "from-primary-700 to-primary-400",
+    viewed: "from-primary-500 to-accent-300",
+    draft: "from-gray-400 to-gray-300",
+    void: "from-gray-500 to-gray-400",
+  };
+  const topPaid = Math.max(...analytics.top_customers.map((c) => c.paid_minor), 1);
 
   return (
     <div className="space-y-4 sm:space-y-5 animate-fade-up">
@@ -689,8 +751,8 @@ function AnalyticsTab({
         </div>
         <div className="relative">
           {collectionRate !== null && (
-            <div className="absolute right-0 -top-1 z-10 rounded-full bg-accent-100 text-accent-800 text-[10px] font-semibold px-2 py-1 dark:bg-accent-950/60 dark:text-accent-300">
-              {collectionRate}% collected
+            <div className="absolute right-0 -top-1 z-10 inline-flex items-center gap-1 rounded-full bg-accent-100 text-accent-800 text-[10px] font-semibold px-2 py-1 dark:bg-accent-950/60 dark:text-accent-300">
+              <TrendingUp size={10} /> {collectionRate}% collected
             </div>
           )}
           <div className="flex items-end gap-1.5 sm:gap-3 h-52 pt-4">
@@ -742,7 +804,9 @@ function AnalyticsTab({
                   </div>
                   <div className="h-1.5 rounded-full bg-gray-100 dark:bg-gray-700/60 overflow-hidden">
                     <div
-                      className="h-full rounded-full bg-primary-800/75 transition-all duration-700 ease-gentle"
+                      className={`h-full rounded-full bg-gradient-to-r ${
+                        statusColour[key] || "from-primary-700 to-primary-400"
+                      } transition-all duration-700 ease-gentle`}
                       style={{ width: `${Math.max(3, (count / statusTotal) * 100)}%` }}
                     />
                   </div>
@@ -767,7 +831,13 @@ function AnalyticsTab({
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-medium truncate">{customer.customer_name}</p>
-                    <p className="text-[10px] text-gray-400">{customer.invoices} invoice{customer.invoices === 1 ? "" : "s"}</p>
+                    <div className="h-1.5 rounded-full bg-gray-100 dark:bg-gray-700/60 mt-1 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-primary-800 to-accent-400 transition-all duration-700"
+                        style={{ width: `${Math.max(4, Math.round((customer.paid_minor / topPaid) * 100))}%` }}
+                      />
+                    </div>
+                    <p className="text-[10px] text-gray-400 mt-0.5">{customer.invoices} invoice{customer.invoices === 1 ? "" : "s"}</p>
                   </div>
                   <div className="text-right">
                     <p className="text-xs font-semibold tabular-nums">{formatMoney(customer.paid_minor, analytics.currency)}</p>

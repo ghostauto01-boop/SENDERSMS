@@ -109,10 +109,10 @@ export default function LoginPage() {
         <div className="text-center mb-7">
           <BrandMark className="w-16 h-16 mx-auto mb-4 rounded-2xl shadow-raised" />
           <h1 className="page-title tracking-tight">
-            SendSMS
+            Sendify
           </h1>
           <p className="text-gray-500 dark:text-gray-400 mt-1">
-            SMS, email and invoices — one calm workspace.
+            SMS, email and payment links — one calm workspace.
           </p>
         </div>
 

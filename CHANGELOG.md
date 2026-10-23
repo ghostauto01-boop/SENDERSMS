@@ -1,3 +1,38 @@
+## Unreleased — Sendify, payment links first, and a theme that follows you
+
+- **The app is called Sendify.** Title, PWA manifest, login screen, inbox,
+  public payment page and the API's name all read Sendify. The service worker
+  cache version was bumped (`sendify-v9`) so an installed copy refreshes its
+  shell instead of pinning the old branding.
+- **The "Download our mobile app" card is gone** from the navigation drawer.
+  The install prompt still exists in the browser; the sidebar is now navigation
+  and one log-out row, nothing else.
+- **Payment links (`POST /invoices/links`, `GET /invoices/links`).** The
+  shortest path from a sale to money: a title, an amount and a currency create
+  a share-ready link. No customer name, email, phone, address, tax or line-item
+  form is required — those are optional fields behind "Add a customer".
+  Invoices gain a `kind` column (`invoice` | `link`) and a `link_title`; both
+  flows share the same totals, statuses, Paystack and analytics code.
+- **Paying never needs an email.** If neither the operator nor the customer
+  supplies one, the server uses a placeholder payer address tied to the link,
+  so Paystack can still take the money (only the emailed receipt is skipped).
+- **The Invoice studio is link-first.** "New link" is the primary action;
+  "New invoice" opens the full document editor. The list can be filtered to
+  Everything / Payment links / Invoices, link rows show a Link badge, and the
+  editor marks customer fields optional.
+- **Light / dark lives in Settings and Overview.** One `ThemeProvider`
+  (`hooks/useTheme.tsx`) owns the choice, persists it in `localStorage` and
+  paints it before the first frame (no white flash). Settings → Appearance has
+  preview cards; the Overview header has the same switch at the top right.
+- **Analytics redesigned.** Nine indicators with trend arrows and sparklines,
+  a gradient composed chart, a delivery-mix donut with the rate in its centre,
+  a funnel with per-stage conversion, coloured campaign comparison, gradient
+  failure/quarantine bars and a calls chart — all from the app palette and
+  readable on a 360px phone.
+- Tests: 4 new backend tests for payment links (creation, shelf, optional
+  customer details, and "no email is required to reach Paystack") and 3 new
+  frontend tests for the link sheet.
+
 ## Unreleased — the forest redesign, an invoice studio, and campaigns move into the managers
 
 - **New look.** The whole app is re-skinned to the reference design: a warm grey

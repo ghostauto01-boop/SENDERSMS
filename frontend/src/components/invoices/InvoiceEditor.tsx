@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import {
-  CalendarDays, Check, ChevronDown, FileText, Loader2, Plus, Search,
-  Send, Sparkles, Trash2, UserRound, X,
+  CalendarDays, Check, ChevronDown, FileText, Link2, Loader2, Plus, Search,
+  Sparkles, Trash2, UserRound, X,
 } from "lucide-react";
 import api from "../../api/client";
 import invoicesApi, { Invoice, InvoiceSettings } from "../../api/invoices";
@@ -177,10 +177,8 @@ export default function InvoiceEditor({
 
   const submit = async (mode: "draft" | "send") => {
     setError(null);
-    if (!customerName.trim()) {
-      setError("Give the invoice a customer name.");
-      return;
-    }
+    // A customer name is a convenience, not a requirement: without one the
+    // server falls back to the first line item, and the link still works.
     if (customerEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail.trim())) {
       setError("That customer email address does not look right.");
       return;
@@ -202,7 +200,7 @@ export default function InvoiceEditor({
     const dueIso = dateInputToIso(dueDate);
 
     const payload = {
-      customer_name: customerName.trim(),
+      customer_name: customerName.trim() || null,
       customer_email: customerEmail.trim() || null,
       customer_phone: customerPhone.trim() || null,
       customer_address: customerAddress.trim() || null,
@@ -237,7 +235,8 @@ export default function InvoiceEditor({
         const created = await invoicesApi.create({
           ...payload,
           send: mode === "send",
-          send_email: true,
+          // Only ask the server to email when there is actually an address.
+          send_email: !!customerEmail.trim(),
         });
         onSaved(created.invoice, created.message);
       }
@@ -265,7 +264,7 @@ export default function InvoiceEditor({
             <p className="text-xs text-gray-500 mt-1">
               {editing
                 ? "Every field stays editable — totals are recalculated when you save."
-                : "Bill a client in Naira or dollars. You can edit it at any time."}
+                : "Need something quick? Use “New link” instead — no customer details at all."}
             </p>
           </div>
           <button
@@ -293,6 +292,7 @@ export default function InvoiceEditor({
                 <UserRound size={14} className="text-primary-800 dark:text-primary-300" />
               </span>
               <h3 className="text-sm font-semibold">Bill to</h3>
+              <span className="text-[10.5px] text-gray-400 ml-1">optional</span>
               {contactId && (
                 <span className="badge-green ml-auto gap-1">
                   <Check size={11} /> Linked contact
@@ -332,7 +332,7 @@ export default function InvoiceEditor({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="sm:col-span-2">
-                <label className="label">Customer / business name *</label>
+                <label className="label">Customer / business name</label>
                 <input
                   className="input"
                   value={customerName}
@@ -340,12 +340,12 @@ export default function InvoiceEditor({
                     setCustomerName(e.target.value);
                     setContactId(null);
                   }}
-                  placeholder="e.g. Adaeze Okafor or Acme Foods Ltd"
+                  placeholder="Optional — e.g. Adaeze Okafor"
                   autoFocus={!editing}
                 />
               </div>
               <div>
-                <label className="label">Email</label>
+                <label className="label">Email <span className="text-gray-400 font-normal">(optional)</span></label>
                 <input
                   type="email"
                   className="input"
@@ -355,7 +355,7 @@ export default function InvoiceEditor({
                 />
               </div>
               <div>
-                <label className="label">Phone</label>
+                <label className="label">Phone <span className="text-gray-400 font-normal">(optional)</span></label>
                 <input
                   className="input"
                   value={customerPhone}
@@ -364,7 +364,7 @@ export default function InvoiceEditor({
                 />
               </div>
               <div className="sm:col-span-2">
-                <label className="label">Billing address</label>
+                <label className="label">Billing address <span className="text-gray-400 font-normal">(optional)</span></label>
                 <textarea
                   className="input resize-none"
                   rows={2}
@@ -630,8 +630,8 @@ export default function InvoiceEditor({
                 disabled={!!saving}
                 className="btn-primary"
               >
-                {saving === "send" ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
-                Save &amp; send
+                {saving === "send" ? <Loader2 size={15} className="animate-spin" /> : <Link2 size={15} />}
+                Save &amp; share link
               </button>
             </div>
           </div>

@@ -13,6 +13,7 @@ import {
 import type { OverviewCampaign, UnifiedMetrics } from "../types";
 import { campaignColor } from "../components/CampaignChip";
 import ChannelSwitch from "../components/ChannelSwitch";
+import { ThemeToggle } from "../components/ThemeToggle";
 import { useChannel } from "../hooks/useChannel";
 import { inboxLink, inboxPathFor } from "../utils/inboxRoute";
 
@@ -167,9 +168,13 @@ export default function OverviewPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {/* Appearance lives at the top of the overview: the one screen an
+              operator opens first, so light/dark is always one tap away. */}
+          <ThemeToggle />
           <ChannelSwitch size="sm" />
           <select
             className="input py-1.5 !w-auto text-sm"
+            aria-label="Date range"
             value={days}
             onChange={(e) => setDays(parseInt(e.target.value))}
           >

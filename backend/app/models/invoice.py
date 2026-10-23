@@ -89,6 +89,14 @@ class Invoice(Base):
     #: revokes every link ever shared.
     public_token: Mapped[str] = mapped_column(String(64), nullable=False, default=_token, index=True)
 
+    #: ``invoice`` — a full document with line items and terms.
+    #: ``link``    — a quick payment link: a product/amount and a Pay button.
+    #: The two share every money, status and Paystack code path, so a link is
+    #: reported in the same analytics and can still be opened as an invoice.
+    kind: Mapped[str] = mapped_column(String(20), default="invoice", nullable=False, index=True)
+    #: The headline of a payment link, e.g. ``Logo design — 50% deposit``.
+    link_title: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
     # ---- Customer -------------------------------------------------------
     contact_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("contacts.id", ondelete="SET NULL"), nullable=True, index=True

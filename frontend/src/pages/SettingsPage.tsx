@@ -31,11 +31,25 @@ import McpConnectors from "../components/McpConnectors";
 import GoogleOAuthSetupCard from "../components/GoogleOAuthSetupCard";
 import MailboxRepliesTab from "../components/MailboxRepliesTab";
 import PaystackSettingsCard from "../components/invoices/PaystackSettingsCard";
+import { ThemeToggle } from "../components/ThemeToggle";
+import { useTheme } from "../hooks/useTheme";
+import { Moon, Sun } from "lucide-react";
 
-type Tab = "gateway" | "calls" | "notifications" | "compliance" | "access" | "email" | "ai" | "gmail" | "payments";
+type Tab =
+  | "appearance"
+  | "gateway"
+  | "calls"
+  | "notifications"
+  | "compliance"
+  | "access"
+  | "email"
+  | "ai"
+  | "gmail"
+  | "payments";
 
 const TAB_IDS: Tab[] = [
-  "access", "gateway", "payments", "email", "gmail", "ai", "calls", "notifications", "compliance",
+  "appearance", "access", "gateway", "payments", "email", "gmail", "ai", "calls", "notifications",
+  "compliance",
 ];
 
 /**
@@ -70,6 +84,7 @@ export default function SettingsPage() {
   };
 
   const tabs = [
+    { id: "appearance" as Tab, label: "Appearance", icon: Sun },
     { id: "access" as Tab, label: "Site access", icon: Lock },
     { id: "gateway" as Tab, label: "SMS Gateway", icon: Wifi },
     { id: "payments" as Tab, label: "Payments (Paystack)", icon: CreditCard },
@@ -91,8 +106,113 @@ export default function SettingsPage() {
       <div className="flex gap-1.5 overflow-x-auto scrollbar-none pb-1 -mx-1 px-1">{tabs.map(t => (<button key={t.id} onClick={() => setTab(t.id)}
         className={`chip shrink-0 ${tab===t.id ? "chip-active" : ""}`}><t.icon size={13}/>{t.label}</button>))}</div>
       {loading ? (<div className="card p-6"><div className="skeleton h-8 w-48 mb-4"/><div className="space-y-3">{[...Array(3)].map((_,i)=>(<div key={i} className="skeleton h-10 w-full"/>))}</div></div>)
-      : (<>{tab==="access"&&<AccessTab />}{tab==="gateway"&&<GatewayTab />}{tab==="payments"&&<PaymentsTab />}{tab==="calls"&&<CallsTab />}{tab==="email"&&<EmailTab />}{tab==="gmail"&&<GmailTab />}{tab==="ai"&&<McpTab />}{tab==="notifications"&&<NotifsTab provs={notifs} onUpdate={load}/>}{tab==="compliance"&&<CompTab s={comp} onUpdate={load}/>}</>)}
+      : (<>{tab==="appearance"&&<AppearanceTab />}{tab==="access"&&<AccessTab />}{tab==="gateway"&&<GatewayTab />}{tab==="payments"&&<PaymentsTab />}{tab==="calls"&&<CallsTab />}{tab==="email"&&<EmailTab />}{tab==="gmail"&&<GmailTab />}{tab==="ai"&&<McpTab />}{tab==="notifications"&&<NotifsTab provs={notifs} onUpdate={load}/>}{tab==="compliance"&&<CompTab s={comp} onUpdate={load}/>}</>)}
     </div>);
+}
+
+/**
+ * APPEARANCE
+ *
+ * Light and dark are the same design, not a filter: every colour token has a
+ * counterpart in the tailwind config. The choice is stored locally and applied
+ * before the first paint, so switching is instant and never flashes.
+ */
+function AppearanceTab() {
+  const { theme, setTheme } = useTheme();
+  const cards = [
+    {
+      id: "light" as const,
+      label: "Parchment light",
+      blurb: "Warm paper, forest ink. The default for daylight and demos.",
+      icon: Sun,
+      swatch: ["#f6f5f1", "#ffffff", "#123c2b", "#dfe9e3"],
+    },
+    {
+      id: "dark" as const,
+      label: "Forest night",
+      blurb: "Deep green-black surfaces for late shifts and low light.",
+      icon: Moon,
+      swatch: ["#0c1712", "#16211b", "#8fc7a8", "#243a2e"],
+    },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div className="card p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:justify-between">
+          <div>
+            <h2 className="text-base font-semibold flex items-center gap-2">
+              {theme === "dark" ? <Moon size={16} /> : <Sun size={16} />} Appearance
+            </h2>
+            <p className="text-xs text-gray-500 mt-1 max-w-md">
+              Choose how Sendify looks on this device. The setting is remembered and applies
+              everywhere — dashboard, invoices and the inbox.
+            </p>
+          </div>
+          <ThemeToggle className="self-start sm:self-auto" />
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-5">
+          {cards.map((card) => {
+            const active = theme === card.id;
+            const Icon = card.icon;
+            return (
+              <ThemePreviewCard
+                key={card.id}
+                active={active}
+                label={card.label}
+                blurb={card.blurb}
+                Icon={Icon}
+                swatch={card.swatch}
+                onSelect={() => setTheme(card.id)}
+              />
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="rounded-2xl bg-primary-50 dark:bg-primary-950/40 px-4 py-3 text-xs text-primary-900 dark:text-primary-200">
+        <p className="font-semibold mb-1">Tip</p>
+        <p>The same switch sits at the top-right of the Overview page, so you can flip themes without leaving your dashboard.</p>
+      </div>
+    </div>
+  );
+}
+
+function ThemePreviewCard({
+  active, label, blurb, Icon, swatch, onSelect,
+}: {
+  active: boolean;
+  label: string;
+  blurb: string;
+  Icon: typeof Sun;
+  swatch: string[];
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-pressed={active}
+      className={`text-left rounded-2xl border p-3 transition-all duration-200 ease-gentle ${
+        active
+          ? "border-primary-900 dark:border-accent-400 ring-2 ring-primary-900/15 dark:ring-accent-400/30"
+          : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
+      }`}
+    >
+      <div className="flex items-center gap-1.5 overflow-hidden rounded-xl h-16 border border-gray-200/70 dark:border-gray-700/60">
+        {swatch.map((colour, index) => (
+          <span key={index} className="h-full" style={{ background: colour, flex: index === 2 ? 0.7 : 1 }} />
+        ))}
+      </div>
+      <div className="flex items-center gap-1.5 mt-2.5">
+        <Icon size={13} className="text-primary-700 dark:text-primary-300" />
+        <span className="text-[12.5px] font-semibold">{label}</span>
+        {active && <span className="badge-green ml-auto">Active</span>}
+      </div>
+      <p className="text-[11px] text-gray-500 mt-0.5 leading-snug">{blurb}</p>
+    </button>
+  );
 }
 
 function PaymentsTab() {

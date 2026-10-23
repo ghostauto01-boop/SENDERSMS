@@ -10,7 +10,7 @@ export default function BrandMark({ className = 'w-8 h-8' }: { className?: strin
       viewBox="0 0 64 64"
       className={className}
       role="img"
-      aria-label="SendSMS"
+      aria-label="Sendify"
       xmlns="http://www.w3.org/2000/svg"
     >
       <defs>

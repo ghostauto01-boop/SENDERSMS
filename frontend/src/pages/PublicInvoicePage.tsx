@@ -27,7 +27,6 @@ export default function PublicInvoicePage() {
   const [verifying, setVerifying] = useState(false);
   const [paidJustNow, setPaidJustNow] = useState(false);
   const [email, setEmail] = useState("");
-  const [needEmail, setNeedEmail] = useState(false);
 
   // Read the query through the router, not window: the same code then works in
   // a test renderer and behind any base path the deployment happens to use.
@@ -96,12 +95,10 @@ export default function PublicInvoicePage() {
 
   const pay = async () => {
     if (!invoice) return;
-    const address = (email || invoice.customer.email || "").trim();
-    if (!address || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)) {
-      setNeedEmail(true);
-      toast.error("Enter the email address for your receipt");
-      return;
-    }
+    // Paying must never be blocked by a form field. A receipt address is a
+    // nice-to-have; the server falls back to a placeholder when it is absent.
+    const typed = (email || invoice.customer.email || "").trim();
+    const address = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(typed) ? typed : undefined;
     setPaying(true);
     try {
       const result = await invoicesApi.publicPay(token, address);
@@ -141,7 +138,6 @@ export default function PublicInvoicePage() {
   const paid = invoice.status === "paid" || invoice.balance_minor === 0;
   const voided = invoice.status === "void";
   const business = invoice.business;
-  const symbol = invoice.currency_symbol;
 
   return (
     <div className="min-h-[100dvh] bg-canvas dark:bg-canvas-dark py-5 sm:py-10 px-3 sm:px-4">
@@ -151,7 +147,7 @@ export default function PublicInvoicePage() {
           <div className="flex items-center gap-2">
             <BrandMark className="w-8 h-8 rounded-xl" />
             <span className="text-sm font-semibold text-primary-950 dark:text-white lowercase tracking-tight">
-              sendsms
+              sendify
             </span>
           </div>
           <span className="text-[10px] text-gray-400 flex items-center gap-1">
@@ -165,12 +161,14 @@ export default function PublicInvoicePage() {
             <div className="absolute -top-24 -right-16 w-64 h-64 rounded-full bg-primary-50 dark:bg-primary-950/30 blur-2xl pointer-events-none" />
             <div className="relative flex items-start justify-between gap-4">
               <div className="min-w-0">
-                <p className="eyebrow">Invoice</p>
-                <h1 className="text-2xl sm:text-3xl font-semibold tracking-[-0.03em] mt-1">
-                  {invoice.number}
+                <p className="eyebrow">{invoice.kind === "link" ? "Payment link" : "Invoice"}</p>
+                <h1 className="text-2xl sm:text-3xl font-semibold tracking-[-0.03em] mt-1 break-words">
+                  {invoice.kind === "link" ? invoice.link_title || invoice.title : invoice.number}
                 </h1>
                 <p className="text-xs text-gray-400 mt-1.5">
-                  Issued {formatDate(invoice.issue_date)} · Due {formatDate(invoice.due_date)}
+                  {invoice.kind === "link"
+                    ? `${business?.name || "Pay securely"} · Ref. ${invoice.number}`
+                    : `Issued ${formatDate(invoice.issue_date)} · Due ${formatDate(invoice.due_date)}`}
                 </p>
               </div>
               {business?.logo_url ? (
@@ -194,6 +192,7 @@ export default function PublicInvoicePage() {
                   {[business?.address, business?.email, business?.phone].filter(Boolean).join("\n")}
                 </p>
               </div>
+              {(invoice.kind !== "link" || invoice.customer.name !== "Customer" || invoice.customer.email || invoice.customer.phone) && (
               <div className="min-w-0">
                 <p className="text-[10px] uppercase tracking-[0.16em] text-gray-400">Bill to</p>
                 <p className="text-sm font-semibold mt-1 truncate">{invoice.customer.name}</p>
@@ -204,6 +203,7 @@ export default function PublicInvoicePage() {
                   <p className="text-[11px] text-gray-400 mt-0.5 whitespace-pre-line">{invoice.customer.address}</p>
                 )}
               </div>
+              )}
               <div className="shrink-0">
                 <StatusPill status={invoice.status} />
               </div>
@@ -233,11 +233,13 @@ export default function PublicInvoicePage() {
 
           {/* Items */}
           <div className="px-4 sm:px-6 py-5">
-            <div className="hidden sm:grid grid-cols-[1fr_60px_120px] gap-3 pb-2 text-[10px] uppercase tracking-[0.14em] text-gray-400">
-              <span>Description</span>
-              <span className="text-right">Qty</span>
-              <span className="text-right">Amount</span>
-            </div>
+            {invoice.kind !== "link" && (
+              <div className="hidden sm:grid grid-cols-[1fr_60px_120px] gap-3 pb-2 text-[10px] uppercase tracking-[0.14em] text-gray-400">
+                <span>Description</span>
+                <span className="text-right">Qty</span>
+                <span className="text-right">Amount</span>
+              </div>
+            )}
             <div className="divide-y divide-gray-100 dark:divide-gray-700/60">
               {invoice.items.map((item, index) => (
                 <div key={item.id || index} className="py-3 grid grid-cols-[1fr_auto] sm:grid-cols-[1fr_60px_120px] gap-2 sm:gap-3">
@@ -323,9 +325,11 @@ export default function PublicInvoicePage() {
               </div>
             ) : (
               <div className="space-y-3">
-                {needEmail || !invoice.customer.email ? (
+                {!invoice.customer.email ? (
                   <div>
-                    <label className="label">Email for the receipt</label>
+                    <label className="label">
+                      Email for a receipt <span className="text-gray-400 font-normal">(optional)</span>
+                    </label>
                     <div className="relative">
                       <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
                       <input
@@ -334,7 +338,6 @@ export default function PublicInvoicePage() {
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         placeholder="you@example.com"
-                        autoFocus={needEmail}
                       />
                     </div>
                   </div>
