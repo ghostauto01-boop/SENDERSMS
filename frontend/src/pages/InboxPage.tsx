@@ -493,7 +493,7 @@ export default function InboxPage() {
     { to: "/settings", icon: SettingsIcon, label: "Settings" },
   ];
 
-  const displayName = user?.display_name || user?.username || "SendSMS";
+  const displayName = user?.display_name || user?.username || "Sendify";
 
   /* ================================================================ */
   return (
@@ -1239,7 +1239,7 @@ export default function InboxPage() {
               <div className="w-[200px] h-[200px] lg:w-[303px] lg:h-[303px] mx-auto mb-6 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center border border-gray-200 dark:border-gray-800 shadow-sm">
                 <MessageCircle size={110} className="text-gray-600 dark:text-gray-400 opacity-20" />
               </div>
-              <h3 className="text-[28px] font-light text-gray-600 dark:text-gray-200 tracking-tight">SendSMS</h3>
+              <h3 className="text-[28px] font-light text-gray-600 dark:text-gray-200 tracking-tight">Sendify</h3>
               <p className="text-[13px] text-gray-500 dark:text-gray-400 mt-2 leading-5 text-center max-w-sm">
                 Select a chat to start messaging. Your messages are synced from your phone via SMS-Gate.
               </p>

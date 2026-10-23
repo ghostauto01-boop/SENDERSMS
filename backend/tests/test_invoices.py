@@ -437,3 +437,83 @@ async def test_frontend_contract_shapes(api_client):
     assert {"configured", "mode", "public_key", "secret_key_masked", "webhook_url", "channels"} <= set(
         settings["paystack"]
     )
+
+
+# ---------------------------------------------------------------------------
+# Payment links — the "create a product, send a link, get paid" flow
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_payment_link_needs_only_a_title_and_an_amount(api_client):
+    """No customer name, email, phone, address or tax: just what and how much."""
+    response = await api_client.post(
+        "/api/v1/invoices/links",
+        json={"title": "Logo design", "amount_minor": 5_000_000, "currency": "NGN"},
+    )
+    assert response.status_code == 201, response.text
+    body = response.json()
+    invoice = body["invoice"]
+    assert invoice["kind"] == "link"
+    assert invoice["link_title"] == "Logo design"
+    assert invoice["title"] == "Logo design"
+    assert invoice["total_minor"] == 5_000_000
+    assert invoice["status"] in ("sent", "overdue")
+    assert body["public_url"].endswith(f"/i/{invoice['public_token']}")
+    # It is immediately payable: nothing here is waiting on a draft step.
+    assert invoice["balance_minor"] == 5_000_000
+
+
+@pytest.mark.asyncio
+async def test_payment_link_appears_in_the_link_shelf(api_client):
+    await api_client.post(
+        "/api/v1/invoices/links",
+        json={"title": "Consultation", "amount_minor": 2_500_000, "currency": "NGN"},
+    )
+    shelf = await api_client.get("/api/v1/invoices/links")
+    assert shelf.status_code == 200, shelf.text
+    assert shelf.json()["total"] == 1
+    assert shelf.json()["items"][0]["kind"] == "link"
+
+    # The general list can be narrowed to links too.
+    listed = await api_client.get("/api/v1/invoices", params={"kind": "link"})
+    assert listed.status_code == 200, listed.text
+    assert all(item["kind"] == "link" for item in listed.json()["items"])
+
+
+@pytest.mark.asyncio
+async def test_public_pay_does_not_require_a_customer_email(api_client):
+    """A link with no email must still reach Paystack, not a validation error."""
+    created = await api_client.post(
+        "/api/v1/invoices/links",
+        json={"title": "Delivery fee", "amount_minor": 150_000, "currency": "NGN"},
+    )
+    token = created.json()["invoice"]["public_token"]
+
+    # Paystack is not configured in the test app, so the *only* reason this may
+    # fail is the missing gateway — never a missing email address.
+    pay = await api_client.post(f"/api/v1/invoices/public/{token}/pay", json={})
+    assert pay.status_code == 400, pay.text
+    assert "Paystack" in pay.json()["detail"]
+    assert "email" not in pay.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_link_payload_accepts_optional_customer_details(api_client):
+    response = await api_client.post(
+        "/api/v1/invoices/links",
+        json={
+            "title": "Catering deposit",
+            "amount_minor": 20_000_000,
+            "currency": "NGN",
+            "customer_name": "Ada Studio",
+            "customer_email": "ada@example.com",
+            "note": "50% deposit for the 40-guest event.",
+            "due_in_days": 7,
+        },
+    )
+    assert response.status_code == 201, response.text
+    invoice = response.json()["invoice"]
+    assert invoice["customer"]["name"] == "Ada Studio"
+    assert invoice["customer"]["email"] == "ada@example.com"
+    assert invoice["notes"] == "50% deposit for the 40-guest event."

@@ -13,6 +13,7 @@ import {
 import type { OverviewCampaign, UnifiedMetrics } from "../types";
 import { campaignColor } from "../components/CampaignChip";
 import ChannelSwitch from "../components/ChannelSwitch";
+import { ThemeToggle } from "../components/ThemeToggle";
 import { useChannel } from "../hooks/useChannel";
 import { inboxLink, inboxPathFor } from "../utils/inboxRoute";
 
@@ -51,16 +52,33 @@ const statusTone = (status: string, isLive: boolean) => {
 
 function StatCard({
   label, value, sub, icon: Icon, tone = "text-primary-600 bg-primary-50 dark:bg-primary-900/40", to,
+  delta,
 }: {
   label: string; value: React.ReactNode; sub?: string;
   icon: any; tone?: string; to?: string;
+  /** Percentage change vs. the first half of the window — an indicator, not a promise. */
+  delta?: number | null;
 }) {
   const body = (
     <div className="card p-4 h-full hover:shadow-md transition-shadow">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{label}</p>
-          <p className="text-2xl font-bold mt-1">{value}</p>
+          <div className="flex items-baseline gap-1.5 mt-1">
+            <p className="text-2xl font-bold tabular-nums tracking-tight">{value}</p>
+            {typeof delta === "number" && delta !== 0 && (
+              <span
+                className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
+                  delta > 0
+                    ? "bg-success-50 text-success-700 dark:bg-success-950/50 dark:text-success-300"
+                    : "bg-danger-50 text-danger-700 dark:bg-danger-950/50 dark:text-danger-300"
+                }`}
+              >
+                {delta > 0 ? <TrendingUp size={9} /> : <ThumbsDown size={9} />}
+                {Math.abs(delta)}%
+              </span>
+            )}
+          </div>
           {sub && <p className="text-[11px] text-gray-400 mt-1 truncate">{sub}</p>}
         </div>
         <div className={`p-2 rounded-lg flex-shrink-0 ${tone}`}><Icon size={18} /></div>
@@ -147,6 +165,19 @@ export default function OverviewPage() {
     );
   }
 
+  // Trend indicators come from the same series the chart draws.
+  const trend = (pick: (point: any) => number) => {
+    const points = (metrics?.series || []).map(pick);
+    if (points.length < 2) return null;
+    const mid = Math.floor(points.length / 2);
+    const before = points.slice(0, mid).reduce((a, b) => a + b, 0);
+    const after = points.slice(mid).reduce((a, b) => a + b, 0);
+    if (before === 0) return after > 0 ? 100 : null;
+    return Math.round(((after - before) / before) * 100);
+  };
+  const sentDelta = trend((p) => Number(p.sent ?? p.count ?? 0));
+  const repliesDelta = trend((p) => Number(p.replies ?? 0));
+
   const sentiment = inbox?.sentiment || { positive: 0, negative: 0, neutral: 0 };
   const sentimentTotal = sentiment.positive + sentiment.negative + sentiment.neutral;
 
@@ -167,9 +198,13 @@ export default function OverviewPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {/* Appearance lives at the top of the overview: the one screen an
+              operator opens first, so light/dark is always one tap away. */}
+          <ThemeToggle />
           <ChannelSwitch size="sm" />
           <select
             className="input py-1.5 !w-auto text-sm"
+            aria-label="Date range"
             value={days}
             onChange={(e) => setDays(parseInt(e.target.value))}
           >
@@ -197,6 +232,7 @@ export default function OverviewPage() {
           label={`${messageLabel} sent`} value={msg?.sent ?? 0}
           sub={`${msg?.queued ?? 0} still queued`}
           icon={Send} tone="text-primary-600 bg-primary-50 dark:bg-primary-900/40"
+          delta={sentDelta}
         />
         <StatCard
           label={`${messageLabel} delivered`} value={`${msg?.delivery_rate ?? 0}%`}
@@ -208,6 +244,7 @@ export default function OverviewPage() {
           sub={`${msg?.reply_rate ?? 0}% reply rate · ${channelLabel.toLowerCase()} only`}
           icon={MessageCircle} tone="text-primary-600 bg-primary-50 dark:bg-primary-900/40"
           to={inboxPathFor(channel)}
+          delta={repliesDelta}
         />
         <StatCard
           label="Unread in inbox" value={inbox?.unread ?? 0}
@@ -241,30 +278,70 @@ export default function OverviewPage() {
             <h3 className="font-semibold">{channelLabel} sending &amp; replies</h3>
             <span className="text-xs text-gray-400">last {days} days</span>
           </div>
-          <ResponsiveContainer width="100%" height={260}>
-            <AreaChart data={metrics?.series || []}>
-              <defs>
-                <linearGradient id="ovSent" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#1a4534" stopOpacity={0.35} />
-                  <stop offset="95%" stopColor="#1a4534" stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="ovReplies" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#2a684e" stopOpacity={0.4} />
-                  <stop offset="95%" stopColor="#2a684e" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
-              <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={(d) => String(d).slice(5)} />
-              <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-              <Tooltip
-                contentStyle={{ fontSize: 12, borderRadius: 8 }}
-                labelFormatter={(d) => new Date(String(d)).toDateString()}
-              />
-              <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Area type="monotone" dataKey="sent" name={`${messageLabel} sent`} stroke="#1a4534" fill="url(#ovSent)" strokeWidth={2} />
-              <Area type="monotone" dataKey="replies" name={`${channelLabel} replies`} stroke="#2a684e" fill="url(#ovReplies)" strokeWidth={2} />
-            </AreaChart>
-          </ResponsiveContainer>
+          <div className="h-[220px] sm:h-[260px] -ml-1">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={metrics?.series || []} margin={{ top: 6, right: 6, left: -18, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="ovSent" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#2a684e" stopOpacity={0.5} />
+                    <stop offset="95%" stopColor="#5fa982" stopOpacity={0.02} />
+                  </linearGradient>
+                  <linearGradient id="ovReplies" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#dbb440" stopOpacity={0.45} />
+                    <stop offset="95%" stopColor="#dbb440" stopOpacity={0.02} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="4 6" opacity={0.35} vertical={false} />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fontSize: 10.5, fill: "#828b83" }}
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={(d) => String(d).slice(5)}
+                  minTickGap={18}
+                />
+                <YAxis
+                  tick={{ fontSize: 10.5, fill: "#828b83" }}
+                  axisLine={false}
+                  tickLine={false}
+                  allowDecimals={false}
+                  width={44}
+                />
+                <Tooltip
+                  contentStyle={{
+                    fontSize: 12,
+                    borderRadius: 12,
+                    border: "1px solid rgba(214,216,211,0.7)",
+                    boxShadow: "0 12px 30px -18px rgba(8,37,26,0.35)",
+                  }}
+                  labelFormatter={(d) => new Date(String(d)).toDateString()}
+                />
+                <Legend
+                  iconType="circle"
+                  iconSize={7}
+                  wrapperStyle={{ fontSize: 11, paddingTop: 6 }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="sent"
+                  name={`${messageLabel} sent`}
+                  stroke="#2a684e"
+                  fill="url(#ovSent)"
+                  strokeWidth={2.2}
+                  activeDot={{ r: 3.5, strokeWidth: 2, stroke: "#fff" }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="replies"
+                  name={`${channelLabel} replies`}
+                  stroke="#c99a2a"
+                  fill="url(#ovReplies)"
+                  strokeWidth={2.2}
+                  activeDot={{ r: 3.5, strokeWidth: 2, stroke: "#fff" }}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
         </div>
 
         <div className="card p-4">

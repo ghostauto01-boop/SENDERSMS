@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
     # --- Application ---
-    APP_NAME: str = "SendSMS"
+    APP_NAME: str = "Sendify"
     APP_ENV: str = "development"
     LOG_LEVEL: str = "INFO"
     DEFAULT_TIMEZONE: str = "Africa/Lagos"

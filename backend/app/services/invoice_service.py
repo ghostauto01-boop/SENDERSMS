@@ -456,6 +456,17 @@ def serialize_invoice(
         "number": invoice.number,
         "public_token": invoice.public_token,
         "public_url": public_link(invoice.public_token),
+        # A payment link and an invoice are the same record with a different
+        # presentation; the client uses `kind` to choose the simple or the
+        # document-shaped screen, and `title` as the human headline.
+        "kind": (getattr(invoice, "kind", None) or "invoice"),
+        "link_title": getattr(invoice, "link_title", None),
+        "title": (
+            getattr(invoice, "link_title", None)
+            or getattr(invoice, "customer_name", None)
+            or (invoice.items[0].description if getattr(invoice, "items", None) else None)
+            or "Payment"
+        ),
         "status": effective_status(invoice),
         "status_label": status_label(invoice),
         "stored_status": invoice.status,

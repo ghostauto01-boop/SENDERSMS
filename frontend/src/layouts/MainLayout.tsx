@@ -1,13 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, Outlet, useNavigate } from "react-router-dom";
-import toast from "react-hot-toast";
 import { useAuth } from "../hooks/useAuth";
 import {
   LayoutDashboard, Users, List, GitBranch, Sparkles,
   Inbox, Send, Clock, FileText, BarChart3, Settings, MessageSquareReply,
-  Zap, Moon, Sun, Menu, X, LogOut, Search, Braces, Repeat, Calendar, Target,
+  Zap, Menu, X, LogOut, Search, Braces, Repeat, Calendar, Target,
   Activity, Phone, Mail, MailOpen, GraduationCap, MoreHorizontal, ShieldCheck, Briefcase,
-  ReceiptText, Download, ArrowUpRight, Smartphone,
+  ReceiptText, ArrowUpRight,
 } from "lucide-react";
 import BrandMark from "../components/BrandMark";
 import ChannelSwitch from "../components/ChannelSwitch";
@@ -89,56 +88,6 @@ const TAB_BAR: NavItem[] = [
   { to: "/contacts", label: "Contacts", icon: Users },
 ];
 
-function PromoCard() {
-  const [installEvent, setInstallEvent] = useState<any>(null);
-
-  useEffect(() => {
-    const handler = (event: Event) => {
-      // Keep the browser's prompt for the moment the user asks to install.
-      event.preventDefault();
-      setInstallEvent(event);
-    };
-    window.addEventListener("beforeinstallprompt", handler);
-    return () => window.removeEventListener("beforeinstallprompt", handler);
-  }, []);
-
-  const install = async () => {
-    if (!installEvent) {
-      toast("Open your browser menu and choose “Add to Home Screen”.", { icon: "📲" });
-      return;
-    }
-    await installEvent.prompt();
-    const choice = await installEvent.userChoice;
-    if (choice?.outcome === "accepted") toast.success("Installing SendSMS…");
-    setInstallEvent(null);
-  };
-
-  return (
-    <div className="promo-card p-4">
-      <div className="relative z-10">
-        <div className="w-9 h-9 rounded-full bg-white/10 ring-1 ring-white/20 flex items-center justify-center mb-6">
-          <Download size={15} className="text-white/80" />
-        </div>
-        <p className="text-[15px] font-semibold leading-tight tracking-tight">
-          Download our
-          <br />
-          mobile app
-        </p>
-        <p className="text-[10.5px] text-white/55 mt-1">Smart access to all features.</p>
-        <button
-          onClick={install}
-          className="mt-4 w-full rounded-xl bg-white text-primary-950 text-[12px] font-semibold py-2.5
-                     flex items-center justify-center gap-1.5 transition-all duration-200 ease-gentle
-                     hover:bg-primary-50 active:scale-[0.98]"
-        >
-          <Smartphone size={13} />
-          Install app
-        </button>
-      </div>
-    </div>
-  );
-}
-
 export default function MainLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   /** Steps in the setup guide that are not done yet; null until the first answer. */
@@ -159,25 +108,9 @@ export default function MainLayout() {
     return () => window.removeEventListener("setup-guide-updated", load);
   }, []);
 
-  // The refresh is a light-first design. Dark mode remains available from the
-  // header, but the OS preference no longer makes a first visit dark.
-  const [dark, setDark] = useState(() => {
-    if (typeof window !== "undefined") return localStorage.getItem("theme") === "dark";
-    return false;
-  });
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-
-  useEffect(() => {
-    document.documentElement.classList.toggle("dark", dark);
-  }, [dark]);
-
-  const toggleDark = () => {
-    const next = !dark;
-    setDark(next);
-    localStorage.setItem("theme", next ? "dark" : "light");
-  };
 
   // Close the drawer whenever the route changes, and scroll content to the top
   // so a new page never opens half-way down the previous one.
@@ -210,17 +143,6 @@ export default function MainLayout() {
     const term = search.trim();
     if (!term) return;
     navigate(`/contacts?search=${encodeURIComponent(term)}`);
-  };
-
-  /** Does this URL match an item, including a query the item names? */
-  const matches = (to: string) => {
-    const [path, search] = to.split("?");
-    if (location.pathname !== path && !location.pathname.startsWith(`${path}/`)) return false;
-    if (!search) return true;
-    const current = new URLSearchParams(location.search);
-    return [...new URLSearchParams(search).entries()].every(
-      ([key, value]) => current.get(key) === value
-    );
   };
 
   /**
@@ -268,7 +190,7 @@ export default function MainLayout() {
         <Link to="/dashboard" className="flex items-center gap-2.5 group">
           <BrandMark className="w-9 h-9 shrink-0 rounded-[13px] shadow-sm transition-transform duration-300 ease-spring group-hover:scale-105" />
           <span className="font-semibold text-[19px] text-primary-950 dark:text-white tracking-[-0.04em] lowercase">
-            sendsms
+            sendify
           </span>
         </Link>
         <button
@@ -312,7 +234,6 @@ export default function MainLayout() {
       </nav>
 
       <div className="p-3.5 pt-2 shrink-0 space-y-2">
-        <PromoCard />
         <button
           onClick={handleLogout}
           className="nav-item w-full text-gray-500 hover:text-danger-600"
@@ -387,14 +308,6 @@ export default function MainLayout() {
                 <ChannelSwitch navigateManagers={location.pathname !== "/overview"} />
               </div>
               <NotificationBell />
-              <button
-                onClick={toggleDark}
-                className="icon-btn hidden sm:flex"
-                title="Toggle dark mode"
-                aria-label="Toggle dark mode"
-              >
-                {dark ? <Sun size={17} /> : <Moon size={17} />}
-              </button>
               <Link to="/settings" className="user-chip" aria-label="Account settings">
                 <span className="avatar w-8 h-8 text-xs">{initials}</span>
                 <span className="hidden sm:block leading-tight pr-0.5">

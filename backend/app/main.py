@@ -1411,8 +1411,8 @@ FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "
 # colours and icon list live in ONE place (frontend/public/manifest.json)
 # instead of being duplicated here with stale values.
 _MANIFEST_FALLBACK = {
-    "name": "SendSMS",
-    "short_name": "SendSMS",
+    "name": "Sendify",
+    "short_name": "Sendify",
     "description": "Nigerian SMS, email and invoice workspace",
     "start_url": "/",
     "scope": "/",
@@ -1481,4 +1481,4 @@ else:
         # page is only for someone opening the root by hand.
         if fp.startswith(("api/", "docs", "manifest", "sw.js", "icon-", "favicon")):
             return JSONResponse({"detail": "Not Found"}, 404)
-        return HTMLResponse("<h1>SendSMS API</h1>")
+        return HTMLResponse("<h1>Sendify API</h1>")

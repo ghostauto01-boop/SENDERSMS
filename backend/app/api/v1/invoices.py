@@ -60,12 +60,18 @@ class ItemIn(BaseModel):
 
 
 class InvoiceIn(BaseModel):
-    customer_name: str = Field(..., min_length=1, max_length=255)
+    #: Optional on purpose. A payment link is often sent before the operator
+    #: knows (or wants to type) who will open it — the amount and the product
+    #: are the only things a client actually needs.
+    customer_name: Optional[str] = Field(default=None, max_length=255)
     customer_email: Optional[str] = Field(default=None, max_length=320)
     customer_phone: Optional[str] = Field(default=None, max_length=40)
     customer_address: Optional[str] = None
     customer_business: Optional[str] = Field(default=None, max_length=255)
     contact_id: Optional[int] = None
+    #: "invoice" (default) or "link".
+    kind: Optional[str] = None
+    link_title: Optional[str] = Field(default=None, max_length=255)
     currency: str = "NGN"
     issue_date: Optional[datetime] = None
     due_date: Optional[datetime] = None
@@ -81,7 +87,8 @@ class InvoiceIn(BaseModel):
 
 
 class InvoicePatch(BaseModel):
-    customer_name: Optional[str] = Field(default=None, min_length=1, max_length=255)
+    customer_name: Optional[str] = Field(default=None, max_length=255)
+    link_title: Optional[str] = Field(default=None, max_length=255)
     customer_email: Optional[str] = Field(default=None, max_length=320)
     customer_phone: Optional[str] = Field(default=None, max_length=40)
     customer_address: Optional[str] = None
@@ -97,6 +104,23 @@ class InvoicePatch(BaseModel):
     terms: Optional[str] = None
     footer: Optional[str] = None
     status: Optional[str] = None
+
+
+class LinkIn(BaseModel):
+    """A quick payment link: one product, one amount, one Pay button."""
+
+    title: str = Field(..., min_length=1, max_length=255)
+    amount_minor: int = Field(..., gt=0)
+    currency: Optional[str] = None
+    description: Optional[str] = Field(default=None, max_length=500)
+    note: Optional[str] = Field(default=None, max_length=2000)
+    customer_name: Optional[str] = Field(default=None, max_length=255)
+    customer_email: Optional[str] = Field(default=None, max_length=320)
+    customer_phone: Optional[str] = Field(default=None, max_length=40)
+    #: Link expiry, in days. A link with no deadline is the default in Stripe
+    #: too; 14 days keeps the "due" badge meaningful for the client.
+    due_in_days: int = Field(default=14, ge=0, le=365)
+    send: bool = False
 
 
 class PaymentIn(BaseModel):
@@ -227,6 +251,22 @@ def _summary(invoices: list[Invoice]) -> dict[str, Any]:
 async def _currency_default(db: AsyncSession) -> str:
     cfg = await svc.get_invoice_settings(db)
     return cfg.get("default_currency") or "NGN"
+
+
+def _payer_email(invoice: Invoice, given: str | None = None) -> str:
+    """The address Paystack needs, without forcing the customer to type one.
+
+    Paystack's checkout requires *an* email. The operator may supply one, and
+    the customer can supply one on the public page for their receipt; when
+    neither does, we generate a stable, obviously-placeholder address tied to
+    the link. The money still arrives — only the emailed receipt is skipped —
+    which is exactly the "open the link and just pay" flow.
+    """
+    address = (given or invoice.customer_email or "").strip()
+    if "@" in address and "." in address.rsplit("@", 1)[-1]:
+        return address
+    token = (invoice.public_token or "link")[:12]
+    return f"payer-{token}@sendify.app"
 
 
 def _mailto(invoice: Invoice, business: dict[str, Any]) -> str | None:
@@ -632,9 +672,9 @@ async def public_pay(
     ok, reason = svc.paystack_ready(cfg)
     if not ok:
         raise HTTPException(400, reason)
-    email = (body.email or invoice.customer_email or "").strip()
-    if "@" not in email:
-        raise HTTPException(422, "Enter a valid email address for your receipt")
+    # Paystack needs an address, the customer does not need to type one:
+    # fall back to theirs, then to a placeholder tied to this link.
+    email = _payer_email(invoice, body.email)
     reference = f"INV-{invoice.id}-{uuid4().hex[:10].upper()}"
     base = (public_base_url() or "").rstrip("/")
     callback = f"{base}/i/{invoice.public_token}?reference={reference}" if base else None
@@ -743,6 +783,7 @@ async def list_invoices(
     currency: Optional[str] = Query(None),
     q: Optional[str] = Query(None),
     contact_id: Optional[int] = Query(None),
+    kind: Optional[str] = Query(None, description="invoice, link or all"),
     db: AsyncSession = Depends(get_db),
     cu: User = Depends(get_current_user),
 ):
@@ -762,6 +803,8 @@ async def list_invoices(
         query = query.where(Invoice.currency == code)
     if contact_id:
         query = query.where(Invoice.contact_id == contact_id)
+    if kind and kind.lower() in ("invoice", "link"):
+        query = query.where(Invoice.kind == kind.lower())
     if q:
         like = f"%{q.strip()}%"
         query = query.where(
@@ -771,6 +814,7 @@ async def list_invoices(
                 Invoice.customer_email.ilike(like),
                 Invoice.customer_phone.ilike(like),
                 Invoice.customer_business.ilike(like),
+                Invoice.link_title.ilike(like),
             )
         )
     total = (await db.execute(select(func.count()).select_from(query.subquery()))).scalar() or 0
@@ -840,10 +884,21 @@ async def create_invoice(
             contact_id = None
 
     number = await svc.next_invoice_number(db, cfg.get("prefix"))
+    kind = "link" if (body.kind or "").lower() == "link" else "invoice"
+    # A name is never required: fall back through the link headline, the first
+    # line item, and finally a neutral "Customer" so the record is always valid.
+    customer_name = (
+        (body.customer_name or "").strip()
+        or (body.link_title or "").strip()
+        or (items[0].description.strip() if items else "")
+        or "Customer"
+    )[:255]
     invoice = Invoice(
         number=number,
+        kind=kind,
+        link_title=(body.link_title or "").strip() or None,
         contact_id=contact_id,
-        customer_name=body.customer_name.strip(),
+        customer_name=customer_name,
         customer_email=_clean_email(body.customer_email),
         customer_phone=(body.customer_phone or "").strip() or None,
         customer_address=(body.customer_address or "").strip() or None,
@@ -874,13 +929,116 @@ async def create_invoice(
     result: dict[str, Any] = {
         "success": True,
         "invoice": svc.serialize_invoice(invoice),
-        "message": "Invoice saved as a draft.",
+        "message": (
+            "Payment link saved as a draft."
+            if kind == "link"
+            else "Invoice saved as a draft."
+        ),
     }
     if body.send:
         send_result = await _send_invoice(db, invoice, cfg, email_customer=body.send_email)
         result["invoice"] = svc.serialize_invoice(invoice)
         result.update(send_result)
     return result
+
+
+@router.post("/links", status_code=201)
+async def create_payment_link(
+    body: LinkIn,
+    db: AsyncSession = Depends(get_db),
+    cu: User = Depends(get_current_user),
+):
+    """Create a Stripe-style payment link: a product, an amount, a URL.
+
+    No customer record, no email, no line-item bookkeeping is required. The
+    link is created *sent* because the whole point is to paste it into a chat
+    or SMS immediately; the shared invoice engine still records every view,
+    payment and Paystack confirmation against it.
+    """
+    cfg = await svc.get_invoice_settings(db)
+    currency = (body.currency or cfg["default_currency"] or "NGN").upper()
+    if currency not in INVOICE_CURRENCIES:
+        raise HTTPException(422, f"Currency must be one of {', '.join(INVOICE_CURRENCIES)}")
+    if body.amount_minor <= 0:
+        raise HTTPException(422, "Enter an amount greater than zero")
+
+    issue = datetime.now(timezone.utc)
+    due = issue + timedelta(days=int(body.due_in_days))
+    title = body.title.strip()[:255]
+    description = (body.description or "").strip() or title
+    totals = svc.calculate_totals(
+        [{"description": description[:500], "quantity": 1, "unit_price_minor": body.amount_minor}],
+        discount_minor=0,
+        tax_rate=0,
+    )
+    number = await svc.next_invoice_number(db, cfg.get("prefix"))
+    invoice = Invoice(
+        number=number,
+        kind="link",
+        link_title=title,
+        customer_name=(body.customer_name or "").strip()[:255] or "Customer",
+        customer_email=_clean_email(body.customer_email),
+        customer_phone=(body.customer_phone or "").strip() or None,
+        currency=currency,
+        issue_date=issue,
+        due_date=due,
+        notes=(body.note or "").strip() or None,
+        terms=cfg.get("default_terms") or None,
+        footer=cfg.get("footer") or None,
+        status="sent",
+        sent_at=issue,
+        created_by=(cu.display_name or cu.username or "admin")[:150],
+    )
+    _apply_totals(invoice, totals)
+    for item in totals["items"]:
+        invoice.items.append(InvoiceItem(**item))
+    svc.log_event(db, invoice, "created", f"Payment link “{title}” created")
+    svc.log_event(db, invoice, "sent", "Payment link ready to share")
+    db.add(invoice)
+    await db.flush()
+    invoice.payment_link = svc.public_link(invoice.public_token)
+    await db.flush()
+
+    result: dict[str, Any] = {
+        "success": True,
+        "invoice": svc.serialize_invoice(invoice),
+        "public_url": invoice.payment_link,
+        "message": "Payment link ready — copy it or share it.",
+    }
+    if body.send and invoice.customer_email:
+        result.update(await _send_invoice(db, invoice, cfg, email_customer=True))
+        result["invoice"] = svc.serialize_invoice(invoice)
+    return result
+
+
+@router.get("/links")
+async def list_payment_links(
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=1, le=200),
+    status: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    cu: User = Depends(get_current_user),
+):
+    """Payment links only, newest first — the "link shelf" in the studio."""
+    query = select(Invoice).where(Invoice.kind == "link")
+    if status:
+        clause = _status_clause(status)
+        if clause is not None:
+            query = query.where(clause)
+    total = (await db.execute(select(func.count()).select_from(query.subquery()))).scalar() or 0
+    rows = (
+        await db.execute(
+            query.order_by(Invoice.created_at.desc(), Invoice.id.desc())
+            .offset((page - 1) * per_page)
+            .limit(per_page)
+        )
+    ).scalars().all()
+    return {
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "items": [svc.serialize_invoice(invoice) for invoice in rows],
+    }
 
 
 async def _send_invoice(
@@ -948,6 +1106,8 @@ async def update_invoice(
 
     if "customer_name" in data and data["customer_name"]:
         invoice.customer_name = str(data["customer_name"]).strip()[:255]
+    if "link_title" in data:
+        invoice.link_title = (data["link_title"] or "").strip()[:255] or None
     if "customer_email" in data:
         invoice.customer_email = _clean_email(data["customer_email"])
     if "customer_phone" in data:
@@ -1064,6 +1224,8 @@ async def duplicate_invoice(
     issue = datetime.now(timezone.utc)
     copy = Invoice(
         number=number,
+        kind=getattr(invoice, "kind", None) or "invoice",
+        link_title=getattr(invoice, "link_title", None),
         contact_id=invoice.contact_id,
         customer_name=invoice.customer_name,
         customer_email=invoice.customer_email,
@@ -1190,9 +1352,9 @@ async def pay_invoice(
     ok, reason = svc.paystack_ready(cfg)
     if not ok:
         raise HTTPException(400, reason)
-    email = (body.email or invoice.customer_email or "").strip()
-    if "@" not in email:
-        raise HTTPException(422, "Add the customer's email address before collecting payment")
+    # Paystack needs an address, the customer does not need to type one:
+    # fall back to theirs, then to a placeholder tied to this link.
+    email = _payer_email(invoice, body.email)
     reference = f"INV-{invoice.id}-{uuid4().hex[:10].upper()}"
     base = (public_base_url() or "").rstrip("/")
     callback = f"{base}/i/{invoice.public_token}?reference={reference}" if base else None

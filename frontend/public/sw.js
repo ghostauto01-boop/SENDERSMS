@@ -10,7 +10,7 @@
  *
  * Bump VERSION on any change here: it evicts every old cache on activate.
  */
-const VERSION = "sendsms-v8";
+const VERSION = "sendify-v9";
 const ASSET_CACHE = `${VERSION}-assets`;
 const SHELL_CACHE = `${VERSION}-shell`;
 
@@ -96,7 +96,7 @@ self.addEventListener("push", (e) => {
       body: d.body || "",
       icon: d.icon || "/icon-192.png",
       badge: d.badge || "/icon-192.png",
-      tag: d.tag || "sendsms",
+      tag: d.tag || "sendify",
       renotify: true,
       data: { url: d.url || "/" },
       vibrate: [100, 50, 100],

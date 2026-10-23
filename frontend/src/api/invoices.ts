@@ -65,6 +65,11 @@ export interface Invoice {
   number: string;
   public_token: string;
   public_url: string;
+  /** "invoice" — a full document. "link" — a one-product payment link. */
+  kind: "invoice" | "link";
+  link_title: string | null;
+  /** The human headline: link title, customer name, or first line item. */
+  title: string;
   status: InvoiceStatus;
   status_label: string;
   stored_status: string;
@@ -176,8 +181,23 @@ export interface InvoiceAnalytics {
   generated_at: string;
 }
 
+export interface PaymentLinkInput {
+  title: string;
+  amount_minor: number;
+  currency?: string;
+  description?: string | null;
+  note?: string | null;
+  customer_name?: string | null;
+  customer_email?: string | null;
+  customer_phone?: string | null;
+  due_in_days?: number;
+  send?: boolean;
+}
+
 export interface InvoiceInput {
-  customer_name: string;
+  customer_name?: string | null;
+  kind?: "invoice" | "link";
+  link_title?: string | null;
   customer_email?: string | null;
   customer_phone?: string | null;
   customer_address?: string | null;
@@ -227,6 +247,7 @@ const invoicesApi = {
     currency?: string;
     q?: string;
     contact_id?: number;
+    kind?: "invoice" | "link";
   }) =>
     api
       .get<{
@@ -239,6 +260,27 @@ const invoicesApi = {
       .then((r) => r.data),
 
   get: (id: number) => api.get<Invoice>(`/invoices/${id}`).then((r) => r.data),
+
+  /** Create a Stripe-style payment link: a title, an amount, a URL. */
+  createLink: (body: PaymentLinkInput) =>
+    api
+      .post<{
+        success: boolean;
+        invoice: Invoice;
+        public_url: string;
+        message: string;
+        email_sent?: boolean;
+        email_message?: string;
+      }>("/invoices/links", body)
+      .then((r) => r.data),
+
+  links: (params: { page?: number; per_page?: number; status?: string } = {}) =>
+    api
+      .get<{ total: number; page: number; per_page: number; items: Invoice[] }>(
+        "/invoices/links",
+        { params }
+      )
+      .then((r) => r.data),
 
   create: (body: InvoiceInput) =>
     api

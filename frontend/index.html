@@ -3,15 +3,31 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
-    <title>SendSMS — SMS, Email & Invoicing</title>
-    <meta name="description" content="Nigerian SMS, email and invoice workspace" />
+    <title>Sendify — SMS, Email & Payments</title>
+    <meta name="description" content="Sendify — SMS, email, payment links and invoicing for growing businesses." />
     <link rel="manifest" href="/manifest.json" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
-    <meta name="theme-color" content="#123c2b" />
+    <meta name="theme-color" content="#f6f5f1" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-title" content="SendSMS" />
+    <meta name="apple-mobile-web-app-title" content="Sendify" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <script>
+      /* Paint the right theme before the first frame. Without this a dark-mode
+         operator sees a white flash on every reload. Keep in sync with
+         src/hooks/useTheme.tsx. */
+      (function () {
+        try {
+          var saved = localStorage.getItem("theme");
+          var dark = saved === "dark" || (saved !== "light" &&
+            window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+          document.documentElement.classList.add(dark ? "dark" : "light");
+          document.documentElement.style.colorScheme = dark ? "dark" : "light";
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute("content", dark ? "#0c1712" : "#f6f5f1");
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body class="bg-canvas dark:bg-canvas-dark">
     <div id="root"></div>
