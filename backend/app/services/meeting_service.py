@@ -362,6 +362,10 @@ async def send_invite(
         )
         if email_result["sent"]:
             meeting.invite_email_sent = True
+            # ``invite_sent`` means "the invite reached somebody", whichever
+            # channel carried it — otherwise the calendar would label an
+            # emailed booking as not invited.
+            meeting.invite_sent = True
 
     await db.flush()
     return {

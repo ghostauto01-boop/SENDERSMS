@@ -627,7 +627,9 @@ export default function EmailInboxPage() {
     <div
       className={`email-inbox flex flex-col overflow-hidden bg-white dark:bg-gray-900 ${
         focus
-          ? "fixed inset-0 z-[70] h-[100dvh] w-screen"
+          // `inset-0` rather than `w-screen`: 100vw includes the scrollbar, so a
+          // full-screen pane would be a few pixels too wide and jitter.
+          ? "fixed inset-0 z-[70] h-[100dvh]"
           : "h-[calc(100dvh-7.5rem)] lg:h-full"
       }`}
     >

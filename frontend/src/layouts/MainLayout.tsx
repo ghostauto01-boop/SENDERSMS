@@ -79,12 +79,16 @@ const GENERAL: NavItem[] = [
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
-//: Thumb-bar destinations. Six is the most that stays comfortable on a phone.
+//: Thumb-bar destinations. Email is a first-class channel now, so it earns a
+//: permanent slot: on a phone the drawer is a two-tap detour away from the mail
+//: people open twenty times a day. Seven columns still leaves every target
+//: wider than the 44px a fingertip needs, even on a 320px screen.
 const TAB_BAR: NavItem[] = [
   { to: "/dashboard", label: "Home", icon: LayoutDashboard },
-  { to: "/invoices", label: "Invoices", icon: ReceiptText },
   { to: "/send", label: "Send", icon: Send },
   { to: "/inbox", label: "SMS", icon: Inbox },
+  { to: "/email-inbox", label: "Mail", icon: MailOpen },
+  { to: "/invoices", label: "Invoices", icon: ReceiptText },
   { to: "/contacts", label: "Contacts", icon: Users },
 ];
 
@@ -363,7 +367,7 @@ export default function MainLayout() {
         className="fixed bottom-0 left-0 right-0 z-40 lg:hidden bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border-t border-gray-200/70 dark:border-gray-700/70 safe-bottom"
         aria-label="Primary"
       >
-        <div className="grid grid-cols-6">
+        <div className="grid grid-cols-7">
           {TAB_BAR.map((item) => {
             const aliases: Record<string, string> = { "/inbox": "/sms-inbox" };
             const path = aliases[location.pathname] || location.pathname;
@@ -385,7 +389,9 @@ export default function MainLayout() {
                 >
                   <item.icon size={18} strokeWidth={active ? 2.2 : 1.8} />
                 </span>
-                <span className="text-[10px] font-medium">{item.label}</span>
+                <span className="text-[10px] font-medium leading-none truncate max-w-full px-0.5">
+                  {item.label}
+                </span>
               </Link>
             );
           })}
@@ -396,7 +402,7 @@ export default function MainLayout() {
             <span className="px-3 py-1">
               <MoreHorizontal size={18} strokeWidth={1.8} />
             </span>
-            <span className="text-[10px] font-medium">More</span>
+            <span className="text-[10px] font-medium leading-none">More</span>
           </button>
         </div>
       </nav>
