@@ -44,6 +44,7 @@ async def _get_rule(db: AsyncSession, followup_id: int) -> CampaignFollowUp:
 @router.get("/campaigns")
 async def list_campaigns_with_followups(
     status: Optional[str] = Query(None, description="Filter, e.g. 'running'"),
+    channel: Optional[str] = Query(None, description="sms | email"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -54,6 +55,10 @@ async def list_campaigns_with_followups(
     query = select(Campaign)
     if status:
         query = query.where(Campaign.status == status)
+    # Follow-up rules are channel-scoped (an email step must not text anybody),
+    # so the picker offers the campaigns of the channel being worked on.
+    if channel in ("sms", "email"):
+        query = query.where(Campaign.channel == channel)
     campaigns = (await db.execute(query.order_by(Campaign.created_at.desc()))).scalars().all()
 
     items = []
@@ -80,6 +85,7 @@ async def list_campaigns_with_followups(
                 "id": campaign.id,
                 "name": campaign.name,
                 "status": campaign.status,
+                "channel": (campaign.channel or "sms"),
                 "total_contacts": campaign.total_contacts,
                 "messages_sent": campaign.messages_sent,
                 "replies": campaign.replies,

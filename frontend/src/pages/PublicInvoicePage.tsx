@@ -6,6 +6,8 @@ import {
 } from "lucide-react";
 import invoicesApi, { Invoice } from "../api/invoices";
 import BrandMark from "../components/BrandMark";
+import ServerWakeBanner from "../components/ServerWakeBanner";
+import { COLD_START_PATIENCE, looksLikeColdStart } from "../utils/serverStatus";
 import StatusPill from "../components/invoices/StatusPill";
 import { formatDate, formatDateTime, formatMoney } from "../utils/money";
 
@@ -27,6 +29,8 @@ export default function PublicInvoicePage() {
   const [verifying, setVerifying] = useState(false);
   const [paidJustNow, setPaidJustNow] = useState(false);
   const [email, setEmail] = useState("");
+  /** True while the free instance is booting and we are retrying quietly. */
+  const [waking, setWaking] = useState(false);
 
   // Read the query through the router, not window: the same code then works in
   // a test renderer and behind any base path the deployment happens to use.
@@ -35,29 +39,59 @@ export default function PublicInvoicePage() {
   const reference = params.get("reference");
   const printMode = params.get("print") === "1";
 
+  /**
+   * Loading this page is the one time a customer meets our infrastructure.
+   *
+   * The service sleeps when nobody has used it and takes 30–60 s to wake, so a
+   * payment link used to show a spinner, fail, and look broken. Instead: keep
+   * trying while the cold start lasts, say "waking up" rather than nothing, and
+   * only report a real error once the server is genuinely unreachable.
+   */
   useEffect(() => {
     let cancelled = false;
-    invoicesApi
-      .publicGet(token)
-      .then((data) => {
+    let attempt = 0;
+    const startedAt = Date.now();
+
+    const load = async (): Promise<void> => {
+      try {
+        const data = await invoicesApi.publicGet(token);
         if (cancelled) return;
         setInvoice(data);
         setEmail(data.customer.email || "");
+        setError(null);
+        setWaking(false);
+        setLoading(false);
         document.title = `${data.number} · ${data.business?.name || "Invoice"}`;
-      })
-      .catch((err: any) => {
-        if (!cancelled) {
-          setError(
-            err?.response?.status === 404
-              ? "This invoice link is not valid. Ask the sender for a new link."
-              : err?.response?.data?.detail || "Could not load this invoice."
-          );
+      } catch (err: any) {
+        if (cancelled) return;
+        // A cold start is retried quietly: the banner explains the wait, and
+        // the customer should never have to press anything.
+        if (
+          looksLikeColdStart(err) &&
+          Date.now() - startedAt < COLD_START_PATIENCE * 2
+        ) {
+          attempt += 1;
+          setWaking(true);
+          setLoading(true);
+          window.setTimeout(() => void load(), Math.min(3_000 + attempt * 1_500, 8_000));
+          return;
         }
-      })
-      .finally(() => !cancelled && setLoading(false));
+        setWaking(false);
+        setLoading(false);
+        setError(
+          err?.response?.status === 404
+            ? "This invoice link is not valid. Ask the sender for a new link."
+            : err?.response?.data?.detail || "Could not load this invoice. Check your connection and try again."
+        );
+      }
+    };
+
+    setLoading(true);
+    void load();
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   // Coming back from Paystack: confirm before claiming anything happened.
@@ -115,7 +149,22 @@ export default function PublicInvoicePage() {
       <div className="min-h-[100dvh] bg-canvas flex items-center justify-center p-4">
         <div className="card p-8 w-full max-w-md text-center">
           <div className="animate-spin rounded-full h-9 w-9 border-2 border-primary-200 border-t-primary-800 mx-auto" />
-          <p className="text-sm text-gray-500 mt-4">Opening your invoice…</p>
+          <p className="text-sm font-medium text-gray-700 dark:text-gray-200 mt-4">
+            {waking ? "Waking the server up…" : "Opening your invoice…"}
+          </p>
+          {waking ? (
+            <>
+              <p className="text-xs text-gray-500 mt-1">
+                The first visit after a quiet period takes about 30 seconds. This page
+                reconnects by itself — no need to refresh or ask for a new link.
+              </p>
+              <div className="mt-4 text-left">
+                <ServerWakeBanner inline />
+              </div>
+            </>
+          ) : (
+            <p className="text-xs text-gray-400 mt-1">Just a moment.</p>
+          )}
         </div>
       </div>
     );

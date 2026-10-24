@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import api from "../api/client";
 import toast from "react-hot-toast";
 import {
-  Bell, CalendarPlus, Check, Clock, Link2, MapPin, Send, Trash2, Users, X,
+  Bell, CalendarPlus, Check, Clock, Link2, Mail, MapPin, Send, Trash2, Users, X,
 } from "lucide-react";
 import ContactPicker from "./ContactPicker";
 import TagPicker from "./TagPicker";
@@ -22,6 +22,9 @@ export interface MeetingInitial {
   title?: string;
   sendInvite?: boolean;
   sendReminder?: boolean;
+  /** Email is independent of SMS: a contact with only an address needs this. */
+  sendInviteEmail?: boolean;
+  sendReminderEmail?: boolean;
 }
 
 interface Props {
@@ -116,11 +119,16 @@ export default function MeetingModal({ meetingId = null, initial, onClose, onSav
   const [tags, setTags] = useState<string[]>([]);
 
   const [sendInvite, setSendInvite] = useState(initial?.sendInvite ?? true);
+  /** Email is a channel of its own: inviting by both is the normal case. */
+  const [sendInviteEmail, setSendInviteEmail] = useState(initial?.sendInviteEmail ?? false);
+  const [inviteSubject, setInviteSubject] = useState("");
   const [inviteTemplateId, setInviteTemplateId] = useState("");
   const [inviteBody, setInviteBody] = useState("");
   const inviteRef = useRef<HTMLTextAreaElement>(null);
 
   const [sendReminder, setSendReminder] = useState(initial?.sendReminder ?? true);
+  const [sendReminderEmail, setSendReminderEmail] = useState(initial?.sendReminderEmail ?? false);
+  const [reminderSubject, setReminderSubject] = useState("");
   const [reminderMinutes, setReminderMinutes] = useState<number[]>([60, 15]);
   const [customMinutes, setCustomMinutes] = useState("");
   const [reminderTemplateId, setReminderTemplateId] = useState("");
@@ -155,14 +163,25 @@ export default function MeetingModal({ meetingId = null, initial, onClose, onSav
         setDescription(data.description || "");
         setTags(data.tags || []);
         setSendInvite(data.send_invite_sms);
+        setSendInviteEmail(Boolean((data as any).send_invite_email));
+        setInviteSubject((data as any).invite_subject || "");
         setInviteTemplateId(data.invite_template_id ? String(data.invite_template_id) : "");
         setInviteBody(data.invite_body || "");
         setSendReminder(data.send_sms_reminder);
+        setSendReminderEmail(Boolean((data as any).send_email_reminder));
+        setReminderSubject((data as any).reminder_subject || "");
         setReminderMinutes(data.reminder_minutes || []);
         setReminderTemplateId(data.reminder_template_id ? String(data.reminder_template_id) : "");
         setReminderBody(data.reminder_body || "");
         setStatus(data.status);
-        if (data.invite_body || data.reminder_body || data.invite_template_id || data.reminder_template_id) {
+        if (
+          data.invite_body ||
+          data.reminder_body ||
+          data.invite_template_id ||
+          data.reminder_template_id ||
+          (data as any).send_invite_email ||
+          (data as any).send_email_reminder
+        ) {
           setShowAdvanced(true);
         }
       })
@@ -280,10 +299,14 @@ export default function MeetingModal({ meetingId = null, initial, onClose, onSav
         contact_ids: contactIds,
         tags,
         send_invite_sms: sendInvite,
+        send_invite_email: sendInviteEmail,
+        invite_subject: inviteSubject.trim() || null,
         invite_template_id: inviteTemplateId ? parseInt(inviteTemplateId, 10) : null,
         invite_body: inviteBody.trim() || null,
         send_sms_reminder: sendReminder,
-        reminder_minutes: sendReminder ? reminderMinutes : [],
+        send_email_reminder: sendReminderEmail,
+        reminder_subject: reminderSubject.trim() || null,
+        reminder_minutes: sendReminder || sendReminderEmail ? reminderMinutes : [],
         reminder_template_id: reminderTemplateId ? parseInt(reminderTemplateId, 10) : null,
         reminder_body: reminderBody.trim() || null,
       };
@@ -293,7 +316,7 @@ export default function MeetingModal({ meetingId = null, initial, onClose, onSav
         ? await api.put(`/calendar/${meetingId}`, payload)
         : await api.post("/calendar/", payload);
       const invite = (data as any).invite;
-      if (!editing && invite && sendInvite) {
+      if (!editing && invite && (sendInvite || sendInviteEmail)) {
         if (invite.sent > 0) toast.success(`Booked · invite sent to ${invite.sent} contact${invite.sent > 1 ? "s" : ""}`);
         else if (invite.error) toast.success("Booked · invite failed, resend it from the calendar");
         else toast.success("Booked");
@@ -354,7 +377,7 @@ export default function MeetingModal({ meetingId = null, initial, onClose, onSav
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4">
+    <div className="fixed inset-0 z-[90] flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4">
       <div className="bg-white dark:bg-gray-800 w-full sm:max-w-2xl max-h-[94vh] overflow-y-auto rounded-t-[20px] sm:rounded-2xl">
         <div className="sticky top-0 bg-primary-700 dark:bg-gray-800 px-4 py-3 flex items-center justify-between z-10">
           <h2 className="text-white font-semibold flex items-center gap-2">
@@ -509,7 +532,7 @@ export default function MeetingModal({ meetingId = null, initial, onClose, onSav
                 className="w-full flex items-center justify-between text-sm font-medium text-gray-900 dark:text-white"
               >
                 <span className="flex items-center gap-2">
-                  <Send size={15} className="text-primary-600" /> SMS invite & reminders
+                  <Send size={15} className="text-primary-600" /> SMS &amp; email invite + reminders
                 </span>
                 <span className="text-xs text-gray-500">{showAdvanced ? "Hide ▲" : "Show ▼"}</span>
               </button>
@@ -546,13 +569,65 @@ export default function MeetingModal({ meetingId = null, initial, onClose, onSav
                     </div>
                   )}
 
+                  {/* Email invite — the same booking, delivered to the address */}
+                  <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={sendInviteEmail}
+                      onChange={(e) => setSendInviteEmail(e.target.checked)}
+                      className="rounded accent-primary-600 w-4 h-4"
+                    />
+                    <span className="text-gray-900 dark:text-white font-medium flex items-center gap-1.5">
+                      <Mail size={14} className="text-primary-600" /> Email the invite too
+                    </span>
+                  </label>
+                  {sendInviteEmail && (
+                    <div className="space-y-2 pl-1">
+                      <input
+                        value={inviteSubject}
+                        onChange={(e) => setInviteSubject(e.target.value)}
+                        placeholder={`Subject — Meeting: ${title || "{{meeting_title}}"}`}
+                        className="w-full px-3 py-2.5 bg-gray-100 dark:bg-gray-900 rounded-xl text-sm text-gray-900 dark:text-white"
+                      />
+                      <p className="text-[11px] text-gray-500">
+                        Empty = &ldquo;Meeting: {title || "the meeting title"}&rdquo;. The body is the invite
+                        message above, personalised per contact.
+                      </p>
+                    </div>
+                  )}
+
                   <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
                     <input type="checkbox" checked={sendReminder} onChange={(e) => setSendReminder(e.target.checked)} className="rounded accent-primary-600 w-4 h-4" />
                     <span className="text-gray-900 dark:text-white font-medium flex items-center gap-1.5">
                       <Bell size={14} className="text-warning-500" /> Send SMS reminders
                     </span>
                   </label>
-                  {sendReminder && (
+                  <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={sendReminderEmail}
+                      onChange={(e) => setSendReminderEmail(e.target.checked)}
+                      className="rounded accent-primary-600 w-4 h-4"
+                    />
+                    <span className="text-gray-900 dark:text-white font-medium flex items-center gap-1.5">
+                      <Mail size={14} className="text-warning-500" /> Send email reminders too
+                    </span>
+                  </label>
+                  {sendReminderEmail && (
+                    <div className="space-y-2 pl-1">
+                      <input
+                        value={reminderSubject}
+                        onChange={(e) => setReminderSubject(e.target.value)}
+                        placeholder={`Subject — Reminder: ${title || "{{meeting_title}}"}`}
+                        className="w-full px-3 py-2.5 bg-gray-100 dark:bg-gray-900 rounded-xl text-sm text-gray-900 dark:text-white"
+                      />
+                      <p className="text-[11px] text-gray-500">
+                        Uses the reminder windows below, at the same times as the SMS reminders.
+                      </p>
+                    </div>
+                  )}
+
+                  {(sendReminder || sendReminderEmail) && (
                     <div className="space-y-2 pl-1">
                       <div className="flex gap-1.5 flex-wrap">
                         {REMINDER_PRESETS.map((p) => (

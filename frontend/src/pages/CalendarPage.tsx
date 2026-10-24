@@ -1,6 +1,6 @@
 /**
  * CalendarPage — the full calendar: month / week / day / agenda views, date
- * selection, contact filtering, tags, and SMS reminders.
+ * selection, contact filtering, tags, and SMS + email reminders.
  *
  * Every meeting is booked through MeetingModal, so invites, templates,
  * shortcodes and reminders behave exactly the same here as from the inbox.
@@ -221,7 +221,7 @@ export default function CalendarPage() {
       >
         <span className="hidden sm:inline font-medium">{fmtTime(m.starts_at)}</span>
         <span className="truncate">{m.title}</span>
-        {m.send_sms_reminder && m.reminder_minutes.length > 0 && (
+        {(m.send_sms_reminder || m.send_email_reminder) && m.reminder_minutes.length > 0 && (
           <Bell size={9} className="flex-shrink-0 opacity-70" />
         )}
       </button>
@@ -587,12 +587,19 @@ function DayAgenda({
                       {m.all_day ? "All day" : `${fmtTime(m.starts_at)} – ${fmtTime(m.ends_at)}`}
                     </span>
                     <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${style.chip}`}>{style.label}</span>
-                    {m.send_sms_reminder && m.reminder_minutes.length > 0 && (
-                      <span className="flex items-center gap-1 text-[11px]">
-                        <Bell size={11} className="text-warning-500" />
-                        {m.reminder_minutes.length} reminder{m.reminder_minutes.length > 1 ? "s" : ""}
-                      </span>
-                    )}
+                    {(m.send_sms_reminder || m.send_email_reminder) &&
+                      m.reminder_minutes.length > 0 && (
+                        <span className="flex items-center gap-1 text-[11px]">
+                          <Bell size={11} className="text-warning-500" />
+                          {m.reminder_minutes.length} reminder
+                          {m.reminder_minutes.length > 1 ? "s" : ""}
+                          <span className="text-gray-400">
+                            via {[m.send_sms_reminder && "SMS", m.send_email_reminder && "email"]
+                              .filter(Boolean)
+                              .join(" + ")}
+                          </span>
+                        </span>
+                      )}
                   </div>
                   {(m.attendees || []).length > 0 && (
                     <p className="flex items-center gap-1.5 mt-1.5 text-xs text-gray-600 dark:text-gray-400">

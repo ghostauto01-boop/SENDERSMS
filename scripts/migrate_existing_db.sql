@@ -481,3 +481,13 @@ ALTER TABLE ads_campaigns ADD COLUMN IF NOT EXISTS sender_distribution VARCHAR(2
 ALTER TABLE ads_campaigns ADD COLUMN IF NOT EXISTS email_sender_weights JSON;
 ALTER TABLE ads_assignments ADD COLUMN IF NOT EXISTS email_account_id INTEGER;
 CREATE INDEX IF NOT EXISTS ix_ads_assignments_email_account_id ON ads_assignments (email_account_id);
+
+-- Meetings on both channels: a booking can email its invite and its reminders
+-- independently of SMS (a contact may have only an address). The app adds these
+-- at startup too (schema_repair); this is the same DDL for a hand-run migration.
+ALTER TABLE meetings ADD COLUMN IF NOT EXISTS send_invite_email BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE meetings ADD COLUMN IF NOT EXISTS invite_subject VARCHAR(500);
+ALTER TABLE meetings ADD COLUMN IF NOT EXISTS email_account_id INTEGER;
+ALTER TABLE meetings ADD COLUMN IF NOT EXISTS invite_email_sent BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE meetings ADD COLUMN IF NOT EXISTS send_email_reminder BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE meetings ADD COLUMN IF NOT EXISTS reminder_subject VARCHAR(500);

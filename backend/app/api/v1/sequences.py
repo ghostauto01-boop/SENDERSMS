@@ -41,6 +41,8 @@ def _step_item(step: SequenceStep) -> dict:
         "config": step.config,
         "wait_duration_hours": step.wait_duration_hours,
         "template_id": step.template_id,
+        "subject": step.subject,
+        "email_account_id": step.email_account_id,
         "condition_type": step.condition_type,
         "condition_value": step.condition_value,
         "true_branch_step_order": step.true_branch_step_order,
@@ -53,6 +55,7 @@ def _sequence_item(sequence: Sequence, steps: list[SequenceStep]) -> dict:
         "id": sequence.id,
         "name": sequence.name,
         "description": sequence.description,
+        "channel": (sequence.channel or "sms"),
         "current_version": sequence.current_version,
         "is_active": sequence.is_active,
         "steps": [_step_item(step) for step in steps],
@@ -66,11 +69,18 @@ async def list_sequences(
     page: int = Query(default=1, ge=1),
     per_page: int = Query(default=25, ge=1, le=100),
     search: Optional[str] = None,
+    channel: Optional[str] = Query(default=None, description="sms | email"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """List sequences, including their current steps for the builder UI."""
+    """List sequences for one channel, with their current steps for the builder UI.
+
+    The channel defaults to *no filter* so existing callers keep seeing every
+    sequence; the app always sends the channel it is showing.
+    """
     query = select(Sequence)
+    if channel in ("sms", "email"):
+        query = query.where(Sequence.channel == channel)
     if search:
         query = query.where(Sequence.name.ilike(f"%{search}%"))
 
@@ -110,13 +120,17 @@ async def create_sequence(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Create a validated sequence with per-step SMS content."""
+    """Create a validated sequence with per-step SMS or email content."""
     try:
-        steps = await validate_sequence_steps(db, data.steps)
+        steps = await validate_sequence_steps(db, data.steps, channel=data.channel)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    sequence = Sequence(name=data.name.strip(), description=data.description)
+    sequence = Sequence(
+        name=data.name.strip(),
+        description=data.description,
+        channel=data.channel,
+    )
     db.add(sequence)
     await db.flush()
 
@@ -130,6 +144,8 @@ async def create_sequence(
                 config=step_data.config,
                 wait_duration_hours=step_data.wait_duration_hours,
                 template_id=step_data.template_id,
+                subject=step_data.subject,
+                email_account_id=step_data.email_account_id,
                 condition_type=step_data.condition_type,
                 condition_value=step_data.condition_value,
                 true_branch_step_order=step_data.true_branch_step_order,
@@ -161,9 +177,30 @@ async def update_sequence(
     if "description" in data.model_fields_set:
         sequence.description = data.description
 
+    # Channel changes are allowed only while nothing is running: a live
+    # campaign snapshot says "send_sms", and flipping the channel would leave
+    # it pointing at steps the other channel cannot execute.
+    if data.channel is not None and data.channel != (sequence.channel or "sms"):
+        running = (
+            await db.execute(
+                select(func.count(Campaign.id)).where(
+                    Campaign.sequence_id == sequence_id,
+                    Campaign.status.in_(("running", "scheduled", "paused")),
+                )
+            )
+        ).scalar() or 0
+        if running:
+            raise HTTPException(
+                status_code=409,
+                detail="This sequence is used by a live campaign. Duplicate it to change its channel.",
+            )
+        sequence.channel = data.channel
+
     if data.steps is not None:
         try:
-            steps = await validate_sequence_steps(db, data.steps)
+            steps = await validate_sequence_steps(
+                db, data.steps, channel=(sequence.channel or "sms")
+            )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -188,6 +225,8 @@ async def update_sequence(
                     config=step_data.config,
                     wait_duration_hours=step_data.wait_duration_hours,
                     template_id=step_data.template_id,
+                    subject=step_data.subject,
+                    email_account_id=step_data.email_account_id,
                     condition_type=step_data.condition_type,
                     condition_value=step_data.condition_value,
                     true_branch_step_order=step_data.true_branch_step_order,

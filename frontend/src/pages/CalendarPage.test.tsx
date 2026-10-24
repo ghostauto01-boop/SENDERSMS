@@ -94,7 +94,7 @@ describe("CalendarPage", () => {
     await waitFor(() => expect(screen.getByText("Book a meeting")).toBeInTheDocument());
     // Booking form essentials: contacts, SMS invite, reminders.
     expect(screen.getByText(/contacts \*/i)).toBeInTheDocument();
-    expect(screen.getByText("SMS invite & reminders")).toBeInTheDocument();
+    expect(screen.getByText("SMS & email invite + reminders")).toBeInTheDocument();
   });
 
   it("opens a meeting for editing when its chip is clicked", async () => {

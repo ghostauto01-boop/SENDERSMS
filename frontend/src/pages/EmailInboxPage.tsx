@@ -13,11 +13,16 @@ import {
   Globe,
   Inbox,
   Mail,
+  Mailbox,
   MailOpen,
   MapPin,
   MessageCircle,
+  Maximize2,
+  Minimize2,
+  Menu,
   MousePointerClick,
   Paperclip,
+  PenSquare,
   Phone,
   RefreshCw,
   Reply,
@@ -31,7 +36,14 @@ import {
   XCircle,
 } from "lucide-react";
 import api from "../api/client";
-import emailApi, { EmailContactDetails, EmailConversation, EmailMessage } from "../api/email";
+import BrandMark from "../components/BrandMark";
+import EmailComposeWindow from "../components/EmailComposeWindow";
+import emailApi, {
+  EmailContactDetails,
+  EmailConversation,
+  EmailMessage,
+  EmailSender,
+} from "../api/email";
 import MeetingModal from "../components/MeetingModal";
 import RichEmailEditor, { AttachmentPayload } from "../components/RichEmailEditor";
 import { openWebsite, openWhatsappChat, openWhatsappForCall, startCall, websiteUrl } from "../utils/call";
@@ -367,9 +379,14 @@ export default function EmailInboxPage() {
   const [showCc, setShowCc] = useState(false);
   const [sending, setSending] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
+  /** Gmail's "full screen": the mail app covers the window, app chrome and all. */
+  const [focus, setFocus] = useState(false);
+  /** The folder rail, opened as a drawer on screens too narrow to pin it. */
+  const [railOpen, setRailOpen] = useState(false);
+  const [composing, setComposing] = useState(false);
   /** Multi-inbox: "" = every sender, otherwise one unified sender id. */
   const [senderFilter, setSenderFilter] = useState("");
-  const [senders, setSenders] = useState<{ id: number; name: string; from_email: string; sender_type?: string }[]>([]);
+  const [senders, setSenders] = useState<EmailSender[]>([]);
   const [showContactInfo, setShowContactInfo] = useState(false);
   const [showBooking, setShowBooking] = useState(false);
   const [editingMeetingId, setEditingMeetingId] = useState<number | null>(null);
@@ -513,6 +530,26 @@ export default function EmailInboxPage() {
     if (detail) bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [detail]);
 
+  // Gmail muscle memory: "c" for a new message, Escape to leave full screen.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const typing =
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable);
+      if (typing || composing) return;
+      if (event.key.toLowerCase() === "c" && !event.metaKey && !event.ctrlKey) {
+        event.preventDefault();
+        setComposing(true);
+      }
+      if (event.key === "Escape" && focus) setFocus(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [focus, composing]);
+
   const sendReply = async () => {
     if (!reply.trim() || !openId) return;
     setSending(true);
@@ -587,141 +624,292 @@ export default function EmailInboxPage() {
   const contactHasPhone = hasSmsPhone(contact?.phone_number);
 
   return (
-    <div className="email-inbox max-w-7xl mx-auto rounded-2xl">
-      {/* ---------- Header: title, count, mailbox links ---------- */}
-      <div className={`flex flex-wrap items-start justify-between gap-3 mb-4 ${openId ? "hidden lg:flex" : ""}`}>
-        <div className="min-w-0">
-          <p className="text-xs font-semibold tracking-wide text-primary-600 dark:text-primary-400 flex items-center gap-1.5">
-            <Mail size={14} /> EMAIL CHANNEL
-          </p>
-          <h1 className="page-title mt-1">{view === "replied" ? "Conversations" : "Inbox"}</h1>
-          <p className="page-subtitle">
-            {loading
-              ? "Loading threads…"
-              : view === "replied"
-              ? `${conversations.length} of ${repliedTotal ?? conversations.length} people who wrote back — everyone here is a live conversation`
-              : unreadTotal > 0
-              ? `${unreadTotal} unread · ${conversations.length} thread${conversations.length === 1 ? "" : "s"}`
-              : `You are all caught up · ${conversations.length} thread${conversations.length === 1 ? "" : "s"}`}
-          </p>
+    <div
+      className={`email-inbox flex flex-col overflow-hidden bg-white dark:bg-gray-900 ${
+        focus
+          // `inset-0` rather than `w-screen`: 100vw includes the scrollbar, so a
+          // full-screen pane would be a few pixels too wide and jitter.
+          ? "fixed inset-0 z-[70] h-[100dvh]"
+          : "h-[calc(100dvh-7.5rem)] lg:h-full"
+      }`}
+    >
+      {/* ---------- Top bar — Gmail's toolbar: search first, actions right ---------- */}
+      <div className="shrink-0 flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 h-14 border-b border-gray-200/80 dark:border-gray-700/70">
+        <button
+          className="xl:hidden icon-btn shrink-0"
+          onClick={() => setRailOpen(true)}
+          aria-label="Open mail menu"
+        >
+          <Menu size={18} />
+        </button>
+
+        <div className="hidden sm:flex items-center gap-2 pr-1 shrink-0">
+          <BrandMark className="w-8 h-8 rounded-[11px]" />
+          <span className="hidden md:inline font-semibold text-[17px] tracking-[-0.04em] text-primary-950 dark:text-white">
+            Mail
+          </span>
         </div>
-        <div className="flex gap-2">
-          <Link to="/email-manager" className="btn-secondary btn-sm">
-            <Sparkles size={14} /> Senders &amp; tracking
-          </Link>
-          <Link to="/inbox" className="btn-secondary btn-sm">
-            SMS Inbox
+
+        <div className="relative flex-1 min-w-0 max-w-[760px] mx-auto">
+          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          <input
+            ref={searchRef}
+            type="search"
+            className="w-full h-10 pl-10 pr-9 rounded-full border border-gray-200 dark:border-gray-700 bg-gray-100/80 dark:bg-gray-800 text-sm
+                       placeholder:text-gray-500 focus:bg-white dark:focus:bg-gray-900 focus:border-primary-300 dark:focus:border-primary-700
+                       outline-none transition-colors"
+            placeholder="Search mail — person, subject, text…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            aria-label="Search email threads"
+          />
+          {search && (
+            <button
+              onClick={() => {
+                setSearch("");
+                searchRef.current?.focus();
+              }}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+              aria-label="Clear search"
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
+
+        <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
+          <button
+            className="icon-btn"
+            onClick={() => load()}
+            title="Refresh"
+            aria-label="Refresh threads"
+          >
+            <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+          </button>
+          <button
+            className="icon-btn"
+            onClick={() => setFocus((v) => !v)}
+            title={focus ? "Leave full screen" : "Full screen"}
+            aria-label={focus ? "Leave full screen" : "Full screen"}
+          >
+            {focus ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+          </button>
+          <Link to="/email-manager" className="hidden md:inline-flex btn-secondary btn-sm" title="Senders & tracking">
+            <Sparkles size={14} /> Senders
           </Link>
         </div>
       </div>
 
-      {/* ---------- The two pages of the email inbox ----------
-          All mail is everything that happened; Conversations is only the people
-          who replied, which is the list you actually work from. Both are the
-          same screen with one filter, so a thread you open keeps its place. */}
-      <div className={`mb-4 ${openId ? "hidden lg:block" : ""}`}>
-        <div className="inline-flex gap-1 p-1 rounded-xl bg-gray-100 dark:bg-gray-700/70 w-full sm:w-auto">
-          {([
-            {
-              key: "all" as const,
-              label: "All mail",
-              count: threadTotal,
-              icon: Inbox,
-              title: "Every email thread, including the ones nobody answered",
-            },
-            {
-              key: "replied" as const,
-              label: "Conversations",
-              count: repliedTotal,
-              icon: MessageCircle,
-              title: "Only people who replied — the conversations you are in",
-            },
-          ]).map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setView(tab.key)}
-              title={tab.title}
-              aria-pressed={view === tab.key}
-              className={`flex-1 sm:flex-none px-3.5 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5 ${
-                view === tab.key
-                  ? "bg-white dark:bg-gray-800 shadow-sm text-primary-600"
-                  : "text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
-              }`}
-            >
-              <tab.icon size={14} />
-              {tab.label}
-              {tab.count !== null && tab.count !== undefined && (
-                <span
-                  className={`text-[11px] px-1.5 rounded-full ${
-                    view === tab.key
-                      ? "bg-primary-100 text-primary-700 dark:bg-primary-950/70 dark:text-primary-300"
-                      : "bg-gray-200 text-gray-600 dark:bg-gray-600 dark:text-gray-200"
-                  }`}
-                >
-                  {tab.count}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-        {view === "replied" && (
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-            Only people who wrote back are on this page. Campaign mail nobody answered is still on
-            the All mail tab —{" "}
-            <button className="text-primary-600 hover:underline" onClick={() => setView("all")}>
-              see every thread
-            </button>
-            .
-          </p>
+      <div className="flex flex-1 min-h-0">
+        {/* ---------- Folder rail — compose, inboxes, the way out ---------- */}
+        {railOpen && (
+          <div
+            className="fixed inset-0 z-40 bg-primary-950/35 backdrop-blur-sm xl:hidden animate-fade-in"
+            onClick={() => setRailOpen(false)}
+          />
         )}
-        {(campaignFilter || contactFilter) && (
-          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs rounded-xl border border-primary-200 dark:border-primary-900 bg-primary-50 dark:bg-primary-950/30 px-3 py-2">
-            <span className="text-primary-700 dark:text-primary-300 font-medium">
-              {contactFilter
-                ? "Showing one person's thread"
-                : `Showing the threads from campaign #${campaignFilter}`}
+        <aside
+          className={`
+            w-[262px] shrink-0 flex-col border-r border-gray-200/80 dark:border-gray-700/70
+            bg-gray-50/80 dark:bg-gray-900/60
+            ${
+              railOpen
+                ? "fixed inset-y-0 left-0 z-50 flex bg-white dark:bg-gray-900 shadow-pop animate-fade-left"
+                : "hidden xl:flex"
+            }
+          `}
+        >
+          <div className="flex items-center justify-between px-4 pt-4 pb-2 xl:hidden">
+            <span className="flex items-center gap-2">
+              <BrandMark className="w-8 h-8 rounded-[11px]" />
+              <span className="font-semibold text-[17px] tracking-[-0.04em] text-primary-950 dark:text-white">Mail</span>
             </span>
-            <span className="text-gray-500 dark:text-gray-400">
-              {conversations.length} shown{view === "replied" ? " · only the ones who replied" : ""}
-            </span>
-            <button onClick={clearScope} className="chip ml-auto">
-              <X size={12} /> Show every thread
+            <button className="icon-btn" onClick={() => setRailOpen(false)} aria-label="Close mail menu">
+              <X size={17} />
             </button>
           </div>
-        )}
-      </div>
 
-      <div className="grid lg:grid-cols-[22rem_1fr] gap-4">
-        {/* ---------- Thread list ---------- */}
-        <section
-          className={`card p-0 overflow-hidden lg:h-[calc(100dvh-11rem)] flex-col ${
-            openId ? "hidden lg:flex" : "flex"
-          }`}
-        >
-          <div className="p-3 border-b border-gray-100 dark:border-gray-700/70 space-y-2">
-            <div className="relative">
-              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                ref={searchRef}
-                className="input pl-9 pr-9"
-                placeholder="Search people, subject, text…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                aria-label="Search email threads"
-              />
-              {search && (
+          <div className="px-3 pt-3 pb-2">
+            <button
+              type="button"
+              onClick={() => {
+                setComposing(true);
+                setRailOpen(false);
+              }}
+              className="btn-primary w-full justify-center shadow-sm"
+            >
+              <PenSquare size={16} /> Compose
+            </button>
+          </div>
+
+          <nav className="flex-1 overflow-y-auto scrollbar-none px-2 pb-3 space-y-5 text-sm" aria-label="Mailboxes">
+            <div>
+              <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500">
+                Inboxes
+              </p>
+              <button
+                type="button"
+                onClick={() => setSenderFilter("")}
+                className={`nav-item w-full ${senderFilter === "" ? "nav-item-active" : ""}`}
+              >
+                <Mailbox size={16} />
+                <span className="flex-1 truncate text-left">All inboxes</span>
+                {unreadTotal > 0 && <span className="nav-badge">{unreadTotal}</span>}
+              </button>
+              {senders.map((s) => (
                 <button
-                  onClick={() => {
-                    setSearch("");
-                    searchRef.current?.focus();
-                  }}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-gray-400 hover:text-gray-600"
-                  aria-label="Clear search"
+                  key={s.id}
+                  type="button"
+                  onClick={() => setSenderFilter(String(s.id))}
+                  className={`nav-item w-full ${senderFilter === String(s.id) ? "nav-item-active" : ""}`}
+                  title={`${s.name} — ${s.from_email}`}
                 >
-                  <X size={14} />
+                  <span className="w-5 h-5 rounded-full bg-primary-100 dark:bg-primary-950/70 text-primary-700 dark:text-primary-300 flex items-center justify-center text-[9px] font-bold shrink-0">
+                    {(s.name || s.from_email || "?").slice(0, 1).toUpperCase()}
+                  </span>
+                  <span className="flex-1 min-w-0 text-left">
+                    <span className="block truncate">{s.name || s.from_email}</span>
+                    <span className="block text-[10px] text-gray-400 truncate">{s.from_email}</span>
+                  </span>
                 </button>
+              ))}
+              {senders.length === 0 && (
+                <p className="px-3 py-2 text-xs text-gray-400">
+                  No sender yet.{" "}
+                  <Link to="/email-manager" className="text-primary-600 hover:underline">
+                    Connect one
+                  </Link>
+                </p>
               )}
             </div>
+
+            <div>
+              <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500">
+                Workspace
+              </p>
+              {[
+                { to: "/dashboard", label: "Dashboard" },
+                { to: "/email-manager", label: "Email Manager" },
+                { to: "/sms-inbox", label: "SMS Inbox" },
+                { to: "/sequences", label: "Sequences" },
+                { to: "/automations", label: "Automations" },
+                { to: "/templates", label: "Templates" },
+                { to: "/analytics", label: "Analytics" },
+                { to: "/settings", label: "Settings" },
+              ].map((item) => (
+                <Link key={item.to} to={item.to} className="nav-item w-full">
+                  <ArrowUpRight size={14} className="opacity-60" />
+                  <span className="flex-1 truncate text-left">{item.label}</span>
+                </Link>
+              ))}
+            </div>
+          </nav>
+
+          <div className="p-3 border-t border-gray-200/80 dark:border-gray-700/70">
+            <p className="text-[11px] leading-relaxed text-gray-400">
+              Opens and clicks come from Brevo. Replies go out from the sender this thread started on.
+            </p>
+          </div>
+        </aside>
+
+        {/* ---------- Thread list ---------- */}
+        <section
+          className={`flex-col min-h-0 w-full lg:w-[400px] xl:w-[440px] shrink-0 border-r border-gray-200/80 dark:border-gray-700/70 ${
+            openId ? (focus ? "hidden" : "hidden lg:flex") : "flex"
+          }`}
+        >
+          {/* List header — the two pages, the scope, and who is talking. */}
+          <div className="shrink-0 px-3 pt-2.5 pb-2 border-b border-gray-200/80 dark:border-gray-700/70 space-y-2 bg-white/90 dark:bg-gray-900/90 backdrop-blur">
+            <div className="flex items-end justify-between gap-2">
+              <div className="min-w-0">
+                <h1 className="text-[19px] leading-tight font-semibold text-primary-950 dark:text-white">
+                  {view === "replied" ? "Conversations" : "Inbox"}
+                </h1>
+                <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
+                  {loading
+                    ? "Loading threads…"
+                    : view === "replied"
+                    ? `${conversations.length} of ${repliedTotal ?? conversations.length} people who wrote back`
+                    : unreadTotal > 0
+                    ? `${unreadTotal} unread · ${conversations.length} thread${conversations.length === 1 ? "" : "s"}`
+                    : `All caught up · ${conversations.length} thread${conversations.length === 1 ? "" : "s"}`}
+                </p>
+              </div>
+              <span className="badge-blue shrink-0 mb-0.5">
+                <Mail size={11} /> {threadTotal ?? conversations.length}
+              </span>
+            </div>
+
+            {/* The two pages of the email inbox: everything, and the people who
+                wrote back. One filter, so a thread keeps its place. */}
+            <div className="inline-flex gap-1 p-1 rounded-xl bg-gray-100 dark:bg-gray-800 w-full">
+              {([
+                {
+                  key: "all" as const,
+                  label: "All mail",
+                  count: threadTotal,
+                  icon: Inbox,
+                  title: "Every email thread, including the ones nobody answered",
+                },
+                {
+                  key: "replied" as const,
+                  label: "Conversations",
+                  count: repliedTotal,
+                  icon: MessageCircle,
+                  title: "Only people who replied — the conversations you are in",
+                },
+              ]).map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => setView(tab.key)}
+                  title={tab.title}
+                  aria-pressed={view === tab.key}
+                  className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 ${
+                    view === tab.key
+                      ? "bg-white dark:bg-gray-700 shadow-sm text-primary-700 dark:text-primary-300"
+                      : "text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+                  }`}
+                >
+                  <tab.icon size={13} />
+                  {tab.label}
+                  {tab.count !== null && tab.count !== undefined && (
+                    <span
+                      className={`text-[10px] px-1.5 rounded-full ${
+                        view === tab.key
+                          ? "bg-primary-100 text-primary-700 dark:bg-primary-950/70 dark:text-primary-300"
+                          : "bg-gray-200 text-gray-600 dark:bg-gray-600 dark:text-gray-200"
+                      }`}
+                    >
+                      {tab.count}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            {(campaignFilter || contactFilter) && (
+              <div className="flex flex-wrap items-center gap-2 text-xs rounded-xl border border-primary-200 dark:border-primary-900 bg-primary-50 dark:bg-primary-950/30 px-2.5 py-1.5">
+                <span className="text-primary-700 dark:text-primary-300 font-medium">
+                  {contactFilter
+                    ? "Showing one person's thread"
+                    : `Showing the threads from campaign #${campaignFilter}`}
+                </span>
+                <span className="text-gray-500 dark:text-gray-400">
+                  {conversations.length} shown{view === "replied" ? " · only the ones who replied" : ""}
+                </span>
+                <button onClick={clearScope} className="chip ml-auto">
+                  <X size={12} /> Show every thread
+                </button>
+              </div>
+            )}
+            {view === "replied" && !campaignFilter && !contactFilter && (
+              <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                Only people who wrote back.{" "}
+                <button className="text-primary-600 hover:underline" onClick={() => setView("all")}>
+                  See every thread
+                </button>
+              </p>
+            )}
 
             {senders.length > 1 && (
               <select
@@ -776,18 +964,10 @@ export default function EmailInboxPage() {
                   {f.label}
                 </button>
               ))}
-              <button
-                className="ml-auto p-1.5 rounded-lg text-gray-400 hover:text-primary-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                onClick={() => load()}
-                title="Refresh"
-                aria-label="Refresh threads"
-              >
-                <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-              </button>
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto divide-y divide-gray-50 dark:divide-gray-700/50 stagger">
+          <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-gray-100/80 dark:divide-gray-700/50 wa-scrollbar stagger">
             {loading && conversations.length === 0 ? (
               <div className="p-3 space-y-3">
                 {[0, 1, 2, 3, 4].map((i) => (
@@ -891,10 +1071,10 @@ export default function EmailInboxPage() {
           </div>
         </section>
 
-        {/* ---------- Reading pane ---------- */}
+        {/* ---------- Reading pane — the whole point: as much email as fits ---------- */}
         <section
-          className={`card p-0 overflow-hidden lg:h-[calc(100dvh-11rem)] flex-col ${
-            openId ? "flex" : "hidden lg:flex"
+          className={`flex-1 min-w-0 min-h-0 flex-col bg-white dark:bg-gray-900 ${
+            openId || focus ? "flex" : "hidden lg:flex"
           }`}
         >
           {!openId ? (
@@ -920,7 +1100,7 @@ export default function EmailInboxPage() {
               <div className="p-3 sm:p-4 border-b border-gray-100 dark:border-gray-700/70 space-y-2">
                 <div className="flex items-start gap-2">
                   <button
-                    className="lg:hidden p-2 -ml-1 rounded-xl text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 shrink-0"
+                    className={`${focus ? "flex" : "lg:hidden"} p-2 -ml-1 rounded-xl text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 shrink-0`}
                     onClick={closeThread}
                     aria-label="Back to threads"
                   >
@@ -941,6 +1121,15 @@ export default function EmailInboxPage() {
                     </p>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      className="icon-btn"
+                      onClick={() => setFocus((v) => !v)}
+                      title={focus ? "Leave full screen" : "Full screen"}
+                      aria-label={focus ? "Leave full screen" : "Full screen"}
+                    >
+                      {focus ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+                    </button>
                     <select
                       className="input py-1.5 text-sm w-auto max-w-[9.5rem]"
                       value={detail.conversation.status}
@@ -1204,11 +1393,29 @@ export default function EmailInboxPage() {
         </section>
       </div>
 
-      <p className="text-xs text-gray-400 mt-3 flex items-center gap-1.5">
+      <p className="hidden lg:flex shrink-0 items-center gap-1.5 border-t border-gray-200/80 dark:border-gray-700/70 px-4 py-1.5 text-[11px] text-gray-400">
         <ArrowUpRight size={12} /> Opens and clicks are recorded by Brevo; when a Gmail mailbox is
         connected under Email Manager → Replies, replies are sent from that mailbox so they thread
         correctly in the prospect's Gmail.
       </p>
+
+      {/* Compose: the rail button on a desktop, a thumb button on a phone. */}
+      <button
+        type="button"
+        onClick={() => setComposing(true)}
+        className="xl:hidden fixed bottom-20 right-4 z-30 h-14 px-5 rounded-full bg-primary-900 text-white shadow-pop
+                   flex items-center gap-2 text-sm font-semibold active:scale-95 transition-transform"
+      >
+        <PenSquare size={17} /> Compose
+      </button>
+
+      {composing && (
+        <EmailComposeWindow
+          senders={senders}
+          onClose={() => setComposing(false)}
+          onSent={() => load({ quiet: true })}
+        />
+      )}
 
       {showBooking && contact && (
         <MeetingModal
@@ -1217,6 +1424,8 @@ export default function EmailInboxPage() {
             conversationId: openId || undefined,
             sendInvite: contactHasPhone,
             sendReminder: contactHasPhone,
+            sendInviteEmail: Boolean(contact.email),
+            sendReminderEmail: Boolean(contact.email),
           }}
           onClose={() => setShowBooking(false)}
           onSaved={() => {

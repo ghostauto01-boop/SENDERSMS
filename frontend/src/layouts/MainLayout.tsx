@@ -79,12 +79,16 @@ const GENERAL: NavItem[] = [
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
-//: Thumb-bar destinations. Six is the most that stays comfortable on a phone.
+//: Thumb-bar destinations. Email is a first-class channel now, so it earns a
+//: permanent slot: on a phone the drawer is a two-tap detour away from the mail
+//: people open twenty times a day. Seven columns still leaves every target
+//: wider than the 44px a fingertip needs, even on a 320px screen.
 const TAB_BAR: NavItem[] = [
   { to: "/dashboard", label: "Home", icon: LayoutDashboard },
-  { to: "/invoices", label: "Invoices", icon: ReceiptText },
   { to: "/send", label: "Send", icon: Send },
   { to: "/inbox", label: "SMS", icon: Inbox },
+  { to: "/email-inbox", label: "Mail", icon: MailOpen },
+  { to: "/invoices", label: "Invoices", icon: ReceiptText },
   { to: "/contacts", label: "Contacts", icon: Users },
 ];
 
@@ -165,6 +169,17 @@ export default function MainLayout() {
   }, [location.pathname, location.search, allItems]);
 
   const isActive = (to: string) => to === activeItem;
+
+  /**
+   * Some screens are an app of their own and must own the whole window.
+   *
+   * The email inbox is Gmail-shaped: a toolbar, a folder rail, a thread list and
+   * a reading pane with their own scroll areas. Giving it the shell's page
+   * padding (and its centred `max-w-7xl` column) squeezed the reading pane into a
+   * letterbox — the exact bug people reported as "I cannot read an email full
+   * screen". Full-bleed hands it every pixel under the header instead.
+   */
+  const fullBleed = location.pathname === "/email-inbox";
 
   const groups = useMemo(
     () => [
@@ -334,7 +349,13 @@ export default function MainLayout() {
           <main
             id="workspace-main"
             key={location.pathname}
-            className="flex-1 min-w-0 px-3 sm:px-4 lg:px-6 pt-4 lg:pt-5 pb-tabbar page-enter lg:overflow-y-auto wa-scrollbar"
+            className={
+              fullBleed
+                ? // No padding, no scroll container of its own: the page manages
+                  // its panes (and their scrollbars) itself.
+                  "flex-1 min-w-0 flex flex-col page-enter overflow-hidden"
+                : "flex-1 min-w-0 px-3 sm:px-4 lg:px-6 pt-4 lg:pt-5 pb-tabbar page-enter lg:overflow-y-auto wa-scrollbar"
+            }
           >
             <Outlet />
           </main>
@@ -346,7 +367,7 @@ export default function MainLayout() {
         className="fixed bottom-0 left-0 right-0 z-40 lg:hidden bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border-t border-gray-200/70 dark:border-gray-700/70 safe-bottom"
         aria-label="Primary"
       >
-        <div className="grid grid-cols-6">
+        <div className="grid grid-cols-7">
           {TAB_BAR.map((item) => {
             const aliases: Record<string, string> = { "/inbox": "/sms-inbox" };
             const path = aliases[location.pathname] || location.pathname;
@@ -368,7 +389,9 @@ export default function MainLayout() {
                 >
                   <item.icon size={18} strokeWidth={active ? 2.2 : 1.8} />
                 </span>
-                <span className="text-[10px] font-medium">{item.label}</span>
+                <span className="text-[10px] font-medium leading-none truncate max-w-full px-0.5">
+                  {item.label}
+                </span>
               </Link>
             );
           })}
@@ -379,7 +402,7 @@ export default function MainLayout() {
             <span className="px-3 py-1">
               <MoreHorizontal size={18} strokeWidth={1.8} />
             </span>
-            <span className="text-[10px] font-medium">More</span>
+            <span className="text-[10px] font-medium leading-none">More</span>
           </button>
         </div>
       </nav>

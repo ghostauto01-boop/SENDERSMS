@@ -142,6 +142,10 @@ export interface SequenceStep {
   config: string | null;
   wait_duration_hours: number | null;
   template_id: number | null;
+  /** Email steps: the subject line for this step. */
+  subject?: string | null;
+  /** Email steps: sender override (Brevo id positive, Gmail mailbox negative). */
+  email_account_id?: number | null;
   condition_type: string | null;
   condition_value: string | null;
   true_branch_step_order: number | null;
@@ -152,6 +156,8 @@ export interface SequenceData {
   id: number;
   name: string;
   description: string | null;
+  /** "sms" or "email" — a sequence only ever runs on one channel. */
+  channel?: "sms" | "email";
   current_version: number;
   is_active: boolean;
   steps: SequenceStep[];
@@ -589,10 +595,18 @@ export interface Meeting {
   campaign_id: number | null;
   tags: string[];
   send_invite_sms: boolean;
+  /** Email the invite as well (independent of the SMS flag). */
+  send_invite_email?: boolean;
+  invite_subject?: string | null;
+  email_account_id?: number | null;
   invite_template_id: number | null;
   invite_body: string | null;
   invite_sent: boolean;
+  invite_email_sent?: boolean;
   send_sms_reminder: boolean;
+  /** Email the reminders as well. */
+  send_email_reminder?: boolean;
+  reminder_subject?: string | null;
   reminder_minutes: number[];
   reminder_template_id: number | null;
   reminder_body: string | null;

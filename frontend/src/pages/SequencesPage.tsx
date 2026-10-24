@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
 import api from "../api/client";
+import emailApi, { EmailSender } from "../api/email";
+import { useChannel } from "../hooks/useChannel";
+import ChannelSwitch from "../components/ChannelSwitch";
 import { SequenceData, SequenceStep } from "../types";
 import toast from "react-hot-toast";
 import {
@@ -9,6 +12,7 @@ import {
   Edit2,
   GitBranch,
   HelpCircle,
+  Mail,
   Plus,
   Send,
   StopCircle,
@@ -16,13 +20,24 @@ import {
   X,
 } from "lucide-react";
 
-type StepType = "send_sms" | "wait" | "condition" | "stop";
+/**
+ * SEQUENCES — multi-step automation, on both channels.
+ *
+ * A sequence is channel-scoped exactly like a campaign: an email sequence
+ * sends email steps (each with its own subject), an SMS sequence sends SMS
+ * steps. The builder renders the steps for the channel you are looking at, and
+ * the server refuses a sequence whose steps belong to the other channel, so the
+ * two can never be mixed by accident.
+ */
+type StepType = "send_sms" | "send_email" | "wait" | "condition" | "stop";
 type MessageMode = "write" | "template";
 
 interface TemplateChoice {
   id: number;
   name: string;
   body: string;
+  subject?: string | null;
+  channel?: string;
   is_active: boolean;
 }
 
@@ -32,27 +47,39 @@ interface BuilderStep {
   message_mode: MessageMode;
   message_body: string;
   template_id: string;
+  /** Email only: the line in the inbox. Required for a send_email step. */
+  subject: string;
+  /** Email only: "" = the default sender. */
+  email_account_id: string;
   condition_type: string;
   true_branch_step_order: string;
   false_branch_step_order: string;
 }
 
-const blankStep = (step_type: StepType = "send_sms"): BuilderStep => ({
+const sendStepType = (channel: "sms" | "email") =>
+  channel === "email" ? "send_email" : "send_sms";
+
+const blankStep = (
+  step_type: StepType = "send_sms",
+  channel: "sms" | "email" = "sms"
+): BuilderStep => ({
   step_type,
   wait_duration_hours: 24,
   message_mode: "write",
   message_body: "",
   template_id: "",
+  subject: "",
+  email_account_id: "",
   condition_type: "contact_replied",
   true_branch_step_order: "",
   false_branch_step_order: "",
 });
 
-const defaultSteps = (): BuilderStep[] => [
-  blankStep("send_sms"),
-  blankStep("wait"),
-  blankStep("send_sms"),
-  blankStep("stop"),
+const defaultSteps = (channel: "sms" | "email" = "sms"): BuilderStep[] => [
+  blankStep(sendStepType(channel), channel),
+  blankStep("wait", channel),
+  blankStep(sendStepType(channel), channel),
+  blankStep("stop", channel),
 ];
 
 const readMessageBody = (config: string | null | undefined) => {
@@ -71,6 +98,8 @@ const fromApiStep = (step: SequenceStep): BuilderStep => ({
   message_mode: step.template_id ? "template" : "write",
   message_body: readMessageBody(step.config),
   template_id: step.template_id ? String(step.template_id) : "",
+  subject: (step as any).subject || "",
+  email_account_id: (step as any).email_account_id == null ? "" : String((step as any).email_account_id),
   condition_type: step.condition_type || "contact_replied",
   true_branch_step_order: step.true_branch_step_order == null ? "" : String(step.true_branch_step_order),
   false_branch_step_order: step.false_branch_step_order == null ? "" : String(step.false_branch_step_order),
@@ -79,6 +108,7 @@ const fromApiStep = (step: SequenceStep): BuilderStep => ({
 const stepIcon = (type: string) => {
   switch (type) {
     case "send_sms": return <Send size={14} className="text-primary-500" />;
+    case "send_email": return <Mail size={14} className="text-primary-500" />;
     case "wait": return <Clock size={14} className="text-warning-500" />;
     case "condition": return <HelpCircle size={14} className="text-primary-500" />;
     case "stop": return <StopCircle size={14} className="text-danger-500" />;
@@ -87,9 +117,12 @@ const stepIcon = (type: string) => {
 };
 
 const stepSummary = (step: SequenceStep) => {
-  if (step.step_type === "send_sms") {
+  if (step.step_type === "send_sms" || step.step_type === "send_email") {
     if (step.template_id) return `Template #${step.template_id}`;
     const body = readMessageBody(step.config);
+    if (step.step_type === "send_email" && (step as any).subject) {
+      return `${(step as any).subject}${body ? ` — ${body}` : ""}`;
+    }
     return body || "No message";
   }
   if (step.step_type === "wait") return `${step.wait_duration_hours || 24} hours`;
@@ -98,19 +131,23 @@ const stepSummary = (step: SequenceStep) => {
 };
 
 export default function SequencesPage() {
+  const { channel } = useChannel();
+  const isEmail = channel === "email";
   const [sequences, setSequences] = useState<SequenceData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<SequenceData | null>(null);
 
-  useEffect(() => { loadSequences(); }, []);
+  useEffect(() => { loadSequences(); }, [channel]);
 
   const loadSequences = async () => {
     try {
       setLoading(true);
       setError(null);
-      const { data } = await api.get("/sequences/", { params: { per_page: 100 } });
+      const { data } = await api.get("/sequences/", {
+        params: { per_page: 100, channel },
+      });
       setSequences(data.items);
     } catch (err: any) {
       setError(err.response?.data?.detail || "Failed to load sequences");
@@ -148,14 +185,20 @@ export default function SequencesPage() {
 
   return (
     <div className="space-y-4 pb-20 lg:pb-0">
-      <div className="flex items-center justify-between gap-2 flex-wrap">
+      <div className="flex items-start justify-between gap-2 flex-wrap">
         <div>
           <h1 className="page-title">Sequences</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Automate messages and create visible follow-ups between steps.</p>
+          <p className="text-sm text-gray-500 mt-0.5">
+            Automate {isEmail ? "emails" : "messages"} and create visible follow-ups between steps.
+            {isEmail ? " Every step has its own subject line." : ""}
+          </p>
         </div>
-        <button onClick={() => setShowCreate(true)} className="btn-primary btn-sm">
-          <Plus size={14} className="mr-1" /> New Sequence
-        </button>
+        <div className="flex items-center gap-2 ml-auto">
+          <ChannelSwitch size="sm" />
+          <button onClick={() => setShowCreate(true)} className="btn-primary btn-sm">
+            <Plus size={14} className="mr-1" /> New {isEmail ? "email " : ""}sequence
+          </button>
+        </div>
       </div>
 
       <div className="space-y-4">
@@ -169,7 +212,7 @@ export default function SequencesPage() {
         ) : sequences.length === 0 ? (
           <div className="card p-12 text-center text-gray-500">
             <GitBranch size={48} className="mx-auto mb-2 opacity-30" />
-            <p>No sequences yet. Build an automated SMS sequence.</p>
+            <p>No {isEmail ? "email " : ""}sequences yet. Build an automated {isEmail ? "email" : "SMS"} sequence.</p>
             <button onClick={() => setShowCreate(true)} className="btn-primary btn-sm mt-3"><Plus size={14} className="mr-1" /> Build sequence</button>
           </div>
         ) : (
@@ -179,7 +222,8 @@ export default function SequencesPage() {
                 <div className="flex-1 min-w-0">
                   <h3 className="font-semibold text-lg truncate">{sequence.name}</h3>
                   {sequence.description && <p className="text-sm text-gray-500 mt-1">{sequence.description}</p>}
-                  <p className="text-xs text-gray-400 mt-1">
+                  <p className="text-xs text-gray-400 mt-1 flex items-center gap-1.5 flex-wrap">
+                    <span className="badge-gray capitalize">{(sequence as any).channel || "sms"}</span>
                     Version {sequence.current_version} · {sequence.steps?.length || 0} steps
                   </p>
                 </div>
@@ -211,33 +255,70 @@ export default function SequencesPage() {
       </div>
 
       {(showCreate || editing) && (
-        <SequenceBuilderModal sequence={editing} onClose={closeBuilder} />
+        <SequenceBuilderModal
+          sequence={editing}
+          channel={((editing as any)?.channel as "sms" | "email") || channel}
+          onClose={closeBuilder}
+        />
       )}
     </div>
   );
 }
 
-function SequenceBuilderModal({ sequence, onClose }: { sequence: SequenceData | null; onClose: () => void }) {
+function SequenceBuilderModal({
+  sequence,
+  channel,
+  onClose,
+}: {
+  sequence: SequenceData | null;
+  channel: "sms" | "email";
+  onClose: () => void;
+}) {
   const editing = !!sequence;
+  const isEmail = channel === "email";
+  const sendType = sendStepType(channel);
   const [name, setName] = useState(sequence?.name || "");
   const [description, setDescription] = useState(sequence?.description || "");
   const [steps, setSteps] = useState<BuilderStep[]>(
-    sequence?.steps?.length ? sequence.steps.map(fromApiStep) : defaultSteps()
+    sequence?.steps?.length ? sequence.steps.map(fromApiStep) : defaultSteps(channel)
   );
   const [templates, setTemplates] = useState<TemplateChoice[]>([]);
+  const [senders, setSenders] = useState<EmailSender[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    api.get("/templates/", { params: { per_page: 100 } })
-      .then((response) => setTemplates((response.data.items || []).filter((template: TemplateChoice) => template.is_active)))
+    // Templates are channel-filtered: an email sequence can only pick email
+    // (or "any") templates, so the wrong body can never be attached.
+    api.get("/templates/", { params: { per_page: 100, channel } })
+      .then((response) =>
+        setTemplates(
+          (response.data.items || []).filter(
+            (template: TemplateChoice) =>
+              template.is_active &&
+              (!template.channel || template.channel === "any" || template.channel === channel)
+          )
+        )
+      )
       .catch(() => toast.error("Could not load templates"));
-  }, []);
+  }, [channel]);
+
+  useEffect(() => {
+    if (!isEmail) {
+      setSenders([]);
+      return;
+    }
+    emailApi
+      .listSenders()
+      .then((data) => setSenders((data.items || []).filter((sender) => sender.is_active !== false)))
+      .catch(() => setSenders([]));
+  }, [isEmail]);
 
   const updateStep = (index: number, patch: Partial<BuilderStep>) => {
     setSteps((current) => current.map((step, position) => position === index ? { ...step, ...patch } : step));
   };
 
-  const addStep = () => setSteps((current) => [...current, blankStep("send_sms")]);
+  const addStep = () =>
+    setSteps((current) => [...current, blankStep(sendType, channel)]);
 
   const removeStep = (index: number) => {
     setSteps((current) =>
@@ -261,16 +342,26 @@ function SequenceBuilderModal({ sequence, onClose }: { sequence: SequenceData | 
     event.preventDefault();
     if (!name.trim()) { toast.error("Sequence name is required"); return; }
     if (steps.length === 0) { toast.error("Add at least one step"); return; }
-    if (!steps.some((step) => step.step_type === "send_sms")) { toast.error("Add at least one Send SMS step"); return; }
+    if (!steps.some((step) => step.step_type === sendType)) {
+      toast.error(`Add at least one Send ${isEmail ? "email" : "SMS"} step`);
+      return;
+    }
 
     for (let index = 0; index < steps.length; index += 1) {
       const step = steps[index];
-      if (step.step_type === "send_sms") {
+      if (step.step_type === "send_sms" || step.step_type === "send_email") {
+        if (step.step_type !== sendType) {
+          toast.error(`Step ${index + 1} must be a Send ${isEmail ? "email" : "SMS"} step`);
+          return;
+        }
         if (step.message_mode === "write" && !step.message_body.trim()) {
           toast.error(`Step ${index + 1} needs a message`); return;
         }
         if (step.message_mode === "template" && !step.template_id) {
           toast.error(`Step ${index + 1} needs a template`); return;
+        }
+        if (isEmail && step.message_mode === "write" && !step.subject.trim()) {
+          toast.error(`Step ${index + 1} needs a subject line`); return;
         }
       }
       if (step.step_type === "wait" && step.wait_duration_hours < 1) {
@@ -278,18 +369,24 @@ function SequenceBuilderModal({ sequence, onClose }: { sequence: SequenceData | 
       }
     }
 
+    const isSend = (type: StepType) => type === "send_sms" || type === "send_email";
     const payload = {
       name: name.trim(),
       description: description.trim() || null,
+      channel,
       steps: steps.map((step, index) => ({
         step_order: index,
         step_type: step.step_type,
-        config: step.step_type === "send_sms" && step.message_mode === "write"
+        config: isSend(step.step_type) && step.message_mode === "write"
           ? JSON.stringify({ message_body: step.message_body.trim() })
           : null,
         wait_duration_hours: step.step_type === "wait" ? step.wait_duration_hours : null,
-        template_id: step.step_type === "send_sms" && step.message_mode === "template"
+        template_id: isSend(step.step_type) && step.message_mode === "template"
           ? Number(step.template_id)
+          : null,
+        subject: step.step_type === "send_email" ? step.subject.trim() || null : null,
+        email_account_id: step.step_type === "send_email" && step.email_account_id !== ""
+          ? Number(step.email_account_id)
           : null,
         condition_type: step.step_type === "condition" ? step.condition_type : null,
         condition_value: null,
@@ -324,8 +421,12 @@ function SequenceBuilderModal({ sequence, onClose }: { sequence: SequenceData | 
       <div className="bg-white dark:bg-gray-800 w-full sm:max-w-3xl max-h-[94vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl">
         <div className="sticky top-0 z-10 bg-primary-700 dark:bg-gray-800 px-4 py-3 flex items-center justify-between">
           <div>
-            <h2 className="text-white font-semibold">{editing ? "Edit Sequence" : "Create Sequence"}</h2>
-            <p className="text-white/70 text-xs">Wait steps become follow-ups and resume automatically.</p>
+            <h2 className="text-white font-semibold">
+              {editing ? "Edit" : "Create"} {isEmail ? "email" : "SMS"} sequence
+            </h2>
+            <p className="text-white/70 text-xs">
+              Wait steps become follow-ups and resume automatically. {isEmail ? "Each step has its own subject." : ""}
+            </p>
           </div>
           <button type="button" onClick={onClose} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white"><X size={16} /></button>
         </div>
@@ -346,7 +447,9 @@ function SequenceBuilderModal({ sequence, onClose }: { sequence: SequenceData | 
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="font-semibold text-sm">Automation steps</h3>
-                <p className="text-xs text-gray-500">Each Send SMS step has its own message or template.</p>
+                <p className="text-xs text-gray-500">
+                  Each Send {isEmail ? "email" : "SMS"} step has its own message or template.
+                </p>
               </div>
               <button type="button" onClick={addStep} className="btn-secondary btn-sm"><Plus size={14} className="mr-1" /> Add step</button>
             </div>
@@ -360,9 +463,20 @@ function SequenceBuilderModal({ sequence, onClose }: { sequence: SequenceData | 
                     <select
                       className="input py-1.5 text-sm w-40"
                       value={step.step_type}
-                      onChange={(event) => updateStep(index, { step_type: event.target.value as StepType })}
+                      onChange={(event) =>
+                        updateStep(index, {
+                          step_type: event.target.value as StepType,
+                          // Coming back to a send step always uses this
+                          // sequence's channel.
+                          ...(event.target.value === "wait" ||
+                          event.target.value === "condition" ||
+                          event.target.value === "stop"
+                            ? {}
+                            : { step_type: sendType }),
+                        })
+                      }
                     >
-                      <option value="send_sms">Send SMS</option>
+                      <option value={sendType}>Send {isEmail ? "email" : "SMS"}</option>
                       <option value="wait">Wait / Follow-up</option>
                       <option value="condition">Condition</option>
                       <option value="stop">Stop</option>
@@ -375,27 +489,72 @@ function SequenceBuilderModal({ sequence, onClose }: { sequence: SequenceData | 
                   </div>
 
                   <div className="p-3">
-                    {step.step_type === "send_sms" && (
+                    {(step.step_type === "send_sms" || step.step_type === "send_email") && (
                       <div className="space-y-2">
                         <div className="flex gap-1 p-1 rounded-lg bg-gray-100 dark:bg-gray-700">
-                          <button type="button" onClick={() => updateStep(index, { message_mode: "write" })} className={`flex-1 px-3 py-1.5 rounded-md text-xs font-medium ${step.message_mode === "write" ? "bg-white dark:bg-gray-800 shadow-sm text-primary-600" : "text-gray-500"}`}>Write message</button>
+                          <button type="button" onClick={() => updateStep(index, { message_mode: "write" })} className={`flex-1 px-3 py-1.5 rounded-md text-xs font-medium ${step.message_mode === "write" ? "bg-white dark:bg-gray-800 shadow-sm text-primary-600" : "text-gray-500"}`}>{isEmail ? "Write email" : "Write message"}</button>
                           <button type="button" onClick={() => updateStep(index, { message_mode: "template" })} className={`flex-1 px-3 py-1.5 rounded-md text-xs font-medium ${step.message_mode === "template" ? "bg-white dark:bg-gray-800 shadow-sm text-primary-600" : "text-gray-500"}`}>Use template</button>
                         </div>
+
+                        {isEmail && (
+                          <>
+                            <div>
+                              <label className="label">Subject line *</label>
+                              <input
+                                className="input text-sm"
+                                placeholder={index === 0 ? "A quick question about {{business_name}}" : "Following up on my last email"}
+                                value={step.subject}
+                                onChange={(event) => updateStep(index, { subject: event.target.value })}
+                                maxLength={500}
+                              />
+                            </div>
+                            <div>
+                              <label className="label">Send from</label>
+                              <select
+                                className="input text-sm"
+                                value={step.email_account_id}
+                                onChange={(event) => updateStep(index, { email_account_id: event.target.value })}
+                              >
+                                <option value="">Default sender</option>
+                                {senders.map((sender) => (
+                                  <option key={sender.id} value={sender.id}>
+                                    {sender.name} — {sender.from_email}
+                                  </option>
+                                ))}
+                              </select>
+                              <p className="text-[11px] text-gray-500 mt-1">
+                                Leave on default to use the campaign's sender (or its sender pool).
+                              </p>
+                            </div>
+                          </>
+                        )}
+
                         {step.message_mode === "write" ? (
                           <>
                             <textarea
-                              className="input min-h-24 text-sm"
-                              placeholder={index === 0 ? "Hi {{first_name}}, ..." : "Hi {{first_name}}, just following up..."}
+                              className={`input text-sm ${isEmail ? "min-h-40" : "min-h-24"}`}
+                              placeholder={
+                                isEmail
+                                  ? index === 0
+                                    ? "Hi {{first_name}},\n\nI wanted to reach out about..."
+                                    : "Hi {{first_name}},\n\nJust following up on my note below..."
+                                  : index === 0
+                                  ? "Hi {{first_name}}, ..."
+                                  : "Hi {{first_name}}, just following up..."
+                              }
                               value={step.message_body}
                               onChange={(event) => updateStep(index, { message_body: event.target.value })}
-                              maxLength={5000}
+                              maxLength={isEmail ? 100000 : 5000}
                             />
-                            <p className="text-[11px] text-gray-500">{step.message_body.length} characters · supports {"{{first_name}}"}</p>
+                            <p className="text-[11px] text-gray-500">
+                              {step.message_body.length} characters · supports {"{{first_name}}"} and the other
+                              shortcodes
+                            </p>
                           </>
                         ) : (
                           <select className="input" value={step.template_id} onChange={(event) => updateStep(index, { template_id: event.target.value })}>
-                            <option value="">Select template...</option>
-                            {templates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}
+                            <option value="">Select {isEmail ? "email " : ""}template...</option>
+                            {templates.map((template) => <option key={template.id} value={template.id}>{template.name}{template.subject ? ` — ${template.subject}` : ""}</option>)}
                           </select>
                         )}
                       </div>
