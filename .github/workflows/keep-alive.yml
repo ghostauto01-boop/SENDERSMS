@@ -1,0 +1,80 @@
+# ============================================================================
+# Keep the free Render instance awake (optional, free)
+# ============================================================================
+#
+# Render's free web service stops after ~15 minutes without traffic. The next
+# visitor then waits 30–60 seconds for the container to boot — which is what
+# makes a payment link look broken.
+#
+# The app now handles a cold start gracefully on its own (the service worker
+# serves the shell immediately, the API client retries, and the customer sees
+# "Waking the server up…"). This workflow goes one step further and simply
+# stops it from falling asleep.
+#
+# WHY IT IS SAFE FOR THE DATABASE
+# -------------------------------
+# Only `/api/v1/health` is pinged. That endpoint is a pure liveness probe: it
+# touches neither the database nor the inline poller (see `_cache_static_assets`
+# in backend/app/main.py — health paths deliberately do not call
+# `poll_activity.touch()`). So keeping the *web* instance warm does not keep
+# Neon's compute from suspending its quota-saving sleep; the poller keeps its
+# idle cadence. Never point this at any other path.
+#
+# SETUP (one time)
+# ----------------
+#   GitHub → repository → Settings → Secrets and variables → Actions →
+#   Variables → New repository variable:
+#
+#       APP_BASE_URL = https://your-service.onrender.com
+#
+# Without that variable every run is a no-op, so nothing breaks in a fork.
+#
+# GitHub's scheduled runs are free for public repositories. They are also not
+# to the second — a 10-minute schedule is normally delivered every 10–15
+# minutes, which is inside Render's 15-minute idle window. If that turns out to
+# be too tight, use a free external pinger on the same URL instead:
+# cron-job.org (1-minute resolution) or UptimeRobot (5 minutes).
+# ============================================================================
+
+name: Keep the API awake
+
+on:
+  schedule:
+    # Every 10 minutes. GitHub may delay a run by a few minutes; Render sleeps
+    # at 15, so there is still margin.
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+# Never let two runs overlap if GitHub is catching up on a backlog.
+concurrency:
+  group: keep-alive
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    name: Ping /api/v1/health
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Wake the service (and confirm it answers)
+        env:
+          APP_BASE_URL: ${{ vars.APP_BASE_URL }}
+        run: |
+          if [ -z "$APP_BASE_URL" ]; then
+            echo "APP_BASE_URL is not set — skipping. Add it under Settings → Variables → Actions."
+            exit 0
+          fi
+          # Strip a trailing slash so both forms of the URL work.
+          BASE="${APP_BASE_URL%/}"
+          echo "Pinging $BASE/api/v1/health"
+          # --retry covers the boot itself: the first attempt may time out while
+          # the container starts, the second usually lands.
+          curl --fail --silent --show-error \
+               --retry 3 --retry-delay 10 --retry-all-errors \
+               --max-time 60 \
+               "$BASE/api/v1/health"
+          echo
+          echo "Awake."

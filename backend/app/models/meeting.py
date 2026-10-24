@@ -72,8 +72,22 @@ class Meeting(Base):
     invite_body: Mapped[str | None] = mapped_column(Text, nullable=True)
     invite_sent: Mapped[bool] = mapped_column(Integer, default=False, nullable=False)
 
+    # ---- Email invite ----
+    #: Email is a channel of its own here: an operator may invite by SMS, by
+    #: email, or both, and a contact with only an address can still be invited.
+    send_invite_email: Mapped[bool] = mapped_column(Integer, default=False, nullable=False)
+    #: Subject for the email invite. Rendered with the same shortcodes as the body.
+    invite_subject: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    #: Optional sender override (Brevo id positive, Gmail mailbox negative).
+    email_account_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    invite_email_sent: Mapped[bool] = mapped_column(Integer, default=False, nullable=False)
+
     # ---- SMS reminders ----
     send_sms_reminder: Mapped[bool] = mapped_column(Integer, default=True, nullable=False)
+    #: Fire the same reminders by email as well (independent of the SMS flag).
+    send_email_reminder: Mapped[bool] = mapped_column(Integer, default=False, nullable=False)
+    #: Subject for reminder emails.
+    reminder_subject: Mapped[str | None] = mapped_column(String(500), nullable=True)
     # JSON list of minutes-before-start, e.g. [1440, 60, 15]
     reminder_minutes_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     reminder_template_id: Mapped[int | None] = mapped_column(

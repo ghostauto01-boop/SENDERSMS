@@ -16,7 +16,7 @@ import json
 import logging
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.contact import Contact
@@ -164,10 +164,16 @@ def serialize_meeting(meeting: Meeting, contacts_by_id: dict[int, Contact] | Non
         "campaign_id": meeting.campaign_id,
         "tags": meeting_tags(meeting),
         "send_invite_sms": bool(meeting.send_invite_sms),
+        "send_invite_email": bool(getattr(meeting, "send_invite_email", False)),
+        "invite_subject": getattr(meeting, "invite_subject", None),
         "invite_template_id": meeting.invite_template_id,
         "invite_body": meeting.invite_body,
         "invite_sent": bool(meeting.invite_sent),
+        "invite_email_sent": bool(getattr(meeting, "invite_email_sent", False)),
+        "email_account_id": getattr(meeting, "email_account_id", None),
         "send_sms_reminder": bool(meeting.send_sms_reminder),
+        "send_email_reminder": bool(getattr(meeting, "send_email_reminder", False)),
+        "reminder_subject": getattr(meeting, "reminder_subject", None),
         "reminder_minutes": reminder_minutes(meeting),
         "reminder_template_id": meeting.reminder_template_id,
         "reminder_body": meeting.reminder_body,
@@ -239,10 +245,75 @@ async def _touch_contact_for_booking(db: AsyncSession, contact: Contact) -> None
         contact.lead_status = "meeting"
 
 
+async def _send_meeting_email(
+    db: AsyncSession,
+    meeting: Meeting,
+    contacts: dict[int, Contact],
+    links,
+    *,
+    subject_template: str | None,
+    body_template: str,
+    extra: dict | None = None,
+    account_id: int | None = None,
+    fallback_subject: str,
+    only_contact_ids: set[int] | None = None,
+) -> dict:
+    """Email every attendee that has an address, respecting email consent.
+
+    A meeting invite or reminder is transactional, but an unsubscribe is still
+    an unsubscribe: a contact who opted out of email is skipped and counted,
+    never quietly mailed.
+    """
+    from app.services import email_service
+
+    account = await email_service.resolve_sender(db, account_id) if account_id else None
+    if account_id and account is None:
+        return {"sent": 0, "skipped": len(links), "error": "Selected email sender no longer exists"}
+
+    sent = 0
+    skipped = 0
+    for link in links:
+        if only_contact_ids is not None and link.contact_id not in only_contact_ids:
+            continue
+        contact = contacts.get(link.contact_id)
+        if contact is None or not (contact.email or "").strip():
+            skipped += 1
+            continue
+        try:
+            problem = await email_service.contact_email_problem(db, contact, outreach=True)
+        except Exception:  # noqa: BLE001 — a consent lookup failure must not block a booking
+            problem = None
+        if problem:
+            skipped += 1
+            continue
+        subject = await render_meeting_message(
+            db, subject_template or fallback_subject, contact, meeting, extra=extra
+        )
+        body = await render_meeting_message(db, body_template, contact, meeting, extra=extra)
+        try:
+            message, result = await email_service.send_now(
+                db,
+                contact,
+                subject=subject,
+                text_body=body,
+                account=account,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Meeting email %s to contact %s failed: %s", meeting.id, contact.id, exc)
+            skipped += 1
+            continue
+        if message is None or not (result or {}).get("success"):
+            skipped += 1
+            continue
+        link.notified = True
+        sent += 1
+    return {"sent": sent, "skipped": skipped}
+
+
 async def send_invite(
     db: AsyncSession, meeting: Meeting, *, only_contact_ids: set[int] | None = None
 ) -> dict:
-    """Send the personalized SMS invite to every attendee (once each)."""
+    """Send the personalized invite to every attendee, on the chosen channels."""
     from app.services.sms_service import SMSService
 
     body, template = await resolve_message_body(
@@ -256,26 +327,49 @@ async def send_invite(
     svc = SMSService(db)
     sent = 0
     skipped = 0
-    for link in links:
-        if only_contact_ids is not None and link.contact_id not in only_contact_ids:
-            continue
-        contact = contacts.get(link.contact_id)
-        if contact is None:
-            skipped += 1
-            continue
-        text = await render_meeting_message(db, body, contact, meeting)
-        msg = await svc.send_message(contact_id=contact.id, body=text)
-        if msg is None:
-            skipped += 1
-            continue
-        link.notified = True
-        sent += 1
+    if meeting.send_invite_sms:
+        for link in links:
+            if only_contact_ids is not None and link.contact_id not in only_contact_ids:
+                continue
+            contact = contacts.get(link.contact_id)
+            if contact is None:
+                skipped += 1
+                continue
+            text = await render_meeting_message(db, body, contact, meeting)
+            msg = await svc.send_message(contact_id=contact.id, body=text)
+            if msg is None:
+                skipped += 1
+                continue
+            link.notified = True
+            sent += 1
     if template is not None and sent:
         template.use_count = (template.use_count or 0) + 1
     if sent:
         meeting.invite_sent = True
+
+    email_result = {"sent": 0, "skipped": 0}
+    if getattr(meeting, "send_invite_email", False):
+        email_result = await _send_meeting_email(
+            db,
+            meeting,
+            contacts,
+            links,
+            subject_template=getattr(meeting, "invite_subject", None),
+            body_template=body,
+            account_id=getattr(meeting, "email_account_id", None),
+            fallback_subject=f"Meeting: {meeting.title}",
+            only_contact_ids=only_contact_ids,
+        )
+        if email_result["sent"]:
+            meeting.invite_email_sent = True
+
     await db.flush()
-    return {"sent": sent, "skipped": skipped}
+    return {
+        "sent": sent + email_result["sent"],
+        "skipped": skipped + email_result["skipped"],
+        "sms_sent": sent,
+        "email_sent": email_result["sent"],
+    }
 
 
 async def send_reminder(
@@ -295,27 +389,49 @@ async def send_reminder(
     svc = SMSService(db)
     sent = 0
     skipped = 0
-    for link in links:
-        contact = contacts.get(link.contact_id)
-        if contact is None:
-            skipped += 1
-            continue
-        # {{meeting_when}} reads naturally in reminders ("in 1 hour"...).
-        extra = {"meeting_when": _human_window(minutes_before) if minutes_before else "soon"}
-        text = await render_meeting_message(db, body, contact, meeting, extra=extra)
-        msg = await svc.send_message(contact_id=contact.id, body=text)
-        if msg is None:
-            skipped += 1
-        else:
-            sent += 1
+    # {{meeting_when}} reads naturally in reminders ("in 1 hour"...). Defined
+    # once, outside the loop, so the email pass uses the identical wording.
+    extra = {"meeting_when": _human_window(minutes_before) if minutes_before else "soon"}
+    if meeting.send_sms_reminder:
+        for link in links:
+            contact = contacts.get(link.contact_id)
+            if contact is None:
+                skipped += 1
+                continue
+            text = await render_meeting_message(db, body, contact, meeting, extra=extra)
+            msg = await svc.send_message(contact_id=contact.id, body=text)
+            if msg is None:
+                skipped += 1
+            else:
+                sent += 1
     if template is not None and sent:
         template.use_count = (template.use_count or 0) + 1
+
+    email_result = {"sent": 0, "skipped": 0}
+    if getattr(meeting, "send_email_reminder", False):
+        email_result = await _send_meeting_email(
+            db,
+            meeting,
+            contacts,
+            links,
+            subject_template=getattr(meeting, "reminder_subject", None),
+            body_template=body,
+            extra=extra,
+            account_id=getattr(meeting, "email_account_id", None),
+            fallback_subject=f"Reminder: {meeting.title}",
+        )
+
     if minutes_before:
         done = reminders_sent(meeting)
         done[str(minutes_before)] = datetime.now(timezone.utc).isoformat()
         meeting.reminders_sent_json = json.dumps(done)
     await db.flush()
-    return {"sent": sent, "skipped": skipped}
+    return {
+        "sent": sent + email_result["sent"],
+        "skipped": skipped + email_result["skipped"],
+        "sms_sent": sent,
+        "email_sent": email_result["sent"],
+    }
 
 
 def _human_window(minutes: int) -> str:
@@ -357,7 +473,11 @@ async def process_due_meeting_reminders() -> dict:
                 Meeting.status.in_(("scheduled", "confirmed")),
                 # Integer-backed boolean: compare with 1, never `== True`
                 # (PostgreSQL rejects `integer = boolean`; see template_service).
-                Meeting.send_sms_reminder == 1,
+                # Either channel can be the reason this reminder is due.
+                or_(
+                    Meeting.send_sms_reminder == 1,
+                    Meeting.send_email_reminder == 1,
+                ),
                 Meeting.starts_at > now,
             ).order_by(Meeting.starts_at.asc()).limit(100)
         )).scalars().all()

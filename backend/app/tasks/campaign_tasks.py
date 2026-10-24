@@ -369,7 +369,7 @@ async def _process_campaign_contact(db: AsyncSession, campaign: Campaign, cc: Ca
             cc.status = "opted_out" if problem in ("email_opted_out", "suppressed", "email_bounced") else "failed"
             cc.last_error = f"Not emailable: {problem}"
             return
-        await _send_template_message(db, campaign, cc, contact, outbox=outbox)
+        await _run_next_campaign_step(db, campaign, cc, contact, outbox)
         return
 
     if contact.is_opted_out:
@@ -396,44 +396,61 @@ async def _process_campaign_contact(db: AsyncSession, campaign: Campaign, cc: Ca
             await mark_undeliverable(contact, blocked)
         return
 
-    # Get sequence snapshot
+    await _run_next_campaign_step(db, campaign, cc, contact, outbox)
+
+
+async def _run_next_campaign_step(db, campaign, cc, contact, outbox=None):
+    """Run the contact's current sequence step, or the single campaign message.
+
+    Shared by both channels: before this, only the SMS branch consulted the
+    sequence snapshot, so an email campaign with a sequence sent step one's
+    letter to everyone and never continued.
+    """
     if campaign.sequence_version_id:
-        version_result = await db.execute(
-            select(SequenceVersion).where(SequenceVersion.id == campaign.sequence_version_id)
-        )
-        version = version_result.scalar_one_or_none()
+        version = (
+            await db.execute(
+                select(SequenceVersion).where(
+                    SequenceVersion.id == campaign.sequence_version_id
+                )
+            )
+        ).scalar_one_or_none()
         if version:
             steps = json.loads(version.snapshot)
-            await _execute_sequence_step(db, campaign, cc, contact, steps, cc.sequence_step, outbox)
-        else:
-            # No sequence, just send the template message
-            await _send_template_message(db, campaign, cc, contact, outbox=outbox)
-    else:
-        await _send_template_message(db, campaign, cc, contact, outbox=outbox)
+            await _execute_sequence_step(
+                db, campaign, cc, contact, steps, cc.sequence_step or 0, outbox
+            )
+            return
+    # No sequence (or its snapshot is gone): the campaign's own message.
+    await _send_template_message(db, campaign, cc, contact, outbox=outbox)
 
 
 async def _sequence_followup_preview(db, campaign, step):
-    """Return the message/template that an upcoming Send SMS step will use."""
-    if not step or step.get("step_type") != "send_sms":
-        return None, None
+    """Return (body, template_id, subject) for the next send step.
+
+    Email steps carry their own subject line; SMS steps return None for it.
+    """
+    if not step or step.get("step_type") not in ("send_sms", "send_email"):
+        return None, None, None
 
     from app.services.sequence_service import step_message_body
 
     template_id = step.get("template_id")
+    subject = step.get("subject") if step.get("step_type") == "send_email" else None
     body = step_message_body(step.get("config"))
     if body:
-        return body, None
+        return body, None, subject
     if template_id:
         template = (
             await db.execute(select(Template).where(Template.id == template_id))
         ).scalar_one_or_none()
-        return (template.body if template else None), template_id
+        if template is not None:
+            return template.body, template_id, subject or template.subject
 
     # Backward compatibility for sequences created before per-step messages
     # were available: they used the campaign's message/template.
     from app.services.campaign_service import CampaignService
 
-    return await CampaignService(db).resolve_body(campaign), campaign.template_id
+    return await CampaignService(db).resolve_body(campaign), campaign.template_id, subject
 
 
 async def _schedule_sequence_followup(
@@ -456,7 +473,9 @@ async def _schedule_sequence_followup(
         return existing
 
     next_step = steps[next_step_idx] if next_step_idx < len(steps) else None
-    message_text, template_id = await _sequence_followup_preview(db, campaign, next_step)
+    message_text, template_id, subject = await _sequence_followup_preview(
+        db, campaign, next_step
+    )
     followup = FollowUp(
         contact_id=cc.contact_id,
         campaign_id=campaign.id,
@@ -467,6 +486,10 @@ async def _schedule_sequence_followup(
         status="pending",
         message_text=message_text,
         template_id=template_id,
+        # Follow-ups are channel-scoped like everything else, so an email
+        # sequence never shows up in the SMS follow-up list (or vice versa).
+        channel=(campaign.channel or "sms"),
+        subject=subject,
     )
     db.add(followup)
     cc.status = "queued"
@@ -483,9 +506,11 @@ async def _execute_sequence_step(db, campaign, cc, contact, steps, current_step_
 
     step = steps[current_step_idx]
 
-    if step["step_type"] == "send_sms":
+    if step["step_type"] in ("send_sms", "send_email"):
         from app.services.sequence_service import step_message_body
 
+        # The step type decides which channel this particular message leaves
+        # on; the campaign channel was validated to match when it launched.
         await _send_template_message(
             db,
             campaign,
@@ -493,6 +518,12 @@ async def _execute_sequence_step(db, campaign, cc, contact, steps, current_step_
             contact,
             step.get("template_id"),
             body_override=step_message_body(step.get("config")),
+            subject_override=(
+                step.get("subject") if step["step_type"] == "send_email" else None
+            ),
+            email_account_id=(
+                step.get("email_account_id") if step["step_type"] == "send_email" else None
+            ),
             outbox=outbox,
         )
         if cc.status == "failed":
@@ -554,9 +585,22 @@ async def _execute_sequence_step(db, campaign, cc, contact, steps, current_step_
 
 
 async def _send_template_message(
-    db, campaign, cc, contact, template_id=None, body_override=None, outbox=None
+    db,
+    campaign,
+    cc,
+    contact,
+    template_id=None,
+    body_override=None,
+    subject_override=None,
+    email_account_id=None,
+    outbox=None,
 ):
-    """Queue one personalized sequence/campaign SMS."""
+    """Queue one personalized campaign/sequence message, on its channel.
+
+    ``subject_override`` and ``email_account_id`` are what a sequence's
+    send_email step contributes: the campaign's own subject would be the same
+    line on every step, which is not what a multi-step email sequence means.
+    """
     # A written per-step message wins, then that step's template, then the
     # legacy campaign-level message/template for older sequences.
     from app.services.campaign_service import CampaignService
@@ -594,9 +638,12 @@ async def _send_template_message(
         from app.models.template import Template
         from app.services import email_service
 
-        subject = campaign.subject
-        html_body = campaign.html_body
-        tid = template_id or campaign.template_id
+        subject = subject_override or campaign.subject
+        # A per-step HTML body would have to come from that step's template;
+        # the campaign's HTML belongs to the campaign's own message. Without
+        # this an email sequence would resend the campaign's letter at step 3.
+        html_body = None if subject_override else campaign.html_body
+        tid = template_id or (None if subject_override else campaign.template_id)
         if tid and not (subject and html_body):
             template = (
                 await db.execute(select(Template).where(Template.id == tid))
@@ -604,13 +651,17 @@ async def _send_template_message(
             if template is not None:
                 subject = subject or template.subject
                 html_body = html_body or template.html_body
-        # Multi-sender pool (optional): the contact's pinned sender wins,
-        # then the pool rotation, then the legacy single sender.
-        account = await email_service.resolve_campaign_sender(
-            db, campaign,
-            key=cc.id or contact.id,
-            pinned_sender_id=getattr(cc, "email_account_id", None),
-        )
+        # An explicit sender on the sequence step wins; otherwise the
+        # multi-sender pool: the contact's pinned sender, then the rotation,
+        # then the legacy single sender.
+        if email_account_id is not None:
+            account = await email_service.resolve_sender(db, email_account_id)
+        else:
+            account = await email_service.resolve_campaign_sender(
+                db, campaign,
+                key=cc.id or contact.id,
+                pinned_sender_id=getattr(cc, "email_account_id", None),
+            )
         if account is None:
             cc.status = "failed"
             cc.last_error = "No email sender configured"

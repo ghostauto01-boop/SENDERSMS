@@ -516,15 +516,26 @@ After deployment, here's what you need to set:
 
 ### Free Tier Notes
 
-- Render web service spins down after 15 min idle (30-60s cold start on wake)
+- Render web service spins down after 15 min idle (30-60s cold start on wake).
+  **This is now handled in two layers.** The app never *looks* broken during a
+  cold start: the service worker serves the shell within ~2.5 s, the API client
+  retries GETs with growing gaps, a "Waking the server up…" banner counts the
+  seconds, and the public invoice page keeps retrying on its own instead of
+  showing an error to a customer paying. To remove the wait entirely, set the
+  repository variable `APP_BASE_URL` and enable `.github/workflows/keep-alive.yml`
+  (it runs every 10 minutes for free on a public repo). It pings only
+  `/api/v1/health`, which is deliberately database-free and does not wake the
+  inline poller — so the web instance stays warm without burning Neon's
+  compute hours.
 - Render free PostgreSQL expires after 90 days
 - Neon free tier: 0.5 GB storage, **100 compute-hours/month per project**. Neon suspends
   the compute after 5 min without queries; a database that is queried around the clock
   (0.25 CU × 24 h × 30 d ≈ 180 CU-h) is switched off by Neon around day 17 of the month
   and every page then fails until the 1st. The inline poller is idle-aware for this
   reason (`INLINE_IDLE_POLL_INTERVAL`, `INLINE_POLL_ACTIVE_WINDOW`), and the UI stops
-  polling in background tabs. Do not point an uptime pinger at the app, and suspend the
-  `sendsms-worker` service when `ENABLE_INLINE_POLLER=true` (it is redundant there).
+  polling in background tabs. **Do not point an uptime pinger at any data route** —
+  only `/api/v1/health` is free of database work. Suspend the `sendsms-worker`
+  service when `ENABLE_INLINE_POLLER=true` (it is redundant there).
 - Upstash free tier: 256 MB, 10,000 commands/day
 - Total cost: **$0.00**
 

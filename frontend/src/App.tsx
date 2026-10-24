@@ -6,6 +6,8 @@ import { ThemeProvider } from "./hooks/useTheme";
 import MainLayout from "./layouts/MainLayout";
 import LoginPage from "./pages/LoginPage";
 import DbStatusBanner from "./components/DbStatusBanner";
+import ServerWakeBanner from "./components/ServerWakeBanner";
+import useServerKeepAlive from "./hooks/useServerKeepAlive";
 
 // Route-level code splitting: each page ships as its own chunk so the initial
 // load (the login screen) no longer pulls in the entire application.
@@ -66,6 +68,10 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function AppRoutes() {
+  // One small heartbeat while the tab is open: keeps the free instance from
+  // falling asleep under an operator who is reading rather than clicking.
+  useServerKeepAlive();
+
   return (
     <Suspense fallback={<PageSpinner />}>
     <Routes>
@@ -152,8 +158,10 @@ export default function App() {
         {/* SMS | Email is an app-wide choice: every channel-aware page reads
             it from here instead of each page growing its own switch. */}
         <ChannelProvider>
-          {/* One explained notice when the database itself is down, above
-              every page — instead of every widget failing on its own. */}
+          {/* Two notices, both explained, both above every page:
+              "the instance is waking up" (Render cold start) and "the database
+              itself is down" (Neon). Neither replaces a page with an error. */}
+          <ServerWakeBanner />
           <DbStatusBanner />
           <AppRoutes />
         </ChannelProvider>

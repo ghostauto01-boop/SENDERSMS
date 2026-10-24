@@ -241,7 +241,7 @@ describe("InboxPage — WhatsApp-style inbox", () => {
     // Header booking button (title tooltip) opens the shared meeting form.
     fireEvent.click(screen.getByTitle("Book a meeting"));
     await waitFor(() => expect(screen.getByText("Book a meeting", { selector: "h2" })).toBeInTheDocument());
-    expect(screen.getByText("SMS invite & reminders")).toBeInTheDocument();
+    expect(screen.getByText("SMS & email invite + reminders")).toBeInTheDocument();
   });
 
   it("shows a failed-outgoing error banner inside the bubble", async () => {

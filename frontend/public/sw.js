@@ -9,8 +9,19 @@
  * changes with the content, so it is safe (and fast) to serve cache first.
  *
  * Bump VERSION on any change here: it evicts every old cache on activate.
+ *
+ * COLD STARTS
+ * -----------
+ * The host is a free instance that sleeps when idle, and while it boots a
+ * navigation request hangs for 30–60 s — a white screen that looks like the
+ * site is down. So a navigation gets a short head start (`SHELL_FIRST_MS`): if
+ * the network has not answered by then, the cached shell is served at once and
+ * the request keeps going in the background. The app then opens instantly and
+ * explains the wake-up itself (ServerWakeBanner) while the API comes back.
  */
-const VERSION = "sendify-v9";
+const VERSION = "sendify-v10";
+/** How long a page navigation waits for the network before the cache answers. */
+const SHELL_FIRST_MS = 2500;
 const ASSET_CACHE = `${VERSION}-assets`;
 const SHELL_CACHE = `${VERSION}-shell`;
 
@@ -62,20 +73,57 @@ self.addEventListener("fetch", (e) => {
     return;
   }
 
-  // Everything else (the HTML document above all): network first, cache only
-  // as an offline fallback.
+  // Everything else (the HTML document above all): network first, but never
+  // let a sleeping instance freeze the screen.
+  const isDocument = request.mode === "navigate" || request.destination === "document";
+
+  const network = fetch(request)
+    .then((resp) => {
+      if (resp.ok && isDocument) {
+        const clone = resp.clone();
+        caches.open(SHELL_CACHE).then((c) => c.put(request, clone));
+      }
+      return resp;
+    });
+
+  if (!isDocument) {
+    e.respondWith(
+      network.catch(() => caches.match(request).then((hit) => hit || caches.match("/")))
+    );
+    return;
+  }
+
   e.respondWith(
-    fetch(request)
-      .then((resp) => {
-        if (resp.ok && (request.mode === "navigate" || request.destination === "document")) {
-          const clone = resp.clone();
-          caches.open(SHELL_CACHE).then((c) => c.put(request, clone));
-        }
-        return resp;
-      })
-      .catch(() =>
-        caches.match(request).then((hit) => hit || caches.match("/"))
-      )
+    new Promise((resolve) => {
+      let settled = false;
+      const settle = (response) => {
+        if (settled || !response) return;
+        settled = true;
+        resolve(response);
+      };
+
+      // Give the network a head start, then hand over the cached shell and let
+      // the request finish in the background.
+      const timer = setTimeout(() => {
+        caches
+          .match(request)
+          .then((hit) => hit || caches.match("/"))
+          .then((hit) => settle(hit));
+      }, SHELL_FIRST_MS);
+
+      network
+        .then((resp) => {
+          clearTimeout(timer);
+          settle(resp);
+        })
+        .catch(() => {
+          clearTimeout(timer);
+          caches
+            .match(request)
+            .then((hit) => hit || caches.match("/"))
+            .then((hit) => settle(hit));
+        });
+    })
   );
 });
 

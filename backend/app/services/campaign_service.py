@@ -283,28 +283,43 @@ class CampaignService:
                 errors.append("Selected sequence is inactive")
             else:
                 check.sequence = sequence
-                steps = list(
-                    (
-                        await self.db.execute(
-                            select(SequenceStep)
-                            .where(
-                                SequenceStep.sequence_id == sequence.id,
-                                SequenceStep.version == sequence.current_version,
-                            )
-                            .order_by(SequenceStep.step_order)
-                        )
-                    ).scalars().all()
-                )
-                from app.services.sequence_service import validate_sequence_steps
-
-                try:
-                    check.sequence_steps = await validate_sequence_steps(
-                        self.db,
-                        steps,
-                        allow_campaign_message_fallback=bool(await self.resolve_body(campaign)),
+                # A sequence is channel-scoped. Sending an email campaign
+                # through an SMS sequence (or the reverse) is the one mistake
+                # that would text somebody who asked for email, so it is
+                # refused here, before the first contact is touched.
+                sequence_channel = (getattr(sequence, "channel", None) or "sms").lower()
+                campaign_channel = (campaign.channel or "sms").lower()
+                if sequence_channel != campaign_channel:
+                    errors.append(
+                        f"Sequence '{sequence.name}' is an {sequence_channel.upper()} "
+                        f"sequence, but this is an {campaign_channel.upper()} campaign. "
+                        f"Pick a {campaign_channel.upper()} sequence."
                     )
-                except ValueError as exc:
-                    errors.append(f"Sequence is invalid: {exc}")
+                    check.sequence = None
+                else:
+                    steps = list(
+                        (
+                            await self.db.execute(
+                                select(SequenceStep)
+                                .where(
+                                    SequenceStep.sequence_id == sequence.id,
+                                    SequenceStep.version == sequence.current_version,
+                                )
+                                .order_by(SequenceStep.step_order)
+                            )
+                        ).scalars().all()
+                    )
+                    from app.services.sequence_service import validate_sequence_steps
+
+                    try:
+                        check.sequence_steps = await validate_sequence_steps(
+                            self.db,
+                            steps,
+                            channel=sequence_channel,
+                            allow_campaign_message_fallback=bool(await self.resolve_body(campaign)),
+                        )
+                    except ValueError as exc:
+                        errors.append(f"Sequence is invalid: {exc}")
 
         gateway_error = await self._check_gateway(campaign)
         if gateway_error:

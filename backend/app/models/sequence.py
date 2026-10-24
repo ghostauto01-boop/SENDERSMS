@@ -18,6 +18,12 @@ class Sequence(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     current_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     is_active: Mapped[bool] = mapped_column(Integer, default=True, nullable=False)
+
+    #: "sms" or "email". A sequence belongs to one channel, exactly like a
+    #: campaign, an automation and an auto-reply rule: an email sequence can
+    #: never text anybody, and an SMS sequence can never mail anybody.
+    #: Existing rows are SMS (that was the only channel when they were built).
+    channel: Mapped[str] = mapped_column(String(10), default="sms", nullable=False, index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
     )
@@ -50,7 +56,7 @@ class SequenceStep(Base):
     # Step ordering
     step_order: Mapped[int] = mapped_column(Integer, nullable=False)
 
-    # Type: send_sms, wait, condition, stop
+    # Type: send_sms, send_email, wait, condition, stop
     step_type: Mapped[str] = mapped_column(String(50), nullable=False)
 
     # Configuration as JSON string
@@ -61,6 +67,14 @@ class SequenceStep(Base):
 
     # For send steps: template id
     template_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("templates.id"), nullable=True)
+
+    # ---- Email channel (send_email steps) --------------------------------
+    #: Subject line for a send_email step. Required: an email with no subject
+    #: is treated as spam by every provider.
+    subject: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    #: Optional sender override. Positive ids are Brevo accounts, negative ids
+    #: are connected Gmail mailboxes (same convention as the rest of email).
+    email_account_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     # For condition steps: condition type and target
     condition_type: Mapped[str | None] = mapped_column(String(50), nullable=True)

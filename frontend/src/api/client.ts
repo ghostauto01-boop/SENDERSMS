@@ -1,10 +1,19 @@
 import axios from "axios";
 import { dbOutageFromError, reportDbOk, reportDbOutage } from "../utils/dbStatus";
+import {
+  looksLikeColdStart,
+  reportServerAwake,
+  reportServerUnreachable,
+} from "../utils/serverStatus";
 
 const api = axios.create({
   baseURL: "/api/v1",
   withCredentials: true,
   headers: { "Content-Type": "application/json" },
+  // Render's free instance stops after ~15 idle minutes and takes 30–60 s to
+  // boot. Without a timeout the browser gives up first and every request looks
+  // like a hard failure instead of a slow start.
+  timeout: 60_000,
 });
 
 /**
@@ -41,6 +50,17 @@ const normaliseDetail = (data: any) => {
 const RATE_LIMIT_MAX_RETRIES = 1;
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/**
+ * Cold-start retries.
+ *
+ * A sleeping instance answers nothing for up to a minute. Retrying a GET a few
+ * times, with the gaps growing, turns "the site is down" into "it took 20
+ * seconds" — which is exactly what people reported when opening a payment link.
+ * Sends (POST/PUT/PATCH/DELETE) are never replayed here: a retry that might
+ * charge somebody twice is worse than an error message.
+ */
+const COLD_START_DELAYS = [1_500, 4_000, 9_000];
+
 const retryAfterMs = (error: any): number => {
   const raw = error?.response?.headers?.["retry-after"];
   const seconds = Number(raw);
@@ -50,7 +70,9 @@ const retryAfterMs = (error: any): number => {
 
 api.interceptors.response.use(
   async (response) => {
-    // Any real answer from the API means the database is back.
+    // Any real answer from the API means both the server and the database are
+    // back (a 4xx still came from a live server).
+    reportServerAwake();
     if (!String(response.config?.url || "").startsWith("/health")) {
       reportDbOk();
     }
@@ -59,6 +81,20 @@ api.interceptors.response.use(
   async (error) => {
     if (error.response?.data) {
       normaliseDetail(error.response.data);
+    }
+
+    // The instance is asleep (or still booting). Say so, and replay idempotent
+    // reads while it wakes up.
+    if (looksLikeColdStart(error)) {
+      reportServerUnreachable();
+      const cfg = error.config || {};
+      const method = (cfg.method || "get").toLowerCase();
+      const attempts = cfg.__coldStartRetries || 0;
+      if (method === "get" && attempts < COLD_START_DELAYS.length) {
+        cfg.__coldStartRetries = attempts + 1;
+        await sleep(COLD_START_DELAYS[attempts]);
+        return api.request(cfg);
+      }
     }
 
     // 429: wait for the window the server named and replay once. Only GETs are

@@ -16,6 +16,8 @@ import {
   X,
 } from "lucide-react";
 import ShortcodePicker from "../components/ShortcodePicker";
+import ChannelSwitch from "../components/ChannelSwitch";
+import { useChannel } from "../hooks/useChannel";
 import type {
   CampaignFollowUp,
   CampaignFollowUpPreview,
@@ -43,6 +45,8 @@ const describeDelay = (minutes: number) => {
 const emptyForm = () => ({
   name: "",
   message_text: "",
+  /** Email follow-ups need a subject line; SMS ones ignore it. */
+  subject: "",
   delay_value: 1,
   delay_unit: "days" as "minutes" | "hours" | "days",
   stop_on_reply: true,
@@ -62,6 +66,8 @@ const fromMinutes = (minutes: number) => {
 };
 
 export default function CampaignFollowUpsPage() {
+  const { channel } = useChannel();
+  const isEmail = channel === "email";
   const [campaigns, setCampaigns] = useState<CampaignWithFollowUps[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [rules, setRules] = useState<CampaignFollowUp[]>([]);
@@ -82,9 +88,11 @@ export default function CampaignFollowUpsPage() {
   const [logRows, setLogRows] = useState<any[]>([]);
 
   useEffect(() => {
+    setSelectedId(null);
     loadCampaigns();
     loadTemplates();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [channel]);
 
   useEffect(() => {
     if (selectedId) loadRules(selectedId);
@@ -94,7 +102,9 @@ export default function CampaignFollowUpsPage() {
     try {
       setLoading(true);
       setError(null);
-      const { data } = await api.get("/campaign-followups/campaigns");
+      const { data } = await api.get("/campaign-followups/campaigns", {
+        params: { channel },
+      });
       setCampaigns(data.items);
       // Default to the first running campaign — that is what the operator is
       // almost always here to work on.
@@ -109,8 +119,13 @@ export default function CampaignFollowUpsPage() {
 
   const loadTemplates = async () => {
     try {
-      const { data } = await api.get("/templates/", { params: { per_page: 100 } });
-      setTemplates((data.items || []).filter((t: Template) => t.is_active));
+      const { data } = await api.get("/templates/", { params: { per_page: 100, channel } });
+      setTemplates(
+        (data.items || []).filter(
+          (t: Template) =>
+            t.is_active && (!(t as any).channel || (t as any).channel === "any" || (t as any).channel === channel)
+        )
+      );
     } catch {
       setTemplates([]);
     }
@@ -145,6 +160,7 @@ export default function CampaignFollowUpsPage() {
     setForm({
       name: rule.name || "",
       message_text: rule.message_text || "",
+      subject: (rule as any).subject || "",
       ...fromMinutes(rule.delay_minutes),
       stop_on_reply: rule.stop_on_reply,
       stop_on_lead_status: (rule.stop_on_lead_status || "")
@@ -164,6 +180,10 @@ export default function CampaignFollowUpsPage() {
       toast.error("Write the follow-up message");
       return;
     }
+    if (isEmail && !form.subject.trim()) {
+      toast.error("Email follow-ups need a subject line");
+      return;
+    }
     if (form.delay_value < 1) {
       toast.error("The wait time must be at least 1");
       return;
@@ -177,6 +197,8 @@ export default function CampaignFollowUpsPage() {
 
     const payload = {
       name: form.name.trim() || null,
+      channel,
+      subject: isEmail ? form.subject.trim() : null,
       message_text: form.message_text.trim(),
       delay_minutes: toMinutes(Number(form.delay_value), form.delay_unit),
       stop_on_reply: form.stop_on_reply,
@@ -281,10 +303,11 @@ export default function CampaignFollowUpsPage() {
           Campaign Follow-ups
         </h1>
         <p className="text-sm text-gray-500 mt-0.5">
-          Pick a campaign, then chain reminders for the contacts who never replied. Each step waits,
-          checks its stop conditions, and only then sends.
+          Pick a campaign, then chain {isEmail ? "emails" : "SMS reminders"} for the contacts who never
+          replied. Each step waits, checks its stop conditions, and only then sends.
         </p>
       </div>
+      <ChannelSwitch size="sm" />
 
       {/* Campaign picker */}
       <div className="card p-4">
@@ -293,7 +316,8 @@ export default function CampaignFollowUpsPage() {
           <div className="skeleton h-10 w-full mt-2" />
         ) : campaigns.length === 0 ? (
           <p className="text-sm text-gray-500 mt-2">
-            No campaigns yet. Create and start a campaign first, then add follow-ups here.
+            No {isEmail ? "email " : ""}campaigns yet. Create and start a campaign first, then add
+            follow-ups here.
           </p>
         ) : (
           <>
@@ -368,6 +392,12 @@ export default function CampaignFollowUpsPage() {
                           {rule.is_active ? "active" : "paused"}
                         </span>
                       </div>
+
+                      {(rule as any).channel === "email" && (rule as any).subject && (
+                        <p className="text-sm font-medium text-gray-800 dark:text-gray-100 mt-2">
+                          {(rule as any).subject}
+                        </p>
+                      )}
 
                       <p className="text-sm text-gray-600 dark:text-gray-300 mt-2 whitespace-pre-wrap">
                         {rule.message_text}
@@ -456,8 +486,22 @@ export default function CampaignFollowUpsPage() {
                 />
               </div>
 
+              {isEmail && (
+                <div>
+                  <label className="text-xs font-medium text-gray-500">Subject *</label>
+                  <input
+                    value={form.subject}
+                    onChange={(e) => setForm({ ...form, subject: e.target.value })}
+                    className="input mt-1"
+                    placeholder="Still thinking about {{business_name}}?"
+                  />
+                </div>
+              )}
+
               <div>
-                <label className="text-xs font-medium text-gray-500">Follow-up message</label>
+                <label className="text-xs font-medium text-gray-500">
+                  Follow-up {isEmail ? "email" : "message"}
+                </label>
                 <textarea
                   ref={fuRef}
                   value={form.message_text}

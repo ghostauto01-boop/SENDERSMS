@@ -560,11 +560,15 @@ function CampaignModal({
   const messageRef = useRef<HTMLTextAreaElement>(null);
 
   // Lists and templates are loaded by their pickers; only sequences need a fetch here.
+  // Sequences are channel-scoped, so this campaign only ever offers ones it can
+  // actually run: an email campaign cannot pick an SMS sequence.
+  const sequenceChannel = campaign?.channel || channel;
   useEffect(() => {
-    api.get("/sequences/").then((s) => {
-      setSequences(s.data.items);
-    }).catch(() => toast.error("Could not load sequences"));
-  }, []);
+    api
+      .get("/sequences/", { params: { channel: sequenceChannel } })
+      .then((s) => setSequences(s.data.items))
+      .catch(() => toast.error("Could not load sequences"));
+  }, [sequenceChannel]);
 
   useEffect(() => {
     if (!isEmail) return;

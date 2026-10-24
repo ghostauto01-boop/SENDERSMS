@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import api from "../api/client";
+import ChannelSwitch from "../components/ChannelSwitch";
+import { useChannel } from "../hooks/useChannel";
 import { AnalyticsOverview } from "../types";
 import {
   TrendingUp, TrendingDown, CheckCircle2, XCircle, MessageSquare,
@@ -208,6 +210,13 @@ function CardHead({
 }
 
 export default function AnalyticsPage() {
+  /**
+   * Analytics is per channel, exactly like the inbox and the campaigns. The
+   * API has always supported this; the page simply never asked, so every
+   * number on it was SMS-only while an email operation looked dead.
+   */
+  const { channel } = useChannel();
+  const isEmail = channel === "email";
   const [analytics, setAnalytics] = useState<AnalyticsOverview | null>(null);
   const [series, setSeries] = useState<any[]>([]);
   const [funnel, setFunnel] = useState<any>(null);
@@ -219,17 +228,18 @@ export default function AnalyticsPage() {
 
   useEffect(() => {
     loadAnalytics();
-  }, [days]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [days, channel]);
 
   const loadAnalytics = async () => {
     try {
       setLoading(true);
       setError(null);
       const [a, t, f, c, k] = await Promise.all([
-        api.get("/analytics/overview", { params: { days } }),
-        api.get("/analytics/timeseries", { params: { days } }),
-        api.get("/analytics/funnel", { params: { days } }),
-        api.get("/analytics/by-campaign", { params: { days } }),
+        api.get("/analytics/overview", { params: { days, channel } }),
+        api.get("/analytics/timeseries", { params: { days, channel } }),
+        api.get("/analytics/funnel", { params: { days, channel } }),
+        api.get("/analytics/by-campaign", { params: { days, channel } }),
         api.get("/analytics/calls", { params: { days } }),
       ]);
       setAnalytics(a.data);
@@ -270,7 +280,7 @@ export default function AnalyticsPage() {
 
   const metrics = analytics
     ? [
-        { label: "Messages sent", value: fmtNumber(analytics.sent), icon: Send, tone: "primary" as Tone, change: trendOf(sparks.sent), spark: sparks.sent, hint: `${series.length} active day${series.length === 1 ? "" : "s"}` },
+        { label: isEmail ? "Emails sent" : "Messages sent", value: fmtNumber(analytics.sent), icon: Send, tone: "primary" as Tone, change: trendOf(sparks.sent), spark: sparks.sent, hint: `${series.length} active day${series.length === 1 ? "" : "s"}` },
         { label: "Delivered", value: fmtNumber(analytics.delivered), icon: CheckCircle2, tone: "success" as Tone, change: trendOf(sparks.delivered), spark: sparks.delivered, hint: `${analytics.delivery_rate}% delivery rate` },
         { label: "Failed", value: fmtNumber(analytics.failed), icon: XCircle, tone: "danger" as Tone, change: trendOf(sparks.failed), spark: sparks.failed, invert: true, hint: "lower is better" },
         { label: "Delivery rate", value: `${analytics.delivery_rate}%`, icon: Percent, tone: "success" as Tone, change: trendOf(sparks.rate), spark: sparks.rate, hint: "of everything sent" },
@@ -312,10 +322,12 @@ export default function AnalyticsPage() {
           </p>
           <h1 className="page-title mt-1.5">Analytics</h1>
           <p className="page-subtitle">
-            Every message, reply and naira of attention — measured from the same tables your inbox reads.
+            Every {isEmail ? "email" : "message"}, reply and naira of attention — measured from the same
+            tables your inbox reads.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <ChannelSwitch size="sm" />
           <div className="segment w-full sm:w-auto">
             {[
               [7, "7d"],
@@ -375,7 +387,7 @@ export default function AnalyticsPage() {
               }
             />
             {series.length === 0 ? (
-              <p className="text-sm text-gray-400 py-12 text-center">No messages in this period yet.</p>
+              <p className="text-sm text-gray-400 py-12 text-center">No {isEmail ? "emails" : "messages"} in this period yet.</p>
             ) : (
               <div className="h-60 sm:h-72 -ml-2">
                 <ResponsiveContainer width="100%" height="100%">

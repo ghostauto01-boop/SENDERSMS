@@ -57,9 +57,17 @@ class MeetingCreate(BaseModel):
     campaign_id: Optional[int] = None
     tags: list[str] = []
     send_invite_sms: bool = True
+    #: Send the same invite by email as well (a contact with only an address
+    #: can be invited this way).
+    send_invite_email: bool = False
+    invite_subject: Optional[str] = None
+    email_account_id: Optional[int] = None
     invite_template_id: Optional[int] = None
     invite_body: Optional[str] = None
     send_sms_reminder: bool = True
+    #: Fire the reminders by email too, independently of the SMS flag.
+    send_email_reminder: bool = False
+    reminder_subject: Optional[str] = None
     reminder_minutes: list[int] = [60, 15]
     reminder_template_id: Optional[int] = None
     reminder_body: Optional[str] = None
@@ -82,9 +90,14 @@ class MeetingUpdate(BaseModel):
     campaign_id: Optional[int] = None
     tags: Optional[list[str]] = None
     send_invite_sms: Optional[bool] = None
+    send_invite_email: Optional[bool] = None
+    invite_subject: Optional[str] = None
+    email_account_id: Optional[int] = None
     invite_template_id: Optional[int] = None
     invite_body: Optional[str] = None
     send_sms_reminder: Optional[bool] = None
+    send_email_reminder: Optional[bool] = None
+    reminder_subject: Optional[str] = None
     reminder_minutes: Optional[list[int]] = None
     reminder_template_id: Optional[int] = None
     reminder_body: Optional[str] = None
@@ -399,11 +412,16 @@ async def create_meeting(
         campaign_id=data.campaign_id,
         tags_json=json.dumps(_clean_tags(data.tags)) if data.tags else None,
         send_invite_sms=bool(data.send_invite_sms),
+        send_invite_email=bool(data.send_invite_email),
+        invite_subject=(data.invite_subject or "").strip() or None,
+        email_account_id=data.email_account_id,
         invite_template_id=data.invite_template_id,
         invite_body=(data.invite_body or "").strip() or None,
         send_sms_reminder=bool(data.send_sms_reminder),
+        send_email_reminder=bool(data.send_email_reminder),
+        reminder_subject=(data.reminder_subject or "").strip() or None,
         reminder_minutes_json=json.dumps(_clean_minutes(data.reminder_minutes))
-        if data.send_sms_reminder else None,
+        if (data.send_sms_reminder or data.send_email_reminder) else None,
         reminder_template_id=data.reminder_template_id,
         reminder_body=(data.reminder_body or "").strip() or None,
         outcome_notes=(data.outcome_notes or "").strip() or None,
@@ -419,7 +437,7 @@ async def create_meeting(
     meeting = await refresh_meeting(db, meeting.id)
 
     invite_result = {"sent": 0, "skipped": 0}
-    if meeting.send_invite_sms and meeting.contact_id:
+    if (meeting.send_invite_sms or meeting.send_invite_email) and (meeting.contact_id or contact_ids):
         try:
             invite_result = await send_invite(db, meeting)
         except Exception as exc:
@@ -464,7 +482,9 @@ async def update_meeting(
     scalar_fields = (
         "title", "description", "event_type", "status", "all_day", "location",
         "meeting_link", "conversation_id", "campaign_id", "send_invite_sms",
+        "send_invite_email", "invite_subject", "email_account_id",
         "invite_template_id", "invite_body", "send_sms_reminder",
+        "send_email_reminder", "reminder_subject",
         "reminder_template_id", "reminder_body", "outcome_notes",
     )
     for field in scalar_fields:

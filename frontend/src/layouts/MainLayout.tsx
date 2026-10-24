@@ -166,6 +166,17 @@ export default function MainLayout() {
 
   const isActive = (to: string) => to === activeItem;
 
+  /**
+   * Some screens are an app of their own and must own the whole window.
+   *
+   * The email inbox is Gmail-shaped: a toolbar, a folder rail, a thread list and
+   * a reading pane with their own scroll areas. Giving it the shell's page
+   * padding (and its centred `max-w-7xl` column) squeezed the reading pane into a
+   * letterbox — the exact bug people reported as "I cannot read an email full
+   * screen". Full-bleed hands it every pixel under the header instead.
+   */
+  const fullBleed = location.pathname === "/email-inbox";
+
   const groups = useMemo(
     () => [
       { title: "Menu", items: MENU },
@@ -334,7 +345,13 @@ export default function MainLayout() {
           <main
             id="workspace-main"
             key={location.pathname}
-            className="flex-1 min-w-0 px-3 sm:px-4 lg:px-6 pt-4 lg:pt-5 pb-tabbar page-enter lg:overflow-y-auto wa-scrollbar"
+            className={
+              fullBleed
+                ? // No padding, no scroll container of its own: the page manages
+                  // its panes (and their scrollbars) itself.
+                  "flex-1 min-w-0 flex flex-col page-enter overflow-hidden"
+                : "flex-1 min-w-0 px-3 sm:px-4 lg:px-6 pt-4 lg:pt-5 pb-tabbar page-enter lg:overflow-y-auto wa-scrollbar"
+            }
           >
             <Outlet />
           </main>
