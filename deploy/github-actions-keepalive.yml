@@ -1,5 +1,14 @@
 # ============================================================================
 # Keep the free Render instance awake (optional, free)
+#
+# This file ships as a TEMPLATE, not as an active workflow.
+# ---------------------------------------------------------
+# Copy it to `.github/workflows/keep-alive.yml` on GitHub (Add file → Create
+# new file → type that path → paste this content). It is kept out of
+# `.github/workflows/` in the repository because automation that commits to
+# this repo is not granted the `workflows` scope — the file would be rejected
+# on push — and because a scheduled pinger should be an explicit, one-time
+# decision rather than something that starts firing the moment you deploy.
 # ============================================================================
 #
 # Render's free web service stops after ~15 minutes without traffic. The next

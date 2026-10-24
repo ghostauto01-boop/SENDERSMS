@@ -521,12 +521,26 @@ After deployment, here's what you need to set:
   cold start: the service worker serves the shell within ~2.5 s, the API client
   retries GETs with growing gaps, a "Waking the server up…" banner counts the
   seconds, and the public invoice page keeps retrying on its own instead of
-  showing an error to a customer paying. To remove the wait entirely, set the
-  repository variable `APP_BASE_URL` and enable `.github/workflows/keep-alive.yml`
-  (it runs every 10 minutes for free on a public repo). It pings only
-  `/api/v1/health`, which is deliberately database-free and does not wake the
-  inline poller — so the web instance stays warm without burning Neon's
-  compute hours.
+  showing an error to a customer paying.
+
+  To remove the wait entirely, ping the service every 10 minutes so it never
+  idles out. Pick **one** of these, both free, both touching only
+  `/api/v1/health`:
+
+  1. **GitHub Actions** — copy `deploy/github-actions-keepalive.yml` to
+     `.github/workflows/keep-alive.yml` (GitHub → *Add file* → *Create new
+     file*, type that exact path, paste). Then add the repository variable
+     `APP_BASE_URL = https://your-service.onrender.com` under
+     *Settings → Secrets and variables → Actions → Variables*. Without the
+     variable every run is a no-op, so a fork stays quiet.
+  2. **Any always-on box or cron** — `APP_BASE_URL=https://your-service.onrender.com
+     scripts/keep_alive.sh`, every 10 minutes.
+  3. **An external pinger** — cron-job.org (1-minute resolution) or
+     UptimeRobot (5 minutes) on the same URL.
+
+  `/api/v1/health` is deliberately database-free and does not wake the inline
+  poller — so the web instance stays warm without burning Neon's compute
+  hours. **Never point a pinger at a data route.**
 - Render free PostgreSQL expires after 90 days
 - Neon free tier: 0.5 GB storage, **100 compute-hours/month per project**. Neon suspends
   the compute after 5 min without queries; a database that is queried around the clock
