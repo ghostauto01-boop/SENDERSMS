@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import api from "../api/client";
 import { Contact, PaginatedResponse } from "../types";
 import toast from "react-hot-toast";
-import { Plus, Search, Trash2, Upload, Download, ChevronLeft, ChevronRight, X, ListPlus, MessageSquare, Phone, Mail, MapPin, Building2, User, CheckSquare, Square, IdCard, Sparkles, ShieldCheck } from "lucide-react";
+import { Plus, Search, Trash2, Upload, Download, ChevronLeft, ChevronRight, X, ListPlus, MessageSquare, Phone, Mail, MapPin, Building2, User, CheckSquare, Square, IdCard, Sparkles, ShieldCheck, Pencil } from "lucide-react";
 import ContactProfileModal from "../components/ContactProfileModal";
 import ContactActions from "../components/ContactActions";
 import ImportContactsModal from "../components/ImportContactsModal";
@@ -50,7 +50,7 @@ export default function ContactsPage() {
   // "Select all N matching" — the selection covers every contact matching the
   // current search/status across ALL pages, not just the 25 on screen.
   const [allMatching, setAllMatching] = useState(false);
-  const [showAdd, setShowAdd] = useState(false); const [showImport, setShowImport] = useState(false);
+  const [showAdd, setShowAdd] = useState(false); const [editingContact, setEditingContact] = useState<Contact | null>(null); const [showImport, setShowImport] = useState(false);
   const [showListModal, setShowListModal] = useState(false);
   const [selectedListId, setSelectedListId] = useState("");
   const [quickMsg, setQuickMsg] = useState(""); const [quickSendId, setQuickSendId] = useState<number|null>(null);
@@ -457,7 +457,7 @@ export default function ContactsPage() {
                   phone={c.phone_number}
                   name={`${c.first_name||""} ${c.last_name||""}`.trim()||c.business_name||undefined}
                   website={c.website}
-                  onSms={()=>{setQuickSendId(c.id);setQuickContact(c);setQuickMsg(`Hi ${c.first_name||c.business_name||"there"}! 👋 This is a quick message from our restaurant promo team. Reply STOP to opt out.`);}}
+                  onSms={()=>{setQuickSendId(c.id);setQuickContact(c);setQuickMsg(`Hi ${c.first_name||c.business_name||"there"}! 👋 This is a quick message from our restaurant promo team.`);}}
                 />
               </div>
               <div className="flex gap-2 px-3 pb-3">
@@ -577,6 +577,7 @@ export default function ContactsPage() {
                         website={c.website}
                         onSms={()=>{setQuickSendId(c.id);setQuickContact(c);setQuickMsg("")}}
                       />
+                      <button onClick={()=>setEditingContact(c)} className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-primary-600 hover:text-white text-gray-600 dark:text-gray-400 flex items-center justify-center" title="Edit contact"><Pencil size={14}/></button>
                       <button onClick={()=>setProfileId(c.id)} className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-primary-600 hover:text-white text-gray-600 dark:text-gray-400 flex items-center justify-center" title="View full profile"><IdCard size={14}/></button>
                       <button onClick={()=>handleDelete(c.id)} disabled={deletingId===c.id} className="w-8 h-8 rounded-full bg-danger-50 hover:bg-danger-500 hover:text-white text-danger-500 flex items-center justify-center disabled:opacity-50" title="Delete permanently">
                         {deletingId===c.id ? <span className="w-3.5 h-3.5 border-2 border-danger-500 border-t-transparent rounded-full animate-spin"/> : <Trash2 size={14}/>}
@@ -593,6 +594,7 @@ export default function ContactsPage() {
       </div>
 
       {showAdd && <AddContactModal lists={[]} onClose={()=>{setShowAdd(false);loadContacts()}} />}
+      {editingContact && <AddContactModal key={editingContact.id} lists={[]} contact={editingContact} onClose={()=>{setEditingContact(null);loadContacts()}} />}
       {showImport && <ImportContactsModal onClose={()=>setShowImport(false)} onDone={()=>{setShowImport(false);loadContacts()}}/>}
       {profileId !== null && <ContactProfileModal contactId={profileId} onClose={()=>setProfileId(null)}/>}
       {showListModal && <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4"><div className="bg-white dark:bg-gray-800 w-full sm:max-w-md rounded-t-2xl sm:rounded-xl p-4 sm:p-6 max-h-[92vh] overflow-y-auto"><div className="flex justify-between mb-4"><h2 className="text-lg font-semibold text-gray-900 dark:text-white">Add to List</h2><button onClick={()=>setShowListModal(false)} className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-900 flex items-center justify-center"><X size={16}/></button></div><p className="text-sm text-gray-500 mb-3">{allMatching ? `All ${total} matching contacts${search||leadStatus?" (current search & status)":""}` : `${selected.size} contacts`}</p><ListPicker value={selectedListId} onChange={setSelectedListId} placeholder="Select list... (or create one)" allowNone={false} /><button onClick={confirmAddToList} disabled={addingToList} className="bg-primary-600 text-white w-full rounded-full py-3 mt-4 font-semibold disabled:opacity-60">{addingToList ? "Adding…" : allMatching ? `Add all ${total} to list` : "Add to List"}</button></div></div>}
@@ -658,8 +660,16 @@ export default function ContactsPage() {
   );
 }
 
-function AddContactModal({ onClose }: { lists: any[]; onClose: () => void }) {
-  const [f, setF] = useState({ first_name:"",last_name:"",business_name:"",phone_number:"",email:"",city:"",state:"",website:"",industry:"",source:"",lead_status:"new",list_id:"" });
+function AddContactModal({ onClose, contact }: { lists: any[]; onClose: () => void; contact?: Contact }) {
+  const editing = Boolean(contact);
+  const [f, setF] = useState({
+    first_name: contact?.first_name || "", last_name: contact?.last_name || "",
+    business_name: contact?.business_name || "", phone_number: contact?.phone_number || "",
+    email: contact?.email || "", city: contact?.city || "", state: contact?.state || "",
+    website: contact?.website || "", industry: contact?.industry || "",
+    source: contact?.source || "", lead_status: contact?.lead_status || "new",
+    list_id: "", notes: contact?.notes || "",
+  });
   const [sub, setSub] = useState(false);
 
   const handle = async (e:React.FormEvent) => { e.preventDefault();
@@ -668,14 +678,22 @@ function AddContactModal({ onClose }: { lists: any[]; onClose: () => void }) {
     // with the reason, so this check only saves a round trip.
     if(!f.phone_number.trim() && !f.email.trim()){toast.error("Add a phone number or an email address");return;}
     setSub(true);
-    try { const res = await api.post("/contacts/", f);
-      if(f.list_id) { try { await api.post(`/lists/${f.list_id}/contacts`,[(res.data as any).id]); } catch {} }
-      toast.success("Contact created"); onClose();
+    try {
+      if (contact) {
+        const { list_id: _listId, ...payload } = f;
+        await api.put(`/contacts/${contact.id}`, payload);
+        toast.success("Contact updated");
+      } else {
+        const res = await api.post("/contacts/", f);
+        if(f.list_id) { try { await api.post(`/lists/${f.list_id}/contacts`,[(res.data as any).id]); } catch {} }
+        toast.success("Contact created");
+      }
+      onClose();
     } catch (err:any) { toast.error(err.response?.data?.detail||"Failed"); }
     finally { setSub(false); }
   };
 
-  return (<div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4"><div className="bg-white dark:bg-gray-800 w-full sm:max-w-lg max-h-[92vh] overflow-y-auto rounded-t-[20px] sm:rounded-2xl"><div className="sticky top-0 bg-primary-700 dark:bg-gray-800 px-4 py-3 flex items-center justify-between"><h2 className="text-white font-semibold flex items-center gap-2"><User size={18}/> Add Contact</h2><button onClick={onClose} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white"><X size={16}/></button></div>
+  return (<div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4"><div className="bg-white dark:bg-gray-800 w-full sm:max-w-lg max-h-[92vh] overflow-y-auto rounded-t-[20px] sm:rounded-2xl"><div className="sticky top-0 bg-primary-700 dark:bg-gray-800 px-4 py-3 flex items-center justify-between"><h2 className="text-white font-semibold flex items-center gap-2"><User size={18}/> {editing ? "Edit Contact" : "Add Contact"}</h2><button onClick={onClose} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white"><X size={16}/></button></div>
     <form onSubmit={handle} className="p-4 sm:p-6 space-y-3">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><div><label className="text-xs font-medium text-gray-600 dark:text-gray-400">First Name</label><input className="w-full mt-1 px-3 py-2.5 bg-gray-100 dark:bg-gray-900 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/20" value={f.first_name} onChange={e=>setF({...f,first_name:e.target.value})}/></div><div><label className="text-xs font-medium text-gray-600">Last Name</label><input className="w-full mt-1 px-3 py-2.5 bg-gray-100 dark:bg-gray-900 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/20" value={f.last_name} onChange={e=>setF({...f,last_name:e.target.value})}/></div></div>
       <div><label className="text-xs font-medium text-gray-600">Phone Number <span className="text-gray-400">(or email below)</span></label><input className="w-full mt-1 px-3 py-2.5 bg-gray-100 dark:bg-gray-900 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/20" placeholder="08012345678" value={f.phone_number} onChange={e=>setF({...f,phone_number:e.target.value})}/></div>
@@ -685,8 +703,9 @@ function AddContactModal({ onClose }: { lists: any[]; onClose: () => void }) {
       <div><label className="text-xs font-medium text-gray-600">Industry</label><input className="w-full mt-1 px-3 py-2.5 bg-gray-100 dark:bg-gray-900 rounded-xl text-sm" placeholder="Restaurant, Fast Food, etc." value={f.industry} onChange={e=>setF({...f,industry:e.target.value})}/></div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div><label className="text-xs font-medium text-gray-600">Lead Status</label><select className="w-full mt-1 px-3 py-2.5 bg-gray-100 dark:bg-gray-900 rounded-xl text-sm" value={f.lead_status} onChange={e=>setF({...f,lead_status:e.target.value})}>{LEAD_STATUSES.map(s=><option key={s} value={s}>{s}</option>)}</select></div>
-        <div><label className="text-xs font-medium text-gray-600">Add to List</label><div className="mt-1"><ListPicker value={f.list_id} onChange={v=>setF({...f,list_id:v})} placeholder="No list — pick or create one" /></div></div>
+        {!editing && <div><label className="text-xs font-medium text-gray-600">Add to List</label><div className="mt-1"><ListPicker value={f.list_id} onChange={v=>setF({...f,list_id:v})} placeholder="No list — pick or create one" /></div></div>}
       </div>
-      <div className="flex gap-2 pt-2"><button type="button" onClick={onClose} className="flex-1 py-3 rounded-full bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-white font-medium">Cancel</button><button type="submit" disabled={sub} className="flex-1 py-3 rounded-full bg-primary-600 text-white font-semibold disabled:opacity-50">{sub?"Creating...":"Create Contact"}</button></div>
+      <div><label className="text-xs font-medium text-gray-600">Notes</label><textarea className="w-full mt-1 px-3 py-2.5 bg-gray-100 dark:bg-gray-900 rounded-xl text-sm" rows={3} value={f.notes} onChange={e=>setF({...f,notes:e.target.value})}/></div>
+      <div className="flex gap-2 pt-2"><button type="button" onClick={onClose} className="flex-1 py-3 rounded-full bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-white font-medium">Cancel</button><button type="submit" disabled={sub} className="flex-1 py-3 rounded-full bg-primary-600 text-white font-semibold disabled:opacity-50">{sub ? (editing ? "Saving…" : "Creating…") : editing ? "Save Contact" : "Create Contact"}</button></div>
     </form></div></div>);
 }

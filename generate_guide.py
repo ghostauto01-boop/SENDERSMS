@@ -318,7 +318,7 @@ def build_pdf(output_path):
     story.append(make_table([header] + step_data, [10*mm, 35*mm, 125*mm]))
     story.append(Spacer(1,3*mm))
     story.append(p("Template to copy for Quick Start:", s_h3))
-    story.append(code_block("Hi {{first_name}}! 🍗 Chicken Republic {{city}} — Family Feast is 20% OFF today only!\n4 pcs chicken + chips + 2 drinks = ₦8,999 (was ₦11,200).\nShow this SMS at any Chicken Republic in {{city}}.\nReply MENU for full menu. STOP to opt out.\n— Chicken Republic"))
+    story.append(code_block("Hi {{first_name}}! 🍗 Chicken Republic {{city}} — Family Feast is 20% OFF today only!\n4 pcs chicken + chips + 2 drinks = ₦8,999 (was ₦11,200).\nShow this SMS at any Chicken Republic in {{city}}.\nReply MENU for full menu.\n— Chicken Republic"))
     story.append(p("Variables in {{double braces}} are replaced per contact. {{city}} for someone in Lekki becomes “Lekki”. If a field is empty we gracefully skip it.", s_small))
     story.extend(image_or_placeholder("docs/images/campaign_dashboard.jpg", width=150*mm, height=75*mm, caption="Fig. 2.1 — Campaigns dashboard with Scheduled badge and Send-at time localized to your timezone"))
 
@@ -415,15 +415,15 @@ def build_pdf(output_path):
     story.append(p("Restaurant Template Library — Copy/Paste", s_h2))
     story.append(p("All under 160 chars where possible (1 segment = cheapest). Emoji = 1 char but forces UCS-2 (70-char limit). We show segment count live — watch it.", s_body))
     templates = [
-        ["1. Flash Promo (all brands)", "Hi {{first_name}}! 🍗 {{business_name}} {{city}}: 20% OFF today only — Family Feast ₦8,999. Show this SMS. Reply MENU. STOP to opt out."],
-        ["2. New Branch (Kilimanjaro)", "Hello {{first_name}}, Kilimanjaro now open in {{city}}! 🎉 Free chapman on first visit this week. {{business_name}} — {{phone_number}}. STOP to stop."],
-        ["3. Pizza Combo (Domino's)", "Hey {{first_name}}! 🍕 Domino's {{city}} — Large pizza + 2 drinks = ₦9,500 till 9PM. Order: 0700-DOMINOS. STOP opt out."],
-        ["4. Breakfast Push (Sweet Sensation)", "Good morning {{first_name}}! Sweet Sensation {{city}} — Jollof + Chicken + Drink = ₦2,800 till 11AM. Walk in or call {{phone_number}}. STOP."],
-        ["5. Buffet / Lounge (The Place)", "Hi {{first_name}}, The Place {{city}} Friday Buffet is LIVE — ₦7,500 all-you-can-eat 7-11PM. Reserve: {{phone_number}}. Reply RESERVE. STOP."],
-        ["6. Corporate Bulk (Mama Gold)", "Hello {{business_name}}, Mama Gold {{city}} handles bulk orders from 20+ packs with free delivery in {{state}}. Quote? Reply BULK. STOP."],
-        ["7. Feedback (all)", "{{first_name}}, enjoyed {{business_name}} {{city}}? Tap to rate 1-5: reply 5=Love it! We read every reply. STOP."],
-        ["8. Re-engage Lapsed", "We miss you, {{first_name}}! 😊 {{business_name}} {{city}} — come back & get 15% OFF your next order. Code: COMEBACK15. STOP."],
-        ["9. Birthday (if you store DOB in notes)", "Happy Birthday {{first_name}}! 🎂 Sweet Sensation {{city}} gifts you ₦1,500 OFF cake today. Show ID + this SMS. STOP."],
+        ["1. Flash Promo (all brands)", "Hi {{first_name}}! 🍗 {{business_name}} {{city}}: 20% OFF today only — Family Feast ₦8,999. Show this SMS. Reply MENU."],
+        ["2. New Branch (Kilimanjaro)", "Hello {{first_name}}, Kilimanjaro now open in {{city}}! 🎉 Free chapman on first visit this week. {{business_name}} — {{phone_number}}."],
+        ["3. Pizza Combo (Domino's)", "Hey {{first_name}}! 🍕 Domino's {{city}} — Large pizza + 2 drinks = ₦9,500 till 9PM. Order: 0700-DOMINOS."],
+        ["4. Breakfast Push (Sweet Sensation)", "Good morning {{first_name}}! Sweet Sensation {{city}} — Jollof + Chicken + Drink = ₦2,800 till 11AM. Walk in or call {{phone_number}}."],
+        ["5. Buffet / Lounge (The Place)", "Hi {{first_name}}, The Place {{city}} Friday Buffet is LIVE — ₦7,500 all-you-can-eat 7-11PM. Reserve: {{phone_number}}. Reply RESERVE."],
+        ["6. Corporate Bulk (Mama Gold)", "Hello {{business_name}}, Mama Gold {{city}} handles bulk orders from 20+ packs with free delivery in {{state}}. Quote? Reply BULK."],
+        ["7. Feedback (all)", "{{first_name}}, enjoyed {{business_name}} {{city}}? Tap to rate 1-5: reply 5=Love it! We read every reply."],
+        ["8. Re-engage Lapsed", "We miss you, {{first_name}}! 😊 {{business_name}} {{city}} — come back & get 15% OFF your next order. Code: COMEBACK15."],
+        ["9. Birthday (if you store DOB in notes)", "Happy Birthday {{first_name}}! 🎂 Sweet Sensation {{city}} gifts you ₦1,500 OFF cake today. Show ID + this SMS."],
     ]
     for t in templates:
         title, body = t
@@ -655,7 +655,7 @@ def build_pdf(output_path):
             "list": "Lagos – CR Regulars – 2,100",
             "goal": "Fill Saturday lunch",
             "steps": [
-                "Template T1 (Fri 11 AM): “Hi {{first_name}}! 🍗 CR {{city}} Family Feast 20% OFF today+tomm — ₦8,999. Show SMS. STOP.”",
+                "Template T1 (Fri 11 AM): “Hi {{first_name}}! 🍗 CR {{city}} Family Feast 20% OFF today+tomm — ₦8,999. Show SMS..”",
                 "Wait 24h",
                 "If not replied → T2 (Sat 9 AM): “Last call {{first_name}} — Feast ends tonight 9PM. 2 extra drinks free if you order before noon!”",
                 "Wait 48h → T3 Feedback: “Enjoyed CR {{city}}? Rate 5=⭐⭐⭐⭐⭐”",
@@ -669,7 +669,7 @@ def build_pdf(output_path):
             "list": "VI + Lekki – Pizza Lovers – 840",
             "goal": "9 PM–Midnight orders",
             "steps": [
-                "T1 (Daily 8 PM): “Hey {{first_name}}! 🍕 Domino’s {{city}} — Large + 2 drinks ₦9,500 till midnight. 0700-DOMINOS. STOP.”",
+                "T1 (Daily 8 PM): “Hey {{first_name}}! 🍕 Domino’s {{city}} — Large + 2 drinks ₦9,500 till midnight. 0700-DOMINOS..”",
                 "Condition: if replied “ORDER” → stop (human takes over in Inbox); else wait 3 days → rotate topping promo",
             ],
             "schedule": "Daily 20:00 WAT (use recurring campaign via duplicate)",
@@ -681,7 +681,7 @@ def build_pdf(output_path):
             "list": "Ogudu + Ikeja – Morning – 560",
             "goal": "6–11 AM breakfast traffic",
             "steps": [
-                "T1 (Weekday 6:30 AM): “Good morning {{first_name}}! ☀️ SS {{city}} Breakfast Jollof ₦2,800 till 11AM. Walk-in. STOP.”",
+                "T1 (Weekday 6:30 AM): “Good morning {{first_name}}! ☀️ SS {{city}} Breakfast Jollof ₦2,800 till 11AM. Walk-in..”",
                 "Wait 3 days → T2: “Missed breakfast? Try our bakery box ₦3,500.”",
             ],
             "schedule": "Tue/Thu 06:30 WAT",
@@ -693,7 +693,7 @@ def build_pdf(output_path):
             "list": "Lekki – Lounge – 430",
             "goal": "Friday 7-11 PM covers",
             "steps": [
-                "T1 (Thu 4 PM): “Hi {{first_name}}, The Place {{city}} Friday Buffet LIVE ₦7,500 7-11PM. Reserve? Reply RESERVE. STOP.”",
+                "T1 (Thu 4 PM): “Hi {{first_name}}, The Place {{city}} Friday Buffet LIVE ₦7,500 7-11PM. Reserve? Reply RESERVE..”",
                 "If RESERVE → Auto-reply with Google Maps + “See you 7PM!”",
                 "Fri 10 AM follow-up to non-reservers: “2 tables left! Confirm now.”",
             ],
@@ -706,7 +706,7 @@ def build_pdf(output_path):
             "list": "Enugu – Students – 1,430",
             "goal": "New outlet footfall",
             "steps": [
-                "T1 (Opening day 9 AM): “Hello {{first_name}}, Kilimanjaro now open in {{city}}! Free chapman on first visit this week. STOP.”",
+                "T1 (Opening day 9 AM): “Hello {{first_name}}, Kilimanjaro now open in {{city}}! Free chapman on first visit this week..”",
                 "Wait 5 days → T2: “Student ID = 10% OFF this week only. Bring a friend!”",
             ],
             "schedule": "Opening day 09:00 WAT",
@@ -718,7 +718,7 @@ def build_pdf(output_path):
             "list": "Ibadan – Corporate – 210",
             "goal": "Bulk lunch orders 20+ packs",
             "steps": [
-                "T1 (Mon 10 AM): “Hello {{business_name}}, Mama Gold {{city}} handles bulk from 20 packs with free delivery in {{state}}. Reply BULK for quote. STOP.”",
+                "T1 (Mon 10 AM): “Hello {{business_name}}, Mama Gold {{city}} handles bulk from 20 packs with free delivery in {{state}}. Reply BULK for quote..”",
                 "If BULK → Inbox tag interested + manual quote in 1h",
                 "Thu → “Soup of the day: Egusi + Pounded Yam ₦2,200. Order till 2PM.”",
             ],
@@ -775,7 +775,6 @@ def build_pdf(output_path):
         "Front-load value: “20% OFF Family Feast — today only” in first 30 chars (preview).",
         "One clear CTA: “Reply MENU”, “Show this SMS”, “Call 0700…”. Not three.",
         "Emoji: 1 max for restaurants (🍗 🍕). More triggers UCS-2 (70-char limit) and looks spammy.",
-        "Always end with <b>“Reply STOP to opt out”</b> — builds trust + legal.",
         "Personalize at least {{first_name}} or {{city}} — lifts reply 25%.",
     ]:
         story.append(bullet(b))
@@ -810,7 +809,7 @@ def build_pdf(output_path):
         ["“Ticks stuck on single ✓”", "• Sent but not delivered — carrier delay. Poll every 3 min updates via poll_status_for_ids.\n• If never delivers after hours, number may be off or DND."],
         ["“Import skipped many”", "• “Duplicates” = phone already exists (we store +234). Check Invalid = malformed. Copy errors preview."],
         ["“Can’t edit running campaign?”", "• Frozen for audit: running/paused/completed can’t change message/list. Duplicate it (Copy) and edit copy."],
-        ["“Message shows STOP but didn’t opt out?”", "• Only inbound STOP opts out. Outbound “STOP to opt out” is just text. Inbound detection is case-insensitive."],
+        ["“Message shows STOP but didn’t opt out?”", "• Only inbound STOP opts out. Inbound detection is case-insensitive."],
     ]
     for q,a in faq:
         story.append(p(f"<b>Q: {q}</b>", s_h3))

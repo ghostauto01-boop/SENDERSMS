@@ -40,6 +40,7 @@ const MENU: NavItem[] = [
   { to: "/invoices", label: "Invoices", icon: ReceiptText },
   { to: "/contacts", label: "Contacts", icon: Users },
   { to: "/send", label: "Send", icon: Send },
+  { to: "/drafts", label: "Drafts", icon: FileText },
   { to: "/analytics", label: "Analytics", icon: BarChart3 },
 ];
 

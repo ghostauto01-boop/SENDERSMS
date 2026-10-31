@@ -12,6 +12,7 @@ and the rule that a guessed address is never marked verified.
 """
 
 import json
+from datetime import datetime, timezone
 
 import pytest
 import pytest_asyncio
@@ -22,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.database import Base, get_db
 from app.models.contact import Contact
 from app.models.contact_list import ContactList, ContactListMember
+from app.models.suppression import SuppressionEntry
 from app.models.user import User
 from app.security.auth import get_current_user
 from app.services.csv_service import detect_column_mapping
@@ -893,3 +895,35 @@ class TestGuessedAddressesCanSend:
         r = await client.get("/api/v1/contacts/", params={"email_state": "inferred"})
         assert r.status_code == 200
         assert r.json()["total"] == 1
+
+
+@pytest.mark.asyncio
+async def test_sms_opt_in_requires_confirmation_and_removes_suppression(client, db):
+    contact = Contact(
+        phone_number="+2348031234567", email="ada@example.com",
+        is_opted_out=True, opted_out_at=datetime.now(timezone.utc),
+        opt_out_reason="Keyword:STOP", consent_status="opted_out", has_consented=False,
+    )
+    db.add(contact)
+    await db.flush()
+    db.add(SuppressionEntry(
+        phone_number=contact.phone_number, contact_id=contact.id,
+        reason="Opt-out:STOP", source="keyword",
+    ))
+    await db.flush()
+
+    refused = await client.post(f"/api/v1/contacts/{contact.id}/sms-opt-in", json={})
+    assert refused.status_code == 400
+    assert contact.is_opted_out is True
+
+    restored = await client.post(
+        f"/api/v1/contacts/{contact.id}/sms-opt-in", json={"consent_confirmed": True}
+    )
+    assert restored.status_code == 200, restored.text
+    assert restored.json()["consent_status"] == "opted_in"
+    assert contact.is_opted_out is False
+    assert contact.has_consented is True
+    assert contact.opt_out_reason is None
+    assert (await db.execute(
+        select(SuppressionEntry).where(SuppressionEntry.phone_number == contact.phone_number)
+    )).scalar_one_or_none() is None

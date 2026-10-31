@@ -28,6 +28,7 @@ const TemplatesPage = lazy(() => import("./pages/TemplatesPage"));
 const AnalyticsPage = lazy(() => import("./pages/AnalyticsPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const SendPage = lazy(() => import("./pages/SendPage"));
+const DraftsPage = lazy(() => import("./pages/DraftsPage"));
 const AutoReplyPage = lazy(() => import("./pages/AutoReplyPage"));
 const AutomationsPage = lazy(() => import("./pages/AutomationsPage"));
 const VariablesPage = lazy(() => import("./pages/VariablesPage"));
@@ -131,6 +132,7 @@ function AppRoutes() {
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/setup" element={<SetupPage />} />
         <Route path="/send" element={<SendPage />} />
+        <Route path="/drafts" element={<DraftsPage />} />
         <Route path="/auto-reply" element={<AutoReplyPage />} />
         <Route path="/automations" element={<AutomationsPage />} />
         <Route path="/variables" element={<VariablesPage />} />

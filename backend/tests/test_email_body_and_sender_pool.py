@@ -1,10 +1,8 @@
-"""Regression tests: email body rendering, footer unsubscribe, sender pools.
+"""Regression tests: email body rendering, footer removal, sender pools.
 
-The blank-email bug: ``apply_unsubscribe`` returned the unsubscribe line
-*instead of* the rendered text whenever a body existed, and plain-text
-creatives got no HTML part at all — so Brevo sent an email whose only
-content was the unsubscribe link. These tests pin the body in place across
-the text part, the HTML part and the Brevo payload, and pin the new
+Outbound message bodies must remain unchanged; opt-out headers and inbound
+opt-out processing are handled separately. These tests pin the body in place
+across the text part, the HTML part and the Brevo payload, and pin the new
 OPTIONAL multi-sender pool (off = legacy single-sender behaviour).
 """
 
@@ -63,37 +61,23 @@ async def _contact(db, email="ada@example.com", name="Ada"):
 
 
 # ==========================================================================
-# Part A/B — body survives, unsubscribe lives in the footer only
+# Part A/B — outbound bodies never receive an unsubscribe footer
 # ==========================================================================
 
 
-def test_apply_unsubscribe_preserves_plain_text_body():
+def test_apply_unsubscribe_leaves_plain_text_body_unchanged():
     body = "Hi ada@example.com, this is my message. Reply if interested. Best, Moh"
     text, html = email_service.apply_unsubscribe(body, None, "ada@example.com")
-
-    # The body is the email; the unsubscribe line comes AFTER it, once.
-    assert text.startswith(body)
-    assert text.count("Unsubscribe:") == 1
-    assert "Unsubscribe: https://app.example.test/api/v1/email/unsubscribe?e=ada%40example.com&t=" in text
-    # A plain-text creative still gets a real HTML part holding the BODY
-    # plus the footer button — not an HTML part holding only the button.
-    assert body in html
-    assert 'class="email-footer"' in html
-    assert "font-size:12px" in html  # small, per the footer spec
-    assert html.count(">Unsubscribe</a>") == 1
-    # Footer is inside the document, not stapled after </html>.
-    assert html.index('class="email-footer"') < html.index("</body>")
+    assert text == body
+    assert html is None
 
 
-def test_apply_unsubscribe_preserves_html_body_and_is_idempotent():
-    text, html = email_service.apply_unsubscribe(
-        "Hello there", "<html><body><p>Hello there</p></body></html>", "ada@example.com"
-    )
-    assert text.startswith("Hello there")
-    assert "<p>Hello there</p>" in html
-    assert html.index('class="email-footer"') < html.index("</body>")
-    again_text, again_html = email_service.apply_unsubscribe(text, html, "ada@example.com")
-    assert (again_text, again_html) == (text, html)
+def test_apply_unsubscribe_leaves_html_body_unchanged():
+    body_text = "Hello there"
+    body_html = "<html><body><p>Hello there</p></body></html>"
+    text, html = email_service.apply_unsubscribe(body_text, body_html, "ada@example.com")
+    assert text == body_text
+    assert html == body_html
 
 
 @pytest.mark.asyncio
@@ -109,9 +93,9 @@ async def test_render_email_renders_tokens_and_unsubscribes_the_recipient(db):
     assert rendered["subject"] == "Hi Ada"
     assert rendered["text"].startswith("Hi Ada, this is my message.")
     assert "{{first_name}}" not in rendered["text"]
-    # The signed token names the RECIPIENT, not the sender's reply-to.
-    assert "e=ada%40example.com" in rendered["text"]
-    assert "e=sender%40acme-leads.io" not in rendered["text"]
+    # No unsubscribe URL or button is appended to the visible message body.
+    assert "unsubscribe" not in rendered["text"].lower()
+    assert "unsubscribe" not in rendered["html"].lower()
     assert "Hi Ada, this is my message." in rendered["html"]
 
 
@@ -321,13 +305,13 @@ async def test_ads_dispatch_sends_full_personalized_bodies_from_rotating_senders
     ).scalars().all()
     assert len(messages) == 5
     for message, contact, name in zip(messages, contacts, names):
-        # Body first, footer after — never a blank email with only a link.
-        assert message.body.startswith(f"Hi {name}, this is my message.")
+        # The creative body is sent as written, without an appended footer.
+        assert message.body == f"Hi {name}, this is my message. Reply if interested. Best, Moh"
         assert message.subject == f"Hi {name}"
-        assert message.body.count("Unsubscribe:") == 1
-        assert f"e=lead{contacts.index(contact)}%40acme-leads.io" in message.body
-        assert f"Hi {name}, this is my message." in (message.html_body or "")
-        assert 'class="email-footer"' in (message.html_body or "")
+        assert "unsubscribe" not in message.body.lower()
+        if message.html_body:
+            assert f"Hi {name}, this is my message." in message.html_body
+            assert "unsubscribe" not in message.html_body.lower()
     # The pool actually rotated: no single From took all five.
     assert [m.from_address for m in messages] == [
         "one@acme-leads.io", "two@acme-leads.io", "one@acme-leads.io",

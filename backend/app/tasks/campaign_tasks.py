@@ -695,10 +695,8 @@ async def _send_template_message(
             cc.last_error = "Email body is empty"
             logger.error("Campaign %s has an empty email body; skipping contact %s", campaign.id, contact.id)
             return
-        # Campaign mail is bulk mail, so it carries the one-click unsubscribe the
-        # Gmail/Yahoo bulk-sender rules ask for: the List-Unsubscribe headers for
-        # the machines (added in build_headers) and one footer button for the
-        # reader — signed for the RECIPIENT, not the sender's reply-to.
+        # The compatibility helper intentionally leaves the email body alone.
+        # Bulk-send List-Unsubscribe headers are added separately in build_headers.
         body, html_body = email_service.apply_unsubscribe(
             body or "", html_body, (contact.email or "").strip(),
         )

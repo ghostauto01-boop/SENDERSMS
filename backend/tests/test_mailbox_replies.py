@@ -1,4 +1,4 @@
-"""Email replies: the connected-mailbox pipeline, and the unsubscribe button.
+"""Email replies: the connected-mailbox pipeline and visible footer removal.
 
 Two problems are covered here, because they share one code path.
 
@@ -13,9 +13,8 @@ field names, which were wrong (``TextBody``/``Date``/``inReplyTo`` instead of
 ``RawTextBody``/``SentAtDate``/``InReplyTo``) and so silently stored empty
 bodies on a fresh thread.
 
-**"Just add a button."** The unsubscribe footer used to be a two-sentence
-paragraph stapled onto every email, including one-to-one replies. It is now a
-single small button, emitted on bulk mail only.
+Visible unsubscribe links are not appended to outbound message bodies. Bulk
+List-Unsubscribe headers and inbound opt-out handling remain covered separately.
 
 Everything runs offline: IMAP/SMTP/Gmail REST are monkeypatched at the provider
 boundary, so the assertions are about our behaviour, not Google's.
@@ -120,28 +119,22 @@ async def _outgoing(db, contact, *, rfc_id="<sent-1@app.example.test>", subject=
 
 
 # ==========================================================================
-# 1. The unsubscribe button (and nothing else)
+# 1. Visible unsubscribe footer removal
 # ==========================================================================
 
 
 @pytest.mark.asyncio
-async def test_bulk_email_carries_a_button_not_a_paragraph(db):
+async def test_bulk_email_body_has_no_unsubscribe_footer(db):
     contact = await _contact(db)
     account = await _account(db, from_email="hello@acme-leads.io")
     rendered = await email_service.render_email(
         db, contact, subject="Hi {{first_name}}", text_body="Hello", html_body="<p>Hello</p>",
         account=account, append_unsubscribe=True,
     )
-    assert rendered["html"].count(">Unsubscribe</a>") == 1
-    # The signed token names the RECIPIENT (prospect@acme.com) — it used to
-    # name the sender's own address, so the link unsubscribed the sender.
-    assert "/api/v1/email/unsubscribe?e=prospect%40acme.com" in rendered["html"]
-    assert rendered["text"].strip().endswith("Unsubscribe: https://app.example.test/api/v1/email/unsubscribe?e=prospect%40acme.com&t=" +
-                                             email_service._unsubscribe_token("prospect@acme.com"))
-    # The old wording must be gone for good — it read as a legal paragraph.
-    for phrase in ("click here", "no longer wish", "will no longer", "If you'd prefer"):
-        assert phrase.lower() not in rendered["html"].lower()
-        assert phrase.lower() not in rendered["text"].lower()
+    assert rendered["text"] == "Hello"
+    assert rendered["html"] == "<p>Hello</p>"
+    assert "Unsubscribe" not in rendered["text"]
+    assert "Unsubscribe" not in rendered["html"]
 
 
 @pytest.mark.asyncio
