@@ -380,15 +380,34 @@
   }
   /* Sender HTML arrives with its own (light-mode) colours. In dark mode its
      text inherits the readable foreground and its links take the mint token. */
+  .email-reader-body {
+    color: var(--email-text-primary);
+    background-color: var(--email-bg-primary);
+    overflow-wrap: anywhere;
+    min-width: 0;
+  }
+  .email-reader-body iframe {
+    width: 100%;
+    border: 0;
+  }
+  .email-reader-body img {
+    max-width: 100%;
+    height: auto;
+  }
+  .email-reader-body table {
+    max-width: 100%;
+  }
   .email-body-content {
     color: var(--email-text-primary);
     background-color: var(--email-bg-secondary);
     overflow-wrap: anywhere;
   }
-  .dark .email-body-content :where(p, div, span, li, td, th, h1, h2, h3, h4, h5, h6, blockquote, font) {
+  .dark .email-body-content :where(p, div, span, li, td, th, h1, h2, h3, h4, h5, h6, blockquote, font),
+  .dark .email-reader-body :where(p, div, span, li, td, th, h1, h2, h3, h4, h5, h6, blockquote, font) {
     color: inherit !important;
   }
-  .dark .email-body-content a {
+  .dark .email-body-content a,
+  .dark .email-reader-body a {
     color: var(--email-link) !important;
   }
 }
