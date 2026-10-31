@@ -27,6 +27,7 @@ export default function ContactProfileModal({
   //: Email side of this contact — opens, clicks, the links clicked. Loaded in
   //: parallel and shown only when the contact has email history.
   const [engagement, setEngagement] = useState<any>(null);
+  const [restoringOptIn, setRestoringOptIn] = useState<"sms" | "email" | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -58,6 +59,36 @@ export default function ContactProfileModal({
   const copy = (shortcode: string) => {
     navigator.clipboard?.writeText(`{{${shortcode}}}`);
     toast.success(`Copied {{${shortcode}}}`);
+  };
+
+  const restoreSmsOptIn = async () => {
+    if (!window.confirm("Only continue if this contact has explicitly agreed to receive SMS again. Restore SMS permission?")) return;
+    setRestoringOptIn("sms");
+    try {
+      await api.post(`/contacts/${contactId}/sms-opt-in`, { consent_confirmed: true });
+      const { data } = await api.get(`/variables/contact/${contactId}/profile`);
+      setProfile(data);
+      toast.success("SMS permission restored");
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || "Could not restore SMS permission");
+    } finally {
+      setRestoringOptIn(null);
+    }
+  };
+
+  const restoreEmailOptIn = async () => {
+    if (!window.confirm("Only continue if this contact has explicitly agreed to receive email again. Restore email permission?")) return;
+    setRestoringOptIn("email");
+    try {
+      await api.post(`/contacts/${contactId}/email-opt-in`);
+      const data = await emailApi.engagement(contactId);
+      setEngagement(data);
+      toast.success("Email permission restored");
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || "Could not restore email permission");
+    } finally {
+      setRestoringOptIn(null);
+    }
   };
 
   const filled = profile?.fields.filter((field) => field.value) || [];
@@ -103,6 +134,17 @@ export default function ContactProfileModal({
                 name={profile.display_name}
                 website={(profile.fields.find((f) => f.shortcode === "website") || {}).value as string | null | undefined}
               />
+              {profile.is_opted_out && (
+                <div className="flex items-center justify-between gap-3 rounded-lg border border-warning-200 bg-warning-50 dark:bg-warning-950/20 p-3">
+                  <div>
+                    <p className="text-sm font-medium">SMS is opted out</p>
+                    <p className="text-xs text-gray-500">Restore only after confirming fresh consent.</p>
+                  </div>
+                  <button onClick={restoreSmsOptIn} disabled={restoringOptIn !== null} className="btn-secondary btn-sm shrink-0">
+                    {restoringOptIn === "sms" ? "Restoring…" : "Restore SMS"}
+                  </button>
+                </div>
+              )}
               {engagement && (engagement.totals?.sent > 0 || engagement.email) && (
                 <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-3 space-y-2">
                   <div className="flex items-center justify-between gap-2">
@@ -123,6 +165,11 @@ export default function ContactProfileModal({
                   </div>
                   {engagement.email && (
                     <p className="text-xs text-gray-500 truncate">{engagement.email}</p>
+                  )}
+                  {engagement.is_email_opted_out && (
+                    <button onClick={restoreEmailOptIn} disabled={restoringOptIn !== null} className="btn-secondary btn-sm">
+                      {restoringOptIn === "email" ? "Restoring…" : "Restore email (after confirming consent)"}
+                    </button>
                   )}
                   <div className="grid grid-cols-4 gap-2 text-center text-sm">
                     <div>

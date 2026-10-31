@@ -1499,8 +1499,7 @@ async def dispatch_campaign(
                 assignment.next_attempt_at = now_utc() + timedelta(minutes=30)
                 skip("empty_body")
                 continue
-            # Footer-only unsubscribe, signed for the RECIPIENT (this used to
-            # pass the sender's reply-to, so the link unsubscribed the sender).
+            # Keep the body unchanged; bulk unsubscribe headers are added separately.
             rendered, rendered_html = email_service.apply_unsubscribe(
                 rendered, rendered_html, (contact.email or "").strip(),
             )

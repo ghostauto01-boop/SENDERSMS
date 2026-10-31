@@ -129,14 +129,22 @@ function ScheduleModal({
 export default function CampaignsPage({
   embedded = false,
   fixedChannel,
+  unifiedDrafts = false,
 }: {
   /** Rendered as a panel inside a manager: no page heading, no channel switch. */
   embedded?: boolean;
   /** Pin the list to one channel instead of following the app-wide switch. */
   fixedChannel?: "sms" | "email";
+  /** One review page for SMS and email campaign drafts. */
+  unifiedDrafts?: boolean;
 } = {}) {
   const { channel: activeChannel } = useChannel();
-  const channel = fixedChannel ?? activeChannel;
+  const [draftChannel, setDraftChannel] = useState<"all" | "sms" | "email">("all");
+  const [createChannel, setCreateChannel] = useState<"sms" | "email">("sms");
+  const channel = unifiedDrafts ? draftChannel : fixedChannel ?? activeChannel;
+  const modalChannel: "sms" | "email" = unifiedDrafts
+    ? createChannel
+    : channel === "email" ? "email" : "sms";
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -156,7 +164,9 @@ export default function CampaignsPage({
     try {
       setLoading(true);
       setError(null);
-      const { data } = await api.get("/campaigns/", { params: { channel } });
+      const { data } = await api.get("/campaigns/", {
+        params: { channel, ...(unifiedDrafts ? { status: "draft" } : {}) },
+      });
       setCampaigns(data.items);
       // Best-effort: the page is fully usable without it.
       api.get("/overview/campaigns")
@@ -188,6 +198,11 @@ export default function CampaignsPage({
   };
 
   const handleAction = async (id: number, action: string) => {
+    if (unifiedDrafts && action === "start") {
+      const campaign = campaigns.find((item) => item.id === id);
+      const channelLabel = campaign?.channel === "email" ? "email" : "SMS";
+      if (!window.confirm(`Send “${campaign?.name || "this campaign"}” to its selected audience now by ${channelLabel}?`)) return;
+    }
     try {
       const { data } = await api.post(`/campaigns/${id}/${action}`);
       // The server says what actually happened (and when nothing did).
@@ -272,7 +287,33 @@ export default function CampaignsPage({
 
   return (
     <div className="space-y-4">
-      {embedded ? (
+      {unifiedDrafts ? (
+        <div className="space-y-3">
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div>
+              <h1 className="page-title">Drafts</h1>
+              <p className="page-subtitle">Review and edit SMS or email campaign drafts before you validate, schedule, or send them.</p>
+              <p className="text-xs text-gray-500 mt-1">MCP-created campaigns saved as drafts appear here too.</p>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => { setCreateChannel("sms"); setShowCreate(true); }} className="btn-secondary btn-sm">
+                <Plus size={14} className="mr-1" /> SMS draft
+              </button>
+              <button onClick={() => { setCreateChannel("email"); setShowCreate(true); }} className="btn-primary btn-sm">
+                <Plus size={14} className="mr-1" /> Email draft
+              </button>
+            </div>
+          </div>
+          <div className="flex gap-2" role="tablist" aria-label="Draft channel">
+            {(["all", "sms", "email"] as const).map((filter) => (
+              <button key={filter} role="tab" aria-selected={draftChannel === filter}
+                onClick={() => setDraftChannel(filter)} className={`chip ${draftChannel === filter ? "chip-active" : ""}`}>
+                {filter === "all" ? "All drafts" : filter === "sms" ? "SMS" : "Email"}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : embedded ? (
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div>
             <h2 className="text-base font-semibold">Bulk campaigns</h2>
@@ -315,7 +356,9 @@ export default function CampaignsPage({
           <div className="card p-12 text-center text-gray-500">
             <Megaphone size={48} className="mx-auto mb-2 opacity-30" />
             <p>
-              No {channel === "email" ? "email" : "SMS"} campaigns yet. Create your first one.
+              {unifiedDrafts
+                ? `No ${channel === "all" ? "" : channel === "email" ? "email " : "SMS "}drafts yet. Create a draft or ask your MCP assistant to prepare one.`
+                : `No ${channel === "email" ? "email" : "SMS"} campaigns yet. Create your first one.`}
             </p>
           </div>
         ) : (
@@ -476,7 +519,7 @@ export default function CampaignsPage({
 
       {showCreate && (
         <CampaignModal
-          channel={channel}
+          channel={modalChannel}
           onClose={() => { setShowCreate(false); loadCampaigns(); }}
         />
       )}

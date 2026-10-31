@@ -104,6 +104,26 @@ beforeEach(() => {
 });
 
 describe("CampaignsPage lifecycle", () => {
+  it("shows email and SMS drafts together in the review hub", async () => {
+    apiGet.mockImplementation((url: string) => {
+      if (url === "/campaigns/") return Promise.resolve({
+        data: { total: 2, items: [ITEMS[0], campaign({ id: 5, name: "Email draft", channel: "email" })] },
+      });
+      if (url === "/overview/campaigns") return Promise.resolve({ data: { items: [] } });
+      return Promise.resolve({ data: {} });
+    });
+    render(<MemoryRouter><CampaignsPage unifiedDrafts /></MemoryRouter>);
+
+    await waitFor(() => {
+      expect(screen.getByText("Draft one")).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Email draft" })).toBeInTheDocument();
+    });
+    expect(apiGet).toHaveBeenCalledWith("/campaigns/", {
+      params: { channel: "all", status: "draft" },
+    });
+    expect(screen.getByRole("heading", { name: "Drafts" })).toBeInTheDocument();
+  });
+
   it("Validate only reports: it calls /validate and never starts or schedules", async () => {
     apiPost.mockResolvedValueOnce({
       data: { valid: false, errors: ["No contact list selected"], message: "1 problem(s) found." },

@@ -381,7 +381,7 @@ function SmsSendPage() {
                 showPreview={false}
               />
               <div className="relative">
-                <textarea ref={msgRef} className="w-full px-3 py-3 bg-gray-100 dark:bg-gray-900 rounded-xl text-[15px] placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-600/20 resize-none" rows={6} placeholder="Hi {{first_name}}, craving something tasty? 🍗 At Chicken Republic… Reply STOP to opt out" value={message} onChange={e=>setMessage(e.target.value)} maxLength={1600}/>
+                <textarea ref={msgRef} className="w-full px-3 py-3 bg-gray-100 dark:bg-gray-900 rounded-xl text-[15px] placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-600/20 resize-none" rows={6} placeholder="Hi {{first_name}}, craving something tasty? 🍗 At Chicken Republic…" value={message} onChange={e=>setMessage(e.target.value)} maxLength={1600}/>
                 <span className="absolute bottom-2 right-2 text-[11px] bg-white dark:bg-gray-700 px-2 py-0.5 rounded-full text-gray-500 shadow-sm">{charCount} chars</span>
               </div>
               <div className="flex justify-between text-xs text-gray-500">

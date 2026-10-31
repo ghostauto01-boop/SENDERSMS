@@ -882,7 +882,7 @@ PROMPTS = [
                         "use real HTML: a short opener, one clear ask, one link, and the "
                         "{{first_name}} variable.\n"
                         "4. send_test_email() or preview_template() and show me the result.\n"
-                        "5. create_campaign(status draft) → validate_campaign() → ask me to confirm "
+                        "5. create_campaign (draft; visible in the Drafts review page) → validate_campaign() → ask me to confirm "
                         "→ start_campaign().\n"
                         "Then report what was sent and to how many people."
                     ),

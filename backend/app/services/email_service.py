@@ -1363,116 +1363,17 @@ async def build_headers(
     return headers
 
 
-#: The whole visible unsubscribe mechanism: one button, nothing else.
-#:
-#: Gmail's and Yahoo's bulk-sender rules require an *easy* unsubscribe, and the
-#: ``List-Unsubscribe`` + ``List-Unsubscribe-Post`` headers already satisfy the
-#: machine-readable half. What used to be appended here was a three-line
-#: sentence telling the reader to reply with the word UNSUBSCRIBE, which read
-#: like a newsletter disclaimer on mail that was meant to look personal, and
-#: which spam filters weigh as marketing copy. A button is what a real sender
-#: puts in the mail; the keyword unsubscribe still works if anybody replies with
-#: it (see ``looks_like_unsubscribe``), it is simply no longer advertised in a
-#: paragraph.
-_UNSUBSCRIBE_BUTTON = (
-    '<div class="email-footer" style="margin-top:32px;padding-top:16px;'
-    'border-top:1px solid #e5e7eb;text-align:center">'
-    '<a href="{url}" target="_blank" rel="noopener" style="display:inline-block;'
-    'padding:6px 14px;border:1px solid #e5e7eb;border-radius:6px;background:#f3f4f6;'
-    'color:#6b7280;font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,Helvetica,'
-    'Arial,sans-serif;font-size:12px;line-height:18px;text-decoration:none">'
-    'Unsubscribe</a></div>'
-)
-
-
-def unsubscribe_button_html(url: str) -> str:
-    """The footer-only unsubscribe block appended to bulk HTML mail.
-
-    Deliberately a footer, never part of the message body: small (12px),
-    grey-on-grey, separated from the copy by a hairline — present for the
-    reader (and for Gmail/Yahoo bulk-sender rules) without making the mail
-    read as a newsletter blast.
-    """
-    return _UNSUBSCRIBE_BUTTON.format(url=url)
-
-
-def _append_html_footer(html: str, footer: str) -> str:
-    """Insert *footer* inside ``</body>`` when there is one, else append it.
-
-    Appending after ``</html>`` (what a bare ``html + footer`` does to the
-    shell :func:`text_to_html` produces) puts the footer outside the
-    document; some clients drop everything out there, button included.
-    """
-    lowered = html.lower()
-    for closing in ("</body>", "</html>"):
-        idx = lowered.rfind(closing)
-        if idx != -1:
-            return html[:idx] + footer + html[idx:]
-    return html + footer
-
-
-def unsubscribe_line_text(url: str) -> str:
-    """The plain-text equivalent: one line, no paragraph.
-
-    A text alternative is mandatory — HTML-only mail is a spam signal — but it is
-    a single short line rather than instructions.
-    """
-    return f"\n\nUnsubscribe: {url}"
-
-
 def apply_unsubscribe(
     text: str, html: str | None, address: str | None
 ) -> tuple[str, str | None]:
-    """Append the unsubscribe button to a rendered body, when there is a URL.
+    """Keep outbound message bodies unchanged; opt-out remains header-based.
 
-    Returns the bodies unchanged when no signed unsubscribe URL can be built
-    (``PUBLIC_BASE_URL`` unset), because a button that goes nowhere is worse than
-    no button: the ``List-Unsubscribe`` header still carries the ``mailto:``
-    fallback in that case.
+    This compatibility helper is still called by campaign and ads send paths,
+    but deliberately adds no visible unsubscribe footer or text to the body.
+    Bulk email's List-Unsubscribe headers are built separately by
+    :func:`build_headers`, and inbound opt-out handling remains active.
     """
-    url = unsubscribe_url(address or "")
-    if not url:
-        return text or "", html
-    body_text = text or ""
-    # Idempotent: a retry/re-render must never stack a second footer.
-    if url in body_text and html and url in html:
-        return body_text, html
-    # The body ALWAYS survives. The previous implementation returned
-    # ``unsubscribe_line_text(url)`` *instead of* the text whenever a body
-    # existed (a missing ``body_text +``), so every bulk email Brevo sent
-    # contained nothing but the unsubscribe line — the blank-email bug.
-    new_text = (
-        body_text.rstrip() + unsubscribe_line_text(url)
-        if body_text.strip()
-        else f"Unsubscribe: {url}"
-    )
-    if (html or "").strip():
-        new_html = html if url in html else _append_html_footer(html, unsubscribe_button_html(url))
-    elif body_text.strip():
-        # Plain-text-only copy still gets a real HTML part with the footer
-        # button in it, rather than an HTML part holding only the button.
-        new_html = _append_html_footer(text_to_html(body_text), unsubscribe_button_html(url))
-    else:
-        new_html = html
-    if url in body_text:  # text already carried the line; only the HTML needed it
-        new_text = body_text
-    logger.debug(
-        "EMAIL: unsubscribe footer applied recipient=%s text_len=%d html_len=%d",
-        bool(address), len(new_text), len(new_html or ""),
-    )
-    return new_text, new_html
-
-
-def _unsubscribe_footer(account: EmailAccount | None) -> str:
-    """Deprecated shim: the footer is a button now, not a sentence.
-
-    Kept as a thin wrapper so anything that imported it keeps working; it
-    returns the one-line text form only.
-    """
-    if account is None:
-        return ""
-    url = unsubscribe_url((account.reply_to or account.from_email or "").strip())
-    return unsubscribe_line_text(url) if url else ""
+    return text or "", html
 
 
 async def render_email(
@@ -1492,9 +1393,8 @@ async def render_email(
     channels. Any short code the contact has no value for is removed rather
     than mailed out verbatim.
 
-    ``append_unsubscribe`` adds the one-button unsubscribe (bulk mail only — a
-    personal one-to-one email carries no visible unsubscribe, exactly as it
-    carries no ``List-Unsubscribe`` header).
+    ``append_unsubscribe`` is retained for backwards compatibility. Outbound
+    message bodies no longer receive an unsubscribe footer.
     """
     from app.services.variable_service import render_for_contact
 
@@ -1582,9 +1482,8 @@ async def queue_email(
     if not (text_body or "").strip() and (html_body or "").strip():
         text_body = html_to_text(html_body)
 
-    # Only bulk mail carries a visible unsubscribe: a one-to-one email that ends
-    # in "click here to unsubscribe" reads as marketing, and Gmail reads it that
-    # way too. Bulk mail gets the button plus the List-Unsubscribe headers.
+    # Bulk email gets machine-readable List-Unsubscribe headers, but no visible
+    # unsubscribe footer is appended to the message body.
     rendered = await render_email(
         db, contact,
         subject=subject, text_body=text_body, html_body=html_body,

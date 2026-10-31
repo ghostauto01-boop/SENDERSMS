@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.contact import Contact, Tag, ContactTag
+from app.models.suppression import SuppressionEntry
 from app.models.contact_list import ContactList, ContactListMember
 from app.models.import_job import ContactImportJob
 from app.models.user import User
@@ -1765,6 +1766,36 @@ async def email_opt_in(
         contact.email_status = "active"
     await db.commit()
     return {"success": True, "is_email_opted_out": False, "email_status": contact.email_status}
+
+
+@router.post("/{contact_id}/sms-opt-in")
+async def sms_opt_in(
+    contact_id: int,
+    confirmation: dict = Body(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Restore SMS permission only after an operator confirms fresh consent."""
+    if confirmation.get("consent_confirmed") is not True:
+        raise HTTPException(400, "Confirm that the contact has explicitly consented before restoring SMS")
+    contact = (await db.execute(select(Contact).where(Contact.id == contact_id))).scalar_one_or_none()
+    if not contact:
+        raise HTTPException(status_code=404, detail="Contact not found")
+    if not contact.phone_number:
+        raise HTTPException(400, "Contact has no phone number")
+    suppression = (await db.execute(
+        select(SuppressionEntry).where(SuppressionEntry.phone_number == contact.phone_number)
+    )).scalar_one_or_none()
+    if suppression is not None:
+        await db.delete(suppression)
+    contact.is_opted_out = False
+    contact.opted_out_at = None
+    contact.opt_out_reason = None
+    contact.has_consented = True
+    contact.consent_status = "opted_in"
+    contact.updated_at = datetime.now(timezone.utc)
+    await db.commit()
+    return {"success": True, "is_opted_out": False, "consent_status": contact.consent_status}
 
 
 @router.get("/{contact_id}/activity")

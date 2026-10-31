@@ -788,17 +788,16 @@ async def _optional_steps(db: AsyncSession) -> list[dict]:
         "unsubscribe", "optional", "Unsubscribe handling",
         status=DONE if (accounts or public_base_url()) else ATTENTION,
         why=(
-            "Gmail and Yahoo require one-click unsubscribe on bulk mail, and a complaint rate above "
-            "0.3% gets you filtered. Bulk mail carries a small Unsubscribe button plus the "
-            "List-Unsubscribe headers; one-to-one mail carries neither, so a personal reply still "
-            "reads as personal."
+            "Gmail and Yahoo expect one-click unsubscribe support on bulk mail, and a complaint rate "
+            "above 0.3% gets you filtered. Bulk email carries List-Unsubscribe headers without "
+            "adding an unsubscribe footer to the message body; one-to-one mail carries neither."
         ),
         detail=(
-            "Bulk mail gets the button and the headers. A reply of STOP / unsubscribe / remove is "
-            "also honoured and suppresses that address."
+            "Bulk email gets machine-readable unsubscribe headers but no visible footer. A reply of "
+            "STOP / unsubscribe / remove is also honoured and suppresses that address."
             if public_base_url() else
-            "The button needs PUBLIC_BASE_URL; until then bulk mail falls back to a mailto: "
-            "List-Unsubscribe header only."
+            "PUBLIC_BASE_URL enables the one-click URL in bulk List-Unsubscribe headers; until then "
+            "bulk mail falls back to a mailto: List-Unsubscribe header only."
         ),
         route="/email-manager",
         route_label="Open Email Manager → Suppression",
