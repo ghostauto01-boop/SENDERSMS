@@ -46,6 +46,9 @@ export default function RichEmailEditor({
   onHtml,
   attachments,
   onAttachments,
+  fillHeight = false,
+  bodyLabel = "Email body",
+  autoFocus = false,
   variables = [
     "{{first_name}}",
     "{{business_name}}",
@@ -62,6 +65,10 @@ export default function RichEmailEditor({
   /** Optional: when omitted, the attach button is hidden (e.g. ad creatives). */
   attachments?: AttachmentPayload[];
   onAttachments?: (value: AttachmentPayload[]) => void;
+  /** The dedicated reply page gives the body all remaining vertical space. */
+  fillHeight?: boolean;
+  bodyLabel?: string;
+  autoFocus?: boolean;
   variables?: string[];
 }) {
   const files = attachments ?? [];
@@ -245,13 +252,14 @@ export default function RichEmailEditor({
   ];
 
   return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap items-center gap-1 rounded-lg border border-gray-200 dark:border-gray-700 p-1">
+    <div className={fillHeight ? "h-full min-h-0 flex flex-col gap-2" : "space-y-2"}>
+      <div className="shrink-0 flex flex-wrap items-center gap-1 rounded-lg border border-gray-200 dark:border-gray-700 p-1" role="toolbar" aria-label="Email formatting">
         {tools.map(({ icon: Icon, title, run }) => (
           <button
             key={title}
             type="button"
             title={title}
+            aria-label={title}
             onClick={run}
             className="p-1.5 rounded text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"
           >
@@ -265,6 +273,7 @@ export default function RichEmailEditor({
               <Paperclip size={15} />
               <input
                 type="file"
+                aria-label="Attach files"
                 multiple
                 className="hidden"
                 onChange={(e) => {
@@ -278,6 +287,8 @@ export default function RichEmailEditor({
         <button
           type="button"
           title="Edit the raw HTML"
+          aria-label="Edit the raw HTML"
+          aria-pressed={showHtml}
           onClick={() => setShowHtml((v) => !v)}
           className={`p-1.5 rounded ${showHtml ? "text-primary-600 bg-primary-50 dark:bg-primary-900/20" : "text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"}`}
         >
@@ -286,6 +297,8 @@ export default function RichEmailEditor({
         <button
           type="button"
           title="Preview what the recipient sees"
+          aria-label="Preview what the recipient sees"
+          aria-pressed={preview}
           onClick={() => setPreview((v) => !v)}
           className={`p-1.5 rounded ${preview ? "text-primary-600 bg-primary-50 dark:bg-primary-900/20" : "text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"}`}
         >
@@ -324,9 +337,11 @@ export default function RichEmailEditor({
         </div>
       )}
 
+      <div className={fillHeight ? "flex-1 min-h-[160px] flex flex-col" : ""}>
       {showHtml ? (
         <textarea
-          className="input min-h-[160px] font-mono text-xs"
+          aria-label="HTML email body"
+          className={`input w-full resize-y ${fillHeight ? "flex-1 min-h-[160px]" : "min-h-[160px]"} font-mono text-xs`}
           value={html}
           onChange={(e) => onHtml(e.target.value)}
           placeholder={'<p>Hi {{first_name}},</p>'}
@@ -334,14 +349,17 @@ export default function RichEmailEditor({
       ) : (
         <textarea
           ref={textRef}
-          className="input min-h-[160px]"
+          aria-label={bodyLabel}
+          autoFocus={autoFocus}
+          className={`input w-full resize-y ${fillHeight ? "flex-1 min-h-[160px]" : "min-h-[160px]"}`}
           value={body}
           onChange={(e) => onBody(e.target.value)}
           placeholder={"Hi {{first_name}},\n\n…"}
         />
       )}
+      </div>
 
-      <div className="flex flex-wrap items-center gap-1">
+      <div className="shrink-0 flex flex-wrap items-center gap-1">
         <span className="text-xs text-gray-400 mr-1">Insert:</span>
         {variables.map((v) => (
           <button
@@ -356,7 +374,7 @@ export default function RichEmailEditor({
       </div>
 
       {files.length > 0 && (
-        <div className="space-y-1">
+        <div className="shrink-0 space-y-1 max-h-28 overflow-y-auto">
           {files.map((file, index) => (
             <div key={`${file.name}-${index}`} className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
               <Paperclip size={12} />
@@ -367,6 +385,7 @@ export default function RichEmailEditor({
               <button
                 type="button"
                 className="text-gray-400 hover:text-danger-500"
+                aria-label={`Remove ${file.name}`}
                 onClick={() => onAttachments?.(files.filter((_, i) => i !== index))}
               >
                 <X size={12} />
@@ -377,7 +396,7 @@ export default function RichEmailEditor({
       )}
 
       {preview && (
-        <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-3 bg-gray-50 dark:bg-gray-900/40">
+        <div className={`shrink-0 rounded-lg border border-gray-200 dark:border-gray-700 p-3 bg-gray-50 dark:bg-gray-900/40 ${fillHeight ? "max-h-[35vh] overflow-y-auto" : ""}`}>
           <p className="text-xs text-gray-500 mb-2">Preview</p>
           {html.trim() ? (
             <div

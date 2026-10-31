@@ -211,6 +211,20 @@ export type EmailConversation = {
   ads_campaign_id?: number | null;
 };
 
+export type EmailConversationDetail = {
+  conversation: {
+    id: number;
+    contact_id: number;
+    subject?: string | null;
+    status: string;
+    unread_count: number;
+    email_account_id?: number | null;
+    email_account_name?: string | null;
+  };
+  contact: EmailContactDetails | null;
+  messages: EmailMessage[];
+};
+
 export type EmailSuppression = {
   id: number;
   email_address: string;
@@ -359,21 +373,8 @@ const emailApi = {
     account_id?: number;
   }): Promise<InboxPage> =>
     (await api.get("/email/inbox/conversations", { params })).data,
-  conversation: async (
-    id: number
-  ): Promise<{
-    conversation: {
-      id: number;
-      contact_id: number;
-      subject?: string | null;
-      status: string;
-      unread_count: number;
-      email_account_id?: number | null;
-      email_account_name?: string | null;
-    };
-    contact: EmailContactDetails | null;
-    messages: EmailMessage[];
-  }> => (await api.get(`/email/inbox/conversations/${id}`)).data,
+  conversation: async (id: number): Promise<EmailConversationDetail> =>
+    (await api.get(`/email/inbox/conversations/${id}`)).data,
   reply: async (
     id: number,
     payload: {

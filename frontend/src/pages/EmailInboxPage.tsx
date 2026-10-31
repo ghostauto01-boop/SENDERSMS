@@ -27,7 +27,6 @@ import {
   RefreshCw,
   Reply,
   Search,
-  Send,
   Sparkles,
   Star,
   Briefcase,
@@ -41,11 +40,13 @@ import EmailComposeWindow from "../components/EmailComposeWindow";
 import emailApi, {
   EmailContactDetails,
   EmailConversation,
+  EmailConversationDetail,
   EmailMessage,
   EmailSender,
 } from "../api/email";
 import MeetingModal from "../components/MeetingModal";
-import RichEmailEditor, { AttachmentPayload } from "../components/RichEmailEditor";
+import EmailReplyPage from "./EmailReplyPage";
+import type { AttachmentPayload } from "../components/RichEmailEditor";
 import { openWebsite, openWhatsappChat, openWhatsappForCall, startCall, websiteUrl } from "../utils/call";
 import type { Meeting } from "../types";
 
@@ -61,10 +62,11 @@ import type { Meeting } from "../types";
  *   individual messages with the sender's name, address, time and the
  *   delivery/open/click state for anything this app sent;
  * * on a phone it is one column: the list fills the screen, tapping a thread
- *   slides the conversation in full-width with a back button, and the composer
- *   stays above the keyboard;
- * * replies send from the same Brevo sender (or the connected mailbox) the
- *   thread started on, in the same mail thread the prospect sees in Gmail.
+ *   slides the conversation in full-width with a back button, and the reply
+ *   page keeps its send controls above the keyboard;
+ * * reading owns the pane: the latest email is expanded, history is tucked
+ *   away, and Reply opens a separate full-page editor only when requested;
+ * * replies stay in the same mail thread the prospect sees in Gmail.
  *
  * Status, search and the open thread all live in the URL, so a notification
  * can deep-link straight to a conversation and a refresh keeps your place.
@@ -247,11 +249,13 @@ function MessageCard({
   message,
   contactName,
   defaultOpen,
+  featured = false,
   onOpenActivity,
 }: {
   message: EmailMessage;
   contactName: string;
   defaultOpen: boolean;
+  featured?: boolean;
   onOpenActivity: () => Promise<any>;
 }) {
   const [expanded, setExpanded] = useState(defaultOpen);
@@ -262,14 +266,21 @@ function MessageCard({
 
   return (
     <article
-      className={`card overflow-hidden animate-fade-up ${
-        outgoing ? "" : "border-l-2 border-l-primary-500"
+      className={`overflow-hidden ${featured
+        ? "flex-1 flex flex-col min-h-[240px] bg-white dark:bg-gray-900"
+        : `card animate-fade-up ${outgoing ? "" : "border-l-2 border-l-primary-500"}`
       }`}
+      aria-label={featured ? "Current email" : "Earlier email"}
     >
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
-        className="w-full text-left p-3.5 flex items-start gap-3 hover:bg-gray-50/70 dark:hover:bg-gray-700/20 transition-colors"
+        aria-expanded={expanded}
+        aria-controls={`email-message-${message.id}`}
+        aria-label={`${expanded ? "Collapse" : "Expand"} email from ${from}`}
+        className={`w-full text-left flex items-start gap-3 transition-colors ${featured
+          ? "px-1 py-2 sm:px-2 border-b border-gray-100 dark:border-gray-700/60"
+          : "p-3.5 hover:bg-gray-50/70 dark:hover:bg-gray-700/20"}`}
       >
         <span
           className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 ${
@@ -323,12 +334,12 @@ function MessageCard({
       </button>
 
       {expanded && (
-        <div className="px-3.5 pb-3.5 animate-fade-in">
-          <div className="email-body-content rounded-xl p-3.5 text-sm">
+        <div id={`email-message-${message.id}`} className={`${featured ? "flex-1 flex flex-col px-1 py-5 sm:px-2" : "px-3.5 pb-3.5"} animate-fade-in`}>
+          <div className={`${featured ? "email-reader-body flex-1 text-[15px] leading-relaxed" : "email-body-content rounded-xl p-3.5 text-sm"}`}>
             {message.html_body ? (
               <div
-                className="prose prose-sm max-w-none dark:prose-invert break-anywhere
-                           prose-a:text-primary-600 dark:prose-a:text-primary-400"
+                className={`prose ${featured ? "prose-base" : "prose-sm"} max-w-none dark:prose-invert break-anywhere
+                           prose-a:text-primary-600 dark:prose-a:text-primary-400`}
                 dangerouslySetInnerHTML={{ __html: message.html_body }}
               />
             ) : (
@@ -370,7 +381,7 @@ export default function EmailInboxPage() {
   const [status, setStatus] = useState("all");
   const [search, setSearch] = useState("");
   const [openId, setOpenId] = useState<number | null>(null);
-  const [detail, setDetail] = useState<any>(null);
+  const [detail, setDetail] = useState<EmailConversationDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [reply, setReply] = useState("");
   const [replyHtml, setReplyHtml] = useState("");
@@ -378,6 +389,9 @@ export default function EmailInboxPage() {
   const [cc, setCc] = useState("");
   const [showCc, setShowCc] = useState(false);
   const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState("");
+  const sendingRef = useRef(false);
+  const detailRequestRef = useRef(0);
   const [filterOpen, setFilterOpen] = useState(false);
   /** Gmail's "full screen": the mail app covers the window, app chrome and all. */
   const [focus, setFocus] = useState(false);
@@ -395,7 +409,6 @@ export default function EmailInboxPage() {
   const [repliedTotal, setRepliedTotal] = useState<number | null>(null);
   /** Every thread, unfiltered — the number on the All mail tab. */
   const [threadTotal, setThreadTotal] = useState<number | null>(null);
-  const bottomRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   /** Which deep link already opened its thread, so it only happens once. */
   const autoOpened = useRef<string | null>(null);
@@ -403,6 +416,7 @@ export default function EmailInboxPage() {
   const deepLinkedId = params.get("conversation_id");
   /** "all" = every thread, "replied" = the Conversations page. */
   const view: "all" | "replied" = params.get("view") === "replied" ? "replied" : "all";
+  const replyOpen = params.get("reply") === "1" && openId !== null;
   const campaignFilter = params.get("campaign_id");
   const contactFilter = params.get("contact_id");
 
@@ -466,30 +480,42 @@ export default function EmailInboxPage() {
   }, [load]);
 
   const open = useCallback(
-    async (id: number) => {
+    async (id: number, opts: { preserveReply?: boolean } = {}) => {
+      const requestId = ++detailRequestRef.current;
       setOpenId(id);
+      setParams((current) => {
+        const next = new URLSearchParams(current);
+        next.set("conversation_id", String(id));
+        if (!opts.preserveReply) next.delete("reply");
+        return next;
+      }, { replace: true });
       setShowContactInfo(false);
+      setDetail(null);
       setLoadingDetail(true);
       setReply("");
       setReplyHtml("");
       setReplyAttachments([]);
       setCc("");
+      setShowCc(false);
+      setSendError("");
       try {
         const data = await emailApi.conversation(id);
+        if (requestId !== detailRequestRef.current) return;
         setDetail(data);
         if ((data.conversation?.unread_count || 0) > 0) {
           await emailApi.markRead(id);
+          if (requestId !== detailRequestRef.current) return;
           setConversations((prev) =>
             prev.map((c) => (c.id === id ? { ...c, unread_count: 0, status: "active" } : c))
           );
         }
       } catch {
-        toast.error("Could not open this conversation");
+        if (requestId === detailRequestRef.current) toast.error("Could not open this conversation");
       } finally {
-        setLoadingDetail(false);
+        if (requestId === detailRequestRef.current) setLoadingDetail(false);
       }
     },
-    []
+    [setParams]
   );
 
   // Deep link: a notification (or a refresh) can name the thread to open.
@@ -497,8 +523,7 @@ export default function EmailInboxPage() {
     if (!deepLinkedId) return;
     const id = Number(deepLinkedId);
     if (!Number.isFinite(id) || id === openId) return;
-    open(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    open(id, { preserveReply: params.get("reply") === "1" });
   }, [deepLinkedId]);
 
   // Deep link by *person*: a campaign's reply list knows the contact, not the
@@ -517,18 +542,46 @@ export default function EmailInboxPage() {
   }, [conversations, contactFilter, campaignFilter, loading, openId, deepLinkedId, open]);
 
   const closeThread = () => {
+    detailRequestRef.current += 1;
+    setLoadingDetail(false);
     setOpenId(null);
     setDetail(null);
     if (deepLinkedId) {
       const next = new URLSearchParams(params);
       next.delete("conversation_id");
+      next.delete("reply");
       setParams(next, { replace: true });
     }
   };
 
-  useEffect(() => {
-    if (detail) bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [detail]);
+  const openReply = () => {
+    if (!openId) return;
+    const next = new URLSearchParams(params);
+    next.set("conversation_id", String(openId));
+    next.set("reply", "1");
+    setSendError("");
+    setParams(next);
+  };
+
+  const closeReply = () => {
+    const next = new URLSearchParams(params);
+    next.delete("reply");
+    // Keep the thread deep link. Going back must return to the email, not the
+    // empty inbox. The draft stays in this page's state while they read again.
+    setParams(next);
+  };
+
+  const discardReply = () => {
+    setReply("");
+    setReplyHtml("");
+    setReplyAttachments([]);
+    setCc("");
+    setShowCc(false);
+    setSendError("");
+    closeReply();
+  };
+
+  useEffect(() => () => { detailRequestRef.current += 1; }, []);
 
   // Gmail muscle memory: "c" for a new message, Escape to leave full screen.
   useEffect(() => {
@@ -539,7 +592,7 @@ export default function EmailInboxPage() {
         (target.tagName === "INPUT" ||
           target.tagName === "TEXTAREA" ||
           target.isContentEditable);
-      if (typing || composing) return;
+      if (typing || composing || replyOpen) return;
       if (event.key.toLowerCase() === "c" && !event.metaKey && !event.ctrlKey) {
         event.preventDefault();
         setComposing(true);
@@ -548,30 +601,45 @@ export default function EmailInboxPage() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [focus, composing]);
+  }, [focus, composing, replyOpen]);
 
   const sendReply = async () => {
-    if (!reply.trim() || !openId) return;
+    if (sendingRef.current || !openId || (!reply.trim() && !replyHtml.trim())) return;
+    if (detail?.contact?.is_email_opted_out) return;
+    sendingRef.current = true;
     setSending(true);
+    setSendError("");
+    const threadId = openId;
     try {
-      await emailApi.reply(openId, {
+      const result = await emailApi.reply(threadId, {
         body: reply,
         html_body: replyHtml.trim() || null,
         attachments: replyAttachments.length ? replyAttachments : undefined,
-        cc: cc
-          .split(/[,;\s]+/)
-          .map((s) => s.trim())
-          .filter(Boolean),
+        cc: cc.split(/[,;\s]+/).map((s) => s.trim()).filter(Boolean),
       });
+      // A provider rejection can arrive as HTTP 200 with success=false. Never
+      // clear a draft or announce success until the provider accepted it.
+      if (!result?.success && result?.message?.status !== "queued") {
+        throw new Error(result?.error || "The email provider did not accept this reply. Your draft is still here.");
+      }
+      toast.success(result?.message?.status === "queued" ? "Reply queued for delivery" : "Reply sent");
       setReply("");
       setReplyHtml("");
       setReplyAttachments([]);
-      toast.success("Reply sent");
-      await open(openId);
+      setCc("");
+      setShowCc(false);
+      const next = new URLSearchParams(params);
+      next.delete("reply");
+      next.set("conversation_id", String(threadId));
+      setParams(next, { replace: true });
+      await open(threadId);
       load({ quiet: true });
     } catch (err: any) {
-      toast.error(err.response?.data?.detail || "Could not send the reply");
+      const message = err.response?.data?.detail || err.message || "Could not send the reply. Your draft is still here.";
+      setSendError(message);
+      toast.error(message);
     } finally {
+      sendingRef.current = false;
       setSending(false);
     }
   };
@@ -580,7 +648,7 @@ export default function EmailInboxPage() {
     if (!openId) return;
     try {
       await emailApi.setStatus(openId, next);
-      setDetail((d: any) =>
+      setDetail((d) =>
         d ? { ...d, conversation: { ...d.conversation, status: next } } : d
       );
       load({ quiet: true });
@@ -622,6 +690,33 @@ export default function EmailInboxPage() {
   const contact: EmailContactDetails | null = detail?.contact || null;
   const threadMessages: EmailMessage[] = detail?.messages || [];
   const contactHasPhone = hasSmsPhone(contact?.phone_number);
+  const latestMessage = threadMessages[threadMessages.length - 1];
+  const earlierMessages = threadMessages.slice(0, -1);
+
+  if (replyOpen) {
+    return (
+      <EmailReplyPage
+        detail={detail}
+        loading={loadingDetail}
+        body={reply}
+        onBody={setReply}
+        html={replyHtml}
+        onHtml={setReplyHtml}
+        attachments={replyAttachments}
+        onAttachments={setReplyAttachments}
+        cc={cc}
+        onCc={setCc}
+        showCc={showCc}
+        onShowCc={setShowCc}
+        sending={sending}
+        error={sendError}
+        onSend={sendReply}
+        onBack={closeReply}
+        onDiscard={discardReply}
+        onRetry={() => openId && open(openId, { preserveReply: true })}
+      />
+    );
+  }
 
   return (
     <div
@@ -636,7 +731,7 @@ export default function EmailInboxPage() {
       {/* ---------- Top bar — Gmail's toolbar: search first, actions right ---------- */}
       <div className="shrink-0 flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 h-14 border-b border-gray-200/80 dark:border-gray-700/70">
         <button
-          className="xl:hidden icon-btn shrink-0"
+          className={`${openId ? "2xl:hidden" : "xl:hidden"} icon-btn shrink-0`}
           onClick={() => setRailOpen(true)}
           aria-label="Open mail menu"
         >
@@ -715,7 +810,7 @@ export default function EmailInboxPage() {
             ${
               railOpen
                 ? "fixed inset-y-0 left-0 z-50 flex bg-white dark:bg-gray-900 shadow-pop animate-fade-left"
-                : "hidden xl:flex"
+                : openId ? "hidden 2xl:flex" : "hidden xl:flex"
             }
           `}
         >
@@ -736,7 +831,7 @@ export default function EmailInboxPage() {
                 setComposing(true);
                 setRailOpen(false);
               }}
-              className="btn-primary w-full justify-center shadow-sm"
+              className="btn-primary w-full justify-center shadow-sm" disabled={sending}
             >
               <PenSquare size={16} /> Compose
             </button>
@@ -815,7 +910,9 @@ export default function EmailInboxPage() {
         {/* ---------- Thread list ---------- */}
         <section
           className={`flex-col min-h-0 w-full lg:w-[400px] xl:w-[440px] shrink-0 border-r border-gray-200/80 dark:border-gray-700/70 ${
-            openId ? (focus ? "hidden" : "hidden lg:flex") : "flex"
+            // Reading is a full-width destination. Back to threads brings the
+            // list back instead of squeezing the letter into a narrow column.
+            openId ? "hidden" : "flex"
           }`}
         >
           {/* List header — the two pages, the scope, and who is talking. */}
@@ -1084,8 +1181,8 @@ export default function EmailInboxPage() {
               </span>
               <p className="font-medium text-gray-800 dark:text-gray-200">Pick a conversation</p>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 max-w-sm">
-                Choose an email on the left to read the whole thread, see whether it was opened or
-                clicked, and answer without leaving the app.
+                Choose an email to read it across the page. Reply opens a separate writing
+                screen only when you need it.
               </p>
             </div>
           ) : loadingDetail && !detail ? (
@@ -1096,34 +1193,39 @@ export default function EmailInboxPage() {
             </div>
           ) : detail ? (
             <>
-              {/* Thread header */}
-              <div className="p-3 sm:p-4 border-b border-gray-100 dark:border-gray-700/70 space-y-2">
-                <div className="flex items-start gap-2">
+              {/* Keep the reader, not the composer, in charge of the pane. */}
+              <div className="shrink-0 px-3 py-2.5 sm:px-5 sm:py-3 border-b border-gray-100 dark:border-gray-700/70 space-y-2">
+                <div className="flex items-center gap-2">
                   <button
-                    className={`${focus ? "flex" : "lg:hidden"} p-2 -ml-1 rounded-xl text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 shrink-0`}
+                    className="icon-btn shrink-0"
                     onClick={closeThread}
                     aria-label="Back to threads"
                   >
                     <ArrowLeft size={18} />
                   </button>
                   <div className="min-w-0 flex-1">
-                    <h2 className="font-semibold text-gray-900 dark:text-white break-anywhere">
+                    <h2 className="font-semibold text-base sm:text-lg leading-snug text-gray-900 dark:text-white break-anywhere">
                       {detail.conversation.subject || detail.contact?.name || "Conversation"}
                     </h2>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1.5 flex-wrap">
-                      <span className="font-medium text-gray-700 dark:text-gray-300">
-                        {detail.contact?.name || "Unknown"}
-                      </span>
-                      <span className="text-gray-400">&lt;{detail.contact?.email}&gt;</span>
-                      {detail.conversation.email_account_name && (
-                        <span className="badge-gray">{detail.conversation.email_account_name}</span>
-                      )}
+                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate" title={`${detail.contact?.name || "Unknown"} <${detail.contact?.email || ""}>`}>
+                      {detail.contact?.name || "Unknown"}
+                      <span className="hidden sm:inline"> · {detail.contact?.email}</span>
+                      {detail.conversation.email_account_name && <span className="hidden xl:inline"> · {detail.conversation.email_account_name}</span>}
                     </p>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
                     <button
                       type="button"
-                      className="icon-btn"
+                      className="btn-primary btn-sm"
+                      onClick={openReply}
+                      disabled={Boolean(detail.contact?.is_email_opted_out)}
+                      title={detail.contact?.is_email_opted_out ? "This contact has unsubscribed" : "Open reply page"}
+                    >
+                      <Reply size={15} /> Reply
+                    </button>
+                    <button
+                      type="button"
+                      className="icon-btn hidden sm:inline-flex"
                       onClick={() => setFocus((v) => !v)}
                       title={focus ? "Leave full screen" : "Full screen"}
                       aria-label={focus ? "Leave full screen" : "Full screen"}
@@ -1131,62 +1233,25 @@ export default function EmailInboxPage() {
                       {focus ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
                     </button>
                     <select
-                      className="input py-1.5 text-sm w-auto max-w-[9.5rem]"
+                      className="input hidden md:block py-1.5 text-xs w-auto max-w-[8.5rem]"
                       value={detail.conversation.status}
                       onChange={(e) => setConversationStatus(e.target.value)}
                       aria-label="Conversation status"
                     >
                       {STATUS_FILTERS.filter((f) => !["all", "unread"].includes(f.key)).map((f) => (
-                        <option key={f.key} value={f.key}>
-                          {f.label}
-                        </option>
+                        <option key={f.key} value={f.key}>{f.label}</option>
                       ))}
                     </select>
                   </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    className="chip"
-                    onClick={() => setConversationStatus("interested")}
-                    title="Mark as interested"
-                  >
-                    <Star size={12} /> Interested
-                  </button>
-                  <button
-                    className={detail.conversation.status === "opportunity" ? "chip-active" : "chip"}
-                    onClick={() =>
-                      setConversationStatus(detail.conversation.status === "opportunity" ? "active" : "opportunity")
-                    }
-                    title={detail.conversation.status === "opportunity" ? "Remove from Opportunity" : "Move to Opportunity"}
-                  >
-                    <Briefcase size={12} />
-                    {detail.conversation.status === "opportunity" ? "In Opportunity" : "Opportunity"}
-                  </button>
-                  <button
-                    className="chip"
-                    onClick={() => setConversationStatus("closed")}
-                    title="Mark as closed"
-                  >
-                    <CheckCheck size={12} /> Done
-                  </button>
-                  {detail.contact?.phone_number && !detail.contact.phone_number.startsWith("email:") && (
-                    <span className="text-[11px] text-gray-400">{detail.contact.phone_number}</span>
-                  )}
-                </div>
-                {detail.contact?.is_email_opted_out && (
-                  <p className="text-xs text-warning-600 dark:text-warning-400 flex items-center gap-1">
-                    <XCircle size={13} /> This contact unsubscribed — replies are blocked until they
-                    are opted back in on the Contacts page.
-                  </p>
-                )}
-                <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-                  <div role="tablist" aria-label="Email conversation views" className="flex gap-1 rounded-xl bg-gray-100 dark:bg-gray-900 p-1">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div role="tablist" aria-label="Email conversation views" className="flex gap-1 rounded-lg bg-gray-100 dark:bg-gray-800 p-0.5">
                     <button
                       type="button"
                       role="tab"
                       aria-selected={!showContactInfo}
                       onClick={() => setShowContactInfo(false)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                      className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
                         !showContactInfo ? "bg-white dark:bg-gray-700 text-primary-700 dark:text-primary-300 shadow-sm" : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
                       }`}
                     >Conversation</button>
@@ -1195,26 +1260,47 @@ export default function EmailInboxPage() {
                       role="tab"
                       aria-selected={showContactInfo}
                       onClick={() => setShowContactInfo(true)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                      className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
                         showContactInfo ? "bg-white dark:bg-gray-700 text-primary-700 dark:text-primary-300 shadow-sm" : "text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
                       }`}
                     >Contact information</button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowBooking(true)}
-                    className="btn-primary py-2 px-3 text-xs"
-                    title="Book a meeting"
-                  >
-                    <CalendarPlus size={14} /> Book meeting
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <button className="chip" onClick={() => setConversationStatus("interested")} title="Mark as interested">
+                      <Star size={12} /> Interested
+                    </button>
+                    <button
+                      className={detail.conversation.status === "opportunity" ? "chip-active" : "chip"}
+                      onClick={() => setConversationStatus(detail.conversation.status === "opportunity" ? "active" : "opportunity")}
+                      title={detail.conversation.status === "opportunity" ? "Remove from Opportunity" : "Move to Opportunity"}
+                    >
+                      <Briefcase size={12} /> {detail.conversation.status === "opportunity" ? "In Opportunity" : "Opportunity"}
+                    </button>
+                    <button className="chip hidden sm:inline-flex" onClick={() => setConversationStatus("closed")} title="Mark as closed">
+                      <CheckCheck size={12} /> Done
+                    </button>
+                    <button type="button" onClick={() => setShowBooking(true)} className="btn-secondary btn-sm" title="Book a meeting">
+                      <CalendarPlus size={14} /><span className="hidden sm:inline">Book meeting</span>
+                    </button>
+                  </div>
                 </div>
+                {detail.contact?.is_email_opted_out && (
+                  <p className="text-xs text-warning-600 dark:text-warning-400 flex items-center gap-1">
+                    <XCircle size={13} /> This contact unsubscribed. Opt them back in on the Contacts page before replying.
+                  </p>
+                )}
               </div>
 
               {showContactInfo ? (
                 <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-5 bg-gray-50/60 dark:bg-gray-900/30 wa-scrollbar" role="tabpanel" aria-label="Contact information">
                   {contact ? (
                     <>
+                      <div className="md:hidden flex items-center justify-between gap-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2">
+                        <label htmlFor="mobile-conversation-status" className="text-xs font-medium text-gray-500">Conversation status</label>
+                        <select id="mobile-conversation-status" className="input py-1.5 text-xs w-auto" value={detail.conversation.status} onChange={(e) => setConversationStatus(e.target.value)}>
+                          {STATUS_FILTERS.filter((f) => !["all", "unread"].includes(f.key)).map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
+                        </select>
+                      </div>
                       <section className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
                         <div className="flex items-start gap-3">
                           <span className={`w-12 h-12 rounded-2xl flex items-center justify-center text-sm font-bold shrink-0 ${toneFor(contact.email || String(contact.id))}`}>
@@ -1307,74 +1393,40 @@ export default function EmailInboxPage() {
                 </div>
               ) : (
                 <>
-                  {/* Messages */}
-                  <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 bg-gray-50/60 dark:bg-gray-900/30 wa-scrollbar">
-                    {threadMessages.map((m, index) => (
-                      <MessageCard
-                        key={m.id}
-                        message={m}
-                        contactName={contactName}
-                        // Only the newest message is open by default, like Gmail.
-                        defaultOpen={index === threadMessages.length - 1}
-                        onOpenActivity={() => emailApi.messageEvents(m.id)}
-                      />
-                    ))}
-                    <div ref={bottomRef} />
-                  </div>
-
-                  {/* Composer */}
-                  <div className="border-t border-gray-100 dark:border-gray-700/70 p-3 sm:p-4 space-y-2 safe-bottom">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
-                        <Reply size={13} /> Reply
-                      </p>
-                      <div className="flex items-center gap-2">
-                        <button
-                          className="text-xs text-gray-500 hover:text-primary-600"
-                          onClick={() => setShowCc((v) => !v)}
-                        >
-                          Cc
-                        </button>
-                        <span className="text-[11px] text-gray-400 hidden sm:inline">
-                          {senders.some((s) => s.sender_type === "gmail")
-                            ? `reply sends from ${senders.filter((s) => s.sender_type === "gmail").map((s) => s.from_email).join(", ")}`
-                            : `sent from ${detail.conversation.email_account_name || "the default sender"}`}
-                        </span>
-                      </div>
-                    </div>
-                    {showCc && (
-                      <input
-                        className="input animate-fade-in"
-                        placeholder="Cc — separate several addresses with a comma"
-                        value={cc}
-                        onChange={(e) => setCc(e.target.value)}
-                      />
-                    )}
-                    <RichEmailEditor
-                      body={reply}
-                      onBody={setReply}
-                      html={replyHtml}
-                      onHtml={setReplyHtml}
-                      attachments={replyAttachments}
-                      onAttachments={setReplyAttachments}
-                    />
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-[11px] text-gray-400 hidden sm:flex items-center gap-1">
-                        <Sparkles size={12} /> Ctrl/⌘ + Enter sends
-                      </p>
-                      <button
-                        className="btn-primary w-full sm:w-auto"
-                        onClick={sendReply}
-                        disabled={sending || !reply.trim()}
-                      >
-                        {sending ? (
-                          <>Sending…</>
-                        ) : (
-                          <>
-                            <Send size={15} /> Send reply
-                          </>
-                        )}
-                      </button>
+                  {/* The current email gets the page. History is one small,
+                      explicit disclosure, and the reply editor is another page. */}
+                  <div className="flex-1 min-h-0 overflow-y-auto bg-white dark:bg-gray-900 wa-scrollbar" aria-label="Email messages">
+                    <div className="min-h-full flex flex-col gap-3 p-3 sm:p-5">
+                      {latestMessage ? (
+                        <MessageCard
+                          key={`${detail.conversation.id}-${latestMessage.id}`}
+                          message={latestMessage}
+                          contactName={contactName}
+                          defaultOpen
+                          featured
+                          onOpenActivity={() => emailApi.messageEvents(latestMessage.id)}
+                        />
+                      ) : (
+                        <div className="flex-1 flex items-center justify-center py-16 text-sm text-gray-500">No email content in this conversation yet.</div>
+                      )}
+                      {earlierMessages.length > 0 && (
+                        <details className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50/70 dark:bg-gray-800/50 shrink-0">
+                          <summary className="cursor-pointer px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 select-none">
+                            Earlier messages ({earlierMessages.length})
+                          </summary>
+                          <div className="px-2 pb-2 space-y-2">
+                            {earlierMessages.map((m) => (
+                              <MessageCard
+                                key={`${detail.conversation.id}-${m.id}`}
+                                message={m}
+                                contactName={contactName}
+                                defaultOpen={false}
+                                onOpenActivity={() => emailApi.messageEvents(m.id)}
+                              />
+                            ))}
+                          </div>
+                        </details>
+                      )}
                     </div>
                   </div>
                 </>
@@ -1393,21 +1445,22 @@ export default function EmailInboxPage() {
         </section>
       </div>
 
-      <p className="hidden lg:flex shrink-0 items-center gap-1.5 border-t border-gray-200/80 dark:border-gray-700/70 px-4 py-1.5 text-[11px] text-gray-400">
+      <p className={`${openId ? "hidden" : "hidden lg:flex"} shrink-0 items-center gap-1.5 border-t border-gray-200/80 dark:border-gray-700/70 px-4 py-1.5 text-[11px] text-gray-400`}>
         <ArrowUpRight size={12} /> Opens and clicks are recorded by Brevo; when a Gmail mailbox is
         connected under Email Manager → Replies, replies are sent from that mailbox so they thread
         correctly in the prospect's Gmail.
       </p>
 
-      {/* Compose: the rail button on a desktop, a thumb button on a phone. */}
-      <button
-        type="button"
-        onClick={() => setComposing(true)}
-        className="xl:hidden fixed bottom-20 right-4 z-30 h-14 px-5 rounded-full bg-primary-900 text-white shadow-pop
-                   flex items-center gap-2 text-sm font-semibold active:scale-95 transition-transform"
-      >
-        <PenSquare size={17} /> Compose
-      </button>
+      {/* Compose belongs to the list, never on top of the email being read. */}
+      {!openId && (
+        <button
+          type="button"
+          onClick={() => setComposing(true)}
+          className="xl:hidden fixed bottom-20 right-4 z-30 h-14 px-5 rounded-full bg-primary-900 text-white shadow-pop flex items-center gap-2 text-sm font-semibold active:scale-95 transition-transform"
+        >
+          <PenSquare size={17} /> Compose
+        </button>
+      )}
 
       {composing && (
         <EmailComposeWindow

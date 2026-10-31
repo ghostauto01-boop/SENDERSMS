@@ -1,3 +1,16 @@
+## Unreleased — email reading comes first
+
+- Opening an email now gives the message the full reading pane. The always-open
+  reply editor is gone; **Reply** opens a separate full-page writer instead.
+- The latest email is expanded at the top. Older messages live in one compact
+  **Earlier messages** disclosure, and opening a thread no longer force-scrolls
+  past the message header.
+- The reply page keeps formatting, attachments, Cc and the existing Gmail/Brevo
+  thread routing. Back preserves the unfinished draft; Send or an explicit
+  Discard clears it. Provider failures keep the draft and show the reason.
+- Reading and reply layouts were checked at desktop, tablet and phone sizes,
+  in light and dark mode. Adds 10 inbox/reply regression tests.
+
 ## Unreleased — Sendify, payment links first, and a theme that follows you
 
 - **The app is called Sendify.** Title, PWA manifest, login screen, inbox,
