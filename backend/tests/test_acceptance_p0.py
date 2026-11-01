@@ -329,10 +329,12 @@ async def test_acceptance_followups_keep_original_sender_thread_and_plain_body(
         # 3. exactly one "Re: "
         assert m.subject == f"Re: {root.subject}"
         assert not m.subject.startswith("Re: Re:")
-        # 4. personal-looking body: no button, no card, no raw unsubscribe URL
+        # 4. personal-looking body: no button, no card — and NO visible
+        #    unsubscribe control of any kind (permanently removed)
         assert "<button" not in (m.html_body or "")
         assert "600px" not in (m.html_body or "")
-        assert "unsubscribe?" not in (m.body or "")
+        assert "unsubscribe" not in (m.body or "").lower()
+        assert "unsubscribe" not in (m.html_body or "").lower()
         # 5. the send-log row records the sender used
         from app.models.email import EmailSendLog
 
@@ -846,7 +848,7 @@ async def test_bot_clicks_and_proxy_opens_never_count(db):
                and e.bot_reason == "click_within_10s_of_open" for e in events)
 
 
-def test_plain_mode_has_no_pixel_no_button_and_small_gray_footer(monkeypatch):
+def test_plain_mode_has_no_pixel_no_button_and_no_unsubscribe_footer(monkeypatch):
     monkeypatch.setattr(
         "app.utils.urls.public_base_url", lambda: "https://app.example.com"
     )
@@ -856,9 +858,8 @@ def test_plain_mode_has_no_pixel_no_button_and_small_gray_footer(monkeypatch):
     assert "1x1" not in html and "tracking" not in html.lower()
     assert "<button" not in html and "<table" not in html
     assert "background-color: #f4f4f5" not in html
-    footer = email_service.plain_footer_html("ada@example.org")
-    assert "11px" in footer and "#9ca3af" in footer
-    assert "<button" not in footer
-    assert footer.count("href=") == 1  # the unsubscribe link is the only link
+    # The unsubscribe button/line is permanently removed: nothing visible.
+    assert "unsubscribe" not in html.lower()
+    assert email_service.plain_footer_html("ada@example.org") is None
     # The raw URL never gets wrapped into a tracked link in plain mode.
     assert "track.example/x</a>" not in html

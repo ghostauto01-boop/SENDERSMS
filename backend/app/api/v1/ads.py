@@ -2355,6 +2355,11 @@ async def list_followups(
                 "campaign_id": r.campaign_id,
                 "due_at": svc.as_utc(r.due_at),
                 "status": r.status,
+                "is_overdue": bool(
+                    r.status == "pending"
+                    and r.due_at is not None
+                    and svc.as_utc(r.due_at) < now
+                ),
                 "priority": r.priority,
                 "body": r.body,
                 "note": r.note,
@@ -2407,7 +2412,13 @@ async def followup_action(
             raise HTTPException(400, "due_at is required to reschedule")
         task.due_at = svc.as_utc(due_at)
     elif action == "send-now":
+        # Process exactly this task now — the stop conditions still run, but
+        # the due-time filter does not apply ("send this one now").
         task.due_at = svc.now_utc() - timedelta(seconds=1)
+        await db.commit()
+        result = await svc.process_followups(db, send_inline=True, task_ids=[task.id])
+        await db.refresh(task)
+        return {"ok": True, "status": task.status, "sent": result.get("sent", 0)}
     else:
         raise HTTPException(400, "Unknown action")
     await db.commit()

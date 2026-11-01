@@ -266,19 +266,6 @@ def text_to_html(text: str, *, plain: bool = False) -> str:
     )
 
 
-#: The ONLY visible unsubscribe affordance in "Plain personal email" mode: one
-#: small gray text line (11px, #9ca3af) with the word "unsubscribe" as a link.
-#: No border, no background, no button — and never anything else in the footer.
-def plain_footer_html(address: str | None) -> str | None:
-    url = unsubscribe_url(address) if address else None
-    if not url:
-        return None
-    return (
-        '<p style="margin:16px 0 0;font-size:11px;line-height:1.5;color:#9ca3af">'
-        f'<a href="{url}" style="color:#9ca3af">unsubscribe</a></p>'
-    )
-
-
 def _now() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -1417,6 +1404,18 @@ async def build_headers(
     return headers
 
 
+def plain_footer_html(address: str | None) -> None:
+    """Nothing visible, permanently.
+
+    Outbound email bodies carry NO unsubscribe button, link or footer line —
+    in any mode. Opt-out is machine-readable only (List-Unsubscribe /
+    List-Unsubscribe-Post headers, built by :func:`build_headers`), plus the
+    in-app / emailed link target that still answers GET/POST. Kept as a named
+    hook so no future path can silently re-grow a visible footer.
+    """
+    return None
+
+
 def apply_unsubscribe(
     text: str, html: str | None, address: str | None
 ) -> tuple[str, str | None]:
@@ -1450,8 +1449,8 @@ async def render_email(
 
     ``plain`` is the "Plain personal email" format: the text part is
     authoritative (a rich HTML body is folded back to text), the HTML part is a
-    minimal wrapper — no gray page background, no 600px card — and the ONLY
-    footer is the small gray ``unsubscribe`` link line. The raw
+    minimal wrapper — no gray page background, no 600px card — and there is NO
+    visible unsubscribe footer of any kind (no button, no link line). The raw
     "Unsubscribe: <long URL>" line is never added to the plain-text part;
     bulk mail keeps the machine-readable List-Unsubscribe headers (see
     :func:`build_headers`).
@@ -1471,10 +1470,9 @@ async def render_email(
         if not (text or "").strip() and (html or "").strip():
             text = html_to_text(html)
         html = text_to_html(text or "", plain=True)
-        if append_unsubscribe:
-            footer = plain_footer_html((contact.email or "").strip())
-            if footer:
-                html = (html or "").replace("</body></html>", f"{footer}</body></html>")
+        # No visible unsubscribe footer, in any mode (the button-style footer
+        # and the small gray line are both permanently gone). Bulk opt-out is
+        # expressed only through the List-Unsubscribe headers.
     elif not (html or "").strip() and (text or "").strip():
         html = text_to_html(text or "")
 
@@ -1597,8 +1595,8 @@ async def queue_email(
     if plain is None:
         plain = await campaign_plain_mode(db, campaign_id, ads_campaign_id)
 
-    # Bulk email gets machine-readable List-Unsubscribe headers; in plain mode
-    # the only visible footer is the small gray "unsubscribe" link line.
+    # Bulk email gets machine-readable List-Unsubscribe headers; the body
+    # itself never shows an unsubscribe button, link or footer line.
     rendered = await render_email(
         db, contact,
         subject=subject, text_body=text_body, html_body=html_body,

@@ -1409,22 +1409,17 @@ async def dispatch_campaign(
                 rendered = _html_to_text(rendered_html)
             # "Plain personal email" mode (default ON for Email Manager): the
             # text is authoritative, the HTML is a minimal wrapper (no gray
-            # page background, no 600px card, no pixel, no link wrapping) with
-            # ONLY the small gray "unsubscribe" line as footer — no button, no
-            # raw URL in the text part.
+            # page background, no 600px card, no pixel, no link wrapping) and
+            # NO visible unsubscribe footer of any kind — the button-style
+            # footer and the gray link line are permanently gone; opt-out is
+            # header-only (List-Unsubscribe) and there is never a raw
+            # "Unsubscribe: <URL>" line in the text part.
             if bool(getattr(campaign, "plain_personal_email", True)):
-                from app.services.email_service import (
-                    plain_footer_html as _footer_html,
-                    text_to_html as _wrap_html,
-                )
+                from app.services.email_service import text_to_html as _wrap_html
 
                 if not (rendered or "").strip() and (rendered_html or "").strip():
                     rendered = email_service.html_to_text(rendered_html)
-                plain_html = _wrap_html(rendered or "", plain=True)
-                footer = _footer_html((contact.email or "").strip())
-                if footer:
-                    plain_html = plain_html.replace("</body></html>", f"{footer}</body></html>")
-                rendered_html = plain_html
+                rendered_html = _wrap_html(rendered or "", plain=True)
 
         if campaign.test_mode:
             # Simulated send: nothing leaves the server, no credits consumed.
@@ -1969,7 +1964,11 @@ async def process_followups(
     every stop condition.
     """
     totals = {"sent": 0, "cancelled": 0, "completed": 0, "paused": 0}
-    query = select(AdsFollowUpTask).where(AdsFollowUpTask.status == "pending")
+    # A paused row is paused for a reason (usually an unusable pinned sender).
+    # The periodic sweep retries them so a fixed sender un-pauses automatically
+    # (P0-3); task_ids ("process now" on a specific row) always considers them.
+    statuses = ("pending", "paused") if (include_paused or task_ids) else ("pending",)
+    query = select(AdsFollowUpTask).where(AdsFollowUpTask.status.in_(statuses))
     if task_ids:
         query = query.where(AdsFollowUpTask.id.in_(list(task_ids)))
     else:
@@ -3011,6 +3010,38 @@ async def validate_campaign(db: AsyncSession, campaign: AdsCampaign) -> dict:
             f"Sender identity {sender_email} is configured."
             if sender_ok else "Configure a valid sender email address in Email Manager.",
         )
+
+        # Delivery confirmations per sender (P1-9): bounces and opens only
+        # exist if the events arrive — a sender with no webhook registered is
+        # a blind spot the operator should see before launching.
+        if not campaign.test_mode:
+            from app.models.email import EmailAccount
+
+            pool_ids = email_service.campaign_sender_pool(campaign)
+            pool_rows = []
+            if pool_ids:
+                pool_rows = list((await db.execute(
+                    select(EmailAccount).where(EmailAccount.id.in_(pool_ids))
+                )).scalars().all())
+            receiving = 0
+            for acc in pool_rows:
+                status = email_service.serialize_account(acc).get("webhook_status") or {}
+                if status.get("receiving") or status.get("registered"):
+                    receiving += 1
+            if pool_rows:
+                add_check(
+                    "webhook_events",
+                    receiving == len(pool_rows),
+                    (
+                        f"{receiving} of {len(pool_rows)} sender(s) are receiving delivery "
+                        "confirmations (Brevo webhooks)."
+                        if receiving == len(pool_rows) else
+                        f"Only {receiving} of {len(pool_rows)} sender(s) are receiving delivery "
+                        "confirmations — register the Brevo webhook on each sender's settings "
+                        "page so bounces, opens and unsubscribes are tracked."
+                    ),
+                    required=False,
+                )
     else:
         from app.config import settings
 
@@ -3027,6 +3058,7 @@ async def validate_campaign(db: AsyncSession, campaign: AdsCampaign) -> dict:
         add_check("email_account", True, "Not required for SMS campaigns.")
         add_check("sender_health", True, "Not required for SMS campaigns.")
         add_check("sender_identity", True, "Not required for SMS campaigns.")
+        add_check("webhook_events", True, "Not required for SMS campaigns.", required=False)
 
     if campaign.daily_limit is not None and int(campaign.daily_limit) <= 0:
         add_check("daily_limit", False, "Campaign daily limit must be a positive integer or null.")
