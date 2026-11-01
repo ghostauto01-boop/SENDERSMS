@@ -311,7 +311,16 @@ async def test_ads_dispatch_sends_full_personalized_bodies_from_rotating_senders
         assert "unsubscribe" not in message.body.lower()
         if message.html_body:
             assert f"Hi {name}, this is my message." in message.html_body
-            assert "unsubscribe" not in message.html_body.lower()
+            # P1-8 "plain personal email": the ONLY footer that may appear is
+            # the small gray "unsubscribe" link line (11px, #9ca3af) — no
+            # button, no card shell, and never a raw unsubscribe URL in the
+            # text part.
+            assert "<button" not in message.html_body.lower()
+            html_low = message.html_body.lower()
+            if "unsubscribe" in html_low:
+                # one link: the URL's /unsubscribe path + the link text
+                assert html_low.count(">unsubscribe</a>") == 1
+                assert "11px" in message.html_body and "#9ca3af" in message.html_body
     # The pool actually rotated: no single From took all five.
     assert [m.from_address for m in messages] == [
         "one@acme-leads.io", "two@acme-leads.io", "one@acme-leads.io",

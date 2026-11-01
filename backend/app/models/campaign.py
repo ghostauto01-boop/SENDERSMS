@@ -72,6 +72,21 @@ class Campaign(Base):
     html_body: Mapped[str | None] = mapped_column(Text, nullable=True)
     track_opens: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     track_clicks: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    #: "Plain personal email" mode: text/plain part + minimal HTML (no page
+    #: background, no 600px card, no tracking pixel, no link wrapping), a tiny
+    #: gray plain-text "unsubscribe" link line, and the standard
+    #: List-Unsubscribe headers. Classic campaigns default OFF (existing look);
+    #: Email Manager campaigns default ON.
+    plain_personal_email: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    #: Optional {unified_sender_id: daily_cap} map — a per-sender daily cap on
+    #: top of the campaign's own daily_limit. NULL = no per-sender cap.
+    sender_daily_limits: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    #: IANA zone the send window is evaluated in (recipient/operator local
+    #: time). NULL = settings.DEFAULT_TIMEZONE.
+    timezone_name: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    #: CSV of weekday numbers allowed for sending (0=Mon .. 6=Sun), e.g.
+    #: "0,1,2,3,4". NULL/empty = the legacy allow_weekends flag decides.
+    allowed_weekdays: Mapped[str | None] = mapped_column(String(30), nullable=True)
     #: JSON list of attachments (base64) sent with every email in this campaign.
     attachments: Mapped[str | None] = mapped_column(Text, nullable=True)
 

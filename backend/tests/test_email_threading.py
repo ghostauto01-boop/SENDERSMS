@@ -260,6 +260,22 @@ async def test_attachment_caps_drop_oversized_files_not_the_send(db):
     assert [c["name"] for c in cleaned] == ["fine.txt"]
 
 
+def _fake_request(method: str = "POST"):
+    """Minimal starlette Request for direct handler calls (rate-limit safe)."""
+    from starlette.requests import Request
+
+    return Request(
+        {
+            "type": "http",
+            "method": method,
+            "path": "/api/v1/email/unsubscribe",
+            "query_string": b"",
+            "headers": [],
+            "client": ("127.0.0.1", 9),
+        }
+    )
+
+
 @pytest.mark.asyncio
 async def test_one_click_unsubscribe_marks_contact_and_suppresses(db):
     from app.api.v1.email import unsubscribe_post
@@ -270,8 +286,9 @@ async def test_one_click_unsubscribe_marks_contact_and_suppresses(db):
     contact = (await db.execute(select(Contact))).scalar_one()
 
     token = email_service._unsubscribe_token("optout@acme-leads.io")
-    result = await unsubscribe_post(e="optout@acme-leads.io", t=token, db=db)
-    assert result["success"] is True
+    result = await unsubscribe_post(_fake_request(), e="optout@acme-leads.io", t=token, db=db)
+    payload = json.loads(bytes(result.body))
+    assert payload["success"] is True
 
     await db.refresh(contact)
     assert contact.is_email_opted_out is True
@@ -290,7 +307,7 @@ async def test_unsubscribe_rejects_a_forged_token(db):
 
     await _account(db)
     with pytest.raises(HTTPException) as exc:
-        await unsubscribe_post(e="victim@acme-leads.io", t="deadbeef", db=db)
+        await unsubscribe_post(_fake_request(), e="victim@acme-leads.io", t="deadbeef", db=db)
     assert exc.value.status_code == 400
 
 

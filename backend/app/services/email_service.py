@@ -235,8 +235,14 @@ def html_to_text(html: str | None) -> str:
     return text.strip()
 
 
-def text_to_html(text: str) -> str:
-    """Wrap a plain-text email in a minimal, deliverability-friendly HTML shell."""
+def text_to_html(text: str, *, plain: bool = False) -> str:
+    """Wrap a plain-text email in a small HTML shell.
+
+    ``plain=True`` is the "Plain personal email" format: no gray page
+    background, no 600px card, no inline chrome at all — just the words in
+    paragraphs, so the mail reads like something a person typed. The classic
+    shell (gray background + card) stays for campaigns that did not opt in.
+    """
     import html as _html
 
     safe = _html.escape(text or "")
@@ -245,11 +251,31 @@ def text_to_html(text: str) -> str:
         for p in safe.split("\n\n")
         if p.strip()
     )
+    if plain:
+        return (
+            "<!DOCTYPE html><html><body style=\"margin:0;padding:0\">"
+            "<div style=\"font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,"
+            "sans-serif;font-size:15px;line-height:1.6;color:#111827\">"
+            f"{paragraphs}</div></body></html>"
+        )
     return (
         "<!DOCTYPE html><html><body style=\"margin:0;padding:0;background:#f4f5f7\">"
         "<div style=\"max-width:600px;margin:0 auto;padding:24px;font-family:-apple-system,"
         "Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;color:#111827\">"
         f"{paragraphs}</div></body></html>"
+    )
+
+
+#: The ONLY visible unsubscribe affordance in "Plain personal email" mode: one
+#: small gray text line (11px, #9ca3af) with the word "unsubscribe" as a link.
+#: No border, no background, no button — and never anything else in the footer.
+def plain_footer_html(address: str | None) -> str | None:
+    url = unsubscribe_url(address) if address else None
+    if not url:
+        return None
+    return (
+        '<p style="margin:16px 0 0;font-size:11px;line-height:1.5;color:#9ca3af">'
+        f'<a href="{url}" style="color:#9ca3af">unsubscribe</a></p>'
     )
 
 
@@ -741,6 +767,27 @@ def serialize_account(
         "webhook_path": email_webhook_path(account),
         "webhook_token_masked": mask_secret(account.webhook_token),
         "webhook_reveal_path": f"/api/v1/email/accounts/{account.id}/webhook/reveal",
+        # Per-sender webhook health: is the URL registered and is it actually
+        # receiving events? (P0 delivery tracking.)
+        "webhook_last_event_at": (
+            account.last_webhook_event_at.isoformat()
+            if getattr(account, "last_webhook_event_at", None)
+            else None
+        ),
+        "webhook_status": {
+            "url": email_webhook_url(account),
+            "registered": bool(account.webhook_token),
+            "last_event_at": (
+                account.last_webhook_event_at.isoformat()
+                if getattr(account, "last_webhook_event_at", None)
+                else None
+            ),
+            "receiving": bool(
+                _aware(getattr(account, "last_webhook_event_at", None))
+                and (_now() - _aware(account.last_webhook_event_at)).total_seconds()
+                < 7 * 24 * 3600
+            ),
+        },
         "public_base_url": public_base_url(),
         "created_at": account.created_at.isoformat() if account.created_at else None,
         "updated_at": account.updated_at.isoformat() if account.updated_at else None,
@@ -1327,23 +1374,30 @@ async def build_headers(
     """
     headers: dict = {}
 
-    previous = (
-        await db.execute(
-            select(Message.rfc_message_id, Message.in_reply_to)
-            .where(
-                Message.conversation_id == message.conversation_id,
-                Message.id != (message.id or 0),
-                Message.rfc_message_id.isnot(None),
+    # A caller that already pinned the thread root (campaign follow-ups pin
+    # the FIRST email's Message-ID) wins outright: the whole chain must stay in
+    # one thread under that root.
+    if message.in_reply_to:
+        headers["In-Reply-To"] = message.in_reply_to
+        headers["References"] = message.in_reply_to
+    else:
+        previous = (
+            await db.execute(
+                select(Message.rfc_message_id, Message.in_reply_to)
+                .where(
+                    Message.conversation_id == message.conversation_id,
+                    Message.id != (message.id or 0),
+                    Message.rfc_message_id.isnot(None),
+                )
+                .order_by(Message.id.desc())
+                .limit(6)
             )
-            .order_by(Message.id.desc())
-            .limit(6)
-        )
-    ).all()
-    chain = [row[0] for row in previous if row[0]]
-    if chain:
-        headers["In-Reply-To"] = chain[0]
-        # References must read oldest → newest and stay under ~2KB total.
-        headers["References"] = " ".join(reversed(chain))[:2000]
+        ).all()
+        chain = [row[0] for row in previous if row[0]]
+        if chain:
+            headers["In-Reply-To"] = chain[0]
+            # References must read oldest → newest and stay under ~2KB total.
+            headers["References"] = " ".join(reversed(chain))[:2000]
 
     if bulk:
         address = (message.to_address or "").strip().lower()
@@ -1385,6 +1439,7 @@ async def render_email(
     html_body: str | None,
     account: EmailAccount | EmailMailbox | None = None,
     append_unsubscribe: bool = False,
+    plain: bool = False,
 ) -> dict:
     """Render subject/text/html for one contact through the variable registry.
 
@@ -1393,8 +1448,13 @@ async def render_email(
     channels. Any short code the contact has no value for is removed rather
     than mailed out verbatim.
 
-    ``append_unsubscribe`` is retained for backwards compatibility. Outbound
-    message bodies no longer receive an unsubscribe footer.
+    ``plain`` is the "Plain personal email" format: the text part is
+    authoritative (a rich HTML body is folded back to text), the HTML part is a
+    minimal wrapper — no gray page background, no 600px card — and the ONLY
+    footer is the small gray ``unsubscribe`` link line. The raw
+    "Unsubscribe: <long URL>" line is never added to the plain-text part;
+    bulk mail keeps the machine-readable List-Unsubscribe headers (see
+    :func:`build_headers`).
     """
     from app.services.variable_service import render_for_contact
 
@@ -1405,10 +1465,20 @@ async def render_email(
     if not rendered_subject.strip():
         rendered_subject = "(no subject)"
 
-    if not (html or "").strip() and (text or "").strip():
+    if plain:
+        # Text is authoritative. A creative's rich HTML would reintroduce the
+        # card/background/buttons this mode exists to avoid, so fold it down.
+        if not (text or "").strip() and (html or "").strip():
+            text = html_to_text(html)
+        html = text_to_html(text or "", plain=True)
+        if append_unsubscribe:
+            footer = plain_footer_html((contact.email or "").strip())
+            if footer:
+                html = (html or "").replace("</body></html>", f"{footer}</body></html>")
+    elif not (html or "").strip() and (text or "").strip():
         html = text_to_html(text or "")
 
-    if append_unsubscribe and account is not None:
+    if not plain and append_unsubscribe and account is not None:
         # The signed token must name the RECIPIENT. This used to pass the
         # account's reply-to/From address, so the link (a) unsubscribed the
         # sender's own address when clicked and (b) disagreed with the
@@ -1422,6 +1492,44 @@ async def render_email(
         contact.id, len(rendered_subject), len(text or ""), len(html or ""),
     )
     return {"subject": rendered_subject, "text": text or "", "html": html or ""}
+
+
+async def campaign_plain_mode(
+    db: AsyncSession,
+    campaign_id: int | None,
+    ads_campaign_id: int | None,
+) -> bool:
+    """Is the owning campaign on "Plain personal email" mode?
+
+    Email Manager (ads) campaigns default ON; classic campaigns default OFF.
+    A missing/unknown campaign keeps the classic look, so nothing changes for
+    sends that were already working.
+    """
+    try:
+        if ads_campaign_id is not None:
+            from app.models.ads import AdsCampaign
+
+            campaign = (
+                await db.execute(select(AdsCampaign).where(AdsCampaign.id == ads_campaign_id))
+            ).scalar_one_or_none()
+            return bool(getattr(campaign, "plain_personal_email", True)) if campaign else True
+        if campaign_id is not None:
+            from app.models.campaign import Campaign
+
+            campaign = (
+                await db.execute(select(Campaign).where(Campaign.id == campaign_id))
+            ).scalar_one_or_none()
+            return bool(getattr(campaign, "plain_personal_email", False)) if campaign else False
+    except Exception:  # noqa: BLE001 - a lookup failure must not change the mail
+        return False
+    return False
+
+
+#: "Re: Re: Re: x" is never correct. Strip every reply/forward prefix once and
+#: add exactly one "Re:".
+def reply_subject(subject: str | None) -> str:
+    base = _REPLY_SUBJECT_PREFIX.sub("", str(subject or "").strip()).strip()
+    return f"Re: {base}" if base else "Re:"
 
 
 async def queue_email(
@@ -1447,6 +1555,8 @@ async def queue_email(
     recipient_address: str | None = None,
     outreach: bool | None = None,
     refused: dict | None = None,
+    plain: bool | None = None,
+    thread_root_rfc_id: str | None = None,
 ) -> Message | None:
     """Create the outbound email ``Message`` row (delivery happens elsewhere).
 
@@ -1482,12 +1592,18 @@ async def queue_email(
     if not (text_body or "").strip() and (html_body or "").strip():
         text_body = html_to_text(html_body)
 
-    # Bulk email gets machine-readable List-Unsubscribe headers, but no visible
-    # unsubscribe footer is appended to the message body.
+    # "Plain personal email" mode: per-campaign setting, derived from the
+    # campaign rows when the caller does not pass it explicitly.
+    if plain is None:
+        plain = await campaign_plain_mode(db, campaign_id, ads_campaign_id)
+
+    # Bulk email gets machine-readable List-Unsubscribe headers; in plain mode
+    # the only visible footer is the small gray "unsubscribe" link line.
     rendered = await render_email(
         db, contact,
         subject=subject, text_body=text_body, html_body=html_body,
         account=account, append_unsubscribe=bool(bulk),
+        plain=bool(plain),
     )
 
     sender_id_value = sender_id(account)
@@ -1527,6 +1643,9 @@ async def queue_email(
         provider=(account.provider if _sender_is_mailbox(account) else "brevo"),
         idempotency_key=idempotency_key or f"email-{contact.id}-{uuid.uuid4().hex[:12]}",
         is_auto_reply=bool(is_auto_reply),
+        # A follow-up pins the thread to the FIRST email's Message-ID so the
+        # whole conversation stays under one root (sending policy).
+        in_reply_to=thread_root_rfc_id,
         # Inbox replies and autoresponses leave from a connected Gmail. A
         # campaign follow-up is neither, even when its subject starts with Re:.
         send_from_mailbox=bool(as_reply or is_auto_reply),
@@ -1562,6 +1681,8 @@ async def send_now(
     bcc: list[str] | str | None = None,
     recipient_address: str | None = None,
     outreach: bool | None = None,
+    plain: bool | None = None,
+    thread_root_rfc_id: str | None = None,
 ) -> tuple[Message | None, dict]:
     """Queue + deliver in one call. Used by the API's "send now" paths."""
     refused: dict = {}
@@ -1571,7 +1692,7 @@ async def send_now(
         account=account, campaign_id=campaign_id, ads_campaign_id=ads_campaign_id,
         is_auto_reply=is_auto_reply, as_reply=as_reply, attachments=attachments, bulk=bulk,
         cc=cc, bcc=bcc, recipient_address=recipient_address, outreach=outreach,
-        refused=refused,
+        refused=refused, plain=plain, thread_root_rfc_id=thread_root_rfc_id,
     )
     if message is None:
         return None, {"success": False, "error": "contact_not_emailable",
@@ -1792,21 +1913,61 @@ async def _campaign_for_message(db: AsyncSession, message: Message):
 
 
 async def _deliver_via_gmail_reply(db: AsyncSession, message: Message, sender) -> dict | None:
-    """Send an inbox reply from connected Gmail.
+    """Send an inbox reply from the sender that owns the thread.
 
-    Returns None only when no mailbox is connected, so the caller can still
-    send through Brevo. A connected mailbox that fails is tried once more on
-    another Gmail, then the Gmail error is returned — never a Brevo fallback.
+    Sending policy: a reply leaves from the sender account the conversation
+    started with (or the one the operator explicitly picked in the reply box) —
+    never from whichever mailbox happens to be connected. An explicitly picked
+    Brevo sender is honored here by returning None so ``deliver`` uses Brevo;
+    an explicitly picked mailbox sends through that mailbox alone and never
+    rotates onto another Gmail. Only when NO sender was pinned at all does the
+    legacy "best matching mailbox" heuristic apply.
+
+    Returns None when this function does not handle the send (no mailbox
+    path), so the caller can fall through to Brevo. A connected mailbox that
+    fails returns its REAL error — never a silent Brevo fallback.
     """
     from app.services import mailbox_service
 
     if not settings.GMAIL_SEND_REPLIES:
         return None
-    preferred = sender if _sender_is_mailbox(sender) and sender.is_active else None
+
+    explicit_mailbox = _sender_is_mailbox(sender) and bool(message.email_account_id)
+    explicit_account = isinstance(sender, EmailAccount) and bool(message.email_account_id)
+
+    if explicit_account:
+        # The operator/conversation pinned a Brevo sender: replies go through
+        # Brevo from that exact account (deliver() does that).
+        return None
+
+    preferred = sender if explicit_mailbox and sender.is_active else None
     account = sender if isinstance(sender, EmailAccount) else None
     mailbox = preferred or await mailbox_service.mailbox_for_reply(db, message, account)
     if mailbox is None:
         return None
+
+    if preferred is not None:
+        # An explicitly chosen mailbox is tried exactly once. Rotating onto
+        # "the other Gmail" is how replies ended up leaving from the wrong
+        # address.
+        usable, why = await sender_is_usable(mailbox)
+        if not usable:
+            return {
+                "success": False,
+                "error": _no_sender_error([why or "sender_disabled"]),
+            }
+        result = await _send_via_mailbox(db, mailbox, message, None)
+        if result.get("success"):
+            return result
+        return {
+            "success": False,
+            "error": (
+                f"{mailbox.email_address} did not accept the reply "
+                f"({result.get('error') or 'Gmail rejected the message'}). "
+                "Reconnect the mailbox or pick another sender in the reply box."
+            ),
+        }
+
     tried: set[int] = set()
     last_error = "Gmail did not accept the reply."
     while mailbox is not None and len(tried) < 4:
@@ -1878,7 +2039,11 @@ async def deliver(db: AsyncSession, message: Message) -> dict:
     elif sender is not None and not explicit_mailbox:
         _append_sender(candidates, sender)
 
-    if pooled:
+    # A threaded follow-up (in_reply_to pinned to the thread root) must leave
+    # from the sender that started the thread — it never rotates onto another
+    # account, and the caller pauses it with a reason instead. A first campaign
+    # send keeps the operator-configured fallback account and pool.
+    if pooled and not message.in_reply_to:
         campaign = await _campaign_for_message(db, message)
         fallback_id = getattr(campaign, "fallback_email_account_id", None) if campaign else None
         if fallback_id:
@@ -1951,6 +2116,11 @@ async def _send_via_account(db: AsyncSession, account: EmailAccount, message: Me
 
     headers = await build_headers(db, message, account, bulk=bool(message.bulk_send))
     from_email, reply_to = await brevo_envelope(db, account)
+    # "Plain personal email" mode means exactly that: no tracking pixel and no
+    # link wrapping, so Brevo must not inject them.
+    plain = await campaign_plain_mode(db, message.campaign_id, message.ads_campaign_id)
+    track_opens = bool(account.track_opens) and not plain
+    track_clicks = bool(account.track_clicks) and not plain
     send_kwargs = dict(
         to_email=message.to_address or (contact.email if contact else None) or "",
         to_name=to_name,
@@ -1961,8 +2131,8 @@ async def _send_via_account(db: AsyncSession, account: EmailAccount, message: Me
         tags=[t for t in (f"campaign-{message.campaign_id}" if message.campaign_id else None,
                           f"ads-{message.ads_campaign_id}" if message.ads_campaign_id else None,
                           "channel-email") if t],
-        track_opens=bool(account.track_opens),
-        track_clicks=bool(account.track_clicks),
+        track_opens=track_opens,
+        track_clicks=track_clicks,
         headers=headers,
         attachments=load_attachments(message.attachments),
         cc=clean_addresses(message.cc_addresses),
@@ -2044,6 +2214,9 @@ async def _note_email_event(
     payload: dict | None = None,
     campaign_id: int | None = None,
     ads_campaign_id: int | None = None,
+    is_bot: bool = False,
+    bot_reason: str | None = None,
+    occurred_at: datetime | None = None,
 ) -> EmailEvent:
     event = EmailEvent(
         event_type=event_type,
@@ -2058,6 +2231,9 @@ async def _note_email_event(
         link=(link or "")[:1000] or None,
         detail=(detail or "")[:500] or None,
         payload=json.dumps(payload)[:8000] if payload else None,
+        is_bot=bool(is_bot),
+        bot_reason=(bot_reason or "")[:120] or None,
+        occurred_at=occurred_at,
     )
     db.add(event)
     await db.flush()
@@ -2075,6 +2251,72 @@ async def find_message_by_provider_id(db: AsyncSession, provider_id: str | None)
             )
         )
     ).scalar_one_or_none()
+
+
+#: User agents of security scanners / link unfurlers whose "engagement" is a
+#: machine at work, not a person reading.
+_BOT_UA_MARKERS = (
+    "barracuda",
+    "proofpoint",
+    "mimecast",
+    "symantec",
+    "mcafee",
+    "safelinks",
+    "urldefense",
+    "googleimageproxy",
+    "cisco",
+    "sonicwall",
+    "sophos",
+    "virustotal",
+    "phishtank",
+)
+
+
+def _truthy_flag(value) -> bool:
+    return value is True or str(value or "").strip().lower() in ("1", "true", "yes", "on")
+
+
+async def _classify_engagement_event(
+    db: AsyncSession,
+    event_type: str,
+    data: dict,
+    message: Message | None,
+    occurred_at: datetime | None,
+) -> tuple[bool, str | None]:
+    """Is this open/click a machine? Returns ``(is_bot, reason)``.
+
+    Rules (sending policy): a GET-prefetch style ``proxy_open`` flag, a known
+    scanner user agent, or a click that lands within 10 seconds of the open
+    (no human reads and clicks that fast) is bot engagement. Bot events are
+    stored as evidence but never counted as human opens/clicks and never
+    satisfy a follow-up "opened" condition.
+    """
+    for key in ("proxy_open", "proxyOpen", "proxy_opened"):
+        if _truthy_flag(data.get(key)):
+            return True, "proxy_open"
+    ua = str(
+        data.get("userAgent") or data.get("user_agent") or data.get("UserAgent") or ""
+    ).lower()
+    if any(marker in ua for marker in _BOT_UA_MARKERS):
+        return True, f"scanner_ua:{ua[:40]}"
+    if event_type == "clicked" and message is not None:
+        # A click seconds after the open is the scanner signature.
+        last_open = (
+            await db.execute(
+                select(EmailEvent).where(
+                    EmailEvent.message_id == message.id,
+                    EmailEvent.event_type == "opened",
+                )
+                .order_by(EmailEvent.id.desc())
+                .limit(1)
+            )
+        ).scalars().first()
+        if last_open is not None:
+            open_at = _aware(last_open.occurred_at) or _aware(last_open.created_at)
+            click_at = occurred_at or _now()
+            if open_at is not None and 0 <= (click_at - open_at).total_seconds() <= 10:
+                return True, "click_within_10s_of_open"
+    return False, None
 
 
 async def apply_event(db: AsyncSession, event_type: str, data: dict) -> dict:
@@ -2114,12 +2356,31 @@ async def apply_event(db: AsyncSession, event_type: str, data: dict) -> dict:
     contact_id = message.contact_id if message else None
     account_id = message.email_account_id if message else None
 
+    occurred_at = _parse_ts(data.get("ts_event")) or _parse_ts(data.get("date"))
+    is_bot = False
+    bot_reason = None
+    if event_type in ("opened", "clicked"):
+        is_bot, bot_reason = await _classify_engagement_event(
+            db, event_type, data, message, occurred_at
+        )
     await _note_email_event(
         db, event_type, message,
         address=address, subject=subject, link=link,
         provider_event_id=provider_event_id, payload=data,
         detail=data.get("reason") or data.get("tag") or None,
+        is_bot=is_bot, bot_reason=bot_reason,
+        occurred_at=occurred_at or _now(),
     )
+
+    # Per-sender webhook health (P0): the Email Manager shows when each
+    # account's webhook last delivered an event.
+    if account_id and int(account_id) > 0:
+        try:
+            account = await get_account(db, int(account_id))
+            if account is not None:
+                account.last_webhook_event_at = _now()
+        except Exception:  # noqa: BLE001
+            pass
 
     if message is not None:
         now = _now()
@@ -2129,15 +2390,19 @@ async def apply_event(db: AsyncSession, event_type: str, data: dict) -> dict:
                 message.delivered_at = _parse_ts(data.get("ts_event")) or now
                 await _bump_campaign_delivered(db, message, delivered=True)
         elif event_type == "opened":
-            message.open_count = (message.open_count or 0) + 1
-            message.opened_at = message.opened_at or (_parse_ts(data.get("ts_event")) or now)
+            # A bot open still proves delivery; it never counts as human
+            # engagement and never satisfies a follow-up "opened" condition.
+            if not is_bot:
+                message.open_count = (message.open_count or 0) + 1
+                message.opened_at = message.opened_at or (occurred_at or now)
             if message.status in ("sent", "queued", "sending"):
                 message.status = "delivered"
                 message.delivered_at = message.delivered_at or now
         elif event_type == "clicked":
-            message.click_count = (message.click_count or 0) + 1
-            message.clicked_at = message.clicked_at or (_parse_ts(data.get("ts_event")) or now)
-            message.opened_at = message.opened_at or message.clicked_at
+            if not is_bot:
+                message.click_count = (message.click_count or 0) + 1
+                message.clicked_at = message.clicked_at or (occurred_at or now)
+                message.opened_at = message.opened_at or message.clicked_at
         elif event_type in ("bounce", "blocked", "spam", "error"):
             await _apply_bounce(db, message, event_type, data)
         elif event_type == "unsubscribed":
@@ -2210,6 +2475,137 @@ async def _apply_bounce(db: AsyncSession, message: Message, event_type: str, dat
         ).scalar_one_or_none()
         if campaign is not None:
             campaign.messages_failed = (campaign.messages_failed or 0) + 1
+
+
+#: How long a message may sit in "sent" before it counts as unconfirmed and
+#: the Brevo event-API fallback polls for its delivery event.
+UNCONFIRMED_AFTER_MINUTES = 30
+
+
+def delivery_state(message: Message, *, now: datetime | None = None) -> str:
+    """The display state of an outbound email.
+
+    Same as ``message.status``, except a message still "sent" with no delivery
+    confirmation after 30 minutes is shown as ``unconfirmed`` — deliberately
+    separate from ``failed``, which needs a bounce/error event. Analytics count
+    the two apart so a webhook outage does not read as a delivery failure.
+    """
+    if message.status in ("sent", "sending", "queued"):
+        reference = _aware(message.sent_at) or _aware(message.created_at)
+        if reference is not None:
+            age = ((now or _now()) - reference).total_seconds()
+            if age > UNCONFIRMED_AFTER_MINUTES * 60 and message.status == "sent":
+                return "unconfirmed"
+    return message.status
+
+
+#: Provider event names -> the internal vocabulary used by apply_event. The
+#: webhook route has the same map for live events; this copy serves the
+#: event-API fallback poll (kept local to avoid a circular import).
+_POLL_EVENT_MAP = {
+    "delivered": "delivered",
+    "opened": "opened",
+    "unique_opened": "opened",
+    "click": "clicked",
+    "clicked": "clicked",
+    "hard_bounce": "bounce",
+    "soft_bounce": "bounce",
+    "bounce": "bounce",
+    "blocked": "blocked",
+    "spam": "spam",
+    "unsubscribed": "unsubscribed",
+    "error": "error",
+    "deferred": "deferred",
+}
+
+
+async def poll_unconfirmed_deliveries(
+    db: AsyncSession,
+    *,
+    older_than_minutes: int = UNCONFIRMED_AFTER_MINUTES,
+    min_poll_interval_minutes: int = 30,
+    limit: int = 20,
+    account_filter: EmailAccount | None = None,
+) -> dict:
+    """Fallback: poll Brevo's event API for messages stuck in "sent".
+
+    The webhook is the fast path; when it missed events (not registered for
+    this account, provider outage, a replayed deploy) a message would stay
+    "sent" forever and drag the delivery rate down. This sweep finds messages
+    still "sent" after ``older_than_minutes``, asks Brevo's event API what
+    actually happened to them, applies the same events the webhook would have,
+    and stamps ``status_polled_at`` so nothing is polled twice in a row.
+    """
+    now = _now()
+    cutoff = now - timedelta(minutes=max(1, older_than_minutes))
+    recheck = now - timedelta(minutes=max(1, min_poll_interval_minutes))
+    query = (
+        select(Message)
+        .where(
+            Message.channel == "email",
+            Message.direction == "outgoing",
+            Message.status == "sent",
+            Message.provider == "brevo",
+            or_(Message.sent_at.is_(None), Message.sent_at <= cutoff),
+            or_(Message.status_polled_at.is_(None), Message.status_polled_at <= recheck),
+        )
+        .order_by(Message.id.asc())
+        .limit(max(1, limit))
+    )
+    rows = list((await db.execute(query)).scalars().all())
+    result = {"polled": 0, "confirmed": 0, "unconfirmed": 0, "errors": 0}
+    for message in rows:
+        account = await get_account(db, message.email_account_id)
+        if account is None:
+            message.status_polled_at = now
+            result["polled"] += 1
+            continue
+        api_key = decrypt_value(account.api_key_encrypted or "")
+        if not api_key:
+            message.status_polled_at = now
+            result["errors"] += 1
+            continue
+        from app.providers.brevo import list_events
+
+        response = await list_events(
+            api_key,
+            email=message.to_address,
+            message_id=message.provider_message_id,
+            days=14,
+        )
+        message.status_polled_at = now
+        result["polled"] += 1
+        if not response.get("success"):
+            result["errors"] += 1
+            continue
+        found = False
+        for event in response.get("events") or []:
+            if not isinstance(event, dict):
+                continue
+            event_type = _POLL_EVENT_MAP.get(str(event.get("event") or "").lower())
+            if event_type is None:
+                continue
+            provider_event_id = str(
+                event.get("id") or event.get("eventId") or ""
+            ) or f"poll-{message.id}-{event_type}-{event.get('date') or ''}"
+            outcome = await apply_event(
+                db,
+                event_type,
+                {
+                    **event,
+                    "message-id": event.get("messageId") or message.provider_message_id,
+                    "email": event.get("email") or message.to_address,
+                    "event-id": provider_event_id,
+                },
+            )
+            if outcome.get("applied") or outcome.get("reason") == "duplicate":
+                found = True
+        if found or message.status not in ("sent",):
+            result["confirmed"] += 1
+        else:
+            result["unconfirmed"] += 1
+    await db.flush()
+    return result
 
 
 async def send_composer_test(
@@ -2572,6 +2968,127 @@ def _inbound_body(item: dict) -> tuple[str, str | None]:
     return (text, str(html) if html else None)
 
 
+# ---------------------------------------------------------------------------
+# Inbound reply classification (P0: what counts as a reply?)
+# ---------------------------------------------------------------------------
+
+#: Body/subject markers of a machine auto-reply. These are stored for evidence
+#: but are NOT replies: they must not stop follow-ups, must not be counted in
+#: campaign analytics and must not raise "interested" alerts.
+AUTO_REPLY_PATTERNS = (
+    "out of office",
+    "out of the office",
+    "ooo",
+    "i am away",
+    "i will be away",
+    "on vacation",
+    "on leave",
+    "automatic reply",
+    "auto-reply",
+    "autoreply",
+    "automatically generated",
+    "generated automatically",
+    "this is an automated",
+    "do not reply to this",
+    "no-reply",
+    "mailer-daemon",
+    "delivery status notification",
+    "undelivered mail",
+)
+
+
+def is_auto_reply(subject: str | None, body: str | None, headers: dict | None = None) -> bool:
+    """True for out-of-office / vacation / machine-generated notices."""
+    headers = {str(k).lower(): str(v) for k, v in (headers or {}).items()}
+    auto_submitted = headers.get("auto-submitted", "").strip().lower()
+    if auto_submitted and auto_submitted != "no":
+        return True
+    if headers.get("x-autoreply", "").strip().lower() in ("yes", "true", "1"):
+        return True
+    if headers.get("x-autorespond", "").strip().lower() in ("yes", "true", "1"):
+        return True
+    precedence = headers.get("precedence", "").strip().lower()
+    if precedence in ("auto_reply", "autoreply", "bulk_auto_reply"):
+        return True
+    blob = f"{subject or ''}\n{body or ''}".strip().lower()
+    if not blob:
+        return False
+    return any(marker in blob for marker in AUTO_REPLY_PATTERNS)
+
+
+def classify_inbound_reply(
+    subject: str | None, body: str | None, headers: dict | None = None
+) -> str:
+    """One word for what this inbound message IS.
+
+    ``auto_reply`` | ``unsubscribe`` | ``positive`` | ``negative`` |
+    ``question`` | ``meeting_request`` | ``neutral``. Auto-replies and
+    unsubscribe requests are never "a reply" for engagement purposes; the
+    other kinds are, with positive raising an operator alert.
+    """
+    if is_auto_reply(subject, body, headers):
+        return "auto_reply"
+    if looks_like_unsubscribe(body) or looks_like_unsubscribe(subject):
+        return "unsubscribe"
+    try:
+        from app.services.ai_classifier import classify
+
+        sentiment = (classify(body or "").get("sentiment") or "").strip().lower()
+        if sentiment == "positive":
+            return "positive"
+        if sentiment == "negative":
+            return "negative"
+    except Exception:  # noqa: BLE001 — classification must never block ingest
+        pass
+    try:
+        from app.services.ads_service import classify_reply
+
+        kind = classify_reply(body or "")
+        if kind in ("positive", "negative", "meeting_request", "question"):
+            return kind
+    except Exception:  # noqa: BLE001
+        pass
+    return "neutral"
+
+
+async def _stop_followups_for_contact(
+    db: AsyncSession,
+    contact_id: int,
+    *,
+    reason: str,
+    campaign_ids: set[int] | None = None,
+) -> int:
+    """Cancel every pending follow-up for a contact (all engines).
+
+    A human reply and an unsubscribe both end the follow-up chain — the
+    acceptance rule "a real reply stops that contact's follow-ups" and
+    "unsubscribe cancels their follow-ups" — across manual FollowUps, Email
+    Manager (ads) follow-up tasks and the classic campaign rules.
+
+    ``campaign_ids`` limits the stop to specific campaigns when given; None
+    stops everything for the contact.
+    """
+    stopped = 0
+    from app.models.ads import AdsFollowUpTask
+    from app.models.followup import FollowUp
+
+    for model, campaign_col in (
+        (FollowUp, FollowUp.campaign_id),
+        (AdsFollowUpTask, AdsFollowUpTask.campaign_id),
+    ):
+        query = update(model).where(
+            model.contact_id == contact_id,
+            model.status.in_(("pending", "paused", "waiting_reply")),
+        )
+        if campaign_ids:
+            query = query.where(campaign_col.in_(list(campaign_ids)))
+        result = await db.execute(query.values(status="cancelled", note=reason[:300])
+                                 if model is AdsFollowUpTask
+                                 else query.values(status="cancelled", last_error=reason[:300]))
+        stopped += int(result.rowcount or 0)
+    return stopped
+
+
 async def process_inbound_email(db: AsyncSession, payload: dict) -> dict:
     """Store inbound mail as ``Message`` rows on the email inbox thread."""
     from app.services.sms_service import SMSService
@@ -2738,70 +3255,141 @@ async def process_inbound_email(db: AsyncSession, payload: dict) -> dict:
         contact.emails_received = (contact.emails_received or 0) + 1
         contact.last_email_reply_at = received_at
 
-        # Credit the reply to the campaign that last emailed them.
-        last_out = (
-            await db.execute(
-                select(Message)
-                .where(
-                    Message.contact_id == contact.id,
-                    Message.direction == "outgoing",
-                    Message.channel == "email",
-                    Message.campaign_id.isnot(None),
-                )
-                .order_by(Message.created_at.desc())
-                .limit(1)
-            )
-        ).scalars().first()
-        if last_out is not None:
-            campaign = (
-                await db.execute(select(Campaign).where(Campaign.id == last_out.campaign_id))
-            ).scalar_one_or_none()
-            already = (
+        # ---- Classify the reply (P0: what counts as a reply?) ------------
+        # positive | negative | unsubscribe | auto_reply | question |
+        # meeting_request | neutral. Auto-replies (out-of-office, "this
+        # message was automatically generated") are NOT replies: they are
+        # stored but never counted, never stop follow-ups and never alert.
+        reply_kind = classify_inbound_reply(subject, body, headers_blob)
+        if reply_kind == "auto_reply":
+            message.ai_intent = message.ai_intent or "auto_reply"
+        elif reply_kind == "unsubscribe":
+            message.ai_intent = "opt_out"
+        elif reply_kind in ("positive", "negative") and not (message.ai_sentiment or ""):
+            message.ai_sentiment = reply_kind
+
+        # Link the reply to the campaign assignment it answers — via the
+        # In-Reply-To/References parent first (exact thread), then the thread's
+        # campaign attribution — so analytics count replies and opt-outs
+        # instead of showing zeros.
+        last_out = parent_message
+        if last_out is None:
+            last_out = (
                 await db.execute(
-                    select(Message.id).where(
+                    select(Message)
+                    .where(
                         Message.contact_id == contact.id,
-                        Message.campaign_id == last_out.campaign_id,
-                        Message.direction == "incoming",
-                        Message.id != message.id,
+                        Message.direction == "outgoing",
+                        Message.channel == "email",
+                        Message.campaign_id.isnot(None),
                     )
+                    .order_by(Message.created_at.desc())
+                    .limit(1)
                 )
-            ).scalar_one_or_none()
-            if campaign is not None and not already:
-                campaign.replies = (campaign.replies or 0) + 1
-                cc = (
-                    await db.execute(
-                        select(CampaignContact).where(
-                            CampaignContact.campaign_id == campaign.id,
-                            CampaignContact.contact_id == contact.id,
-                        )
-                    )
-                ).scalar_one_or_none()
-                if cc is not None:
-                    cc.status = "replied"
-                    cc.next_action_at = None
+            ).scalars().first()
 
-        # Tell the operator, with enough context to decide whether to answer
-        # now: who wrote, what the subject is, and the first line of what they
-        # said. This is the email twin of notify_inbound_sms — same bell, same
-        # browser push, same deep link straight into the thread.
-        await _notify_inbound_email(db, contact, conversation, message, subject, body)
+        if reply_kind not in ("auto_reply",):
+            try:
+                from app.services.ads_service import associate_reply
 
-        keyword = None
-        if looks_like_unsubscribe(body):
-            keyword = "unsubscribe"
+                await associate_reply(
+                    db,
+                    contact.id,
+                    body or subject or "",
+                    parent_message=parent_message or last_out,
+                    classification=reply_kind,
+                )
+            except Exception as exc:  # noqa: BLE001 — analytics must not break ingest
+                logger.warning("EMAIL-IN reply association failed: %s", exc)
+
+        if reply_kind == "unsubscribe":
+            # Unsubscribe request (one-click headers, mailto, or the word
+            # itself): opt the contact out of email and cancel every pending
+            # follow-up across all engines.
             await unsubscribe_contact(
                 db,
                 contact_id=contact.id,
                 address=from_address,
-                reason=f"Replied with '{keyword}'",
+                reason="Replied with 'unsubscribe'",
                 source="keyword",
-                campaign_id=last_out.campaign_id if last_out else None,
-                keyword=keyword,
+                campaign_id=(last_out.campaign_id or last_out.ads_campaign_id) if last_out else None,
+                keyword="unsubscribe",
             )
+            stopped = await _stop_followups_for_contact(
+                db, contact.id, reason="Contact unsubscribed"
+            )
+            if stopped:
+                logger.info("EMAIL-IN: stopped %s follow-up(s) after unsubscribe", stopped)
+            if last_out is not None:
+                try:
+                    from app.models.ads import AdsAssignment
 
-        # Mirror the SMS pipeline: attribute the reply, run auto-reply rules and
-        # then the automation engine for this channel.
-        if not keyword:
+                    assignment = (
+                        await db.execute(
+                            select(AdsAssignment).where(
+                                AdsAssignment.message_id == last_out.id
+                            )
+                        )
+                    ).scalar_one_or_none()
+                    if assignment is not None:
+                        assignment.reply_status = "unsubscribe"
+                        if not assignment.skip_reason:
+                            assignment.skip_reason = "opted_out"
+                        assignment.last_action_at = _now()
+                except Exception:  # noqa: BLE001
+                    pass
+        elif reply_kind != "auto_reply":
+            # ---- A real reply -------------------------------------------
+            # Stops the follow-up chain, marks the lead as replied, credits
+            # the campaign and alerts the operator (positives get their own
+            # "interested" alert).
+            if (contact.lead_status or "").lower() in ("", "new", "none"):
+                contact.lead_status = "replied"
+            stopped = await _stop_followups_for_contact(
+                db, contact.id, reason="Contact replied"
+            )
+            if stopped:
+                logger.info("EMAIL-IN: stopped %s follow-up(s) after reply", stopped)
+
+            if last_out is not None:
+                if last_out.campaign_id is not None:
+                    campaign = (
+                        await db.execute(
+                            select(Campaign).where(Campaign.id == last_out.campaign_id)
+                        )
+                    ).scalar_one_or_none()
+                    already = (
+                        await db.execute(
+                            select(Message.id).where(
+                                Message.contact_id == contact.id,
+                                Message.campaign_id == last_out.campaign_id,
+                                Message.direction == "incoming",
+                                Message.id != message.id,
+                            )
+                        )
+                    ).scalar_one_or_none()
+                    if campaign is not None and not already:
+                        campaign.replies = (campaign.replies or 0) + 1
+                    cc = (
+                        await db.execute(
+                            select(CampaignContact).where(
+                                CampaignContact.campaign_id == last_out.campaign_id,
+                                CampaignContact.contact_id == contact.id,
+                            )
+                        )
+                    ).scalar_one_or_none()
+                    if cc is not None:
+                        cc.status = "replied"
+                        cc.next_action_at = None
+
+            # Tell the operator, with enough context to decide whether to
+            # answer now: who wrote, what the subject is, and the first line
+            # of what they said. This is the email twin of notify_inbound_sms —
+            # same bell, same browser push, same deep link into the thread.
+            await _notify_inbound_email(db, contact, conversation, message, subject, body)
+            if reply_kind == "positive":
+                await _notify_positive_reply(db, contact, conversation, message, subject, body)
+
             try:
                 await _maybe_auto_reply(db, contact, conversation, message)
             except Exception as exc:  # noqa: BLE001
@@ -2821,14 +3409,6 @@ async def process_inbound_email(db: AsyncSession, payload: dict) -> dict:
                 )
             except Exception as exc:  # noqa: BLE001
                 logger.error("EMAIL automation error: %s", exc)
-        else:
-            from app.models.followup import FollowUp
-
-            await db.execute(
-                update(FollowUp)
-                .where(FollowUp.contact_id == contact.id, FollowUp.status.in_(["pending", "sending"]))
-                .values(status="cancelled")
-            )
 
         stored += 1
 
@@ -2924,6 +3504,31 @@ async def _notify_inbound_email(
         )
     except Exception as exc:  # noqa: BLE001 — never break inbound mail
         logger.warning("EMAIL-IN notify failed: %s", exc)
+
+
+async def _notify_positive_reply(
+    db: AsyncSession,
+    contact: Contact,
+    conversation: Conversation,
+    message: Message,
+    subject: str | None,
+    body: str | None,
+) -> None:
+    """The hot-lead alert: a positive ("interested") reply, with the text."""
+    try:
+        from app.services.push_service import notify_positive_reply
+
+        name, _preview = email_notification_text(contact, subject, body)
+        await notify_positive_reply(
+            db,
+            contact_name=name,
+            reply_text=body or "",
+            subject=subject,
+            conversation_id=conversation.id,
+            channel="email",
+        )
+    except Exception as exc:  # noqa: BLE001 — never break inbound mail
+        logger.warning("EMAIL-IN positive-reply notify failed: %s", exc)
 
 
 async def _maybe_auto_reply(
@@ -3048,23 +3653,49 @@ async def email_totals(db: AsyncSession, *, days: int = 30, account_id: int | No
     suppressed = (await db.execute(select(func.count()).select_from(EmailSuppression))).scalar() or 0
 
     sent = counts["sent"]
+    # "Unconfirmed": sent long ago with no delivery event yet — deliberately
+    # separate from "failed", which needs a bounce/error. The Brevo event-API
+    # fallback polls these; until it confirms them they are neither delivered
+    # nor failed.
+    unconfirmed = sum(1 for m in outbound if delivery_state(m) == "unconfirmed")
+    # Human vs bot engagement: message counters only ever hold HUMAN events
+    # (scanner opens/clicks are stored flagged in email_events), so the split
+    # is exact.
+    bot_query = select(
+        EmailEvent.event_type, func.count()
+    ).where(
+        EmailEvent.is_bot.is_(True),
+        EmailEvent.created_at >= since,
+        EmailEvent.event_type.in_(("opened", "clicked")),
+    ).group_by(EmailEvent.event_type)
+    bot_counts = {"opened": 0, "clicked": 0}
+    for event_type, count in (await db.execute(bot_query)).all():
+        bot_counts[str(event_type)] = int(count)
+    human_opens = int(counts.get("opens") or 0)
+    human_clicks = int(counts.get("clicks") or 0)
     return {
         "period_days": days,
         "sent": sent,
         "delivered": counts["delivered"],
         "failed": counts["failed"],
+        "unconfirmed": unconfirmed,
         "queued": counts["queued"],
         "replies": counts["replies"],
         "opened": counts["opened"],
         "clicked": counts["clicked"],
         "opens": counts["opens"],
         "clicks": counts["clicks"],
+        "human_opens": human_opens,
+        "human_clicks": human_clicks,
+        "bot_opens": bot_counts["opened"],
+        "bot_clicks": bot_counts["clicked"],
         "unsubscribed": suppressed,
         "delivery_rate": metrics.rate(counts["delivered"], sent),
         "open_rate": metrics.rate(counts["opened"], sent),
         "click_rate": metrics.rate(counts["clicked"], sent),
         "reply_rate": metrics.rate(counts["replies"], sent),
         "failure_rate": metrics.rate(counts["failed"], sent),
+        "unconfirmed_rate": metrics.rate(unconfirmed, sent),
         "series": _series(outbound, inbound, since=since, days=days),
         "scope": metrics.scope("email", days),
         "definitions": metrics.DEFINITIONS,

@@ -193,6 +193,34 @@ async def notify_inbound_email(
     )
 
 
+async def notify_positive_reply(
+    db: AsyncSession,
+    *,
+    contact_name: str,
+    reply_text: str = "",
+    subject: Optional[str] = None,
+    conversation_id: Optional[int] = None,
+    channel: str = "email",
+) -> NotificationEvent:
+    """A positive ("interested") reply — the alert the operator must NOT miss.
+
+    Carries the reply text so the operator can answer from the notification
+    itself. Distinct from the plain new-reply bell: this one is the hot-lead
+    signal.
+    """
+    sender = (contact_name or "").strip() or "a contact"
+    snippet = (reply_text or "").strip().replace("\n", " ")[:300]
+    title = f"🔥 Interested reply from {sender}"
+    body = snippet or (subject or "").strip() or "They replied positively — open the thread."
+    path = "/email-inbox" if channel == "email" else "/inbox"
+    return await notify(
+        db, "positive_reply", title, body,
+        url=(f"{path}?conversation_id={conversation_id}" if conversation_id else path),
+        reference_id=conversation_id, reference_type="conversation",
+        tag=f"positive-{conversation_id}" if conversation_id else "positive",
+    )
+
+
 async def notify_campaign_done(db: AsyncSession, campaign_name: str,
                                sent: int = 0, delivered: int = 0,
                                campaign_id: Optional[int] = None) -> NotificationEvent:

@@ -66,6 +66,9 @@ SYSTEM_STATES = (
     "outside_sending_window",
     "insufficient_balance",
     "no_eligible_contacts",
+    # A campaign whose sends are done but whose follow-ups are still pending is
+    # waiting for those follow-ups — NOT "no eligible contacts" (P2-13).
+    "waiting_for_followups",
     "needs_attention",
 )
 
@@ -116,6 +119,14 @@ class AdsCampaign(Base):
     subject: Mapped[str | None] = mapped_column(String(500), nullable=True)
     track_opens: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     track_clicks: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    #: "Plain personal email" mode (default ON for Email Manager campaigns):
+    #: text/plain part + minimal HTML (no page background, no card, no
+    #: tracking pixel, no link wrapping), a tiny gray plain-text "unsubscribe"
+    #: link line, and the standard List-Unsubscribe headers.
+    plain_personal_email: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    #: Optional {unified_sender_id: daily_cap} map — a per-sender daily cap on
+    #: top of the campaign's daily_limit. NULL = no per-sender cap.
+    sender_daily_limits: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     owner_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
