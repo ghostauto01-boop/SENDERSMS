@@ -311,7 +311,11 @@ async def test_ads_dispatch_sends_full_personalized_bodies_from_rotating_senders
         assert "unsubscribe" not in message.body.lower()
         if message.html_body:
             assert f"Hi {name}, this is my message." in message.html_body
+            # The unsubscribe button/line is permanently removed: no visible
+            # unsubscribe control of any kind in the body (opt-out is header
+            # only), no button, no card shell, and never a raw unsubscribe URL.
             assert "unsubscribe" not in message.html_body.lower()
+            assert "<button" not in message.html_body.lower()
     # The pool actually rotated: no single From took all five.
     assert [m.from_address for m in messages] == [
         "one@acme-leads.io", "two@acme-leads.io", "one@acme-leads.io",

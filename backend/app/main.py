@@ -193,6 +193,12 @@ async def _poll() -> int:
                     return 0
                 await set_setting(db, LAST_POLL, str(now),
                                   description="Unix time of the last delivery-status poll")
+                # Heartbeat for the health page / red banner: a completed poll
+                # cycle (even one with nothing to do) proves a processor is
+                # alive. Celery beat stamps the same key every minute.
+                from app.tasks.system_tasks import touch_worker_heartbeat
+
+                await touch_worker_heartbeat(db, source="inline-poller")
                 await db.commit()
         except Exception as exc:
             if db_health.is_db_error(exc):
@@ -254,6 +260,10 @@ async def _poll() -> int:
         # Email campaign health backstop (notifications only) when no Celery
         # worker is available.
         work += await _watch_bounce_rates_inline()
+        # Delivery-tracking fallback: messages still "sent" long after they
+        # left are checked against Brevo's event API (the webhook is the fast
+        # path; this catches the missed events so delivery rates are honest).
+        work += await _poll_unconfirmed_email_deliveries_inline()
         # Sweep any queued messages that were rate-limited / deferred (or that
         # a dead broker left behind). Uses the same atomic claim as Celery so
         # the two can never double-send the same message.
@@ -423,6 +433,22 @@ async def _process_queued_messages_inline() -> int:
         return sent
     except Exception as exc:
         logger.warning("Queued sweep: %s", exc)
+        return 0
+
+
+async def _poll_unconfirmed_email_deliveries_inline() -> int:
+    """Brevo event-API fallback for messages stuck in "sent" (P0)."""
+    try:
+        from app.services.email_service import poll_unconfirmed_deliveries
+
+        async with async_session_factory() as db:
+            result = await poll_unconfirmed_deliveries(db, limit=15)
+            await db.commit()
+        if result.get("confirmed") or result.get("errors"):
+            logger.info("EMAIL DELIVERY POLL: %s", result)
+        return int(result.get("confirmed") or 0)
+    except Exception as exc:  # noqa: BLE001 — never stop the poll cycle
+        logger.warning("Email delivery poll: %s", exc)
         return 0
 
 

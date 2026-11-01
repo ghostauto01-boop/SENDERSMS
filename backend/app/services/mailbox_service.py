@@ -188,8 +188,39 @@ def serialize_mailbox(mailbox: EmailMailbox) -> dict:
         "filters_installed": len(json.loads(mailbox.filter_ids or "[]")),
         "label_id": mailbox.label_id,
         "has_credential": bool(mailbox.credential_encrypted),
+        # P1-10: the sync box's banner signal. "needs_reconnect" means the
+        # OAuth grant itself is dead (expired/revoked token) — no amount of
+        # retrying will fix it, the owner must press Reconnect.
+        "needs_reconnect": _error_needs_reconnect(mailbox.last_error),
         "created_at": mailbox.created_at.isoformat() if mailbox.created_at else None,
     }
+
+
+#: Error fingerprints that mean the OAuth grant itself is dead, not a
+#: transient failure: retrying cannot fix these, only Reconnect can.
+_RECONNECT_ERROR_MARKERS = (
+    "invalid_grant",
+    "token.*expired",
+    "token.*revoked",
+    "unauthorized",
+    "401",
+    "invalid credentials",
+    "credentials.*not.*found",
+    "reauthoriz",
+    "re-auth",
+    "login required",
+    "authfail",
+    "authentication failed",
+)
+
+
+def _error_needs_reconnect(error: str | None) -> bool:
+    import re
+
+    raw = (error or "").strip().lower()
+    if not raw:
+        return False
+    return any(re.search(marker, raw) for marker in _RECONNECT_ERROR_MARKERS)
 
 
 def _cursor_state(mailbox: EmailMailbox) -> dict:
@@ -571,6 +602,7 @@ async def sync_mailbox(db: AsyncSession, mailbox: EmailMailbox) -> dict:
         await db.flush()
         summary["errors"].append(str(exc)[:300])
         summary["success"] = False
+        await _mark_sync_failure(db, mailbox, str(exc)[:500])
         return summary
 
     summary["seen"] = len(items)
@@ -621,6 +653,10 @@ async def sync_mailbox(db: AsyncSession, mailbox: EmailMailbox) -> dict:
     mailbox.total_synced = (mailbox.total_synced or 0) + len(items)
     mailbox.total_replies = (mailbox.total_replies or 0) + stored
     await db.flush()
+    if mailbox.last_sync_status == "error":
+        await _mark_sync_failure(db, mailbox, mailbox.last_error or "sync failed")
+    else:
+        await _clear_sync_failure(db, mailbox)
 
     if stored or summary["rescued"]:
         await _notify(db, mailbox, summary)
@@ -628,6 +664,73 @@ async def sync_mailbox(db: AsyncSession, mailbox: EmailMailbox) -> dict:
     summary["success"] = mailbox.last_sync_status == "ok"
     summary["duration_ms"] = int((_now() - started).total_seconds() * 1000)
     return summary
+
+
+async def _mark_sync_failure(db: AsyncSession, mailbox: EmailMailbox, error: str) -> None:
+    """Remember when the failures started and tell the owner — at most hourly.
+
+    "It has been failing for more than an hour" must be said out loud: a
+    mailbox quietly failing means replies silently land nowhere. The failure
+    start and last notice live in system_settings (no schema change).
+    """
+    try:
+        from app.services.system_settings import get_setting, set_setting
+
+        since_key = f"mailbox.failing_since.{mailbox.id}"
+        noted_key = f"mailbox.failing_notified.{mailbox.id}"
+        now = _now()
+        since_raw = await get_setting(db, since_key)
+        if not since_raw:
+            await set_setting(db, since_key, now.isoformat(), category="mailboxes",
+                              description="When this mailbox's sync failures started")
+            return
+        try:
+            since = datetime.fromisoformat(since_raw)
+            if since.tzinfo is None:
+                since = since.replace(tzinfo=timezone.utc)
+        except ValueError:
+            since = now
+        failing_minutes = int((now - since).total_seconds() // 60)
+        last_noted_raw = await get_setting(db, noted_key)
+        if last_noted_raw:
+            try:
+                last_noted = datetime.fromisoformat(last_noted_raw)
+                if last_noted.tzinfo is None:
+                    last_noted = last_noted.replace(tzinfo=timezone.utc)
+            except ValueError:
+                last_noted = since
+        else:
+            last_noted = since
+        if failing_minutes < 60 or (now - last_noted).total_seconds() < 3600:
+            return
+        await set_setting(db, noted_key, now.isoformat(), category="mailboxes",
+                          description="When this mailbox's failure was last announced")
+        from app.services.push_service import notify
+
+        needs_reconnect = _error_needs_reconnect(error)
+        title = f"⚠️ {mailbox.email_address} has not synced for {failing_minutes // 60}h+"
+        body = (
+            ("Gmail access needs to be reconnected: " if needs_reconnect else "Mailbox sync is failing: ")
+            + (error or "unknown error")[:200]
+        )
+        await notify(db, "email_reply", title, body, url="/email-accounts",
+                     reference_id=mailbox.id, reference_type="mailbox")
+    except Exception as exc:  # noqa: BLE001 — bookkeeping must never break a sync
+        logger.warning("MAILBOX failure bookkeeping failed: %s", exc)
+
+
+async def _clear_sync_failure(db: AsyncSession, mailbox: EmailMailbox) -> None:
+    try:
+        from app.services.system_settings import set_setting
+
+        await set_setting(db, f"mailbox.failing_since.{mailbox.id}", "",
+                          category="mailboxes",
+                          description="When this mailbox's sync failures started")
+        await set_setting(db, f"mailbox.failing_notified.{mailbox.id}", "",
+                          category="mailboxes",
+                          description="When this mailbox's failure was last announced")
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("MAILBOX failure clear failed: %s", exc)
 
 
 async def _notify(db: AsyncSession, mailbox: EmailMailbox, summary: dict) -> None:

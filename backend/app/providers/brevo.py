@@ -323,6 +323,39 @@ async def test_api_key(api_key: str) -> dict:
         return {"success": False, "error": str(exc)[:500]}
 
 
+async def list_events(
+    api_key: str,
+    *,
+    email: str | None = None,
+    message_id: str | None = None,
+    days: int = 7,
+    limit: int = 50,
+) -> dict:
+    """GET /v3/smtp/statistics/events — the event-API fallback poll.
+
+    Used when the webhook missed events (or was never registered): a message
+    still "sent" long after it left is checked here for its delivered/bounce
+    events instead of staying unconfirmed forever.
+    """
+    params: dict = {"days": max(1, min(int(days), 30)), "limit": max(1, min(int(limit), 100))}
+    if email:
+        params["email"] = email
+    if message_id:
+        params["messageId"] = message_id
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(15.0)) as client:
+            r = await client.get(
+                f"{_base()}/smtp/statistics/events", headers=_headers(api_key), params=params
+            )
+            data = r.json() if r.text else {}
+            if r.status_code < 400:
+                events = data.get("events") if isinstance(data, dict) else data
+                return {"success": True, "events": events or []}
+            return {"success": False, "error": _clean_error(r, data)}
+    except Exception as exc:  # noqa: BLE001
+        return {"success": False, "error": str(exc)[:500]}
+
+
 async def list_senders(api_key: str) -> dict:
     """GET /v3/senders — the From addresses Brevo has verified for this key."""
     try:

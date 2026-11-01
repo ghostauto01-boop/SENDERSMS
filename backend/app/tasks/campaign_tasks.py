@@ -893,6 +893,10 @@ async def _check_condition(db, cc, step):
     return False
 
 
+class _SenderPaused(Exception):
+    """The pinned sender is unavailable; the follow-up is paused, not failed."""
+
+
 async def process_followup_async(followup_id: int, *, send_inline: bool = False) -> bool:
     """Claim and execute one follow-up exactly once.
 
@@ -904,7 +908,7 @@ async def process_followup_async(followup_id: int, *, send_inline: bool = False)
     async with async_session_factory() as claim_db:
         claim = await claim_db.execute(
             update(FollowUp)
-            .where(FollowUp.id == followup_id, FollowUp.status == "pending")
+            .where(FollowUp.id == followup_id, FollowUp.status.in_(("pending", "paused")))
             .values(
                 status="sending",
                 attempt_count=FollowUp.attempt_count + 1,
@@ -1000,15 +1004,56 @@ async def process_followup_async(followup_id: int, *, send_inline: bool = False)
                     # consent is checked (never the SMS opt-out flag).
                     from app.services import email_service
 
-                    account = await email_service.resolve_sender(db, followup.email_account_id)
-                    if followup.email_account_id is not None and account is None:
-                        raise ValueError("Selected email sender no longer exists")
+                    # ---- Sender pinning + threading (sending policy) ------
+                    # The follow-up must leave from the sender that sent this
+                    # thread's FIRST email and carry its Message-ID in
+                    # In-Reply-To/References. If that sender is disabled or
+                    # failing the follow-up is PAUSED with the reason — it is
+                    # never silently re-sent from another account.
+                    root_message = None
+                    if followup.campaign_id is not None:
+                        root_message = (
+                            await db.execute(
+                                select(Message)
+                                .where(
+                                    Message.campaign_id == followup.campaign_id,
+                                    Message.contact_id == followup.contact_id,
+                                    Message.direction == "outgoing",
+                                )
+                                .order_by(Message.id.asc())
+                                .limit(1)
+                            )
+                        ).scalars().first()
+                    pinned_sender_id = (
+                        followup.email_account_id
+                        or (root_message.email_account_id if root_message is not None else None)
+                    )
+                    account = await email_service.resolve_sender(db, pinned_sender_id)
+                    if account is None:
+                        raise _SenderPaused(
+                            "the sender that started this thread no longer exists — reconnect it to resume"
+                        )
+                    usable, why = await email_service.sender_is_usable(account)
+                    if not usable:
+                        raise _SenderPaused(
+                            f"the sender that started this thread is paused ({why or 'unavailable'}) — fix it to resume"
+                        )
+                    followup.email_account_id = email_service.sender_id(account)
+                    followup_subject = email_service.reply_subject(
+                        (root_message.subject if root_message is not None else None)
+                        or followup.subject
+                        or "Follow-up"
+                    )
                     message, send_result = await email_service.send_now(
                         db, contact,
-                        subject=followup.subject or "Follow-up",
+                        subject=followup_subject,
                         text_body=followup.message_text,
                         account=account,
                         campaign_id=followup.campaign_id,
+                        bulk=True,
+                        thread_root_rfc_id=(
+                            root_message.rfc_message_id if root_message is not None else None
+                        ),
                     )
                     if message is None:
                         raise ValueError("Contact cannot receive email")
@@ -1030,6 +1075,17 @@ async def process_followup_async(followup_id: int, *, send_inline: bool = False)
             followup.last_error = None
             followup.executed_at = datetime.now(timezone.utc)
             await db.commit()
+        except _SenderPaused as exc:
+            # The stored sender cannot send right now: PAUSE the follow-up with
+            # the reason visible. It retries automatically (the due sweep picks
+            # paused rows up again) once the sender is fixed — never from a
+            # different account.
+            followup.last_error = str(exc)[:2000]
+            followup.status = "paused"
+            followup.attempt_count = max(0, followup.attempt_count - 1)
+            await db.commit()
+            logger.warning("Follow-up %s paused: %s", followup_id, exc)
+            return False
         except Exception as exc:
             followup.last_error = str(exc)[:2000]
             followup.executed_at = datetime.now(timezone.utc)
@@ -1065,7 +1121,9 @@ async def process_due_followups_async(
                 select(FollowUp.id)
                 .outerjoin(Campaign, FollowUp.campaign_id == Campaign.id)
                 .where(
-                    FollowUp.status == "pending",
+                    # "paused" rows (stored sender unavailable) retry too: they
+                    # stay paused until the sender is fixed, then send.
+                    FollowUp.status.in_(("pending", "paused")),
                     FollowUp.scheduled_at <= now,
                     or_(FollowUp.campaign_id.is_(None), Campaign.status == "running"),
                 )
@@ -1113,6 +1171,25 @@ def schedule_followup(followup_id: int):
     except QueueUnavailable as exc:
         logger.error("Could not schedule follow-up %s: %s", followup_id, exc)
         raise
+
+
+@celery_app.task
+def poll_email_deliveries():
+    """Beat entrypoint: poll Brevo's event API for unconfirmed deliveries."""
+    loop = asyncio.get_event_loop()
+    if loop.is_closed():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+    async def _run() -> dict:
+        from app.services.email_service import poll_unconfirmed_deliveries
+
+        async with async_session_factory() as db:
+            result = await poll_unconfirmed_deliveries(db, limit=25)
+            await db.commit()
+        return result
+
+    return loop.run_until_complete(_run())
 
 
 @celery_app.task

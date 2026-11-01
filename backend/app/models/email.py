@@ -99,6 +99,11 @@ class EmailAccount(Base):
     connection_status: Mapped[str] = mapped_column(String(30), default="unknown", nullable=False)
     last_tested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    #: When the Brevo webhook last delivered an event for this account — the
+    #: per-sender "webhook alive" signal shown in Email Manager.
+    last_webhook_event_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
@@ -168,6 +173,14 @@ class EmailEvent(Base):
 
     #: The raw webhook body (JSON string) — capped at 8 KB by the writer.
     payload: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    #: The provider's own event time when it differs from arrival time.
+    occurred_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    #: Security-scanner / machine engagement (proxy opens, a click seconds
+    #: after the open, known bot user agents). Bot events are kept as evidence
+    #: but never counted as human opens/clicks.
+    is_bot: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    bot_reason: Mapped[str | None] = mapped_column(String(120), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, nullable=False)
 

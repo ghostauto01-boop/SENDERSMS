@@ -23,6 +23,11 @@ SIM_NUMBER = "gateway.sim_number"
 LAST_POLL = "gateway.last_poll"
 WEBHOOK_REGISTERED = "gateway.webhook_registered"
 NOTIFY_MUTED_SENDERS = "notifications.muted_senders"
+#: Unix time a background processor (Celery beat/worker or the inline poller)
+#: last completed a cycle. The health page and the UI banner turn red when
+#: this is more than 5 minutes old while work is due.
+WORKER_HEARTBEAT = "worker.heartbeat_at"
+WORKER_HEARTBEAT_SOURCE = "worker.heartbeat_source"
 
 # CallGate (phone calls) — same keys the Settings -> Calls page writes.
 # DB values take precedence over the CALLGATE_* env vars so the whole setup

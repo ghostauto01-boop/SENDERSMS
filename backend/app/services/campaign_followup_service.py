@@ -152,6 +152,55 @@ async def evaluate_contact(
     return "send", "Due"
 
 
+class _SenderPaused(Exception):
+    """The pinned sender is unavailable; the follow-up is paused, not failed."""
+
+
+async def _log_followup(
+    db: AsyncSession,
+    rule: CampaignFollowUp,
+    contact_id: int,
+    *,
+    status: str,
+    reason: str | None = None,
+    message_id: int | None = None,
+    body_preview: str | None = None,
+) -> None:
+    """Append-or-update the one log row for (rule, contact).
+
+    A paused row is updated in place when the same contact pauses again (or
+    finally sends), so the unique (followup_id, contact_id) guard holds and the
+    UI always shows the latest reason.
+    """
+    existing = (
+        await db.execute(
+            select(CampaignFollowUpLog).where(
+                CampaignFollowUpLog.followup_id == rule.id,
+                CampaignFollowUpLog.contact_id == contact_id,
+            )
+        )
+    ).scalars().first()
+    if existing is not None:
+        existing.status = status
+        existing.reason = reason
+        if message_id is not None:
+            existing.message_id = message_id
+        if body_preview is not None:
+            existing.body_preview = body_preview
+        return
+    db.add(
+        CampaignFollowUpLog(
+            followup_id=rule.id,
+            campaign_id=rule.campaign_id,
+            contact_id=contact_id,
+            status=status,
+            reason=reason,
+            message_id=message_id,
+            body_preview=body_preview,
+        )
+    )
+
+
 async def _resolve_body(db: AsyncSession, rule: CampaignFollowUp) -> str | None:
     if rule.message_text and rule.message_text.strip():
         return rule.message_text
@@ -183,11 +232,14 @@ async def process_rule(db: AsyncSession, rule: CampaignFollowUp, *, limit: int =
 
     # Contacts already handled for this rule are excluded outright: the unique
     # (followup_id, contact_id) log row is what guarantees exactly-once.
+    # A "paused" row (stored sender unavailable) is NOT final — the contact is
+    # reconsidered on every sweep and resumes the moment the sender is fixed.
     handled = set(
         (
             await db.execute(
                 select(CampaignFollowUpLog.contact_id).where(
-                    CampaignFollowUpLog.followup_id == rule.id
+                    CampaignFollowUpLog.followup_id == rule.id,
+                    CampaignFollowUpLog.status != "paused",
                 )
             )
         ).scalars().all()
@@ -243,14 +295,8 @@ async def process_rule(db: AsyncSession, rule: CampaignFollowUp, *, limit: int =
             continue
 
         if decision == "stop":
-            db.add(
-                CampaignFollowUpLog(
-                    followup_id=rule.id,
-                    campaign_id=rule.campaign_id,
-                    contact_id=cc.contact_id,
-                    status="stopped",
-                    reason=reason[:300],
-                )
+            await _log_followup(
+                db, rule, cc.contact_id, status="stopped", reason=reason[:300]
             )
             stopped += 1
             continue
@@ -263,6 +309,7 @@ async def process_rule(db: AsyncSession, rule: CampaignFollowUp, *, limit: int =
         from app.services.sms_service import SMSService
 
         channel = (getattr(rule, "channel", None) or getattr(campaign, "channel", "sms") or "sms")
+        paused_reason: str | None = None
         try:
             if channel == "email":
                 contact = (
@@ -273,15 +320,57 @@ async def process_rule(db: AsyncSession, rule: CampaignFollowUp, *, limit: int =
                 problem = await email_service.contact_email_problem(db, contact, outreach=True)
                 if problem:
                     raise ValueError(f"Contact cannot receive email ({problem})")
-                account = await email_service.resolve_sender(db, campaign.email_account_id)
-                if campaign.email_account_id is not None and account is None:
-                    raise ValueError("Campaign email sender no longer exists")
+
+                # ---- Sender pinning + threading (sending policy) ----------
+                # The follow-up leaves from the sender that delivered this
+                # contact's FIRST campaign email — read from the assignment or
+                # the first message row — never from the campaign's *current*
+                # sender list. If that sender is unavailable the follow-up is
+                # PAUSED with the reason, never silently re-sent from another
+                # account.
+                root_message = (
+                    await db.execute(
+                        select(Message)
+                        .where(
+                            Message.campaign_id == campaign.id,
+                            Message.contact_id == cc.contact_id,
+                            Message.direction == "outgoing",
+                        )
+                        .order_by(Message.id.asc())
+                        .limit(1)
+                    )
+                ).scalars().first()
+                pinned_sender_id = (
+                    getattr(cc, "email_account_id", None)
+                    or (root_message.email_account_id if root_message is not None else None)
+                )
+                account = await email_service.resolve_sender(db, pinned_sender_id)
+                if account is None:
+                    raise _SenderPaused(
+                        "the sender that started this thread no longer exists — reconnect it to resume"
+                    )
+                usable, why = await email_service.sender_is_usable(account)
+                if not usable:
+                    raise _SenderPaused(
+                        f"the sender that started this thread is paused ({why or 'unavailable'}) — fix it to resume"
+                    )
+
+                followup_subject = email_service.reply_subject(
+                    (root_message.subject if root_message is not None else None)
+                    or rule.subject
+                    or campaign.subject
+                    or "Follow-up"
+                )
                 message, send_result = await email_service.send_now(
                     db, contact,
-                    subject=rule.subject or campaign.subject or "Follow-up",
+                    subject=followup_subject,
                     text_body=body,
                     account=account,
                     campaign_id=campaign.id,
+                    bulk=True,
+                    thread_root_rfc_id=(
+                        root_message.rfc_message_id if root_message is not None else None
+                    ),
                 )
                 if message is None:
                     raise ValueError("Contact cannot receive email")
@@ -291,34 +380,37 @@ async def process_rule(db: AsyncSession, rule: CampaignFollowUp, *, limit: int =
                 message = await SMSService(db).send_message(
                     cc.contact_id, body, campaign_id=campaign.id
                 )
+        except _SenderPaused as exc:
+            logger.warning(
+                "Follow-up rule %s contact %s paused: %s", rule.id, cc.contact_id, exc
+            )
+            message = None
+            paused_reason = str(exc)[:300]
         except Exception as exc:  # a gateway blow-up must not abort the sweep
             logger.error("Follow-up rule %s contact %s error: %s", rule.id, cc.contact_id, exc)
             message = None
             reason = str(exc)[:300]
 
+        if paused_reason:
+            await _log_followup(
+                db, rule, cc.contact_id, status="paused", reason=paused_reason,
+            )
+            continue
+
         if message is None:
-            db.add(
-                CampaignFollowUpLog(
-                    followup_id=rule.id,
-                    campaign_id=rule.campaign_id,
-                    contact_id=cc.contact_id,
-                    status="failed",
-                    reason=(reason or "Contact cannot receive messages")[:300],
-                )
+            await _log_followup(
+                db, rule, cc.contact_id, status="failed",
+                reason=(reason or "Contact cannot receive messages")[:300],
             )
             stopped += 1
             continue
 
-        db.add(
-            CampaignFollowUpLog(
-                followup_id=rule.id,
-                campaign_id=rule.campaign_id,
-                contact_id=cc.contact_id,
-                status="sent" if message.status != "failed" else "failed",
-                reason=None if message.status != "failed" else (message.last_error or "")[:300],
-                message_id=message.id,
-                body_preview=(message.body or "")[:300],
-            )
+        await _log_followup(
+            db, rule, cc.contact_id,
+            status="sent" if message.status != "failed" else "failed",
+            reason=None if message.status != "failed" else (message.last_error or "")[:300],
+            message_id=message.id,
+            body_preview=(message.body or "")[:300],
         )
         if message.status == "failed":
             stopped += 1

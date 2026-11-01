@@ -51,6 +51,15 @@ from app.security.encryption import decrypt_value
 logger = logging.getLogger(__name__)
 
 
+class SenderUnavailable(Exception):
+    """The pinned sender cannot send right now.
+
+    Raised instead of silently falling back to another account: a thread that
+    changes From address mid-conversation is exactly the failure this rule
+    prevents. The follow-up is paused (not cancelled) with this reason shown.
+    """
+
+
 def now_utc() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -1109,6 +1118,17 @@ async def campaign_state(db: AsyncSession, campaign: AdsCampaign) -> str:
     )).scalar() or 0)
     if pending or sending_assignments or sending_messages:
         return "sending"
+    # Follow-ups still queued is a live state of its own (P2-13): the campaign
+    # is NOT "no_eligible_contacts" while its reminders are pending — and the
+    # UI shows "waiting for follow-ups (next due …)".
+    pending_followups = int((await db.execute(
+        select(func.count()).select_from(AdsFollowUpTask).where(
+            AdsFollowUpTask.campaign_id == campaign.id,
+            AdsFollowUpTask.status.in_(("pending", "paused")),
+        )
+    )).scalar() or 0)
+    if pending_followups:
+        return "waiting_for_followups"
     return "no_eligible_contacts"
 
 
@@ -1387,6 +1407,19 @@ async def dispatch_campaign(
                 from app.services.email_service import html_to_text as _html_to_text
 
                 rendered = _html_to_text(rendered_html)
+            # "Plain personal email" mode (default ON for Email Manager): the
+            # text is authoritative, the HTML is a minimal wrapper (no gray
+            # page background, no 600px card, no pixel, no link wrapping) and
+            # NO visible unsubscribe footer of any kind — the button-style
+            # footer and the gray link line are permanently gone; opt-out is
+            # header-only (List-Unsubscribe) and there is never a raw
+            # "Unsubscribe: <URL>" line in the text part.
+            if bool(getattr(campaign, "plain_personal_email", True)):
+                from app.services.email_service import text_to_html as _wrap_html
+
+                if not (rendered or "").strip() and (rendered_html or "").strip():
+                    rendered = email_service.html_to_text(rendered_html)
+                rendered_html = _wrap_html(rendered or "", plain=True)
 
         if campaign.test_mode:
             # Simulated send: nothing leaves the server, no credits consumed.
@@ -1916,18 +1949,34 @@ async def _schedule_next_step(
     return following
 
 
-async def process_followups(db: AsyncSession, *, limit: int = 50, send_inline: bool = False) -> dict:
-    """Execute due follow-up tasks. Stop conditions are enforced here."""
-    totals = {"sent": 0, "cancelled": 0, "completed": 0}
+async def process_followups(
+    db: AsyncSession,
+    *,
+    limit: int = 50,
+    send_inline: bool = False,
+    task_ids: list[int] | None = None,
+    include_paused: bool = False,
+) -> dict:
+    """Execute due follow-up tasks. Stop conditions are enforced here.
+
+    ``task_ids`` processes exactly those tasks ("Process now" for a row the
+    operator is looking at), ignoring the due-time filter but still enforcing
+    every stop condition.
+    """
+    totals = {"sent": 0, "cancelled": 0, "completed": 0, "paused": 0}
+    # A paused row is paused for a reason (usually an unusable pinned sender).
+    # The periodic sweep retries them so a fixed sender un-pauses automatically
+    # (P0-3); task_ids ("process now" on a specific row) always considers them.
+    statuses = ("pending", "paused") if (include_paused or task_ids) else ("pending",)
+    query = select(AdsFollowUpTask).where(AdsFollowUpTask.status.in_(statuses))
+    if task_ids:
+        query = query.where(AdsFollowUpTask.id.in_(list(task_ids)))
+    else:
+        query = query.where(AdsFollowUpTask.due_at <= now_utc())
     tasks = list(
-        (
-            await db.execute(
-                select(AdsFollowUpTask)
-                .where(AdsFollowUpTask.status == "pending", AdsFollowUpTask.due_at <= now_utc())
-                .order_by(AdsFollowUpTask.due_at)
-                .limit(limit)
-            )
-        ).scalars().all()
+        (await db.execute(query.order_by(AdsFollowUpTask.due_at).limit(limit)))
+        .scalars()
+        .all()
     )
     outbox: list[int] = []
     for task in tasks:
@@ -2003,13 +2052,29 @@ async def process_followups(db: AsyncSession, *, limit: int = 50, send_inline: b
                 task.note = "Step has no message body"
                 totals["cancelled"] += 1
                 continue
-            mid = await send_adhoc_sms(
-                db, contact, body,
-                test_mode=campaign.test_mode,
-                campaign_id=campaign.id,
-                subject=step.subject,
-                channel=channel,
-            )
+            try:
+                mid = await send_adhoc_sms(
+                    db, contact, body,
+                    test_mode=campaign.test_mode,
+                    campaign_id=campaign.id,
+                    subject=step.subject,
+                    channel=channel,
+                )
+            except SenderUnavailable as exc:
+                # The sender this thread started from is disabled, failing or
+                # gone. PAUSE — never fall back to another sender silently.
+                task.status = "paused"
+                task.note = str(exc)[:300]
+                totals["paused"] = totals.get("paused", 0) + 1
+                record_event(
+                    db,
+                    "FOLLOW_UP_PAUSED",
+                    campaign_id=campaign.id,
+                    contact_id=contact.id,
+                    assignment_id=task.assignment_id,
+                    detail=task.note,
+                )
+                continue
             if mid:
                 outbox.append(mid)
             task.status = "completed"
@@ -2107,10 +2172,18 @@ async def send_adhoc_sms(
             campaign = (
                 await db.execute(select(AdsCampaign).where(AdsCampaign.id == campaign_id))
             ).scalar_one_or_none()
-        # Follow-ups stay on the sender the contact was assigned (pool pin),
-        # so a thread never changes From address mid-conversation.
+        # ---- SENDER PINNING (sending policy) -----------------------------
+        # Every follow-up must leave from the sender that delivered the FIRST
+        # email of this thread — never a round-robin re-pick, never a silent
+        # fallback to another account when the original is unavailable. The
+        # sender is read from the assignment (pinned at first-email queue time)
+        # or, for rows written before pinning existed, from the first message
+        # the campaign actually sent. If that sender is missing, disabled or
+        # failing, the follow-up is PAUSED with the reason shown — not sent
+        # from a different address.
         pinned_sender_id = None
         assignment_key: int | str = contact.id
+        root_message = None
         if campaign is not None:
             assignment = (
                 await db.execute(
@@ -2126,23 +2199,79 @@ async def send_adhoc_sms(
             if assignment is not None:
                 pinned_sender_id = getattr(assignment, "email_account_id", None)
                 assignment_key = assignment.id
-        selected_sender_id = campaign.email_account_id if campaign else None
-        sender = (
-            await email_service.resolve_campaign_sender(
-                db, campaign, key=assignment_key, pinned_sender_id=pinned_sender_id
-            )
-            if campaign is not None
-            else await email_service.resolve_sender(db, None)
+                if assignment.message_id:
+                    root_message = (
+                        await db.execute(
+                            select(Message).where(Message.id == assignment.message_id)
+                        )
+                    ).scalar_one_or_none()
+        if root_message is None and campaign is not None:
+            root_message = (
+                await db.execute(
+                    select(Message)
+                    .where(
+                        Message.contact_id == contact.id,
+                        Message.ads_campaign_id == campaign.id,
+                        Message.direction == "outgoing",
+                    )
+                    .order_by(Message.id.asc())
+                    .limit(1)
+                )
+            ).scalars().first()
+        if pinned_sender_id is None and root_message is not None:
+            pinned_sender_id = root_message.email_account_id
+
+        if pinned_sender_id is not None:
+            sender = await email_service.get_sender(db, pinned_sender_id)
+            if sender is None:
+                raise SenderUnavailable(
+                    f"sender {pinned_sender_id} no longer exists — reconnect it to resume"
+                )
+            usable, why = await email_service.sender_is_usable(sender)
+            if not usable:
+                raise SenderUnavailable(
+                    f"sender is paused ({why or 'unavailable'}) — fix the sender to resume"
+                )
+        elif campaign is not None and campaign.email_account_id is not None:
+            # A campaign with a single explicit sender: that IS the pinned one.
+            sender = await email_service.get_sender(db, campaign.email_account_id)
+            if sender is None:
+                raise SenderUnavailable(
+                    f"sender {campaign.email_account_id} no longer exists — reconnect it to resume"
+                )
+            usable, why = await email_service.sender_is_usable(sender)
+            if not usable:
+                raise SenderUnavailable(
+                    f"sender is paused ({why or 'unavailable'}) — fix the sender to resume"
+                )
+        else:
+            # No pin and no explicit campaign sender (legacy default-sender
+            # campaigns): the default sender decides, exactly as the first
+            # email did.
+            sender = await email_service.resolve_sender(db, None)
+            if sender is None:
+                raise SenderUnavailable("no email sender is configured")
+
+        # ---- THREADING (sending policy) ---------------------------------
+        # Subject is always "Re: <the first email's subject>" — never "Re: Re:".
+        # In-Reply-To/References point at the FIRST email's Message-ID so the
+        # whole chain stays under one root.
+        root_rfc_id = root_message.rfc_message_id if root_message is not None else None
+        original_subject = None
+        if root_message is not None:
+            original_subject = root_message.subject
+        followup_subject = email_service.reply_subject(
+            original_subject or subject or (campaign.subject if campaign else None) or "Follow-up"
         )
-        if (selected_sender_id is not None or pinned_sender_id is not None) and sender is None:
-            logger.error("Ads campaign %s references missing email sender %s", campaign_id, selected_sender_id)
-            return None
         message = await email_service.queue_email(
             db, contact,
-            subject=subject or (campaign.subject if campaign else None) or "Follow-up",
+            subject=followup_subject,
             text_body=body,
             account=sender,
             ads_campaign_id=campaign_id,
+            followup=True,
+            bulk=True,
+            thread_root_rfc_id=root_rfc_id,
         )
         return message.id if message else None
 
@@ -2279,20 +2408,60 @@ def classify_reply(text: str) -> str:
     return "other"
 
 
-async def associate_reply(db: AsyncSession, contact_id: int, body: str) -> Optional[AdsAssignment]:
-    """Attach an inbound reply to the most recent ads assignment."""
-    assignment = (
-        await db.execute(
-            select(AdsAssignment)
-            .where(AdsAssignment.contact_id == contact_id, AdsAssignment.sent_at.is_not(None))
-            .order_by(AdsAssignment.sent_at.desc())
-            .limit(1)
-        )
-    ).scalars().first()
+async def associate_reply(
+    db: AsyncSession,
+    contact_id: int,
+    body: str,
+    *,
+    parent_message=None,
+    classification: str | None = None,
+) -> Optional[AdsAssignment]:
+    """Attach an inbound reply to the assignment it answers.
+
+    ``parent_message`` (the outbound message named by In-Reply-To/References)
+    wins: the reply is credited to the exact send it answers. Without one the
+    most recent sent assignment for the contact is used. ``classification``
+    is the inbound classifier's verdict (positive / negative / unsubscribe /
+    question / meeting_request / neutral); an unsubscribe is stored as an
+    opt-out on the assignment so the campaign's opt-outs are counted.
+    """
+    assignment = None
+    if parent_message is not None and getattr(parent_message, "id", None):
+        assignment = (
+            await db.execute(
+                select(AdsAssignment).where(AdsAssignment.message_id == parent_message.id)
+            )
+        ).scalars().first()
+    if assignment is None and getattr(parent_message, "ads_campaign_id", None):
+        assignment = (
+            await db.execute(
+                select(AdsAssignment).where(
+                    AdsAssignment.campaign_id == parent_message.ads_campaign_id,
+                    AdsAssignment.contact_id == contact_id,
+                )
+                .order_by(AdsAssignment.id.desc())
+                .limit(1)
+            )
+        ).scalars().first()
+    if assignment is None:
+        assignment = (
+            await db.execute(
+                select(AdsAssignment)
+                .where(AdsAssignment.contact_id == contact_id, AdsAssignment.sent_at.is_not(None))
+                .order_by(AdsAssignment.sent_at.desc())
+                .limit(1)
+            )
+        ).scalars().first()
     if assignment is None:
         return None
-    classification = classify_reply(body)
-    assignment.reply_status = classification
+    classification = (classification or "").strip() or classify_reply(body)
+    if classification == "unsubscribe":
+        # An unsubscribe is an opt-out event for the campaign's counters.
+        assignment.reply_status = "unsubscribe"
+        if not assignment.skip_reason:
+            assignment.skip_reason = "opted_out"
+    else:
+        assignment.reply_status = classification
     assignment.last_action_at = now_utc()
     record_event(
         db,
@@ -2417,7 +2586,8 @@ async def _counts_for(
     failed = sum(1 for r in rows if r.send_status == "failed")
     pending = sum(1 for r in rows if r.send_status == "pending")
     skipped = sum(1 for r in rows if r.send_status == "skipped")
-    replies = sum(1 for r in rows if r.reply_status)
+    # An unsubscribe is an opt-out, not a reply — counted below instead.
+    replies = sum(1 for r in rows if r.reply_status and r.reply_status != "unsubscribe")
     positive = sum(1 for r in rows if r.reply_status == "positive")
     negative = sum(1 for r in rows if r.reply_status == "negative")
     conversions = sum(1 for r in rows if r.conversion_status == "converted")
@@ -2840,6 +3010,38 @@ async def validate_campaign(db: AsyncSession, campaign: AdsCampaign) -> dict:
             f"Sender identity {sender_email} is configured."
             if sender_ok else "Configure a valid sender email address in Email Manager.",
         )
+
+        # Delivery confirmations per sender (P1-9): bounces and opens only
+        # exist if the events arrive — a sender with no webhook registered is
+        # a blind spot the operator should see before launching.
+        if not campaign.test_mode:
+            from app.models.email import EmailAccount
+
+            pool_ids = email_service.campaign_sender_pool(campaign)
+            pool_rows = []
+            if pool_ids:
+                pool_rows = list((await db.execute(
+                    select(EmailAccount).where(EmailAccount.id.in_(pool_ids))
+                )).scalars().all())
+            receiving = 0
+            for acc in pool_rows:
+                status = email_service.serialize_account(acc).get("webhook_status") or {}
+                if status.get("receiving") or status.get("registered"):
+                    receiving += 1
+            if pool_rows:
+                add_check(
+                    "webhook_events",
+                    receiving == len(pool_rows),
+                    (
+                        f"{receiving} of {len(pool_rows)} sender(s) are receiving delivery "
+                        "confirmations (Brevo webhooks)."
+                        if receiving == len(pool_rows) else
+                        f"Only {receiving} of {len(pool_rows)} sender(s) are receiving delivery "
+                        "confirmations — register the Brevo webhook on each sender's settings "
+                        "page so bounces, opens and unsubscribes are tracked."
+                    ),
+                    required=False,
+                )
     else:
         from app.config import settings
 
@@ -2856,6 +3058,7 @@ async def validate_campaign(db: AsyncSession, campaign: AdsCampaign) -> dict:
         add_check("email_account", True, "Not required for SMS campaigns.")
         add_check("sender_health", True, "Not required for SMS campaigns.")
         add_check("sender_identity", True, "Not required for SMS campaigns.")
+        add_check("webhook_events", True, "Not required for SMS campaigns.", required=False)
 
     if campaign.daily_limit is not None and int(campaign.daily_limit) <= 0:
         add_check("daily_limit", False, "Campaign daily limit must be a positive integer or null.")

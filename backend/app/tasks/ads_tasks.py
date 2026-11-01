@@ -87,7 +87,7 @@ async def run_ads_cycle(*, send_inline: bool = False, batch: int = 25) -> dict:
 
     async with async_session_factory() as db:
         try:
-            fu = await svc.process_followups(db, send_inline=send_inline)
+            fu = await svc.process_followups(db, send_inline=send_inline, include_paused=True)
             totals["followups"] = fu["sent"] + fu["completed"]
         except Exception as exc:  # noqa: BLE001
             logger.error("Ads follow-up processing failed: %s", exc)

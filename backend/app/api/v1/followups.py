@@ -33,8 +33,21 @@ def _utc_iso(value: datetime | None) -> str | None:
 
 def _followup_item(followup: FollowUp, contact: Contact | None) -> dict:
     """Return the stable shape consumed by the follow-ups page."""
+    from datetime import datetime, timezone
+
+    due = followup.scheduled_at
+    if due is not None and due.tzinfo is None:
+        due = due.replace(tzinfo=timezone.utc)
     return {
         "id": followup.id,
+        # Pending and past due = overdue. The poller stamps FollowUp.is_overdue
+        # but the API computes it live so the row can never read "due today"
+        # while the clock says otherwise.
+        "is_overdue": bool(
+            followup.status == "pending"
+            and due is not None
+            and due < datetime.now(timezone.utc)
+        ),
         "contact_id": followup.contact_id,
         "contact_name": (
             contact_display_name(contact, contact.phone_number)

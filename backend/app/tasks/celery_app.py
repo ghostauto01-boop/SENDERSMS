@@ -31,6 +31,7 @@ celery_app = Celery(
         "app.tasks.notification_tasks",
         "app.tasks.ads_tasks",
         "app.tasks.mailbox_tasks",
+        "app.tasks.system_tasks",
     ],
 )
 
@@ -126,5 +127,19 @@ celery_app.conf.beat_schedule = {
     "process-due-message-retries": {
         "task": "app.tasks.sms_tasks.process_due_message_retries",
         "schedule": timedelta(seconds=30),
+    },
+    # Delivery-tracking fallback: poll Brevo's event API for any message still
+    # "sent" after 30 minutes (webhook missed events), so delivery rates stay
+    # honest and unconfirmed mail is visible.
+    "poll-unconfirmed-email-deliveries": {
+        "task": "app.tasks.campaign_tasks.poll_email_deliveries",
+        "schedule": timedelta(minutes=5),
+    },
+    # Heartbeat: proves a worker/beat is alive. The health page and the UI
+    # banner turn red when this stamp is more than 5 minutes old while work
+    # is due (see app.tasks.system_tasks).
+    "worker-heartbeat": {
+        "task": "app.tasks.system_tasks.worker_heartbeat",
+        "schedule": timedelta(minutes=1),
     },
 }

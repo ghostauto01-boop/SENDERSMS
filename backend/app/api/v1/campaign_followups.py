@@ -261,6 +261,36 @@ async def run_campaign_followup(
     return {"success": True, **result}
 
 
+@router.post("/campaigns/{campaign_id}/process-now")
+async def process_campaign_followups_now(
+    campaign_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Process every follow-up rule of one campaign now.
+
+    The overdue backlog escape hatch: the sweep runs all rules for the
+    campaign immediately instead of waiting for its next scheduled pass.
+    Stop conditions (reply / opt-out / lead status) are still enforced.
+    """
+    campaign = await _get_campaign(db, campaign_id)
+    rules = (
+        await db.execute(
+            select(CampaignFollowUp).where(CampaignFollowUp.campaign_id == campaign.id)
+        )
+    ).scalars().all()
+    totals = {"rules": len(rules), "sent": 0, "stopped": 0, "skipped": 0, "failed": 0}
+    for rule in rules:
+        try:
+            result = await process_rule(db, rule)
+        except Exception as exc:  # noqa: BLE001 — one broken rule must not hide the rest
+            totals["failed"] += 1
+            continue
+        for key in ("sent", "stopped", "skipped", "failed"):
+            totals[key] += int(result.get(key, 0) or 0)
+    return {"success": True, "campaign_id": campaign.id, **totals}
+
+
 @router.get("/{followup_id}/preview")
 async def preview_campaign_followup(
     followup_id: int,

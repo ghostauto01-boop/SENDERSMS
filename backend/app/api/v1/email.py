@@ -53,6 +53,7 @@ from app.schemas.email import (
     EmailTestSendIn,
 )
 from app.security.auth import get_current_user
+from app.security.rate_limit import limiter
 from app.services import email_service
 
 logger = logging.getLogger(__name__)
@@ -88,7 +89,26 @@ def _message_dict(message: Message, contact: Optional[Contact] = None,
         "to_address": message.to_address,
         "email_account_id": message.email_account_id,
         "email_account_name": account.name if account else None,
+        # Which sender sent this outbound message — the From name/address on
+        # the wire, so the thread shows who each message left from.
+        "sender": (
+            {
+                "id": message.email_account_id,
+                "email_account_id": message.email_account_id,
+                "name": account.name if account else None,
+                "from_address": message.from_address,
+                "from_name": (
+                    getattr(account, "from_name", None)
+                    or getattr(account, "name", None)
+                ),
+            }
+            if message.direction == "outgoing"
+            else None
+        ),
         "status": message.status,
+        # "unconfirmed" (sent, no delivery event after 30 min) is shown apart
+        # from "failed"; see email_service.delivery_state.
+        "delivery_state": email_service.delivery_state(message),
         "provider": message.provider,
         "provider_message_id": message.provider_message_id,
         "open_count": message.open_count or 0,
@@ -1422,17 +1442,37 @@ async def reply(
         body = email_service.html_to_text(html)
     if not (body or "").strip():
         raise HTTPException(422, "Write a reply first")
-    if not (subject or "").strip():
-        subject = f"Re: {conversation.subject or ''}".strip()
 
+    # The sender that STARTED the conversation: the first outbound message's
+    # account is the default for every reply, and the reply box lets the
+    # operator override it explicitly. Never a different connected mailbox
+    # chosen behind the scenes.
+    first_outbound = (
+        await db.execute(
+            select(Message.email_account_id)
+            .where(
+                Message.conversation_id == conversation.id,
+                Message.channel == "email",
+                Message.direction == "outgoing",
+                Message.email_account_id.isnot(None),
+            )
+            .order_by(Message.id.asc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
     requested_sender_id = (
         data.email_account_id
         if data.email_account_id is not None
-        else conversation.email_account_id
+        else (first_outbound if first_outbound is not None else conversation.email_account_id)
     )
     account = await email_service.resolve_sender(db, requested_sender_id)
     if account is None:
         raise HTTPException(400, "The selected email sender no longer exists")
+
+    # "Re: Re: ..." is never correct — exactly one "Re:" on the original
+    # subject (an explicitly typed subject is left as typed).
+    if not (subject or "").strip():
+        subject = email_service.reply_subject(conversation.subject or "")
 
     latest_inbound = (
         await db.execute(
@@ -1459,6 +1499,20 @@ async def reply(
     )
     if message is None:
         raise HTTPException(400, "This contact cannot be emailed (opted out or suppressed)")
+    if not result.get("success"):
+        # Return the REAL provider error and leave no failed stub in the
+        # thread — a "failed" row here just clutters the conversation and
+        # re-drafting the reply is the actual fix.
+        await db.delete(message)
+        await db.commit()
+        raise HTTPException(
+            502,
+            detail={
+                "success": False,
+                "error": result.get("error") or "The email provider did not accept this message.",
+                "provider": result.get("provider"),
+            },
+        )
     if conversation.status != "opportunity":
         conversation.status = "active"
     conversation.unread_count = 0
@@ -1682,16 +1736,49 @@ async def events(
 # ===========================================================================
 
 
+def _unsubscribe_confirm_html(e: str, t: str) -> str:
+    """The one-button confirm page shown by the GET link.
+
+    GET must NEVER unsubscribe anyone: security scanners and mail-prefetchers
+    follow links seconds after delivery, and a GET that opted people out meant
+    machines unsubscribing real contacts. The button POSTs; only POST opts out.
+    """
+    import html as _html
+
+    safe_e = _html.escape(e or "")
+    return f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Unsubscribe</title>
+<style>body{{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#f7f8fa;
+display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0}}
+.card{{background:#fff;border-radius:12px;padding:32px;max-width:420px;text-align:center;
+box-shadow:0 1px 3px rgba(0,0,0,.08)}}h1{{font-size:20px;margin:0 0 8px}}p{{color:#4b5563;font-size:14px}}
+button{{margin-top:16px;background:#111827;color:#fff;border:0;border-radius:8px;padding:12px 24px;
+font-size:15px;cursor:pointer}}button:hover{{background:#1f2937}}</style></head>
+<body><div class="card">
+<h1>Unsubscribe {safe_e}?</h1>
+<p>You will not receive further email from us. This takes one click and happens only when you press the button.</p>
+<form method="post" action="/api/v1/email/unsubscribe?e={_html.escape(e)}&t={_html.escape(t)}">
+<button type="submit">Unsubscribe me</button>
+</form>
+</div></body></html>"""
+
+
 @router.get("/unsubscribe")
+@limiter.limit("30/minute")
 async def unsubscribe_page(
+    request: Request,
     e: str = Query(..., description="email address"),
     t: str = Query(..., description="signature"),
     db: AsyncSession = Depends(get_db),
 ):
-    """Public one-click unsubscribe target used by the List-Unsubscribe header.
+    """Public unsubscribe link from the List-Unsubscribe header.
 
     Deliberately unauthenticated: a recipient clicking the link in Gmail is not
     logged in here, and the HMAC signature is what proves the request is real.
+
+    GET only shows a one-button confirm page — a prefetcher or security
+    scanner hitting this URL changes nothing. The POST does the opt-out.
     """
     from fastapi.responses import HTMLResponse
 
@@ -1701,30 +1788,49 @@ async def unsubscribe_page(
             "Reply to the email with the word UNSUBSCRIBE instead.</p>",
             status_code=400,
         )
-    await email_service.unsubscribe_contact(
-        db, contact_id=None, address=e, reason="One-click unsubscribe", source="link"
-    )
-    await db.commit()
-    return HTMLResponse(
-        "<h1>You are unsubscribed</h1>"
-        f"<p>{e} will not receive further email from us.</p>",
-    )
+    return HTMLResponse(_unsubscribe_confirm_html(e, t))
 
 
 @router.post("/unsubscribe")
+@limiter.limit("10/minute")
 async def unsubscribe_post(
-    e: str = Query(...),
-    t: str = Query(...),
+    request: Request,
+    e: str | None = Query(default=None),
+    t: str | None = Query(default=None),
     db: AsyncSession = Depends(get_db),
 ):
-    """``List-Unsubscribe=One-Click`` POST target (RFC 8058)."""
+    """``List-Unsubscribe=One-Click`` POST target (RFC 8058) and the confirm form.
+
+    This is the ONLY route that performs an unsubscribe from a link. Gmail and
+    Yahoo one-click posts carry ``List-Unsubscribe=One-Click`` in the body and
+    the signed ``e``/``t`` pair in the query string; the confirm form posts the
+    same URL. The token is validated before anything changes, and the route is
+    rate-limited so the public surface cannot be hammered.
+    """
+    if not e or not t:
+        # Accept form-encoded bodies too (the confirm page's POST).
+        form = await request.form()
+        e = e or str(form.get("e") or "")
+        t = t or str(form.get("t") or "")
     if not email_service.unsubscribe_token_valid(e, t):
         raise HTTPException(400, "Invalid unsubscribe link")
     await email_service.unsubscribe_contact(
         db, contact_id=None, address=e, reason="One-click unsubscribe", source="link"
     )
     await db.commit()
-    return {"success": True, "email_address": email_service.normalize_email(e)}
+    from fastapi.responses import HTMLResponse, JSONResponse
+
+    accept = (request.headers.get("accept") or "").lower()
+    if "text/html" in accept:
+        return HTMLResponse(
+            "<h1>You are unsubscribed</h1>"
+            f"<p>{email_service.normalize_email(e)} will not receive further email from us.</p>"
+        )
+    # A Response object (not a dict): the rate limiter appends its headers to
+    # the response instance it gets back.
+    return JSONResponse(
+        {"success": True, "email_address": email_service.normalize_email(e)}
+    )
 
 
 # ===========================================================================

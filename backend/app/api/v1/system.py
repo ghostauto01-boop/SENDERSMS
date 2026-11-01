@@ -2,21 +2,30 @@
 
 import asyncio
 import logging
+import time
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import get_db
-from app.models.ads import AdsCampaignJob
+from app.models.ads import AdsCampaignJob, AdsFollowUpTask
+from app.models.followup import FollowUp
 from app.models.system_error import SystemErrorRecord
 from app.models.user import User
 from app.security.auth import get_current_user
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+#: How old the background-worker heartbeat may get (with work due) before the
+#: health page and the UI banner say "no worker is running".
+WORKER_STALE_SECONDS = 5 * 60
+#: A follow-up whose due time passed by more than this is "overdue", not just
+#: "due" — the poller should have sent it already.
+FOLLOWUP_OVERDUE_SECONDS = 15 * 60
 
 
 def _serialize(row: SystemErrorRecord, *, include_traceback: bool = True) -> dict:
@@ -97,6 +106,124 @@ async def system_health(
         "message": "Inline recovery poller is enabled." if inline_enabled else "Inline poller is disabled; run a Celery worker and beat process.",
     }
 
+    # --- Background-worker heartbeat -------------------------------------
+    # Celery beat stamps worker.heartbeat_at every minute; the inline poller
+    # stamps the same key on every cycle. When the newest stamp is more than
+    # 5 minutes old AND work is due, nothing is processing the queue: that is
+    # the "344 follow-ups due, none sent" failure mode, and the UI banner
+    # turns red.
+    heartbeat_at: float | None = None
+    heartbeat_source = None
+    try:
+        from app.services.system_settings import (
+            WORKER_HEARTBEAT,
+            WORKER_HEARTBEAT_SOURCE,
+            get_float,
+            get_setting,
+        )
+
+        heartbeat_at = await get_float(db, WORKER_HEARTBEAT, 0.0) or None
+        heartbeat_source = await get_setting(db, WORKER_HEARTBEAT_SOURCE)
+    except Exception as exc:  # noqa: BLE001
+        logger.info("System health heartbeat read failed: %s", exc)
+
+    now_ts = time.time()
+    heartbeat_age = (now_ts - heartbeat_at) if heartbeat_at else None
+    due_followups = 0
+    overdue_followups = 0
+    try:
+        from app.models.conversation import Message
+
+        due_cutoff = datetime.now(timezone.utc) - timedelta(seconds=FOLLOWUP_OVERDUE_SECONDS)
+        now_dt = datetime.now(timezone.utc)
+        overdue_followups = int(
+            (
+                await db.execute(
+                    select(func.count()).select_from(FollowUp).where(
+                        FollowUp.status == "pending", FollowUp.scheduled_at <= due_cutoff
+                    )
+                )
+            ).scalar()
+            or 0
+        ) + int(
+            (
+                await db.execute(
+                    select(func.count()).select_from(AdsFollowUpTask).where(
+                        AdsFollowUpTask.status == "pending", AdsFollowUpTask.due_at <= due_cutoff
+                    )
+                )
+            ).scalar()
+            or 0
+        )
+        due_followups = int(
+            (
+                await db.execute(
+                    select(func.count()).select_from(FollowUp).where(
+                        FollowUp.status == "pending", FollowUp.scheduled_at <= now_dt
+                    )
+                )
+            ).scalar()
+            or 0
+        ) + int(
+            (
+                await db.execute(
+                    select(func.count()).select_from(AdsFollowUpTask).where(
+                        AdsFollowUpTask.status == "pending", AdsFollowUpTask.due_at <= now_dt
+                    )
+                )
+            ).scalar()
+            or 0
+        ) + int(
+            (
+                await db.execute(
+                    select(func.count()).select_from(Message).where(
+                        Message.direction == "outgoing",
+                        Message.status.in_(("queued", "retrying")),
+                        or_(Message.retry_at.is_(None), Message.retry_at <= now_dt),
+                    )
+                )
+            ).scalar()
+            or 0
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.info("System health follow-up counts failed: %s", exc)
+
+    heartbeat_stale = heartbeat_age is None or heartbeat_age > WORKER_STALE_SECONDS
+    work_due = due_followups > 0
+    # A stale heartbeat with nothing due is not an incident (the poller idles
+    # deliberately to let the database sleep); with work due it is exactly the
+    # broken state this check exists to surface.
+    heartbeat_ok = (not heartbeat_stale) or (not work_due)
+    components["background_worker"] = {
+        "ok": worker_ok,
+        "last_heartbeat_at": (
+            datetime.fromtimestamp(heartbeat_at, tz=timezone.utc).isoformat()
+            if heartbeat_at
+            else None
+        ),
+        "heartbeat_source": heartbeat_source,
+        "age_seconds": int(heartbeat_age) if heartbeat_age is not None else None,
+        "stale": heartbeat_stale,
+        "due_followups": due_followups,
+        "overdue_followups": overdue_followups,
+        "message": (
+            "A background worker is processing jobs."
+            if not heartbeat_stale
+            else (
+                f"No worker has run in {int((heartbeat_age or 0) // 60)} minutes and "
+                f"{due_followups} item(s) are due — start a Celery worker + beat "
+                "(or enable the inline poller) and use Process now to clear the backlog."
+                if work_due
+                else (
+                    "No worker heartbeat yet, but nothing is due. The inline poller "
+                    "wakes on activity."
+                    if heartbeat_age is None
+                    else f"No worker has run in {int(heartbeat_age // 60)} minutes; nothing is due."
+                )
+            )
+        ),
+    }
+
     try:
         rows = (await db.execute(
             select(AdsCampaignJob.status, func.count())
@@ -137,16 +264,19 @@ async def system_health(
         }
 
     db_ok = bool(components.get("database", {}).get("ok"))
-    worker_path_ok = worker_ok or inline_enabled
+    worker_path_ok = (worker_ok or inline_enabled) and heartbeat_ok
     jobs_ok = bool(components.get("campaign_jobs", {}).get("ok"))
     fully_healthy = db_ok and worker_path_ok and jobs_ok
     return {
         "ok": fully_healthy,
-        "degraded": not redis_ok or not worker_ok or not jobs_ok,
+        "degraded": not redis_ok or not worker_ok or not jobs_ok or not heartbeat_ok,
+        "due_followups": due_followups,
+        "overdue_followups": overdue_followups,
         "checked_at": datetime.now(timezone.utc).isoformat(),
         "components": components,
         "message": (
             "System is healthy." if fully_healthy and redis_ok and worker_ok else
+            components["background_worker"]["message"] if not heartbeat_ok and work_due else
             "System is using its recovery path; check the component messages." if db_ok and worker_path_ok else
             "No campaign worker path is currently available. Enable the inline poller or restore the Celery worker and Redis broker."
         ),

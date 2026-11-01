@@ -604,3 +604,29 @@ def repair_schema_sync(sync_conn, metadata) -> list[str]:
             )
 
     return applied
+
+
+def verify_schema_sync(sync_conn, metadata) -> list[str]:
+    """Final startup comparison of the models against the live database.
+
+    Called AFTER the repair pass, so anything still missing could not be fixed
+    automatically (permissions, a failing ALTER, a table the repair skips) and
+    is logged as a clear error naming the exact column and the queries it will
+    break — the silent "no such column" failure this project keeps getting
+    bitten by becomes one loud line in the startup log instead.
+    """
+    missing = [
+        f"{table}.{column.name}"
+        for table, column in _pending_columns(sync_conn, metadata)
+    ]
+    for name in missing:
+        logger.error(
+            "SCHEMA CHECK: %s is missing from the database. Pages and API "
+            "endpoints that read it will fail with 'no such column'. Run "
+            "`alembic upgrade head` (backend/migrations) or "
+            "scripts/migrate_existing_db.sql against this database.",
+            name,
+        )
+    if not missing:
+        logger.info("SCHEMA CHECK: every model column exists in the database.")
+    return missing

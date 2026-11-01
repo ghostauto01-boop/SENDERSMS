@@ -266,7 +266,14 @@ async def test_reply_without_address_match_still_leaves_from_gmail_api(db, monke
 
     monkeypatch.setattr(gmail_provider, "google_refresh_access_token", fake_refresh)
     monkeypatch.setattr(gmail_provider, "gmail_send", fake_send)
-    message = await _message(db, contact, account, send_from_mailbox=True, subject="Re: Hello")
+    # No sender pinned on the message (the reply box passed none and the
+    # conversation has no first email): the connected-Gmail heuristic applies
+    # and the reply leaves from the Gmail API mailbox. An explicitly pinned
+    # sender is honored exactly instead — see the sender-pinning tests.
+    message = await _message(
+        db, contact, account,
+        send_from_mailbox=True, subject="Re: Hello", email_account_id=None,
+    )
     result = await email_service.deliver(db, message)
     assert result["success"] is True, result
     assert result["provider"] == "gmail_api"

@@ -81,11 +81,17 @@ async def init_db():
     runtime, while the service itself looks healthy. repair_schema_sync closes
     that gap with additive-only ALTER TABLE ... ADD COLUMN.
     """
-    from app.schema_repair import repair_schema_sync
+    from app.schema_repair import repair_schema_sync, verify_schema_sync
 
+    added: list[str] = []
+    missing: list[str] = []
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         added = await conn.run_sync(repair_schema_sync, Base.metadata)
+        # Always re-compare after the repair: a column the repair could not add
+        # must be a loud startup error, not a silent 500 later (see
+        # verify_schema_sync).
+        missing = await conn.run_sync(verify_schema_sync, Base.metadata)
 
     if added:
         import logging
