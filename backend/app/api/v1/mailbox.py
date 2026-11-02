@@ -278,6 +278,7 @@ async def reply_routing_report(
 
 @router.get("")
 @router.get("/")
+@router.get("", include_in_schema=False)
 async def list_mailboxes(
     include_inactive: bool = Query(default=False),
     db: AsyncSession = Depends(get_db),

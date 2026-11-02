@@ -62,17 +62,25 @@ export default function CampaignChip({
 
   if (onClick) {
     return (
-      <button
-        type="button"
+      <span
+        role="button"
+        tabIndex={0}
         onClick={(e) => {
           e.stopPropagation();
           onClick();
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            e.stopPropagation();
+            onClick();
+          }
         }}
         title={title || `From campaign: ${campaign.name} — open it`}
         className={`${base} hover:opacity-80 transition-opacity cursor-pointer`}
       >
         {content}
-      </button>
+      </span>
     );
   }
 

@@ -47,11 +47,11 @@ NEW_COLUMNS: dict[str, dict[str, tuple]] = {
         "plain_personal_email": (sa.Boolean(), False, False),
         "timezone_name": (sa.String(60), True, None),
         "allowed_weekdays": (sa.String(30), True, None),
-        "sender_daily_limits": (sa.Text(), True, None),
+        "sender_daily_limits": (sa.JSON(), True, None),
     },
     "ads_campaigns": {
         "plain_personal_email": (sa.Boolean(), False, True),
-        "sender_daily_limits": (sa.Text(), True, None),
+        "sender_daily_limits": (sa.JSON(), True, None),
     },
     "email_accounts": {
         "last_webhook_event_at": (sa.DateTime(timezone=True), True, None),
@@ -79,9 +79,22 @@ def upgrade() -> None:
     for table, columns in NEW_COLUMNS.items():
         if table not in tables:
             continue  # fresh database: create_all owns it
-        have = {col["name"] for col in inspector.get_columns(table)}
+        have = {col["name"]: col for col in inspector.get_columns(table)}
         for name, (col_type, nullable, default) in columns.items():
             if name in have:
+                live_type = str(have[name].get("type", "")).lower()
+                if (
+                    bind.dialect.name == "postgresql"
+                    and isinstance(col_type, sa.JSON)
+                    and live_type in ("text", "varchar")
+                ):
+                    bind.execute(
+                        sa.text(
+                            f'ALTER TABLE "{table}" ALTER COLUMN "{name}" TYPE JSON '
+                            f'USING (CASE WHEN "{name}" IS NULL OR BTRIM("{name}") = \'\' '
+                            f'THEN NULL ELSE "{name}"::json END)'
+                        )
+                    )
                 continue
             op.add_column(
                 table,

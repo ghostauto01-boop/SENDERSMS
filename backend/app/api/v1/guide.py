@@ -23,6 +23,7 @@ router = APIRouter()
 
 @router.get("")
 @router.get("/")
+@router.get("", include_in_schema=False)
 async def guide(
     db: AsyncSession = Depends(get_db),
     cu: User = Depends(get_current_user),

@@ -91,6 +91,7 @@ def _email_metrics(subject: str | None, body: str, html: str | None) -> tuple[in
 
 
 @router.get("/")
+@router.get("", include_in_schema=False)
 async def list_templates(
     page: int = Query(default=1, ge=1),
     per_page: int = Query(default=25, ge=1, le=200),

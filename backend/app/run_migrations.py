@@ -13,6 +13,7 @@ already fixed is a no-op.
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 
 from alembic import command
@@ -26,7 +27,7 @@ def _config(database_url: str | None = None) -> Config:
     cfg = Config(str(BACKEND_DIR / "alembic.ini"))
     cfg.set_main_option("script_location", str(MIGRATIONS_DIR))
     if database_url:
-        cfg.set_main_option("sqlalchemy.url", database_url)
+        cfg.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))
     return cfg
 
 
@@ -35,28 +36,28 @@ def upgrade_head(database_url: str | None = None) -> None:
     command.upgrade(_config(database_url), "head")
 
 
-def _sync_url(url: str) -> str:
-    for async_prefix, sync_prefix in (
-        ("postgresql+asyncpg://", "postgresql+psycopg2://"),
-        ("sqlite+aiosqlite://", "sqlite://"),
-    ):
-        if url.startswith(async_prefix):
-            return url.replace(async_prefix, sync_prefix, 1)
-    return url
-
-
 def current_revision(database_url: str | None = None) -> str | None:
     """The revision the database is currently at, or None when unversioned."""
     from alembic.runtime.migration import MigrationContext
-    from sqlalchemy import create_engine
+    from sqlalchemy import pool
+    from sqlalchemy.ext.asyncio import create_async_engine
+    from app.database import _normalize_database_url
 
     if database_url is None:
         from app.config import settings
 
         database_url = settings.DATABASE_URL
-    engine = create_engine(_sync_url(database_url))
-    try:
-        with engine.connect() as connection:
-            return MigrationContext.configure(connection).get_current_revision()
-    finally:
-        engine.dispose()
+
+    norm_url, connect_args = _normalize_database_url(database_url)
+
+    async def _read_rev() -> str | None:
+        eng = create_async_engine(norm_url, poolclass=pool.NullPool, connect_args=connect_args)
+        try:
+            async with eng.connect() as conn:
+                return await conn.run_sync(
+                    lambda sc: MigrationContext.configure(sc).get_current_revision()
+                )
+        finally:
+            await eng.dispose()
+
+    return asyncio.run(_read_rev())

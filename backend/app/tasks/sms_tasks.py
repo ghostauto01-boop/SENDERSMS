@@ -447,6 +447,5 @@ def process_scheduled_messages():
     _run(_do())
 
 def _run(coro):
-    loop=asyncio.get_event_loop()
-    if loop.is_closed():loop=asyncio.new_event_loop();asyncio.set_event_loop(loop)
-    return loop.run_until_complete(coro)
+    from app.tasks._loop import run_in_worker_loop
+    return run_in_worker_loop(coro)

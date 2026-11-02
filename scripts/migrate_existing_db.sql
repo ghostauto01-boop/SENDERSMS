@@ -483,11 +483,31 @@ ALTER TABLE ads_assignments ADD COLUMN IF NOT EXISTS email_account_id INTEGER;
 CREATE INDEX IF NOT EXISTS ix_ads_assignments_email_account_id ON ads_assignments (email_account_id);
 
 -- Meetings on both channels: a booking can email its invite and its reminders
--- independently of SMS (a contact may have only an address). The app adds these
--- at startup too (schema_repair); this is the same DDL for a hand-run migration.
-ALTER TABLE meetings ADD COLUMN IF NOT EXISTS send_invite_email BOOLEAN NOT NULL DEFAULT FALSE;
+-- independently of SMS (a contact may have only an address). Meeting maps its
+-- 0/1 flags as INTEGER (and queries Meeting.send_email_reminder == 1).
+ALTER TABLE meetings ADD COLUMN IF NOT EXISTS send_invite_email INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE meetings ADD COLUMN IF NOT EXISTS invite_subject VARCHAR(500);
 ALTER TABLE meetings ADD COLUMN IF NOT EXISTS email_account_id INTEGER;
-ALTER TABLE meetings ADD COLUMN IF NOT EXISTS invite_email_sent BOOLEAN NOT NULL DEFAULT FALSE;
-ALTER TABLE meetings ADD COLUMN IF NOT EXISTS send_email_reminder BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE meetings ADD COLUMN IF NOT EXISTS invite_email_sent INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE meetings ADD COLUMN IF NOT EXISTS send_email_reminder INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE meetings ADD COLUMN IF NOT EXISTS reminder_subject VARCHAR(500);
+
+-- P0/P1 email deliverability, bot filtering, plain-email mode, and send-window caps.
+ALTER TABLE email_events ADD COLUMN IF NOT EXISTS is_bot BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE email_events ADD COLUMN IF NOT EXISTS bot_reason VARCHAR(120);
+ALTER TABLE email_events ADD COLUMN IF NOT EXISTS occurred_at TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS ix_email_events_is_bot ON email_events (is_bot);
+CREATE INDEX IF NOT EXISTS ix_email_events_occurred_at ON email_events (occurred_at);
+
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS status_polled_at TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS ix_messages_status_polled_at ON messages (status_polled_at);
+
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS plain_personal_email BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS timezone_name VARCHAR(60);
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS allowed_weekdays VARCHAR(30);
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS sender_daily_limits JSON;
+
+ALTER TABLE ads_campaigns ADD COLUMN IF NOT EXISTS plain_personal_email BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE ads_campaigns ADD COLUMN IF NOT EXISTS sender_daily_limits JSON;
+
+ALTER TABLE email_accounts ADD COLUMN IF NOT EXISTS last_webhook_event_at TIMESTAMPTZ;

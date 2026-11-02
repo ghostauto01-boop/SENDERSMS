@@ -230,10 +230,18 @@ export default function CampaignRepliesDrawer({
               {filtered.map((row) => {
                 const chip = sentimentChip(row.last_reply?.ai_sentiment);
                 return (
-                  <button
+                  <div
                     key={row.conversation_id}
+                    role="button"
+                    tabIndex={0}
                     onClick={() => openChat(row)}
-                    className="w-full text-left px-4 sm:px-5 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors group"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        openChat(row);
+                      }
+                    }}
+                    className="w-full text-left px-4 sm:px-5 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors group"
                     title={`Open your chat with ${row.contact_name}`}
                   >
                     <div className="flex items-start justify-between gap-3">
@@ -296,7 +304,7 @@ export default function CampaignRepliesDrawer({
                         </div>
                       </div>
                     </div>
-                  </button>
+                  </div>
                 );
               })}
             </div>

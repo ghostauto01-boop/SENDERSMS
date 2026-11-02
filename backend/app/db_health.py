@@ -77,7 +77,7 @@ _PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     (KIND_AUTH, re.compile(r"password authentication failed|authentication failed|invalid authorization|role .* does not exist|no pg_hba", re.I)),
     (KIND_TIMEOUT, re.compile(r"timed? ?out|timeout", re.I)),
     (KIND_UNREACHABLE, re.compile(r"connection refused|could not connect|connect call failed|name or service not known|nodename nor servname|network is unreachable|connection reset|server closed the connection|ssl syscall|too many connections|remaining connection slots", re.I)),
-    (KIND_SCHEMA, re.compile(r"does not exist|undefined column|undefined table|no such table|no such column", re.I)),
+    (KIND_SCHEMA, re.compile(r"does not exist|undefined column|undefined table|no such table|no such column|cached statement plan is invalid|invalidcachedstatementerror", re.I)),
 ]
 
 _HINTS = {

@@ -26,7 +26,9 @@ logger = logging.getLogger(__name__)
 
 
 def _run(coro):
-    return asyncio.run(coro)
+    from app.tasks._loop import run_in_worker_loop
+
+    return run_in_worker_loop(coro)
 
 
 async def _sync_due() -> dict:

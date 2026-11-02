@@ -55,6 +55,7 @@ async def system_health(
         await db.execute(select(1))
         components["database"] = {"ok": True, "message": "Database is responding."}
     except Exception as exc:  # noqa: BLE001
+        await db.rollback()
         components["database"] = {
             "ok": False,
             "message": "Database is unavailable. Check DATABASE_URL and database health.",
@@ -125,6 +126,7 @@ async def system_health(
         heartbeat_at = await get_float(db, WORKER_HEARTBEAT, 0.0) or None
         heartbeat_source = await get_setting(db, WORKER_HEARTBEAT_SOURCE)
     except Exception as exc:  # noqa: BLE001
+        await db.rollback()
         logger.info("System health heartbeat read failed: %s", exc)
 
     now_ts = time.time()
@@ -186,6 +188,7 @@ async def system_health(
             or 0
         )
     except Exception as exc:  # noqa: BLE001
+        await db.rollback()
         logger.info("System health follow-up counts failed: %s", exc)
 
     heartbeat_stale = heartbeat_age is None or heartbeat_age > WORKER_STALE_SECONDS
@@ -257,6 +260,7 @@ async def system_health(
             ),
         }
     except Exception as exc:  # noqa: BLE001
+        await db.rollback()
         logger.info("System health job query failed: %s", exc)
         components["campaign_jobs"] = {
             "ok": False,

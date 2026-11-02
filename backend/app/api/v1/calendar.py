@@ -160,6 +160,7 @@ def _parse_iso(raw: Optional[str]) -> datetime | None:
 # --------------------------------------------------------------------------- #
 
 @router.get("/")
+@router.get("", include_in_schema=False)
 async def list_meetings(
     page: int = Query(default=1, ge=1),
     per_page: int = Query(default=100, ge=1, le=500),

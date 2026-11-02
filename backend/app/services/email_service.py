@@ -1503,21 +1503,24 @@ async def campaign_plain_mode(
     A missing/unknown campaign keeps the classic look, so nothing changes for
     sends that were already working.
     """
+    if ads_campaign_id is None and campaign_id is None:
+        return False
     try:
-        if ads_campaign_id is not None:
-            from app.models.ads import AdsCampaign
+        async with db.begin_nested():
+            if ads_campaign_id is not None:
+                from app.models.ads import AdsCampaign
 
-            campaign = (
-                await db.execute(select(AdsCampaign).where(AdsCampaign.id == ads_campaign_id))
-            ).scalar_one_or_none()
-            return bool(getattr(campaign, "plain_personal_email", True)) if campaign else True
-        if campaign_id is not None:
-            from app.models.campaign import Campaign
+                campaign = (
+                    await db.execute(select(AdsCampaign).where(AdsCampaign.id == ads_campaign_id))
+                ).scalar_one_or_none()
+                return bool(getattr(campaign, "plain_personal_email", True)) if campaign else True
+            if campaign_id is not None:
+                from app.models.campaign import Campaign
 
-            campaign = (
-                await db.execute(select(Campaign).where(Campaign.id == campaign_id))
-            ).scalar_one_or_none()
-            return bool(getattr(campaign, "plain_personal_email", False)) if campaign else False
+                campaign = (
+                    await db.execute(select(Campaign).where(Campaign.id == campaign_id))
+                ).scalar_one_or_none()
+                return bool(getattr(campaign, "plain_personal_email", False)) if campaign else False
     except Exception:  # noqa: BLE001 - a lookup failure must not change the mail
         return False
     return False

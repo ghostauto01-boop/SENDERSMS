@@ -90,11 +90,8 @@ def send_push_notification(self, event_id: int):
             await db.commit()
 
     try:
-        loop = asyncio.get_event_loop()
-        if loop.is_closed():
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-        loop.run_until_complete(_send())
+        from app.tasks._loop import run_in_worker_loop
+        run_in_worker_loop(_send())
     except Exception as exc:
         logger.error(f"Notification task error: {exc}")
         # Never retry notification failures - they're non-critical
@@ -114,8 +111,5 @@ def process_pending_notifications():
                 try_enqueue(send_push_notification, event.id)
             await db.commit()
 
-    loop = asyncio.get_event_loop()
-    if loop.is_closed():
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-    loop.run_until_complete(_process())
+    from app.tasks._loop import run_in_worker_loop
+    run_in_worker_loop(_process())
