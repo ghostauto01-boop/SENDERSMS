@@ -128,7 +128,7 @@ def _apply_contact_filters(query, search: Optional[str], lead_status: Optional[s
     if undeliverable in ("1", "true", "yes"):
         query = query.where(Contact.is_undeliverable.is_(True))
     elif undeliverable in ("0", "false", "no"):
-        query = query.where(Contact.is_undeliverable.is_(False))
+        query = query.where(func.coalesce(Contact.is_undeliverable, False).is_(False))
 
     return query
 
@@ -163,8 +163,8 @@ def _apply_channel_filters(query, email_state: Optional[str], channel: Optional[
     if state in ("emailable", "has_email"):
         query = query.where(
             *has_address,
-            Contact.is_email_opted_out.is_(False),
-            Contact.is_email_undeliverable.is_(False),
+            func.coalesce(Contact.is_email_opted_out, False).is_(False),
+            func.coalesce(Contact.is_email_undeliverable, False).is_(False),
         )
     elif state == "no_email":
         query = query.where(or_(Contact.email.is_(None), Contact.email == ""))
@@ -175,13 +175,14 @@ def _apply_channel_filters(query, email_state: Optional[str], channel: Optional[
     elif state == "verified":
         query = query.where(*has_address, Contact.email_verified.is_(True))
     elif state == "unverified":
-        query = query.where(*has_address, Contact.email_verified.is_(False))
+        query = query.where(*has_address, func.coalesce(Contact.email_verified, False).is_(False))
     elif state == "inferred":
         query = query.where(*has_address, Contact.email_source == "inferred")
     return query
 
 
 @router.get("/", response_model=ContactListOut)
+@router.get("", response_model=ContactListOut, include_in_schema=False)
 async def list_contacts(
     page: int = Query(default=1, ge=1),
     per_page: int = Query(default=25, ge=1, le=100),

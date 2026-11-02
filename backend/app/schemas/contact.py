@@ -1,6 +1,6 @@
 """Pydantic schemas for contacts."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
@@ -96,21 +96,21 @@ class ContactUpdate(BaseModel):
 
 class ContactOut(BaseModel):
     id: int
-    first_name: Optional[str]
-    last_name: Optional[str]
-    business_name: Optional[str]
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    business_name: Optional[str] = None
     phone_number: Optional[str] = None
-    email: Optional[str]
-    city: Optional[str]
-    state: Optional[str]
+    email: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
     country: Optional[str] = None
-    website: Optional[str]
-    industry: Optional[str]
-    source: Optional[str]
-    lead_status: str
-    consent_status: str
-    has_consented: bool
-    is_opted_out: bool
+    website: Optional[str] = None
+    industry: Optional[str] = None
+    source: Optional[str] = None
+    lead_status: str = "new"
+    consent_status: str = "unknown"
+    has_consented: bool = False
+    is_opted_out: bool = False
     is_undeliverable: bool = False
     undeliverable_reason: Optional[str] = None
     delivery_fail_count: int = 0
@@ -127,20 +127,69 @@ class ContactOut(BaseModel):
     email_verified_at: Optional[datetime] = None
     email_verdict: Optional[str] = None
     email_confidence: Optional[int] = None
-    email_confidence: Optional[int] = None
     email_enriched_at: Optional[datetime] = None
     email_enrichment_note: Optional[str] = None
     opt_out_reason: Optional[str] = None
     opted_out_at: Optional[datetime] = None
-    notes: Optional[str]
-    custom_fields: Optional[str]
+    notes: Optional[str] = None
+    custom_fields: Optional[str] = None
     tags: list[str] = Field(default_factory=list)
-    messages_sent: int
-    messages_received: int
-    last_contacted_at: Optional[datetime]
-    last_reply_at: Optional[datetime]
+    messages_sent: int = 0
+    messages_received: int = 0
+    last_contacted_at: Optional[datetime] = None
+    last_reply_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
+
+    @field_validator(
+        "has_consented",
+        "is_opted_out",
+        "is_undeliverable",
+        "is_email_opted_out",
+        "is_email_undeliverable",
+        "email_verified",
+        mode="before",
+    )
+    @classmethod
+    def _coerce_null_bool(cls, v):
+        return False if v is None else v
+
+    @field_validator(
+        "delivery_fail_count",
+        "emails_sent",
+        "emails_received",
+        "messages_sent",
+        "messages_received",
+        mode="before",
+    )
+    @classmethod
+    def _coerce_null_int(cls, v):
+        return 0 if v is None else v
+
+    @field_validator("lead_status", mode="before")
+    @classmethod
+    def _coerce_null_lead_status(cls, v):
+        return "new" if v is None else v
+
+    @field_validator("consent_status", mode="before")
+    @classmethod
+    def _coerce_null_consent_status(cls, v):
+        return "unknown" if v is None else v
+
+    @field_validator("email_status", mode="before")
+    @classmethod
+    def _coerce_null_email_status(cls, v):
+        return "active" if v is None else v
+
+    @field_validator("tags", mode="before")
+    @classmethod
+    def _coerce_null_tags(cls, v):
+        return [] if v is None else v
+
+    @field_validator("created_at", "updated_at", mode="before")
+    @classmethod
+    def _coerce_null_timestamps(cls, v):
+        return datetime.now(timezone.utc) if v is None else v
 
     model_config = {"from_attributes": True}
 

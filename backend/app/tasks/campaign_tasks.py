@@ -11,6 +11,7 @@ from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.tasks.celery_app import celery_app
+from app.tasks._loop import run_in_worker_loop
 from app.tasks.queue import QueueUnavailable, enqueue, try_enqueue
 from app.database import async_session_factory
 from app.models.campaign import Campaign, CampaignContact
@@ -39,11 +40,7 @@ def process_running_campaigns():
                 # the whole beat cycle.
                 try_enqueue(process_campaign, campaign.id)
 
-    loop = asyncio.get_event_loop()
-    if loop.is_closed():
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-    loop.run_until_complete(_process())
+    run_in_worker_loop(_process())
 
 
 async def launch_due_campaigns_async() -> list[int]:
@@ -149,21 +146,13 @@ def launch_due_campaigns():
     Without this, setting a launch time only records an intention: the
     campaign would sit in "scheduled" forever waiting for a manual Start.
     """
-    loop = asyncio.get_event_loop()
-    if loop.is_closed():
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-    loop.run_until_complete(launch_due_campaigns_async())
+    run_in_worker_loop(launch_due_campaigns_async())
 
 
 @celery_app.task
 def watch_bounce_rates():
     """Sweep email campaigns for bounce/complaint risk as a webhook backstop."""
-    loop = asyncio.get_event_loop()
-    if loop.is_closed():
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-    return loop.run_until_complete(watch_bounce_rates_async())
+    return run_in_worker_loop(watch_bounce_rates_async())
 
 
 async def watch_bounce_rates_async() -> list[dict]:
@@ -271,11 +260,7 @@ async def process_campaign_batch_async(
 @celery_app.task
 def process_campaign(campaign_id: int):
     """Celery entrypoint for the next campaign batch."""
-    loop = asyncio.get_event_loop()
-    if loop.is_closed():
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-    return loop.run_until_complete(process_campaign_batch_async(campaign_id))
+    return run_in_worker_loop(process_campaign_batch_async(campaign_id))
 
 
 async def _flush_outbox(message_ids):
@@ -1142,21 +1127,13 @@ async def process_due_followups_async(
 @celery_app.task
 def process_followup(followup_id: int):
     """Celery entrypoint for sending one follow-up now."""
-    loop = asyncio.get_event_loop()
-    if loop.is_closed():
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-    return loop.run_until_complete(process_followup_async(followup_id))
+    return run_in_worker_loop(process_followup_async(followup_id))
 
 
 @celery_app.task
 def process_due_followups():
     """Celery beat entrypoint for the due follow-up sweep."""
-    loop = asyncio.get_event_loop()
-    if loop.is_closed():
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-    return loop.run_until_complete(process_due_followups_async())
+    return run_in_worker_loop(process_due_followups_async())
 
 
 @celery_app.task
@@ -1176,11 +1153,6 @@ def schedule_followup(followup_id: int):
 @celery_app.task
 def poll_email_deliveries():
     """Beat entrypoint: poll Brevo's event API for unconfirmed deliveries."""
-    loop = asyncio.get_event_loop()
-    if loop.is_closed():
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-
     async def _run() -> dict:
         from app.services.email_service import poll_unconfirmed_deliveries
 
@@ -1189,7 +1161,7 @@ def poll_email_deliveries():
             await db.commit()
         return result
 
-    return loop.run_until_complete(_run())
+    return run_in_worker_loop(_run())
 
 
 @celery_app.task
@@ -1201,8 +1173,4 @@ def process_campaign_followups():
     """
     from app.services.campaign_followup_service import process_due_campaign_followups
 
-    loop = asyncio.get_event_loop()
-    if loop.is_closed():
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-    return loop.run_until_complete(process_due_campaign_followups())
+    return run_in_worker_loop(process_due_campaign_followups())

@@ -65,6 +65,7 @@ def _sequence_item(sequence: Sequence, steps: list[SequenceStep]) -> dict:
 
 
 @router.get("/")
+@router.get("", include_in_schema=False)
 async def list_sequences(
     page: int = Query(default=1, ge=1),
     per_page: int = Query(default=25, ge=1, le=100),

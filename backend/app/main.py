@@ -10,7 +10,14 @@ from fastapi.responses import JSONResponse, HTMLResponse, FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.datastructures import Headers, MutableHeaders
 from app.config import settings
-from app.database import init_db, async_session_factory
+from app.database import (
+    init_db,
+    ensure_db_initialized,
+    is_db_initialized,
+    async_session_factory,
+    engine as _db_engine,
+)
+_default_session_factory = async_session_factory
 from app import db_health
 from app.poll_scheduler import PollActivity, next_poll_delay
 from app.utils.urls import bind_request_base, clear_request_base
@@ -1050,17 +1057,33 @@ async def lifespan(app: FastAPI):
     # Uvicorn binds the listen socket only AFTER this startup section
     # returns (i.e. we reach `yield`). Blocking here on Postgres / SMS-Gate
     # is what made Render report "no open ports" and time the deploy out.
+    boot_gate = asyncio.Event()
+
     async def _boot():
-        try:
-            await asyncio.wait_for(init_db(), timeout=45)
-            db_health.status.note_ok()
-            logger.info("DB ready")
-        except Exception as e:
-            if db_health.is_db_error(e) or isinstance(e, asyncio.TimeoutError):
-                kind, msg = db_health.status.note_error(e)
-                logger.error("init_db failed (%s): %s", kind, msg)
-            else:
-                logger.warning("init_db: %s", e)
+        retry_delays = (5, 12, 25, 45, 60)
+        attempt = 0
+        while not is_db_initialized():
+            try:
+                ok = await ensure_db_initialized(timeout=90)
+                if ok:
+                    db_health.status.note_ok()
+                    logger.info("DB ready")
+                    break
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                if db_health.is_db_error(e) or isinstance(e, asyncio.TimeoutError):
+                    kind, msg = db_health.status.note_error(e)
+                    logger.error("init_db attempt %d failed (%s): %s", attempt + 1, kind, msg)
+                else:
+                    logger.warning("init_db attempt %d: %s", attempt + 1, e)
+            finally:
+                boot_gate.set()
+            wait_s = retry_delays[min(attempt, len(retry_delays) - 1)]
+            attempt += 1
+            await asyncio.sleep(wait_s)
+        boot_gate.set()
+
         try:
             await asyncio.wait_for(_repair_placeholder_phones(), timeout=30)
         except Exception as e:
@@ -1078,12 +1101,19 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning("verification jobs: %s", e)
 
+    async def _gated_poll_loop():
+        try:
+            await asyncio.wait_for(boot_gate.wait(), timeout=25)
+        except asyncio.TimeoutError:
+            pass
+        await _poll_loop()
+
     boot = asyncio.create_task(_boot())
 
     poller = None
     app.state.inline_poller_enabled = bool(settings.ENABLE_INLINE_POLLER)
     if settings.ENABLE_INLINE_POLLER:
-        poller = asyncio.create_task(_poll_loop())
+        poller = asyncio.create_task(_gated_poll_loop())
         app.state.inline_poller_task = poller
         logger.info("Inline poller started (every %ss)", settings.INLINE_POLL_INTERVAL)
 
@@ -1211,6 +1241,23 @@ async def _error_response(request: Request, exc: Exception) -> JSONResponse:
     headers = {"Cache-Control": "no-store", "X-Request-ID": request_id}
     if db_health.is_db_error(exc):
         kind, message = db_health.classify_db_error(exc)
+        msg_lower = message.lower()
+        if "cached statement plan is invalid" in msg_lower or "invalidcachedstatementerror" in msg_lower:
+            try:
+                await _db_engine.dispose()
+            except Exception:
+                pass
+        if kind == db_health.KIND_SCHEMA and not is_db_initialized() and async_session_factory is _default_session_factory:
+            import asyncio as _aio
+
+            async def _bg_repair():
+                try:
+                    await ensure_db_initialized(timeout=45)
+                except Exception as rep_exc:
+                    logger.warning("Background schema self-heal failed: %s", rep_exc)
+
+            _aio.create_task(_bg_repair())
+
         if not db_health.is_db_down_kind(kind):
             # The database answered and refused the statement: our SQL is
             # wrong, the database is fine. Reporting this as "Database
@@ -1372,6 +1419,14 @@ async def health_db():
     Answers 200 when healthy and 503 when not, so uptime tools can alert.
     """
     result = await db_health.check_db(async_session_factory)
+    if result.get("ok") and not is_db_initialized() and async_session_factory is _default_session_factory:
+        try:
+            ok = await ensure_db_initialized(timeout=30)
+            if not ok:
+                result = db_health.status.as_dict()
+        except Exception as exc:
+            db_health.status.note_error(exc)
+            result = db_health.status.as_dict()
     code = 200 if result.get("ok") else 503
     return JSONResponse(result, status_code=code, headers={"Cache-Control": "no-store"})
 

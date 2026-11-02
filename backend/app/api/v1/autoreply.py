@@ -40,6 +40,7 @@ def _validate(match_type: Optional[str], keywords: Optional[str]) -> None:
 
 
 @router.get("/", response_model=dict)
+@router.get("", response_model=dict, include_in_schema=False)
 async def list_rules(
     channel: Optional[str] = None,
     db: AsyncSession = Depends(get_db),

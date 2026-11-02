@@ -63,6 +63,8 @@ class CampaignCreate(BaseModel):
     send_start_hour: Optional[int] = Field(default=None, ge=0, le=23)
     send_end_hour: Optional[int] = Field(default=None, ge=0, le=23)
     allow_weekends: bool = True
+    timezone_name: Optional[str] = None
+    allowed_weekdays: Optional[str] = None
 
     # --- Email channel -------------------------------------------------
     #: Unified sender id: positive Brevo, negative connected mailbox (NULL = default).
@@ -72,12 +74,14 @@ class CampaignCreate(BaseModel):
     email_account_ids: Optional[list[int]] = None
     sender_distribution: str = "round_robin"
     email_sender_weights: Optional[dict] = None
+    sender_daily_limits: Optional[dict] = None
     subject: Optional[str] = Field(default=None, max_length=500)
     html_body: Optional[str] = None
     #: [{"name": "...", "content_base64": "..."}] attached to every email.
     attachments: Optional[list[dict]] = None
     track_opens: bool = True
     track_clicks: bool = True
+    plain_personal_email: bool = False
 
     _check_future = field_validator("scheduled_start_at")(_require_future)
     _check_distribution = field_validator("sender_distribution")(_clean_sender_distribution)
@@ -100,6 +104,8 @@ class CampaignUpdate(BaseModel):
     send_start_hour: Optional[int] = Field(default=None, ge=0, le=23)
     send_end_hour: Optional[int] = Field(default=None, ge=0, le=23)
     allow_weekends: Optional[bool] = None
+    timezone_name: Optional[str] = None
+    allowed_weekdays: Optional[str] = None
     scheduled_start_at: Optional[datetime] = None
     #: Only changeable while the campaign has no messages queued.
     channel: Optional[str] = None
@@ -108,11 +114,13 @@ class CampaignUpdate(BaseModel):
     email_account_ids: Optional[list[int]] = None
     sender_distribution: Optional[str] = None
     email_sender_weights: Optional[dict] = None
+    sender_daily_limits: Optional[dict] = None
     subject: Optional[str] = Field(default=None, max_length=500)
     html_body: Optional[str] = None
     attachments: Optional[list[dict]] = None
     track_opens: Optional[bool] = None
     track_clicks: Optional[bool] = None
+    plain_personal_email: Optional[bool] = None
 
     _check_future = field_validator("scheduled_start_at")(_require_future)
     _check_distribution = field_validator("sender_distribution")(_clean_sender_distribution)
@@ -124,8 +132,8 @@ class CampaignOut(BaseModel):
     #: Manager number independently, so an id is only meaningful with its kind.
     kind: str = "campaign"
     name: str
-    description: Optional[str]
-    status: str
+    description: Optional[str] = None
+    status: str = "draft"
     #: Set while ``status == "paused"``: "scheduled" if it was paused before it
     #: ever started (resume restores the schedule), otherwise null.
     paused_from: Optional[str] = None
@@ -138,37 +146,84 @@ class CampaignOut(BaseModel):
     email_account_ids: Optional[list[int]] = None
     sender_distribution: str = "round_robin"
     email_sender_weights: Optional[dict] = None
+    sender_daily_limits: Optional[dict] = None
     subject: Optional[str] = None
     html_body: Optional[str] = None
     attachments: Optional[list[dict]] = None
     track_opens: bool = True
     track_clicks: bool = True
-    list_id: Optional[int]
-    template_id: Optional[int]
-    message_body: Optional[str]
-    sequence_id: Optional[int]
-    sequence_version_id: Optional[int]
-    gateway_setting_id: Optional[int]
-    daily_limit: Optional[int]
-    hourly_limit: Optional[int]
-    per_minute_limit: Optional[int]
-    min_delay: Optional[int]
-    max_delay: Optional[int]
-    send_start_hour: Optional[int]
-    send_end_hour: Optional[int]
-    allow_weekends: bool
-    total_contacts: int
-    messages_sent: int
-    messages_delivered: int
-    messages_failed: int
-    replies: int
-    interested: int
-    scheduled_at: Optional[datetime]
-    scheduled_start_at: Optional[datetime]
-    started_at: Optional[datetime]
-    completed_at: Optional[datetime]
+    plain_personal_email: bool = False
+    list_id: Optional[int] = None
+    template_id: Optional[int] = None
+    message_body: Optional[str] = None
+    sequence_id: Optional[int] = None
+    sequence_version_id: Optional[int] = None
+    gateway_setting_id: Optional[int] = None
+    daily_limit: Optional[int] = None
+    hourly_limit: Optional[int] = None
+    per_minute_limit: Optional[int] = None
+    min_delay: Optional[int] = None
+    max_delay: Optional[int] = None
+    send_start_hour: Optional[int] = None
+    send_end_hour: Optional[int] = None
+    allow_weekends: bool = True
+    timezone_name: Optional[str] = None
+    allowed_weekdays: Optional[str] = None
+    total_contacts: int = 0
+    messages_sent: int = 0
+    messages_delivered: int = 0
+    messages_failed: int = 0
+    replies: int = 0
+    interested: int = 0
+    scheduled_at: Optional[datetime] = None
+    scheduled_start_at: Optional[datetime] = None
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
+
+    @field_validator("track_opens", "track_clicks", "allow_weekends", mode="before")
+    @classmethod
+    def _coerce_null_true(cls, v):
+        return True if v is None else v
+
+    @field_validator("plain_personal_email", mode="before")
+    @classmethod
+    def _coerce_null_false(cls, v):
+        return False if v is None else v
+
+    @field_validator(
+        "total_contacts",
+        "messages_sent",
+        "messages_delivered",
+        "messages_failed",
+        "replies",
+        "interested",
+        mode="before",
+    )
+    @classmethod
+    def _coerce_null_zero(cls, v):
+        return 0 if v is None else v
+
+    @field_validator("channel", mode="before")
+    @classmethod
+    def _coerce_null_channel(cls, v):
+        return "sms" if v is None else v
+
+    @field_validator("sender_distribution", mode="before")
+    @classmethod
+    def _coerce_null_dist(cls, v):
+        return "round_robin" if v is None else v
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def _coerce_null_status(cls, v):
+        return "draft" if v is None else v
+
+    @field_validator("created_at", "updated_at", mode="before")
+    @classmethod
+    def _coerce_null_timestamps(cls, v):
+        return datetime.now(timezone.utc) if v is None else v
 
     # Every timestamp we store is UTC, but some drivers (SQLite, and any column
     # created without a timezone) hand back a naive datetime. Serialised naive,

@@ -29,6 +29,7 @@ def _out(e: NotificationEvent) -> dict:
 
 
 @router.get("/")
+@router.get("", include_in_schema=False)
 async def list_notifications(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),

@@ -65,9 +65,8 @@ if celery_app is not None:
     @celery_app.task(name="app.tasks.system_tasks.worker_heartbeat")
     def worker_heartbeat() -> float:
         """Beat entrypoint: stamp the heartbeat once per minute."""
-        import asyncio
-
         from app.database import async_session_factory
+        from app.tasks._loop import run_in_worker_loop
 
         async def _run() -> float:
             async with async_session_factory() as db:
@@ -75,8 +74,4 @@ if celery_app is not None:
                 await db.commit()
                 return value
 
-        loop = asyncio.new_event_loop()
-        try:
-            return loop.run_until_complete(_run())
-        finally:
-            loop.close()
+        return run_in_worker_loop(_run())

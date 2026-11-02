@@ -29,6 +29,7 @@ router = APIRouter()
 
 
 @router.get("/")
+@router.get("", include_in_schema=False)
 async def list_variables(
     search: Optional[str] = None,
     source: Optional[str] = None,

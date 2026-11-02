@@ -162,16 +162,19 @@ async def get_dashboard_stats(
             "name": camp.name,
             "status": camp.status,
             "channel": getattr(camp, "channel", "sms") or "sms",
-            "messages_sent": camp.messages_sent,
-            "replies": camp.replies,
-            "updated_at": camp.updated_at.isoformat(),
+            "messages_sent": camp.messages_sent or 0,
+            "replies": camp.replies or 0,
+            "updated_at": (camp.updated_at or camp.created_at).isoformat() if (camp.updated_at or camp.created_at) else None,
         })
 
     # Lead status distribution
     status_result = await db.execute(
         select(Contact.lead_status, func.count(Contact.id)).group_by(Contact.lead_status)
     )
-    lead_distribution = {row[0]: row[1] for row in status_result}
+    lead_distribution: dict[str, int] = {}
+    for status_key, cnt in status_result:
+        key = status_key or "new"
+        lead_distribution[key] = lead_distribution.get(key, 0) + int(cnt or 0)
 
     return {
         "total_contacts": total_contacts,

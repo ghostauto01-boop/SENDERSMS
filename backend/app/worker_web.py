@@ -37,10 +37,21 @@ def run_health_server():
     server.serve_forever()
 
 
+def _init_db_background():
+    try:
+        from app.database import ensure_db_initialized
+        from app.tasks._loop import run_in_worker_loop
+
+        run_in_worker_loop(ensure_db_initialized(timeout=60))
+    except Exception as exc:
+        print(f"[worker-web] init_db warning: {exc}")
+
+
 if __name__ == "__main__":
     # Start health check server in a daemon thread
     t = threading.Thread(target=run_health_server, daemon=True)
     t.start()
+    threading.Thread(target=_init_db_background, daemon=True).start()
 
     # Start Celery worker (blocks forever)
     celery_app.worker_main(

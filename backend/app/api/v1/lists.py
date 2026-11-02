@@ -73,6 +73,7 @@ async def _matching_member_ids(
 
 
 @router.get("/")
+@router.get("", include_in_schema=False)
 async def list_lists(
     page: int = Query(default=1, ge=1),
     per_page: int = Query(default=25, ge=1, le=100),
