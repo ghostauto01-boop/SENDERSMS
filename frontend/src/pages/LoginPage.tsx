@@ -72,7 +72,7 @@ export default function LoginPage() {
     setLoading(false);
     if (result === true) {
       toast.success("Signed in");
-      navigate("/dashboard");
+      navigate("/overview");
       return;
     }
     explain(result);
@@ -85,7 +85,7 @@ export default function LoginPage() {
     setLoading(false);
     if (result === true) {
       toast.success("Signed in as admin");
-      navigate("/dashboard");
+      navigate("/overview");
       return;
     }
     explain(result);

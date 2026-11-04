@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import api from "../api/client";
+import AgentModelSettings from "../components/agent/AgentModelSettings";
 import { useAuth } from "../hooks/useAuth";
 import { NotificationProviderSettings } from "../types";
 import toast from "react-hot-toast";
@@ -941,81 +942,9 @@ function McpTab() {
 }
 
 function AIAgentKeysCard() {
-  const [groq, setGroq] = useState("");
-  const [gemini, setGemini] = useState("");
-  const [status, setStatus] = useState<{ groq_configured?: boolean; gemini_configured?: boolean; groq_hint?: string; gemini_hint?: string } | null>(null);
-  const [saving, setSaving] = useState<string | null>(null);
-  const [showGroq, setShowGroq] = useState(false);
-  const [showGemini, setShowGemini] = useState(false);
-  useEffect(() => {
-    api.get("/ai-agent/settings").then(({ data }) => setStatus(data)).catch(() => {});
-  }, []);
-  const save = async (provider: "groq" | "gemini") => {
-    const key = provider === "groq" ? groq : gemini;
-    if (!key.trim()) { toast.error("Paste the API key first"); return; }
-    setSaving(provider);
-    try {
-      await api.put("/ai-agent/settings", { provider, api_key: key.trim() });
-      toast.success(`${provider === "groq" ? "Groq" : "Gemini"} key saved`);
-      if (provider === "groq") setGroq("");
-      else setGemini("");
-      const { data } = await api.get("/ai-agent/settings");
-      setStatus(data);
-    } catch (e: any) { toast.error(e.response?.data?.detail || "Save failed"); }
-    finally { setSaving(null); }
-  };
-  const test = async (provider: "groq" | "gemini") => {
-    const key = provider === "groq" ? groq : gemini;
-    if (!key.trim()) { toast.error("Paste the key to test it first"); return; }
-    setSaving(`test-${provider}`);
-    try {
-      const { data } = await api.post("/ai-agent/settings/test", { provider, api_key: key.trim() });
-      if (data.success) toast.success(data.message || "Key is valid");
-      else toast.error(data.error || "Key check failed");
-    } catch (e: any) { toast.error(e.response?.data?.detail || "Test failed"); }
-    finally { setSaving(null); }
-  };
-  return (
-    <div className="card p-4 sm:p-6">
-      <h2 className="text-base font-semibold flex items-center gap-2"><Sparkles size={16} /> AI Agent — LLM Keys</h2>
-      <p className="text-xs text-gray-500 mt-1">The in-app AI Agent (at /ai-agent) uses <b>Groq (Madeline)</b> or <b>Gemini</b>. Paste one or both keys — the agent will use the model you pick per session. Keys are encrypted on the server and never shown back.</p>
-      {status && (
-        <p className="text-xs mt-2 flex flex-wrap gap-2">
-          <span className={`px-2 py-1 rounded-full text-[11px] font-medium ${status.groq_configured ? "bg-success-100 text-success-700" : "bg-gray-100 text-gray-500"}`}>Groq: {status.groq_configured ? `set (${status.groq_hint})` : "not set"}</span>
-          <span className={`px-2 py-1 rounded-full text-[11px] font-medium ${status.gemini_configured ? "bg-success-100 text-success-700" : "bg-gray-100 text-gray-500"}`}>Gemini: {status.gemini_configured ? `set (${status.gemini_hint})` : "not set"}</span>
-        </p>
-      )}
-      <div className="grid sm:grid-cols-2 gap-4 mt-4">
-        <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-3">
-          <label className="text-xs font-semibold">Groq API Key (Madeline)</label>
-          <p className="text-[11px] text-gray-500 mt-0.5">Get it at console.groq.com → API keys. Model: {`llama-3.3-70b-versatile`}.</p>
-          <div className="flex gap-1.5 mt-2">
-            <div className="flex-1 relative">
-              <input type={showGroq ? "text" : "password"} value={groq} onChange={e=>setGroq(e.target.value)} placeholder={status?.groq_configured ? "•••••••• (set) — paste new to rotate" : "gsk_..."} className="input pr-8 text-sm" />
-              <button type="button" onClick={()=>setShowGroq(v=>!v)} className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-gray-400 hover:text-gray-600">{showGroq ? <EyeOff size={14}/> : <Eye size={14}/>}</button>
-            </div>
-          </div>
-          <div className="flex gap-2 mt-2">
-            <button onClick={()=>save("groq")} disabled={saving==="groq"} className="btn-primary btn-sm flex-1">{saving==="groq" ? "Saving…" : "Save Groq"}</button>
-            <button onClick={()=>test("groq")} disabled={saving==="test-groq"} className="btn-secondary btn-sm">Test</button>
-          </div>
-        </div>
-        <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-3">
-          <label className="text-xs font-semibold">Gemini API Key</label>
-          <p className="text-[11px] text-gray-500 mt-0.5">Get it at aistudio.google.com → Get API key. Model: {`gemini-1.5-flash`}.</p>
-          <div className="flex gap-1.5 mt-2">
-            <div className="flex-1 relative">
-              <input type={showGemini ? "text" : "password"} value={gemini} onChange={e=>setGemini(e.target.value)} placeholder={status?.gemini_configured ? "•••••••• (set)" : "AIza..."} className="input pr-8 text-sm" />
-              <button type="button" onClick={()=>setShowGemini(v=>!v)} className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-gray-400 hover:text-gray-600">{showGemini ? <EyeOff size={14}/> : <Eye size={14}/>}</button>
-            </div>
-          </div>
-          <div className="flex gap-2 mt-2">
-            <button onClick={()=>save("gemini")} disabled={saving==="gemini"} className="btn-primary btn-sm flex-1">{saving==="gemini" ? "Saving…" : "Save Gemini"}</button>
-            <button onClick={()=>test("gemini")} disabled={saving==="test-gemini"} className="btn-secondary btn-sm">Test</button>
-          </div>
-        </div>
-      </div>
-      <p className="text-[11px] text-gray-400 mt-3">Without a key the agent still works for basic commands (list contacts, create campaign, import CSV) via offline intent matching — but LLM reasoning, @skills and free-form chat need a key.</p>
-    </div>
-  );
+  // One component for both pages, so the Agent screen and Settings can never
+  // disagree about which key is set or which model is live — and a retired model
+  // is repaired in a single place. Keys stay on the server; only masked hints
+  // ever come back.
+  return <AgentModelSettings />;
 }

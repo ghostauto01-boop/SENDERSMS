@@ -1,428 +1,981 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import api from "../api/client";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import {
-  MessageSquare, Upload, Trash2, Plus, Settings, X, ChevronLeft,
-  Send, Sparkles, Menu, FileText, Code, Layers, Cpu, Brain,
-  ChevronDown, ChevronUp, Paperclip, Zap, Database, Users, Megaphone, CheckCircle, AlertCircle, Copy
+  Activity, AlertTriangle, Brain, ChevronDown, ChevronRight, Cpu, History,
+  Menu, MessageSquarePlus, MoreHorizontal, Paperclip, Pencil, Plug, Settings2,
+  Sparkles, Trash2, WifiOff, X,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import {
+  agentApi,
+  streamChat,
+  type AgentFile,
+  type AgentHealth,
+  type AgentSettings,
+  type ConfirmationCard,
+  type Provider,
+  type StreamEvent,
+  type AgentSession,
+  type Skill,
+} from "../api/aiAgent";
+import AgentThread, { ActivityList, type Turn, type TurnBlock } from "../components/agent/AgentThread";
+import AgentComposer from "../components/agent/AgentComposer";
+import AgentFilesPanel from "../components/agent/AgentFilesPanel";
+import AgentModelSettings from "../components/agent/AgentModelSettings";
+import { ProviderStatusPill } from "../components/agent/AgentModelSettings";
 
-type ModelType = "groq" | "gemini";
-type ChatMessage = { id?: number; role: "user" | "assistant" | "system" | "tool"; content: string; tool_calls?: any; created_at?: string; timestamp?: number };
-type Session = { id: string; name: string; model: ModelType; memory?: string; skills?: string[]; updated_at?: string; created_at?: string };
-type Skill = { id: number; name: string; description?: string; is_active?: boolean };
-type FileItem = { id: number; filename: string; size: number; preview?: any; created_at?: string };
+/**
+ * THE AGENT
+ *
+ * One screen where the workspace can be operated in sentences. Layout follows
+ * what the operator is doing, not what the code finds convenient:
+ *
+ *   left   — sessions (drawer on a phone, a rail on a laptop)
+ *   centre — the conversation, with files and approvals inline
+ *   right  — what the agent did, and its memory, on demand
+ *
+ * Three rules hold this page together:
+ *
+ *   1. Nothing destructive happens without a card. Approvals appear inside the
+ *      conversation, where the operator is already reading.
+ *   2. Every failure is visible and explained. A missing key, a dead model or a
+ *      provider outage becomes a sentence with a fix — never a spinner that
+ *      stops, and never a toast that vanishes.
+ *   3. The transcript survives a reload. Messages, pending approvals and files
+ *      all come back from the server.
+ */
 
-const MODEL_LABEL: Record<ModelType, string> = { groq: "Groq (Madeline)", gemini: "Gemini" };
-const MODEL_ICON: Record<ModelType, any> = { groq: Cpu, gemini: Brain };
+const SUGGESTIONS = [
+  "How many contacts do I have, and how many opted out?",
+  "Import a CSV — I'll upload it next",
+  "Write an SMS for restaurants in Abuja",
+  "Which campaign got the most replies this month?",
+  "Reply to everyone who asked about pricing",
+  "Draft an invoice for a ₦120,000 monthly retainer",
+];
+
+const starterBlocks = (text: string): TurnBlock[] => [{ kind: "text", text }];
+
+let placeholderId = 0;
+const nextId = (prefix: string) => `${prefix}-${Date.now()}-${(placeholderId += 1)}`;
 
 export default function AIAgentPage() {
   const navigate = useNavigate();
-  const [sessions, setSessions] = useState<Session[]>([]);
+  const [sessions, setSessions] = useState<AgentSession[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [sessionMeta, setSessionMeta] = useState<Session | null>(null);
-  const [files, setFiles] = useState<FileItem[]>([]);
+  const [turns, setTurns] = useState<Turn[]>([]);
+  const [files, setFiles] = useState<AgentFile[]>([]);
   const [skills, setSkills] = useState<Skill[]>([]);
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [loadingSessions, setLoadingSessions] = useState(true);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [showSkills, setShowSkills] = useState(false);
-  const [showFiles, setShowFiles] = useState(false);
-  const [showMemory, setShowMemory] = useState(false);
-  const [aiStatus, setAiStatus] = useState<{ groq_configured: boolean; gemini_configured: boolean } | null>(null);
-  const [modelOverride, setModelOverride] = useState<ModelType | "">("");
-  const chatRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const skillInputRef = useRef<HTMLInputElement>(null);
+  const [activity, setActivity] = useState<any[]>([]);
+  const [memory, setMemory] = useState("");
+  const [editingMemory, setEditingMemory] = useState(false);
+  const [settings, setSettings] = useState<AgentSettings | null>(null);
+  const [health, setHealth] = useState<AgentHealth | null>(null);
+  const [loadingSession, setLoadingSession] = useState(true);
+  const [loadingList, setLoadingList] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [streamError, setStreamError] = useState<{ message: string; hint?: string; retryable?: boolean } | null>(null);
+  const [busyCard, setBusyCard] = useState<{ id: number; state: "approve" | "cancel" } | null>(null);
+  const [attached, setAttached] = useState<AgentFile | null>(null);
 
-  const active = sessions.find(s => s.id === activeId) || sessionMeta;
+  const [drawer, setDrawer] = useState(false);
+  const [panel, setPanel] = useState<"files" | "settings" | "activity" | "memory" | null>(null);
+  const [renaming, setRenaming] = useState(false);
+  const [draftName, setDraftName] = useState("");
+  const [lastMessage, setLastMessage] = useState("");
+  const abortRef = useRef<AbortController | null>(null);
+  // A prompt handed over from the Overview ("Ask the agent") — sent once.
+  const askRef = useRef<string | null>(
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("ask")
+      : null,
+  );
+  const streamBuffer = useRef<{ text: string; blocks: TurnBlock[] }>({ text: "", blocks: [] });
 
-  // Load sessions + status + skills
-  const loadSessions = useCallback(async () => {
+  const active = sessions.find((s) => s.id === activeId) || null;
+  const configured = Boolean(settings?.groq_configured || settings?.gemini_configured);
+
+  // ---------------------------------------------------------------------
+  // load
+  // ---------------------------------------------------------------------
+  const loadShell = useCallback(async () => {
+    setLoadingList(true);
     try {
-      const [sRes, statusRes, skillsRes] = await Promise.all([
-        api.get("/ai-agent/sessions").catch(() => ({ data: { sessions: [] } })),
-        api.get("/ai-agent/settings").catch(() => ({ data: { groq_configured: false, gemini_configured: false } })),
-        api.get("/ai-agent/skills").catch(() => ({ data: { skills: [] } })),
+      const [list, s, h, sk] = await Promise.all([
+        agentApi.sessions().catch(() => [] as AgentSession[]),
+        agentApi.settings().catch(() => null),
+        agentApi.health().catch(() => null),
+        agentApi.skills().catch(() => [] as Skill[]),
       ]);
-      const list: Session[] = sRes.data.sessions || [];
       setSessions(list);
-      setAiStatus({ groq_configured: statusRes.data.groq_configured, gemini_configured: statusRes.data.gemini_configured });
-      setSkills(skillsRes.data.skills || []);
+      setSettings(s);
+      setHealth(h);
+      setSkills(sk);
       if (list.length && !activeId) setActiveId(list[0].id);
-    } catch {}
-    finally { setLoadingSessions(false); }
+    } finally {
+      setLoadingList(false);
+    }
   }, [activeId]);
 
-  useEffect(() => { loadSessions(); }, []);
+  useEffect(() => {
+    void loadShell();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // Load active session details
   const loadSession = useCallback(async (id: string) => {
+    setLoadingSession(true);
+    setStreamError(null);
     try {
-      const { data } = await api.get(`/ai-agent/sessions/${id}`);
-      setSessionMeta({ id: data.session.id, name: data.session.name, model: data.session.model, memory: data.session.memory, skills: data.session.skills });
-      setMessages(data.messages.map((m: any) => ({ ...m, timestamp: new Date(m.created_at).getTime() })));
-      setFiles(data.files || []);
-      // refresh skills list too
-      api.get("/ai-agent/skills").then(r => setSkills(r.data.skills || [])).catch(() => {});
-    } catch (e: any) {
-      toast.error(e.response?.data?.detail || "Could not load session");
+      const data = await agentApi.session(id);
+      setTurns(messagesToTurns(data.messages, data.pending_actions));
+      setFiles(data.files);
+      setMemory(data.session.memory || "");
+      setAttached(null);
+      agentApi.activity(id).then(setActivity).catch(() => setActivity([]));
+    } catch (error: any) {
+      toast.error(error?.response?.data?.detail || "Could not open that conversation.");
+      setTurns([]);
+    } finally {
+      setLoadingSession(false);
     }
   }, []);
 
-  useEffect(() => { if (activeId) loadSession(activeId); }, [activeId, loadSession]);
+  useEffect(() => {
+    if (activeId) void loadSession(activeId);
+  }, [activeId, loadSession]);
 
-  // Auto-scroll to bottom
-  useEffect(() => { if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight; }, [messages, loading]);
+  // Send the handoff prompt exactly once, after the conversation it belongs to
+  // has actually been loaded — otherwise its first turn would render into an
+  // empty transcript and then be overwritten by the load.
+  useEffect(() => {
+    if (loadingSession) return;
+    const pending = askRef.current;
+    if (!pending) return;
+    if (!activeId) {
+      // No conversation yet: make one, which re-enters this effect.
+      askRef.current = pending;
+      void createSession();
+      return;
+    }
+    askRef.current = null;
+    if (window.history.replaceState) {
+      window.history.replaceState({}, "", "/ai-agent");
+    }
+    if (configured) void send(pending);
+    else setStreamError({
+      message: "Add a key first — then this runs.",
+      hint: "Groq and Gemini are the only providers; either key is enough.",
+      retryable: false,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadingSession, activeId, configured]);
 
-  // Create session
+  // ---------------------------------------------------------------------
+  // sessions
+  // ---------------------------------------------------------------------
   const createSession = async () => {
     try {
-      const { data } = await api.post("/ai-agent/sessions", { name: `Session ${sessions.length + 1}`, model: "groq" });
-      const s = data.session;
-      const newList = [{ id: s.id, name: s.name, model: s.model, updated_at: s.created_at }, ...sessions];
-      setSessions(newList);
-      setActiveId(s.id);
-      setDrawerOpen(false);
-      toast.success("New session created");
-    } catch (e: any) { toast.error(e.response?.data?.detail || "Failed to create session"); }
+      const session = await agentApi.createSession({ name: "New chat" });
+      setSessions((list) => [session, ...list]);
+      setActiveId(session.id);
+      setTurns([]);
+      setFiles([]);
+      setMemory("");
+      setActivity([]);
+      setDrawer(false);
+    } catch {
+      toast.error("Could not start a new chat.");
+    }
   };
 
   const deleteSession = async (id: string) => {
-    if (!confirm("Delete this session and all its messages?")) return;
+    if (!window.confirm("Delete this conversation and its messages?")) return;
     try {
-      await api.delete(`/ai-agent/sessions/${id}`);
-      const next = sessions.filter(s => s.id !== id);
-      setSessions(next);
-      if (activeId === id) setActiveId(next[0]?.id || null);
-      toast.success("Session deleted");
-    } catch { toast.error("Failed to delete"); }
+      await agentApi.deleteSession(id);
+      const rest = sessions.filter((s) => s.id !== id);
+      setSessions(rest);
+      if (activeId === id) setActiveId(rest[0]?.id || null);
+      toast.success("Conversation deleted");
+    } catch {
+      toast.error("Could not delete that conversation.");
+    }
   };
 
-  const sendMessage = async () => {
-    if (!input.trim() || !activeId || loading) return;
-    const text = input.trim();
-    setInput("");
-    const userMsg: ChatMessage = { role: "user", content: text, timestamp: Date.now() };
-    setMessages(prev => [...prev, userMsg]);
-    setLoading(true);
+  const renameSession = async () => {
+    if (!activeId) return;
+    const name = draftName.trim();
+    if (!name) return setRenaming(false);
     try {
-      const payload: any = { message: text };
-      if (modelOverride) payload.model = modelOverride;
-      // Include pending file ids if user referenced a file? For now auto-attach recent file if text mentions csv/file
-      const { data } = await api.post(`/ai-agent/sessions/${activeId}/chat`, payload);
-      setMessages(data.messages.map((m: any) => ({ ...m, timestamp: new Date(m.created_at).getTime() })));
-      // refresh sessions list to update updated_at
-      const sRes = await api.get("/ai-agent/sessions");
-      setSessions(sRes.data.sessions || []);
-      // refresh session meta for memory
-      const sDetail = await api.get(`/ai-agent/sessions/${activeId}`);
-      setSessionMeta({ id: sDetail.data.session.id, name: sDetail.data.session.name, model: sDetail.data.session.model, memory: sDetail.data.session.memory, skills: sDetail.data.session.skills });
-    } catch (e: any) {
-      const detail = e.response?.data?.detail || e.message || "Agent error";
-      toast.error(detail);
-      // Show error as assistant message for visibility
-      setMessages(prev => [...prev, { role: "assistant", content: `⚠️ ${detail}`, timestamp: Date.now() }]);
-    } finally { setLoading(false); }
+      await agentApi.renameSession(activeId, name);
+      setSessions((list) => list.map((s) => (s.id === activeId ? { ...s, name } : s)));
+    } catch {
+      toast.error("Could not rename that conversation.");
+    } finally {
+      setRenaming(false);
+    }
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const list = e.target.files;
-    if (!list || !list.length || !activeId) return;
-    const fd = new FormData();
-    fd.append("file", list[0]);
+  // ---------------------------------------------------------------------
+  // sending
+  // ---------------------------------------------------------------------
+  const send = async (text: string) => {
+    if (!activeId || sending) return;
+    setSending(true);
+    setStreamError(null);
+    setLastMessage(text);
+
+    const userTurn: Turn = { id: nextId("u"), role: "user", blocks: [{ kind: "text", text }] };
+    const assistantId = nextId("a");
+    const assistantTurn: Turn = {
+      id: assistantId,
+      role: "assistant",
+      blocks: [],
+      streaming: true,
+      step: null,
+    };
+    streamBuffer.current = { text: "", blocks: [] };
+    setTurns((current) => [...current, userTurn, assistantTurn]);
+
+    const patchAssistant = (update: (turn: Turn) => Turn) =>
+      setTurns((current) => current.map((turn) => (turn.id === assistantId ? update(turn) : turn)));
+
+    const appendBlock = (block: TurnBlock) => {
+      streamBuffer.current.blocks = [...streamBuffer.current.blocks, block];
+      patchAssistant((turn) => ({ ...turn, blocks: [...turn.blocks, block] }));
+    };
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+    let sawText = false;
+    let failed = false;
+
     try {
-      toast.loading("Uploading file…", { id: "fileup" });
-      const { data } = await api.post(`/ai-agent/sessions/${activeId}/files`, fd, { headers: { "Content-Type": "multipart/form-data" } } as any);
-      toast.success(`Uploaded ${data.file.filename}`, { id: "fileup" });
-      setFiles(prev => [data.file, ...prev]);
-      // Pre-fill input with hint
-      setInput(prev => prev ? `${prev} Use file #${data.file.id} (${data.file.filename})` : `Import contacts from ${data.file.filename} (file #${data.file.id}) — map phone and email columns`);
-      inputRef.current?.focus();
-    } catch (err: any) { toast.error(err.response?.data?.detail || "Upload failed", { id: "fileup" }); }
-    finally { if (fileInputRef.current) fileInputRef.current.value = ""; }
+      await streamChat(activeId, text, {
+        file_ids: attached ? [attached.id] : [],
+        signal: controller.signal,
+        onEvent: (event: StreamEvent) => {
+          switch (event.type) {
+            case "turn_start":
+              patchAssistant((turn) => ({ ...turn, step: { current: 0, max: 15 } }));
+              break;
+            case "step":
+              patchAssistant((turn) => ({ ...turn, step: { current: event.step, max: event.max } }));
+              break;
+            case "text": {
+              sawText = true;
+              streamBuffer.current.text += event.text;
+              const buffered = streamBuffer.current.text;
+              patchAssistant((turn) => {
+                const blocks = [...turn.blocks];
+                const last = blocks[blocks.length - 1];
+                if (last && last.kind === "text") blocks[blocks.length - 1] = { kind: "text", text: buffered };
+                else blocks.push({ kind: "text", text: buffered });
+                return { ...turn, blocks };
+              });
+              break;
+            }
+            case "notice":
+              streamBuffer.current.text = "";
+              appendBlock({ kind: "notice", noticeKind: event.kind, text: event.text });
+              break;
+            case "tool_start":
+              appendBlock({
+                kind: "tool",
+                tool: event.tool,
+                label: event.label,
+                status: "running",
+              });
+              streamBuffer.current.text = "";
+              break;
+            case "tool_end":
+              setTurns((current) =>
+                current.map((turn) => {
+                  if (turn.id !== assistantId) return turn;
+                  const blocks = [...turn.blocks];
+                  for (let i = blocks.length - 1; i >= 0; i -= 1) {
+                    const block = blocks[i];
+                    if (block.kind === "tool" && block.tool === event.tool && block.status === "running") {
+                      blocks[i] = {
+                        ...block,
+                        status: event.status,
+                        label: event.label || block.label,
+                        durationMs: event.duration_ms,
+                        data: event.data,
+                      };
+                      return { ...turn, blocks };
+                    }
+                  }
+                  return turn;
+                }),
+              );
+              streamBuffer.current.text = "";
+              break;
+            case "confirmation":
+              appendBlock({
+                kind: "confirmation",
+                card: {
+                  kind: "confirmation",
+                  action_id: event.action_id,
+                  tool: event.tool,
+                  title: event.title,
+                  summary: event.summary,
+                  details: event.details,
+                },
+              });
+              break;
+            case "error":
+              failed = true;
+              appendBlock({
+                kind: "error",
+                message: event.error.message,
+                hint: event.error.hint,
+                code: event.error.code,
+                retryable: event.error.retryable,
+              });
+              if (!event.error.retryable) {
+                setStreamError({ message: event.error.message, hint: event.error.hint, retryable: false });
+              }
+              break;
+            case "done":
+              patchAssistant((turn) => ({ ...turn, streaming: false, step: null }));
+              break;
+            default:
+              break;
+          }
+        },
+      });
+    } catch (error: any) {
+      if (error?.name !== "AbortError") {
+        failed = true;
+        const message =
+          error?.message === "Failed to fetch"
+            ? "Could not reach the server. It may be waking up — try again in a moment."
+            : error?.message || "Something went wrong while the agent was working.";
+        setStreamError({ message, retryable: true });
+      }
+    } finally {
+      abortRef.current = null;
+      setSending(false);
+      patchAssistant((turn) => ({
+        ...turn,
+        streaming: false,
+        step: null,
+        blocks: turn.blocks.length
+          ? turn.blocks
+          : [{ kind: "text", text: failed ? "" : "…" } as TurnBlock].filter(() => false),
+      }));
+
+      // Refresh the peripheral state once the turn is settled.
+      if (!controller.signal.aborted) {
+        agentApi.sessions().then(setSessions).catch(() => {});
+        agentApi.activity(activeId).then(setActivity).catch(() => {});
+        agentApi.session(activeId).then((data) => setMemory(data.session.memory || "")).catch(() => {});
+        agentApi.health().then(setHealth).catch(() => {});
+        if (!sawText && !failed) {
+          // The turn ended with nothing said (e.g. only an approval card): show
+          // the card and leave the bubble alone rather than an empty shell.
+        }
+        setAttached(null);
+      }
+    }
   };
 
-  const handleSkillUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const list = e.target.files;
-    if (!list || !list.length) return;
-    const fd = new FormData();
-    fd.append("file", list[0]);
-    fd.append("name", list[0].name.replace(/\.[^.]+$/, ""));
+  const stop = () => {
+    abortRef.current?.abort();
+    setSending(false);
+    toast("Stopped.", { icon: "⏹" });
+  };
+
+  // ---------------------------------------------------------------------
+  // approvals
+  // ---------------------------------------------------------------------
+  const approve = async (actionId: number) => {
+    setBusyCard({ id: actionId, state: "approve" });
     try {
-      toast.loading("Uploading skill…", { id: "skillup" });
-      await api.post("/ai-agent/skills", fd, { headers: { "Content-Type": "multipart/form-data" } } as any);
-      toast.success(`Skill ${list[0].name} added`, { id: "skillup" });
-      const r = await api.get("/ai-agent/skills");
-      setSkills(r.data.skills || []);
-    } catch (err: any) { toast.error(err.response?.data?.detail || "Skill upload failed", { id: "skillup" }); }
-    finally { if (skillInputRef.current) skillInputRef.current.value = ""; }
+      const result = await agentApi.approve(actionId);
+      const ok = result?.status === "done";
+      if (ok) toast.success(result.summary || "Done");
+      else {
+        const reason = result?.result?.errors?.[0] || result?.error || result?.result?.error || "It did not run.";
+        toast.error(String(reason), { duration: 8000 });
+      }
+      if (activeId) {
+        const data = await agentApi.session(activeId);
+        setTurns(messagesToTurns(data.messages, data.pending_actions));
+        agentApi.activity(activeId).then(setActivity).catch(() => {});
+      }
+    } catch (error: any) {
+      toast.error(error?.response?.data?.detail || "Could not run that action.");
+    } finally {
+      setBusyCard(null);
+    }
   };
 
-  const copyText = async (text: string) => {
-    try { await navigator.clipboard.writeText(text); toast.success("Copied"); } catch {}
+  const cancel = async (actionId: number) => {
+    setBusyCard({ id: actionId, state: "cancel" });
+    try {
+      await agentApi.cancel(actionId);
+      setTurns((current) =>
+        current.map((turn) => ({
+          ...turn,
+          blocks: turn.blocks.filter(
+            (block) => !(block.kind === "confirmation" && block.card.action_id === actionId),
+          ),
+        })),
+      );
+      toast.success("Cancelled — nothing was done.");
+    } catch {
+      toast.error("Could not cancel that action.");
+    } finally {
+      setBusyCard(null);
+    }
   };
 
-  const needsKey = aiStatus && !aiStatus.groq_configured && !aiStatus.gemini_configured;
-  const activeModel: ModelType = (modelOverride as ModelType) || (active?.model as ModelType) || "groq";
-  const ModelIcon = MODEL_ICON[activeModel] || Cpu;
+  const undo = async (actionId: number) => {
+    try {
+      const result = await agentApi.undo(actionId);
+      toast.success(`Undone — ${result.restored} restored`);
+      if (activeId) agentApi.activity(activeId).then(setActivity).catch(() => {});
+    } catch (error: any) {
+      toast.error(error?.response?.data?.detail || "That cannot be undone.");
+    }
+  };
+
+  // ---------------------------------------------------------------------
+  // files + memory
+  // ---------------------------------------------------------------------
+  const onUploaded = (file: AgentFile) => {
+    setFiles((current) => [file, ...current]);
+    setAttached(file);
+  };
+
+  const useFile = (file: AgentFile) => {
+    setAttached(file);
+    setPanel(null);
+    toast.success(`${file.filename} will go with your next message`);
+  };
+
+  const saveMemory = async () => {
+    try {
+      await agentApi.saveMemory("global", memory);
+      setEditingMemory(false);
+      toast.success("Saved — the agent will remember this in every chat.");
+    } catch {
+      toast.error("Could not save that note.");
+    }
+  };
+
+  const toolsByArea = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    for (const area of health?.tool_areas || []) map[area] = [];
+    return map;
+  }, [health?.tool_areas]);
+
+  // ---------------------------------------------------------------------
+  // render
+  // ---------------------------------------------------------------------
+  const keyMissing = settings !== null && !configured;
 
   return (
-    <div className="flex flex-col h-[calc(100vh-64px)] lg:h-[calc(100vh-88px)] -m-4 sm:-m-6 lg:mx-0 bg-white dark:bg-gray-900 rounded-none lg:rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-800 shadow-sm">
-      {/* Top bar */}
-      <div className="shrink-0 h-14 sm:h-16 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between px-3 sm:px-5 bg-white dark:bg-gray-900 gap-2">
-        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-          <button className="lg:hidden p-2 -ml-1 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800" onClick={() => setDrawerOpen(v => !v)} aria-label="Toggle sessions">
-            <Menu size={18} />
-          </button>
-          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-primary-900 dark:bg-primary-800 flex items-center justify-center text-white shrink-0">
-            <Sparkles size={16} className="sm:w-[18px] sm:h-[18px]" />
-          </div>
-          <div className="min-w-0">
-            <h1 className="text-[15px] sm:text-[17px] font-semibold leading-none truncate flex items-center gap-1.5">AI Agent <span className="hidden sm:inline text-[11px] font-medium px-1.5 py-0.5 rounded-full bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300">Full Access</span></h1>
-            <p className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 truncate hidden sm:block">Groq (Madeline) + Gemini — campaigns, contacts, inbox, everything.</p>
+    <div className="-m-4 flex h-[calc(100dvh-4rem)] flex-col overflow-hidden bg-white dark:bg-gray-900 sm:-m-6 lg:m-0 lg:h-[calc(100dvh-6.5rem)] lg:rounded-3xl lg:border lg:border-gray-200 lg:shadow-card dark:lg:border-gray-800">
+      {/* ---------- header ------------------------------------------- */}
+      <header className="flex shrink-0 items-center gap-2 border-b border-gray-200 bg-white/95 px-2.5 py-2 backdrop-blur dark:border-gray-800 dark:bg-gray-900/95 sm:px-4">
+        <button
+          type="button"
+          onClick={() => setDrawer((v) => !v)}
+          className="rounded-xl p-2 hover:bg-gray-100 dark:hover:bg-gray-800 lg:hidden"
+          aria-label="Conversations"
+        >
+          <Menu size={18} />
+        </button>
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary-900 text-white dark:bg-primary-800">
+          <Sparkles size={16} />
+        </div>
+        <div className="min-w-0 flex-1">
+          {renaming ? (
+            <input
+              autoFocus
+              value={draftName}
+              onChange={(e) => setDraftName(e.target.value)}
+              onBlur={renameSession}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void renameSession();
+                if (e.key === "Escape") setRenaming(false);
+              }}
+              className="w-full rounded-lg border border-gray-200 px-1.5 py-0.5 text-[14px] font-semibold dark:border-gray-700 dark:bg-gray-800"
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                if (!active) return;
+                setDraftName(active.name);
+                setRenaming(true);
+              }}
+              className="group flex max-w-full items-center gap-1 text-left"
+            >
+              <h1 className="truncate text-[14.5px] font-semibold leading-tight">
+                {active?.name || "AI Agent"}
+              </h1>
+              {active && (
+                <Pencil size={10} className="shrink-0 text-gray-300 opacity-0 transition-opacity group-hover:opacity-100" />
+              )}
+            </button>
+          )}
+          <div className="mt-0.5 flex items-center gap-1.5">
+            {health ? (
+              <>
+                {(["groq", "gemini"] as Provider[]).map((provider) => (
+                  <ProviderStatusPill
+                    key={provider}
+                    provider={provider}
+                    check={health.providers.find((c) => c.provider === provider)}
+                  />
+                ))}
+              </>
+            ) : (
+              <span className="flex items-center gap-1 text-[11px] text-gray-400">
+                <WifiOff size={10} /> checking…
+              </span>
+            )}
           </div>
         </div>
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          <button onClick={createSession} className="inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-2 rounded-full bg-primary-900 dark:bg-primary-800 text-white text-xs sm:text-sm font-medium hover:bg-primary-800 dark:hover:bg-primary-700 transition-colors">
-            <Plus size={14} /> <span className="hidden sm:inline">New</span><span className="sm:hidden">New</span>
+        <div className="flex shrink-0 items-center gap-1">
+          <button
+            type="button"
+            onClick={createSession}
+            className="btn-primary btn-sm"
+            title="Start a new conversation"
+          >
+            <MessageSquarePlus size={13} />
+            <span className="hidden sm:inline">New</span>
           </button>
-          <button onClick={() => navigate("/settings?tab=ai")} className="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-700">
-            <Settings size={14} /> Keys
+          <button
+            type="button"
+            onClick={() => setPanel(panel === "files" ? null : "files")}
+            className={`rounded-xl p-2 transition-colors ${
+              panel === "files"
+                ? "bg-primary-50 text-primary-800 dark:bg-primary-950/50 dark:text-primary-300"
+                : "text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+            }`}
+            aria-label="Files"
+            aria-pressed={panel === "files"}
+          >
+            <Paperclip size={17} />
           </button>
-          <button onClick={() => navigate("/settings?tab=ai")} className="sm:hidden p-2 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200">
-            <Settings size={16} />
+          <button
+            type="button"
+            onClick={() => setPanel(panel === "activity" ? null : "activity")}
+            className={`rounded-xl p-2 transition-colors ${
+              panel === "activity"
+                ? "bg-primary-50 text-primary-800 dark:bg-primary-950/50 dark:text-primary-300"
+                : "text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+            }`}
+            aria-label="Activity"
+            aria-pressed={panel === "activity"}
+          >
+            <History size={17} />
+          </button>
+          <button
+            type="button"
+            onClick={() => setPanel(panel === "settings" ? null : "settings")}
+            className={`rounded-xl p-2 transition-colors ${
+              panel === "settings"
+                ? "bg-primary-50 text-primary-800 dark:bg-primary-950/50 dark:text-primary-300"
+                : "text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+            }`}
+            aria-label="Agent settings"
+            aria-pressed={panel === "settings"}
+          >
+            <Settings2 size={17} />
           </button>
         </div>
-      </div>
+      </header>
 
-      {needsKey && (
-        <div className="shrink-0 px-3 sm:px-4 py-2.5 bg-warning-50 dark:bg-warning-950/30 border-b border-warning-200 dark:border-warning-900 flex items-start gap-2.5 text-xs sm:text-sm">
-          <AlertCircle size={16} className="text-warning-600 dark:text-warning-400 shrink-0 mt-0.5" />
-          <div className="min-w-0 flex-1">
-            <p className="font-medium text-warning-900 dark:text-warning-100">No LLM key set — the agent can&apos;t answer yet.</p>
-            <p className="text-warning-800/80 dark:text-warning-200/80 mt-0.5">Add your <b>Groq</b> (Madeline) or <b>Gemini</b> API key in Settings → AI Agent. The agent needs one key to chat. <button onClick={() => navigate("/settings?tab=ai")} className="underline font-medium">Open Settings →</button></p>
-          </div>
+      {keyMissing && (
+        <div className="flex shrink-0 items-start gap-2 border-b border-warning-200 bg-warning-50 px-3 py-2 text-[12.5px] dark:border-warning-900 dark:bg-warning-950/30">
+          <AlertTriangle size={14} className="mt-0.5 shrink-0 text-warning-600" />
+          <p className="min-w-0 flex-1 text-warning-900 dark:text-warning-100">
+            <b>No key yet.</b> Add a Groq or Gemini key and the agent can run your
+            workspace.{" "}
+            <button
+              type="button"
+              onClick={() => setPanel("settings")}
+              className="font-semibold underline"
+            >
+              Add a key
+            </button>
+          </p>
         </div>
       )}
 
-      <div className="flex flex-1 overflow-hidden relative">
-        {/* Sidebar — drawer on mobile, fixed on desktop */}
-        <div className={`${drawerOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0 fixed lg:static inset-y-0 left-0 z-20 w-[84%] max-w-[300px] lg:w-[300px] border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 flex flex-col transition-transform duration-200 ease-out lg:shrink-0`}>
-          <div className="shrink-0 p-3 sm:p-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
-            <h2 className="font-semibold text-sm">Sessions</h2>
-            <div className="flex items-center gap-1">
-              <span className="text-[11px] px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300">{sessions.length}</span>
-              <button onClick={() => setDrawerOpen(false)} className="lg:hidden p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"><X size={14} /></button>
-            </div>
+      {/* ---------- body --------------------------------------------- */}
+      <div className="relative flex min-h-0 flex-1">
+        {/* sessions rail */}
+        {drawer && (
+          <button
+            type="button"
+            aria-label="Close conversations"
+            onClick={() => setDrawer(false)}
+            className="absolute inset-0 z-20 bg-black/30 lg:hidden"
+          />
+        )}
+        <aside
+          className={`absolute inset-y-0 left-0 z-30 flex w-[80%] max-w-[280px] flex-col border-r border-gray-200 bg-white transition-transform duration-200 dark:border-gray-800 dark:bg-gray-900 lg:static lg:z-0 lg:w-[248px] lg:translate-x-0 ${
+            drawer ? "translate-x-0 shadow-xl" : "-translate-x-full"
+          }`}
+        >
+          <div className="flex items-center justify-between px-3 py-2">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+              Conversations
+            </p>
+            <button
+              type="button"
+              onClick={() => setDrawer(false)}
+              className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 lg:hidden dark:hover:bg-gray-800"
+              aria-label="Close"
+            >
+              <X size={14} />
+            </button>
           </div>
-          <div className="flex-1 overflow-y-auto p-2 space-y-1 scrollbar-thin">
-            {loadingSessions ? (
-              <div className="p-4 space-y-3">{[0,1,2].map(i=> <div key={i} className="h-16 rounded-xl bg-gray-100 dark:bg-gray-800 animate-pulse" />)}</div>
-            ) : sessions.length === 0 ? (
-              <div className="p-6 text-center">
-                <MessageSquare size={28} className="mx-auto text-gray-300 dark:text-gray-600 mb-2" />
-                <p className="text-sm text-gray-500 dark:text-gray-400">No sessions yet</p>
-                <button onClick={createSession} className="mt-3 btn-primary btn-sm">Start one →</button>
+          <div className="flex-1 space-y-0.5 overflow-y-auto px-1.5 pb-3">
+            {loadingList &&
+              [0, 1, 2].map((i) => <div key={i} className="skeleton mx-1 h-12 rounded-xl" />)}
+            {!loadingList && sessions.length === 0 && (
+              <div className="px-2 py-6 text-center">
+                <Brain size={22} className="mx-auto mb-1.5 text-gray-300 dark:text-gray-600" />
+                <p className="text-[12px] text-gray-500">No conversations yet.</p>
               </div>
-            ) : sessions.map(s => {
-              const isActive = s.id === activeId;
+            )}
+            {sessions.map((session) => {
+              const isActive = session.id === activeId;
+              const Icon = session.model === "gemini" ? Brain : Cpu;
               return (
-                <button key={s.id} onClick={() => { setActiveId(s.id); setDrawerOpen(false); }} className={`w-full text-left p-3 rounded-xl flex gap-2.5 transition-colors ${isActive ? "bg-primary-50 dark:bg-primary-900/30 text-primary-900 dark:text-primary-100 border border-primary-200 dark:border-primary-800" : "hover:bg-gray-50 dark:hover:bg-gray-800 border border-transparent"}`}>
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isActive ? "bg-primary-900 dark:bg-primary-700 text-white" : "bg-gray-100 dark:bg-gray-800 text-gray-500"}`}>
-                    {s.model === "gemini" ? <Brain size={14} /> : <Cpu size={14} />}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[13px] font-medium truncate leading-none">{s.name}</p>
-                    <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-1.5"><span className="uppercase tracking-wide">{s.model}</span> <span>•</span> {s.updated_at ? new Date(s.updated_at).toLocaleDateString() : ""}</p>
-                  </div>
-                </button>
+                <div
+                  key={session.id}
+                  className={`group flex items-start gap-2 rounded-xl px-2 py-2 transition-colors ${
+                    isActive
+                      ? "bg-primary-50 dark:bg-primary-950/40"
+                      : "hover:bg-gray-50 dark:hover:bg-gray-800/60"
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveId(session.id);
+                      setDrawer(false);
+                    }}
+                    className="flex min-w-0 flex-1 items-start gap-2 text-left"
+                  >
+                    <Icon
+                      size={13}
+                      className={`mt-0.5 shrink-0 ${isActive ? "text-primary-700 dark:text-primary-300" : "text-gray-400"}`}
+                    />
+                    <span className="min-w-0">
+                      <span
+                        className={`block truncate text-[12.5px] ${
+                          isActive ? "font-semibold text-primary-900 dark:text-primary-100" : "font-medium"
+                        }`}
+                      >
+                        {session.name}
+                      </span>
+                      <span className="block truncate text-[10.5px] text-gray-400">
+                        {session.last_message || `${session.message_count || 0} messages`}
+                      </span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => deleteSession(session.id)}
+                    className="mt-0.5 rounded p-1 text-gray-300 opacity-0 transition-opacity hover:text-danger-600 group-hover:opacity-100"
+                    aria-label={`Delete ${session.name}`}
+                  >
+                    <Trash2 size={11} />
+                  </button>
+                </div>
               );
             })}
           </div>
-          {/* Sidebar footer: skills + files quick access */}
-          <div className="shrink-0 p-3 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/20 space-y-2">
-            <button onClick={() => setShowSkills(v=>!v)} className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-medium hover:bg-gray-50 dark:hover:bg-gray-750">
-              <span className="flex items-center gap-1.5"><Layers size={12}/> Skills ({skills.length})</span>{showSkills ? <ChevronUp size={12}/> : <ChevronDown size={12}/>}
-            </button>
-            {showSkills && (
-              <div className="rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-2 max-h-32 overflow-y-auto">
-                {skills.length===0 ? <p className="text-[11px] text-gray-500 px-2 py-1">No skills. Upload one — a .md/.txt with instructions. Use @name to invoke.</p> : skills.map(sk=>(
-                  <div key={sk.id} className="flex items-center justify-between px-2 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                    <span className="text-xs font-mono truncate">@{sk.name}</span><button onClick={async()=>{ await api.delete(`/ai-agent/skills/${sk.id}`); setSkills(prev=>prev.filter(x=>x.id!==sk.id)); toast.success("Skill removed");}} className="p-1 text-gray-400 hover:text-danger-600"><Trash2 size={12}/></button>
-                  </div>
+          {skills.length > 0 && (
+            <div className="border-t border-gray-100 px-3 py-2 dark:border-gray-800">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+                Skills
+              </p>
+              <div className="mt-1 flex flex-wrap gap-1">
+                {skills.slice(0, 6).map((skill) => (
+                  <span
+                    key={skill.id}
+                    className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300"
+                    title={skill.description || skill.name}
+                  >
+                    {skill.name}
+                  </span>
                 ))}
-                <label className="mt-2 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg border border-dashed border-gray-300 dark:border-gray-600 text-[11px] font-medium cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/30"><Upload size={12}/> Upload skill<input ref={skillInputRef} type="file" accept=".md,.txt,.json" className="hidden" onChange={handleSkillUpload} /></label>
               </div>
-            )}
-            {activeId && <button onClick={() => deleteSession(activeId)} className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium text-gray-500 hover:text-danger-600 hover:bg-white dark:hover:bg-gray-800 border border-transparent hover:border-gray-200 dark:hover:border-gray-700"><Trash2 size={12}/> Delete session</button>}
-          </div>
-        </div>
-        {/* Backdrop for drawer */}
-        {drawerOpen && <div className="fixed inset-0 bg-black/20 dark:bg-black/40 z-10 lg:hidden" onClick={()=>setDrawerOpen(false)} />}
+            </div>
+          )}
+        </aside>
 
-        {/* Main chat */}
-        <div className="flex-1 flex flex-col min-w-0 bg-gray-50 dark:bg-gray-950">
-          {!activeId ? (
-            <div className="flex-1 flex flex-col items-center justify-center p-6 sm:p-10 text-center">
-              <div className="w-16 h-16 rounded-2xl bg-primary-900 dark:bg-primary-800 flex items-center justify-center text-white mb-4 shadow-lg"><Sparkles size={28}/></div>
-              <h2 className="text-xl font-semibold">Your AI Agent</h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 max-w-md leading-relaxed">Talk to your workspace like a teammate. <b>Create campaigns</b>, <b>import CSVs</b>, <b>delete contacts</b>, <b>check inbox</b>, <b>run analytics</b> — everything you can do in the UI, the agent can do via tools. Upload a skill and call it with <code className="px-1 py-0.5 rounded bg-gray-100 dark:bg-gray-800 font-mono text-xs">@skill</code>.</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 mt-6 w-full max-w-lg">
-                {[
-                  { t: "Create a campaign", d: "Create SMS campaign for my Lagos contacts", icon: Megaphone },
-                  { t: "Clean my list", d: "Find and delete invalid contacts", icon: Users },
-                  { t: "Show inbox", d: "Who replied interested today?", icon: MessageSquare },
-                  { t: "Analyze", d: "How did my last campaign perform?", icon: Database },
-                ].map(card=>(
-                  <button key={card.t} onClick={async()=>{
-                    const prompt = card.d;
-                    if (!activeId) {
-                      // create session then send
-                      const { data } = await api.post("/ai-agent/sessions", { name: card.t, model: "groq" });
-                      setSessions(prev=>[{id:data.session.id, name:data.session.name, model:data.session.model}, ...prev]);
-                      setActiveId(data.session.id);
-                      setTimeout(()=> { setInput(prompt); }, 300);
-                    } else { setInput(prompt); inputRef.current?.focus(); }
-                  }} className="text-left p-3 sm:p-4 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 hover:border-primary-300 dark:hover:border-primary-700 hover:shadow-sm transition-all">
-                    <card.icon size={16} className="text-primary-700 dark:text-primary-300 mb-1.5"/>
-                    <p className="text-sm font-medium">{card.t}</p><p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-1">{card.d}</p>
-                  </button>
-                ))}
-              </div>
-              <button onClick={createSession} className="mt-6 inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-primary-900 dark:bg-primary-800 text-white text-sm font-medium hover:bg-primary-800 dark:hover:bg-primary-700"><Plus size={16}/> New Session</button>
+        {/* conversation */}
+        <main className="flex min-w-0 flex-1 flex-col">
+          {loadingSession ? (
+            <div className="flex-1 space-y-4 p-4">
+              <div className="skeleton h-16 w-2/3 rounded-2xl" />
+              <div className="ml-auto skeleton h-10 w-1/2 rounded-2xl" />
+              <div className="skeleton h-24 w-3/4 rounded-2xl" />
             </div>
           ) : (
-            <>
-              {/* Chat header */}
-              <div className="shrink-0 h-12 sm:h-14 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between px-3 sm:px-4 bg-white dark:bg-gray-900 gap-2">
-                <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <button onClick={()=> setActiveId(null)} className="sm:hidden p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"><ChevronLeft size={18}/></button>
-                  <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-white shrink-0 ${activeModel==="gemini" ? "bg-violet-600" : "bg-primary-800"}`}><ModelIcon size={14} /></div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold truncate leading-none">{active?.name || sessionMeta?.name || "Session"}</p>
-                    <p className="text-[11px] text-gray-500 dark:text-gray-400">Memory • {sessionMeta?.memory ? `${Math.min(6000, sessionMeta.memory.length)} chars` : "empty"} • {files.length} files</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-                  <div className="hidden sm:flex items-center gap-1 p-1 rounded-full bg-gray-100 dark:bg-gray-800">
-                    {(["groq","gemini"] as ModelType[]).map(m=>{
-                      const on = activeModel===m;
-                      return <button key={m} onClick={()=> { setModelOverride(m); if (activeId) api.patch(`/ai-agent/sessions/${activeId}`, { model: m }).catch(()=>{}); }} className={`px-2.5 sm:px-3 py-1 rounded-full text-xs font-medium transition-colors ${on ? "bg-white dark:bg-gray-700 shadow-sm text-gray-900 dark:text-white" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"}`}>{MODEL_LABEL[m]}</button>;
-                    })}
-                  </div>
-                  <select value={modelOverride || active?.model || "groq"} onChange={e=> { setModelOverride(e.target.value as ModelType); if (activeId) api.patch(`/ai-agent/sessions/${activeId}`, { model: e.target.value }).catch(()=>{}); }} className="sm:hidden text-xs px-2 py-1.5 rounded-full bg-gray-100 dark:bg-gray-800 border-none">
-                    <option value="groq">Groq</option><option value="gemini">Gemini</option>
-                  </select>
-                  <button onClick={()=> setShowFiles(v=>!v)} className={`p-2 rounded-lg border text-xs font-medium ${showFiles ? "bg-primary-50 dark:bg-primary-900/20 border-primary-200 dark:border-primary-800 text-primary-800 dark:text-primary-200" : "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300"}`} title="Files"><Paperclip size={14}/></button>
-                  <button onClick={()=> setShowMemory(v=>!v)} className={`p-2 rounded-lg border text-xs font-medium ${showMemory ? "bg-primary-50 dark:bg-primary-900/20 border-primary-200 dark:border-primary-800 text-primary-800 dark:text-primary-200" : "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300"}`} title="Memory"><Brain size={14}/></button>
-                </div>
-              </div>
-
-              {(showFiles || showMemory) && (
-                <div className="shrink-0 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-3 flex flex-col sm:flex-row gap-3 max-h-[40vh] overflow-y-auto">
-                  {showFiles && (
-                    <div className="flex-1 min-w-0 rounded-xl border border-gray-200 dark:border-gray-700 p-3">
-                      <p className="text-xs font-semibold flex items-center gap-1.5"><Paperclip size={12}/> Session files</p>
-                      {files.length===0 ? <p className="text-xs text-gray-500 mt-2">No files. Upload a CSV to import contacts, etc.</p> : <ul className="mt-2 space-y-1.5">{files.map(f=>(
-                        <li key={f.id} className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg bg-gray-50 dark:bg-gray-800 text-xs">
-                          <span className="truncate flex items-center gap-1.5"><FileText size={12} className="shrink-0"/>{f.filename} <span className="text-[10px] text-gray-400">#{f.id} • {(f.size/1024).toFixed(1)}KB</span></span>
-                          <span className="text-[11px] text-gray-500 hidden sm:inline">{f.preview?.headers?.slice(0,3).join(", ")}</span>
-                        </li>
-                      ))}</ul>}
-                    </div>
-                  )}
-                  {showMemory && (
-                    <div className="flex-1 min-w-0 rounded-xl border border-gray-200 dark:border-gray-700 p-3">
-                      <p className="text-xs font-semibold flex items-center gap-1.5"><Brain size={12}/> Memory</p>
-                      <p className="text-xs text-gray-600 dark:text-gray-300 mt-2 whitespace-pre-wrap break-words max-h-32 overflow-y-auto">{sessionMeta?.memory || "No memory yet. The agent remembers your preferences and past actions in this session."}</p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Messages */}
-              <div ref={chatRef} className="flex-1 overflow-y-auto p-3 sm:p-5 space-y-4 scrollbar-thin">
-                {messages.length===0 && (
-                  <div className="text-center py-8">
-                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary-800 to-primary-600 flex items-center justify-center text-white mx-auto"><Zap size={20}/></div>
-                    <p className="text-sm font-medium mt-3">How can I help today?</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5 max-w-sm mx-auto leading-relaxed">Try: <b>“Create an SMS campaign for my 2025 leads”</b> • <b>“Delete contacts without phone numbers”</b> • <b>“What does @my_skill do?”</b> • Upload a CSV and say <b>“import this”</b></p>
-                  </div>
-                )}
-                {messages.filter(m=> m.role!=="system").map((m,i)=> {
-                  const isUser = m.role==="user";
-                  const isTool = m.role==="tool";
-                  const isAssistant = m.role==="assistant";
-                  if (isTool) {
-                    // Tool results are shown as collapsible technical cards, not chat bubbles
-                    let parsed: any = null;
-                    try { parsed = JSON.parse(m.content); } catch {}
-                    const isError = parsed?.error;
-                    return (
-                      <div key={i} className="flex justify-start">
-                        <div className={`max-w-[90%] sm:max-w-[85%] rounded-xl border px-3 py-2 text-xs ${isError ? "bg-danger-50 dark:bg-danger-950/30 border-danger-200 dark:border-danger-900 text-danger-900 dark:text-danger-100" : "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900 text-emerald-900 dark:text-emerald-100"}`}>
-                          <p className="font-medium flex items-center gap-1.5">{isError ? <AlertCircle size={12}/> : <CheckCircle size={12}/>} Tool: { (m as any).tool_call_id ? "" : ""} {m.content.slice(0,120)}</p>
-                          <details className="mt-1"><summary className="cursor-pointer text-[11px] underline opacity-70">Details</summary><pre className="mt-1 whitespace-pre-wrap break-words text-[11px] opacity-90 max-h-48 overflow-y-auto">{m.content.slice(0,3000)}</pre></details>
-                        </div>
-                      </div>
-                    );
-                  }
-                  return (
-                    <div key={i} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
-                      <div className={`max-w-[88%] sm:max-w-[78%] rounded-2xl px-3.5 sm:px-4 py-3 shadow-sm text-[13.5px] leading-[1.6] whitespace-pre-wrap break-words ${isUser ? "bg-primary-900 dark:bg-primary-800 text-white rounded-br-md" : isAssistant ? "bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-bl-md" : "bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs text-gray-600 dark:text-gray-300"}`}>
-                        {m.content}
-                        <div className={`flex items-center gap-1.5 mt-2 text-[10px] ${isUser ? "text-white/60 justify-end" : "text-gray-400"}`}>
-                          <span>{m.timestamp ? new Date(m.timestamp).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}) : m.created_at ? new Date(m.created_at).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}) : ""}</span>
-                          {!isUser && <button onClick={()=>copyText(m.content)} className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800" title="Copy"><Copy size={10}/></button>}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-                {loading && (
-                  <div className="flex justify-start"><div className="max-w-[85%] sm:max-w-[78%] rounded-2xl rounded-bl-md bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 px-4 py-4 shadow-sm"><div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400"><span className="w-2 h-2 rounded-full bg-primary-600 animate-pulse"/><span className="w-2 h-2 rounded-full bg-primary-600 animate-pulse [animation-delay:150ms]"/><span className="w-2 h-2 rounded-full bg-primary-600 animate-pulse [animation-delay:300ms]"/><span className="ml-1">Thinking & acting…</span></div></div></div>
-                )}
-              </div>
-
-              {/* Composer */}
-              <div className="shrink-0 p-3 sm:p-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
-                <div className="flex items-end gap-2">
-                  <div className="flex items-center gap-1 shrink-0">
-                    <label className="p-2 sm:p-2.5 rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 cursor-pointer transition-colors" title="Upload CSV / file">
-                      <Paperclip size={16} />
-                      <input ref={fileInputRef} type="file" accept=".csv,.txt,.json,.xlsx" className="hidden" onChange={handleFileUpload} />
-                    </label>
-                    <label className="hidden sm:flex p-2.5 rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 cursor-pointer transition-colors" title="Upload skill (.md, .txt)">
-                      <Layers size={16} />
-                      <input ref={skillInputRef} type="file" accept=".md,.txt,.json" className="hidden" onChange={handleSkillUpload} />
-                    </label>
-                  </div>
-                  <div className="flex-1 relative min-w-0">
-                    <input
-                      ref={inputRef}
-                      value={input}
-                      onChange={e=>setInput(e.target.value)}
-                      onKeyDown={e=>{ if(e.key==="Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }}}
-                      placeholder="Ask or instruct… e.g. Create campaign, Import CSV, @skill-name do X"
-                      className="w-full pl-3 sm:pl-4 pr-10 sm:pr-12 py-3 sm:py-3.5 rounded-full border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 focus:bg-white dark:focus:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-200 dark:focus:ring-primary-800 focus:border-primary-400 text-sm placeholder:text-gray-400"
-                    />
-                    {input.length>0 && <span className="absolute right-[52px] top-1/2 -translate-y-1/2 hidden sm:block text-[10px] text-gray-400">Enter ↵</span>}
-                    <button onClick={sendMessage} disabled={loading || !input.trim()} className="absolute right-1 top-1 bottom-1 w-9 sm:w-10 rounded-full bg-primary-900 dark:bg-primary-800 text-white flex items-center justify-center hover:bg-primary-800 dark:hover:bg-primary-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-                      {loading ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/> : <Send size={16} className="translate-x-[-1px]" />}
-                    </button>
-                  </div>
-                </div>
-                <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-2 text-center hidden sm:block">The agent has full app access — it can create campaigns, import/delete contacts, send messages, and more. Use <code className="px-1 py-0.5 rounded bg-gray-100 dark:bg-gray-800 font-mono">@skill</code> to invoke a skill. Press Enter to send, Shift+Enter for new line.</p>
-              </div>
-            </>
+            <AgentThread
+              turns={turns}
+              onApprove={approve}
+              onCancel={cancel}
+              busyCard={busyCard}
+              error={streamError}
+              onRetry={() => lastMessage && send(lastMessage)}
+              suggestions={SUGGESTIONS}
+              onSuggestion={(text) => {
+                if (text.includes("upload it next")) setPanel("files");
+                else void send(text);
+              }}
+            />
           )}
-        </div>
+
+          <AgentComposer
+            onSend={send}
+            busy={sending}
+            onStop={stop}
+            attached={attached}
+            onDetachAttachment={() => setAttached(null)}
+            onOpenFiles={() => setPanel(panel === "files" ? null : "files")}
+            disabled={!activeId || keyMissing}
+          />
+        </main>
+
+        {/* right panel */}
+        {panel && (
+          <aside className="absolute inset-y-0 right-0 z-30 flex w-full max-w-[340px] flex-col border-l border-gray-200 bg-white shadow-xl dark:border-gray-800 dark:bg-gray-900 lg:static lg:z-0 lg:w-[330px] lg:shadow-none">
+            {panel === "files" && activeId && (
+              <AgentFilesPanel
+                sessionId={activeId}
+                files={files}
+                onUploaded={onUploaded}
+                onDeleted={(id) => setFiles((current) => current.filter((f) => f.id !== id))}
+                onUse={useFile}
+                onClose={() => setPanel(null)}
+              />
+            )}
+
+            {panel === "settings" && (
+              <div className="flex h-full flex-col">
+                <div className="flex items-center justify-between border-b border-gray-100 px-3 py-2.5 dark:border-gray-800">
+                  <h3 className="flex items-center gap-1.5 text-[13px] font-semibold">
+                    <Settings2 size={13} /> Agent settings
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setPanel(null)}
+                    className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                    aria-label="Close settings"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+                <div className="flex-1 overflow-y-auto p-2.5">
+                  <AgentModelSettings
+                    compact
+                    onConfigured={() => {
+                      agentApi.settings().then(setSettings).catch(() => {});
+                      agentApi.health().then(setHealth).catch(() => {});
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => navigate("/settings?tab=ai")}
+                    className="btn-secondary btn-sm mt-3 w-full"
+                  >
+                    <Plug size={12} /> All settings, skills and MCP
+                  </button>
+                  {health && (
+                    <div className="mt-3 rounded-xl border border-gray-200 p-2.5 dark:border-gray-700">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                        Can do · {health.tools} tools
+                      </p>
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {health.tool_areas.map((area) => (
+                          <span
+                            key={area}
+                            className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium capitalize text-gray-600 dark:bg-gray-800 dark:text-gray-300"
+                          >
+                            {area}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {panel === "activity" && (
+              <div className="flex h-full flex-col">
+                <div className="flex items-center justify-between border-b border-gray-100 px-3 py-2.5 dark:border-gray-800">
+                  <h3 className="flex items-center gap-1.5 text-[13px] font-semibold">
+                    <Activity size={13} /> What it did
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setPanel(null)}
+                    className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                    aria-label="Close activity"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+                <div className="flex-1 space-y-3 overflow-y-auto p-2.5">
+                  <ActivityList actions={activity} onUndo={undo} limit={40} />
+
+                  <div className="rounded-xl border border-gray-200 p-2.5 dark:border-gray-700">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                        Memory
+                      </p>
+                      {editingMemory ? (
+                        <button
+                          type="button"
+                          onClick={saveMemory}
+                          className="text-[10.5px] font-semibold text-primary-700 dark:text-primary-300"
+                        >
+                          Save
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setEditingMemory(true)}
+                          className="text-[10.5px] font-semibold text-primary-700 dark:text-primary-300"
+                        >
+                          Edit
+                        </button>
+                      )}
+                    </div>
+                    <p className="mt-0.5 text-[10.5px] text-gray-400">
+                      Standing notes the agent reads in every conversation.
+                    </p>
+                    {editingMemory ? (
+                      <textarea
+                        value={memory}
+                        onChange={(e) => setMemory(e.target.value)}
+                        rows={5}
+                        className="input mt-1.5 !text-[12px]"
+                        placeholder="e.g. We sell to restaurants in Abuja. Prices in Naira. Never promise a discount."
+                      />
+                    ) : (
+                      <p className="mt-1.5 whitespace-pre-wrap text-[12px] text-gray-600 dark:text-gray-300">
+                        {memory || <span className="text-gray-400">Nothing saved yet.</span>}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </aside>
+        )}
       </div>
     </div>
   );
+}
+
+// ---------------------------------------------------------------------------
+// stored messages → turns
+// ---------------------------------------------------------------------------
+function messagesToTurns(
+  messages: { id?: number; role: string; content: string; created_at?: string; error?: any }[],
+  pending: ConfirmationCard[],
+): Turn[] {
+  const turns: Turn[] = [];
+  let current: Turn | null = null;
+
+  for (const message of messages) {
+    if (message.role === "user") {
+      current = null;
+      turns.push({
+        id: `u-${message.id ?? Math.random()}`,
+        role: "user",
+        blocks: [{ kind: "text", text: message.content }],
+        createdAt: message.created_at,
+      });
+      continue;
+    }
+    if (message.role === "tool") {
+      // Approved/cancelled actions are appended to the transcript server-side.
+      const blocks: TurnBlock[] = [];
+      try {
+        const payload = JSON.parse(message.content);
+        if (payload?.approved) {
+          const failed = payload?.result?.error || payload?.result?.errors;
+          blocks.push({
+            kind: "tool",
+            tool: payload.tool,
+            label: failed
+              ? `Approved · ${typeof failed === "string" ? failed : failed[0]}`
+              : `Approved · ${payload.tool.replace(/_/g, " ")}`,
+            status: failed ? "failed" : "done",
+            data: payload.result,
+          });
+        }
+      } catch {
+        blocks.push({ kind: "text", text: message.content.slice(0, 400) });
+      }
+      if (!blocks.length) continue;
+      if (!current) {
+        current = { id: `a-${message.id ?? Math.random()}`, role: "assistant", blocks: [], createdAt: message.created_at };
+        turns.push(current);
+      }
+      current.blocks = [...current.blocks, ...blocks];
+      continue;
+    }
+    if (message.role === "assistant") {
+      if (message.error) {
+        const block: TurnBlock = {
+          kind: "error",
+          message: message.error.message || "The agent could not answer.",
+          hint: message.error.hint,
+          code: message.error.code,
+          retryable: message.error.retryable,
+        };
+        if (!current) {
+          current = { id: `a-${message.id}`, role: "assistant", blocks: [], createdAt: message.created_at };
+          turns.push(current);
+        }
+        current.blocks = [...current.blocks, block];
+        continue;
+      }
+      const text = (message.content || "").trim();
+      if (!text) continue;
+      if (current && !current.blocks.some((b) => b.kind === "error")) {
+        current.blocks = [...current.blocks, { kind: "text", text }];
+      } else {
+        current = { id: `a-${message.id ?? Math.random()}`, role: "assistant", blocks: [{ kind: "text", text }], createdAt: message.created_at };
+        turns.push(current);
+      }
+    }
+  }
+
+  // Whatever is still awaiting the operator goes at the end of the thread.
+  for (const card of pending) {
+    if (!current || current.role !== "assistant") {
+      current = {
+        id: `pending-${card.action_id}`,
+        role: "assistant",
+        blocks: [],
+      };
+      turns.push(current);
+    }
+    current.blocks = [
+      ...current.blocks,
+      { kind: "notice", noticeKind: "info", text: "Waiting for your approval — nothing has run yet." },
+      { kind: "confirmation", card },
+    ];
+  }
+
+  return turns;
 }
