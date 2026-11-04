@@ -39,6 +39,7 @@ import json
 import logging
 import re
 import time
+import uuid
 from dataclasses import dataclass, field
 from typing import Any, AsyncIterator, Optional
 
@@ -1080,3 +1081,202 @@ def sanitise_schema(schema: Any) -> Any:
         else:
             out[key] = value
     return out
+
+
+# ---------------------------------------------------------------------------
+# Streaming
+# ---------------------------------------------------------------------------
+async def stream_complete(
+    provider: str,
+    *,
+    api_key: str,
+    model: str,
+    messages: list[dict],
+    tools: Optional[list[dict]] = None,
+    system_text: str = "",
+    temperature: float = 0.4,
+    max_tokens: int = 4096,
+    timeout: float = 120.0,
+) -> AsyncIterator[dict]:
+    """Stream one model call as ``{"type": "text"|"done"}`` events.
+
+    Text is yielded the moment the provider produces it, which is what makes
+    the chat feel alive. The last event is always ``{"type": "done",
+    "response": <OpenAI-shaped response>}`` so the caller's tool loop is
+    identical to the non-streaming path — tool calls arrive in the same shape.
+    """
+    if not api_key:
+        raise ProviderError(
+            code="key_missing", provider=provider, model=model,
+            message=f"No {provider.title()} API key is configured.",
+        )
+
+    if provider == "groq":
+        payload: dict[str, Any] = {
+            "model": model,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "stream": True,
+        }
+        if tools:
+            payload["tools"] = tools
+            payload["tool_choice"] = "auto"
+        url = GROQ_CHAT_URL
+        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+        params = None
+    else:
+        body: dict[str, Any] = {
+            "contents": _messages_for_gemini(messages, system_text),
+            "generationConfig": {"temperature": temperature, "maxOutputTokens": max_tokens},
+        }
+        if system_text:
+            body["systemInstruction"] = {"parts": [{"text": system_text}]}
+        if tools:
+            body["tools"] = _convert_tools_for_gemini(tools)
+        url = f"{GEMINI_BASE}/models/{model}:streamGenerateContent"
+        headers = {"Content-Type": "application/json"}
+        params = {"key": api_key, "alt": "sse"}
+        payload = body
+
+    text_parts: list[str] = []
+    tool_calls: list[dict] = []
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            async with client.stream(
+                "POST", url, headers=headers, params=params, json=payload
+            ) as response:
+                if response.status_code != 200:
+                    raw = (await response.aread()).decode("utf-8", "ignore")
+                    raise _classify(provider, response.status_code, raw, model)
+                async for line in response.aiter_lines():
+                    if not line or not line.startswith("data:"):
+                        continue
+                    chunk = line[5:].strip()
+                    if chunk in ("", "[DONE]"):
+                        continue
+                    try:
+                        data = json.loads(chunk)
+                    except json.JSONDecodeError:
+                        continue
+                    if provider == "groq":
+                        for choice in data.get("choices") or []:
+                            delta = choice.get("delta") or {}
+                            piece = delta.get("content")
+                            if piece:
+                                text_parts.append(piece)
+                                yield {"type": "text", "text": piece}
+                            for call in delta.get("tool_calls") or []:
+                                index = call.get("index", len(tool_calls))
+                                while len(tool_calls) <= index:
+                                    tool_calls.append(
+                                        {"id": "", "type": "function",
+                                         "function": {"name": "", "arguments": ""}}
+                                    )
+                                slot = tool_calls[index]
+                                if call.get("id"):
+                                    slot["id"] = call["id"]
+                                fn = call.get("function") or {}
+                                if fn.get("name"):
+                                    slot["function"]["name"] += fn["name"]
+                                if fn.get("arguments"):
+                                    slot["function"]["arguments"] += fn["arguments"]
+                    else:
+                        for candidate in data.get("candidates") or []:
+                            for part in (candidate.get("content") or {}).get("parts") or []:
+                                if part.get("text"):
+                                    text_parts.append(part["text"])
+                                    yield {"type": "text", "text": part["text"]}
+                                call = part.get("functionCall")
+                                if call:
+                                    tool_calls.append(
+                                        {
+                                            "id": f"call_{uuid.uuid4().hex[:8]}",
+                                            "type": "function",
+                                            "function": {
+                                                "name": call.get("name"),
+                                                "arguments": json.dumps(call.get("args") or {}),
+                                            },
+                                        }
+                                    )
+    except ProviderError:
+        raise
+    except httpx.TimeoutException as exc:
+        raise _timeout(provider, model, exc) from exc
+    except Exception as exc:
+        raise _unreachable(provider, model, exc) from exc
+
+    message: dict[str, Any] = {"role": "assistant", "content": "".join(text_parts)}
+    if tool_calls:
+        message["tool_calls"] = tool_calls
+    yield {
+        "type": "done",
+        "response": {
+            "choices": [
+                {
+                    "message": message,
+                    "finish_reason": "tool_calls" if tool_calls else "stop",
+                }
+            ]
+        },
+    }
+
+
+async def stream_with_recovery(
+    db: AsyncSession,
+    provider: str,
+    **kwargs: Any,
+) -> AsyncIterator[dict]:
+    """``stream_complete`` plus model recovery and provider fallback.
+
+    The generator is *lazy*: nothing is called until the consumer starts
+    iterating, so a failure is raised inside the async-for the caller already
+    has around it.
+    """
+    model = kwargs.pop("model")
+    keys = kwargs.get("api_key")
+    tried_fallback = False
+    while True:
+        try:
+            async for event in stream_complete(provider, model=model, **kwargs):
+                yield event
+            return
+        except ProviderError as exc:
+            if exc.code == "model_unavailable":
+                try:
+                    models = await list_models(db, provider, api_key=keys)
+                    replacement = pick_default(provider, [m for m in models if m.id != model])
+                except ProviderError:
+                    replacement = None
+                if replacement:
+                    note = (
+                        f"The saved model “{model}” is no longer available at "
+                        f"{provider.title()}. Switched to “{replacement}”."
+                    )
+                    await set_model(db, provider, replacement)
+                    yield {"type": "notice", "kind": "recovery", "text": note}
+                    model = replacement
+                    continue
+            if not tried_fallback:
+                other = "gemini" if provider == "groq" else "groq"
+                other_key = await get_api_key(db, other)
+                if other_key and exc.code not in ("safety_blocked",):
+                    try:
+                        other_model = await resolve_model(db, other, api_key=other_key)
+                    except ProviderError:
+                        other_model = None
+                    if other_model:
+                        tried_fallback = True
+                        yield {
+                            "type": "notice",
+                            "kind": "fallback",
+                            "text": (
+                                f"{provider.title()} failed ({exc.message}) — "
+                                f"continuing on {other.title()} with {other_model}."
+                            ),
+                        }
+                        provider = other
+                        model = other_model
+                        kwargs["api_key"] = other_key
+                        continue
+            raise
