@@ -323,6 +323,11 @@ async def create_campaign(
 ):
     payload = data.model_dump()
     payload["channel"] = _validate_channel(payload.get("channel"))
+    # Defensive truncation for VARCHAR columns historically 60 chars
+    if payload.get("timezone_name"):
+        payload["timezone_name"] = str(payload["timezone_name"]).strip()[:120] or None
+    if payload.get("send_days"):
+        payload["send_days"] = str(payload["send_days"]).strip()[:30] or None
     campaign = AdsCampaign(**payload, owner_id=user.id, status="draft")
     campaign.state_changed_at = svc.now_utc()
     db.add(campaign)
@@ -420,6 +425,11 @@ async def update_campaign(
                     "This campaign already has an audience assigned. Duplicate it to run "
                     "the same campaign on another channel.",
                 )
+    # Defensive truncation for VARCHAR columns historically 60 chars
+    if "timezone_name" in payload and payload["timezone_name"]:
+        payload["timezone_name"] = str(payload["timezone_name"]).strip()[:120] or None
+    if "send_days" in payload and payload["send_days"]:
+        payload["send_days"] = str(payload["send_days"]).strip()[:30] or None
     for key, value in payload.items():
         setattr(campaign, key, value)
     if "optimize_metric" in payload and payload["optimize_metric"] not in svc.OPTIMIZE_METRICS:

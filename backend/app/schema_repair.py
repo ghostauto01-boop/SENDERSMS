@@ -702,6 +702,52 @@ def _repair_relaxed_not_null(
     return changes
 
 
+def _repair_postgres_varchar_widening(
+    sync_conn: Connection,
+    metadata: MetaData,
+    snapshot: _SchemaSnapshot,
+) -> List[str]:
+    """Widen VARCHAR columns that were created too narrow (e.g. VARCHAR(60) -> 255).
+
+    Production DBs created before the model was widened still have
+    character varying(60) while the model now says VARCHAR(120)/255.
+    Without this, any value longer than 60 chars fails with
+    ``value too long for type character varying(60)`` on INSERT/UPDATE.
+
+    This is purely additive: PostgreSQL can widen VARCHAR without rewriting
+    the table, and the operation is safe to run on every startup.
+    """
+    if snapshot.dialect_name != "postgresql":
+        return []
+    preparer = sync_conn.dialect.identifier_preparer
+    changes: List[str] = []
+    # Known columns that grew: (table, column, new_size)
+    widenings = [
+        ("campaigns", "timezone_name", 120),
+        ("ads_campaigns", "timezone_name", 120),
+        ("ads_assignments", "experiment_group", 255),
+        ("quarantined_sms", "reason", 255),
+    ]
+    for table_name, col_name, new_size in widenings:
+        if table_name not in snapshot.tables:
+            continue
+        live = snapshot.columns.get(table_name, {}).get(col_name)
+        if live is None:
+            continue
+        # Only attempt on PostgreSQL; rely on exception handling for idempotency.
+        # If the column is already wide enough, the ALTER is a no-op (or we catch the error).
+        q_table = preparer.quote(table_name)
+        q_col = preparer.quote(col_name)
+        try:
+            with sync_conn.begin_nested():
+                sync_conn.execute(text(f"ALTER TABLE {q_table} ALTER COLUMN {q_col} TYPE VARCHAR({new_size})"))
+            changes.append(f"{table_name}.{col_name}: widened to VARCHAR({new_size})")
+        except Exception:
+            # Already correct size, or transient error — ignore but log
+            logger.debug("Schema repair skip widening %s.%s to VARCHAR(%s)", table_name, col_name, new_size)
+    return changes
+
+
 def _repair_postgres_column_types(
     sync_conn: Connection,
     metadata: MetaData,
@@ -818,6 +864,10 @@ def repair_schema_sync(sync_conn: Connection, metadata: MetaData) -> List[str]:
             logger.exception(
                 "Schema auto-repair failed on %s.%s (SQL: %s)", table_name, column.name, sql
             )
+
+    for change in _repair_postgres_varchar_widening(sync_conn, metadata, snapshot=snapshot):
+        added.append(change)
+        logger.warning("Schema auto-repair %s", change)
 
     for change in _repair_postgres_column_types(sync_conn, metadata, snapshot=snapshot):
         added.append(change)

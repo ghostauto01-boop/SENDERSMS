@@ -20,7 +20,7 @@ class QuarantinedSMS(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     sender: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
     body: Mapped[str] = mapped_column(Text, nullable=False)
-    reason: Mapped[str] = mapped_column(String(60), nullable=False, index=True)
+    reason: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     provider_message_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     device_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
     received_at: Mapped[datetime] = mapped_column(

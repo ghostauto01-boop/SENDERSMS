@@ -148,6 +148,16 @@ class CampaignService:
 
     async def create_campaign(self, data: dict) -> Campaign:
         """Create a new campaign (draft)."""
+        # Defensive truncation: a long timezone/allowed_weekdays would otherwise
+        # raise "value too long for type character varying(60)" and surface as
+        # "Database unavailable" on Render.  Truncating preserves the campaign
+        # and lets validation warn the operator.
+        tz = data.get("timezone_name")
+        if tz:
+            tz = str(tz).strip()[:120] or None
+        aw = data.get("allowed_weekdays")
+        if aw:
+            aw = str(aw).strip()[:30] or None
         campaign = Campaign(
             name=data["name"],
             description=data.get("description"),
@@ -165,6 +175,8 @@ class CampaignService:
             send_start_hour=data.get("send_start_hour"),
             send_end_hour=data.get("send_end_hour"),
             allow_weekends=data.get("allow_weekends", True),
+            timezone_name=tz,
+            allowed_weekdays=aw,
             email_account_id=data.get("email_account_id"),
             fallback_email_account_id=data.get("fallback_email_account_id"),
             email_account_ids=data.get("email_account_ids"),

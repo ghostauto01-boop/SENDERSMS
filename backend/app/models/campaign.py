@@ -83,7 +83,7 @@ class Campaign(Base):
     sender_daily_limits: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     #: IANA zone the send window is evaluated in (recipient/operator local
     #: time). NULL = settings.DEFAULT_TIMEZONE.
-    timezone_name: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    timezone_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
     #: CSV of weekday numbers allowed for sending (0=Mon .. 6=Sun), e.g.
     #: "0,1,2,3,4". NULL/empty = the legacy allow_weekends flag decides.
     allowed_weekdays: Mapped[str | None] = mapped_column(String(30), nullable=True)

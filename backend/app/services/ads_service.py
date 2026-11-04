@@ -838,7 +838,7 @@ async def assign_contacts(
                     contact_id=contact.id,
                     phone_number=normalize(contact.phone_number),
                     assignment_method=(ads_set.split_mode or "equal"),
-                    experiment_group=creative.name,
+                    experiment_group=(creative.name or "")[:255],
                     send_status="pending",
                     email_account_id=pinned_sender,
                 )
@@ -4046,7 +4046,7 @@ async def run_optimization(
                     creative_version_id=version.id,
                     skip_reason=None,
                     next_attempt_at=None,
-                    experiment_group=winner.name,
+                    experiment_group=(winner.name or "")[:255],
                 )
             )
             moved += result.rowcount or 0
@@ -4192,7 +4192,7 @@ async def pause_losing_creatives(
                 creative_version_id=version.id,
                 skip_reason=None,
                 next_attempt_at=None,
-                experiment_group=winner.name,
+                experiment_group=(winner.name or "")[:255],
             )
         )
         moved += result.rowcount or 0
