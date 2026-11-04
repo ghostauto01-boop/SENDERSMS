@@ -2611,11 +2611,10 @@ async def add_suppression(
     if contact is not None:
         await svc.suppress_contact(db, contact, reason=data.reason, source="manual")
     elif number:
-        exists = (
-            await db.execute(select(SuppressionEntry).where(SuppressionEntry.phone_number == number))
-        ).scalar_one_or_none()
-        if exists is None:
-            db.add(SuppressionEntry(phone_number=number, reason=data.reason, source="manual"))
+        from app.services.suppression_service import add_suppression
+        await add_suppression(
+            db, number, reason=data.reason, source="manual", allow_sender_ids=True,
+        )
     else:
         raise HTTPException(400, "Provide a phone number or contact")
     svc.log_activity(db, "contact_suppressed", actor=user.username, detail=data.reason)

@@ -826,11 +826,13 @@ async def message_feedback(message_id: int, data: _ReplyFeedback,
                 contact.consent_status = "opted_out"
             if hasattr(contact, "has_consented"):
                 contact.has_consented = False
-            exists = (await db.execute(select(SuppressionEntry).where(
-                SuppressionEntry.phone_number == contact.phone_number))).scalar_one_or_none()
-            if not exists:
-                db.add(SuppressionEntry(phone_number=contact.phone_number, contact_id=contact.id,
-                                        reason="Marked bad reply in inbox", source="manual"))
+            from app.services.suppression_service import add_suppression
+            await add_suppression(
+                db, contact.phone_number,
+                contact_id=contact.id,
+                reason="Marked bad reply in inbox",
+                source="manual",
+            )
             from app.services.sms_service import SMSService
             await SMSService(db)._stop_seq(contact.id)
     await db.flush()

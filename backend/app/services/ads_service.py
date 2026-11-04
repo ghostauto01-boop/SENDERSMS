@@ -2355,18 +2355,13 @@ async def remove_tag(db: AsyncSession, contact_id: int, name: str) -> None:
 async def suppress_contact(db: AsyncSession, contact: Contact, *, reason: str = "Manual", source: str = "manual") -> None:
     """Add to the EXISTING global suppression list and stop future automation."""
     number = normalize(contact.phone_number) or contact.phone_number
-    exists = (
-        await db.execute(select(SuppressionEntry).where(SuppressionEntry.phone_number == number))
-    ).scalar_one_or_none()
-    if exists is None:
-        db.add(
-            SuppressionEntry(
-                phone_number=number,
-                contact_id=contact.id,
-                reason=reason,
-                source=source,
-            )
-        )
+    from app.services.suppression_service import add_suppression
+    # ON CONFLICT DO NOTHING: two opt-outs for the same contact can arrive at
+    # once (carrier event + automation rule) and used to raise a unique
+    # constraint violation that poisoned the caller's transaction.
+    await add_suppression(
+        db, number, contact_id=contact.id, reason=reason, source=source,
+    )
     contact.is_opted_out = True
     contact.opted_out_at = now_utc()
     contact.opt_out_reason = reason
