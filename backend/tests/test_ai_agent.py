@@ -744,3 +744,40 @@ def test_tool_coverage_includes_every_area():
     assert len(agent_tools.REGISTRY) >= 55
     for name in ("start_campaign", "bulk_delete_contacts", "send_to_list", "launch_ads_campaign"):
         assert name in agent_tools.danger_tools()
+
+
+async def test_spreadsheet_rows_survive_upload_and_are_queryable(client, db, fake):
+    import io
+    import zipfile
+    from app.services import agent_tools
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        archive.writestr("xl/worksheets/sheet1.xml", '''<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>
+        <row><c r="A1" t="inlineStr"><is><t>Name</t></is></c><c r="B1" t="inlineStr"><is><t>Phone</t></is></c><c r="C1" t="inlineStr"><is><t>City</t></is></c></row>
+        <row><c r="A2" t="inlineStr"><is><t>Ada, Ltd</t></is></c><c r="C2" t="inlineStr"><is><t>Abuja</t></is></c></row>
+        </sheetData></worksheet>''')
+    session_id = await _new_session(client)
+    response = await client.post(f"/api/v1/ai-agent/sessions/{session_id}/files", files={"file": ("leads.xlsx", buffer.getvalue(), "application/octet-stream")})
+    assert response.status_code == 200, response.text
+    file_id = response.json()["file"]["id"]
+    rows = (await client.get(f"/api/v1/ai-agent/files/{file_id}")).json()["rows"]
+    assert rows == [{"Name": "Ada, Ltd", "Phone": "", "City": "Abuja"}]
+    result = await agent_tools.REGISTRY["query_file"].handler(db, {"file_id": file_id, "query": "Abuja"}, None)
+    assert result["rows"] == rows
+
+
+async def test_file_context_is_scoped_to_session_and_includes_document_excerpt(db):
+    from app.models.ai_agent import AIAgentFile
+    from app.services.agent_runtime import _file_summaries
+    db.add_all([
+        AIAgentSession(id="one", name="One"), AIAgentSession(id="two", name="Two"),
+    ])
+    await db.flush()
+    own = AIAgentFile(session_id="one", filename="notes.txt", content="hello", preview={"summary": "Text", "text_head": "hello"}, size_bytes=5)
+    other = AIAgentFile(session_id="two", filename="private.txt", content="secret", preview={"text_head": "secret"}, size_bytes=6)
+    db.add_all([own, other])
+    await db.flush()
+    summaries = await _file_summaries(db, "one", [own.id, other.id])
+    assert len(summaries) == 1
+    assert "hello" in summaries[0] and "secret" not in summaries[0]

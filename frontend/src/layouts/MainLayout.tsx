@@ -183,7 +183,7 @@ export default function MainLayout() {
    * letterbox — the exact bug people reported as "I cannot read an email full
    * screen". Full-bleed hands it every pixel under the header instead.
    */
-  const fullBleed = location.pathname === "/email-inbox";
+  const fullBleed = location.pathname === "/email-inbox" || location.pathname === "/ai-agent";
 
   const groups = useMemo(
     () => [
@@ -289,7 +289,7 @@ export default function MainLayout() {
         </aside>
 
         {/* Workspace */}
-        <div className="workspace-content flex-1 flex flex-col min-w-0 lg:rounded-r-[2.5rem]">
+        <div className={`workspace-content flex-1 flex flex-col min-w-0 lg:rounded-r-[2.5rem] ${location.pathname === "/ai-agent" ? "h-[100dvh] min-h-0" : ""}`}>
           <header className="shrink-0 flex items-center gap-2 px-3 sm:px-4 lg:px-6 pt-3 lg:pt-4 safe-top">
             <button
               className="lg:hidden icon-btn"
@@ -357,7 +357,7 @@ export default function MainLayout() {
               fullBleed
                 ? // No padding, no scroll container of its own: the page manages
                   // its panes (and their scrollbars) itself.
-                  "flex-1 min-w-0 flex flex-col page-enter overflow-hidden"
+                  `flex-1 min-h-0 min-w-0 flex flex-col page-enter overflow-hidden ${location.pathname === "/ai-agent" ? "pb-tabbar lg:!pb-0" : ""}`
                 : "flex-1 min-w-0 px-3 sm:px-4 lg:px-6 pt-4 lg:pt-5 pb-tabbar page-enter lg:overflow-y-auto wa-scrollbar"
             }
           >

@@ -208,3 +208,16 @@ Three deliberate, different-looking cases:
   the validation errors word for word.
 > *Screenshot label: "Failure — a sentence, a cause and a fix, never a bare
 > 500."*
+
+## Current upload and voice limits
+
+The composer records a voice note and places the transcription in the draft for
+review. Microphone permission, a compatible browser and a configured provider
+are required. Files up to 25 MB can be selected or dropped: CSV, TSV, TXT,
+XLSX, PDF, DOCX, PNG, JPG and WebP. Text extraction from scanned PDFs is not
+supported. Image uploads currently retain only a description/metadata, not the
+image pixels: the agent **cannot see or analyze images**. Other file types are
+rejected. XLSX files are normalized as CSV so rows can be queried and imported;
+the first worksheet is used. Preview mapping edits are for reference only —
+tell the agent which mapping to use when importing. Risky actions still require
+approval unless the operator explicitly enables auto-approval.

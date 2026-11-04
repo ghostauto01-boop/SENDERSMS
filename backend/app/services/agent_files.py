@@ -325,6 +325,14 @@ def _parse_xlsx(content: bytes) -> ParsedFile:
         for row in root.findall(".//m:sheetData/m:row", ns):
             values: list[str] = []
             for cell in row.findall("m:c", ns):
+                # XLSX omits empty cells; use the cell reference to preserve columns.
+                ref = re.match(r"([A-Z]+)", cell.get("r", ""))
+                if ref:
+                    column = 0
+                    for char in ref.group(1):
+                        column = column * 26 + ord(char) - ord("A") + 1
+                    while len(values) < column - 1:
+                        values.append("")
                 cell_type = cell.get("t")
                 if cell_type == "inlineStr":
                     values.append("".join(cell.itertext()))
@@ -348,8 +356,12 @@ def _parse_xlsx(content: bytes) -> ParsedFile:
         if not any(str(v).strip() for v in values):
             continue
         rows.append({h: (values[i].strip() if i < len(values) else "") for i, h in enumerate(headers)})
-    text = "\n".join(",".join(row.get(h, "") for h in headers) for row in rows)
-    return ParsedFile(kind="xlsx", text=text, headers=headers, rows=rows, total_rows=len(rows))
+    # Store a lossless CSV representation for subsequent reads and imports.
+    output = io.StringIO(newline="")
+    writer = csv.DictWriter(output, fieldnames=headers)
+    writer.writeheader()
+    writer.writerows(rows)
+    return ParsedFile(kind="xlsx", text=output.getvalue(), headers=headers, rows=rows, total_rows=len(rows))
 
 
 def _parse_pdf(content: bytes) -> ParsedFile:
@@ -417,9 +429,10 @@ def parse_file(filename: str, content: bytes) -> ParsedFile:
             except UnicodeDecodeError:
                 # Nigerian exports are often saved by Excel as Windows-1252.
                 text = content.decode("cp1252", errors="replace")
-            parsed = _parse_delimited(text, delimiter="\t" if ext == "tsv" else None)
             if ext == "txt":
-                parsed.kind = "text"
+                parsed = ParsedFile(kind="text", text=text)
+            else:
+                parsed = _parse_delimited(text, delimiter="\t" if ext == "tsv" else None)
 
     if parsed.is_tabular:
         parsed.preview = build_preview(parsed)
@@ -501,3 +514,13 @@ def columns_of(rows: list[dict]) -> list[str]:
     for row in rows[:1]:
         seen.extend(row.keys())
     return seen
+
+
+def parse_stored(filename: str, content: str) -> ParsedFile:
+    """Read the persisted, normalized representation of an uploaded file."""
+    ext = extension_of(filename)
+    if ext == "xlsx":
+        return parse_file("stored.csv", content.encode("utf-8"))
+    if ext in ("pdf", "docx"):
+        return ParsedFile(kind=ext, text=content, summary="Extracted document text.")
+    return parse_file(filename, content.encode("utf-8"))

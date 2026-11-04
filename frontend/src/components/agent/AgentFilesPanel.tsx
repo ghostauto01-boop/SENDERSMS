@@ -32,7 +32,7 @@ const CONTACT_FIELDS = [
   { key: "", label: "— ignore —" },
 ];
 
-const ACCEPT = ".csv,.tsv,.txt,.xlsx,.xlsm,.pdf,.docx";
+const ACCEPT = ".csv,.tsv,.txt,.xlsx,.pdf,.docx,.png,.jpg,.jpeg,.webp";
 const MAX_MB = 25;
 
 const iconFor = (filename: string) => {
@@ -174,7 +174,7 @@ export default function AgentFilesPanel({
           onClick={() => inputRef.current?.click()}
           role="button"
           tabIndex={0}
-          onKeyDown={(e) => e.key === "Enter" && inputRef.current?.click()}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); inputRef.current?.click(); } }}
           className={`flex cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border border-dashed px-3 py-4 text-center transition-colors ${
             dragging
               ? "border-primary-500 bg-primary-50 dark:bg-primary-950/40"
@@ -185,7 +185,8 @@ export default function AgentFilesPanel({
           <p className="text-[12px] font-medium text-gray-700 dark:text-gray-200">
             Drop a file, or tap to choose
           </p>
-          <p className="text-[10.5px] text-gray-400">CSV · Excel · PDF · Word · up to {MAX_MB} MB</p>
+          <p className="text-[10.5px] text-gray-400">CSV · XLSX · TXT · PDF · DOCX · PNG · JPG · WebP · up to {MAX_MB} MB</p>
+          <p className="text-[10.5px] text-gray-500">Images can be attached, but the agent cannot inspect their pixels yet.</p>
           {progress !== null && (
             <div className="mt-1 w-full max-w-[180px]">
               <div className="h-1 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
@@ -302,8 +303,7 @@ export default function AgentFilesPanel({
                 ))}
               </div>
               <p className="mt-1.5 text-[10px] text-gray-400">
-                The agent uses this to decide which column is the phone number — the
-                one field that must be right.
+                Suggested mapping for reference. Tell the agent about any changes before importing.
               </p>
             </div>
           )}
@@ -318,7 +318,7 @@ export default function AgentFilesPanel({
               </div>
             ) : rows.length === 0 ? (
               <p className="flex items-center gap-1.5 text-[11.5px] text-gray-500">
-                <AlertTriangle size={11} /> No rows could be read from this file.
+                <AlertTriangle size={11} /> No tabular rows to display. See the summary above.
               </p>
             ) : (
               <>
