@@ -1475,6 +1475,9 @@ app.include_router(mailbox_api.router, prefix="/api/v1/mailbox")
 # to diagnose from a symptom.
 app.include_router(guide_api.router, prefix="/api/v1/guide")
 app.include_router(mcp_api.router, prefix="/api/v1/mcp")
+# In-app AI Agent (Groq/Gemini) with full tool access, sessions, skills, file upload.
+from app.api.v1 import ai_agent as ai_agent_api
+app.include_router(ai_agent_api.router, prefix="/api/v1/ai-agent")
 # The canonical address an AI assistant is pointed at: https://your-app/mcp
 app.include_router(mcp_api.protocol_router, prefix="/mcp")
 # Per-client connector endpoints (/connectors/chatgpt/mcp, ...), the OAuth 2.1

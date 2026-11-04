@@ -243,6 +243,11 @@ async def update_campaign(
     if update_data.get("template_id") and "message_body" not in update_data:
         update_data["message_body"] = None
 
+    # Defensive truncation for VARCHAR columns that were historically 60 chars.
+    if "timezone_name" in update_data and update_data["timezone_name"]:
+        update_data["timezone_name"] = str(update_data["timezone_name"]).strip()[:120] or None
+    if "allowed_weekdays" in update_data and update_data["allowed_weekdays"]:
+        update_data["allowed_weekdays"] = str(update_data["allowed_weekdays"]).strip()[:30] or None
     for key, value in update_data.items():
         setattr(campaign, key, value)
 

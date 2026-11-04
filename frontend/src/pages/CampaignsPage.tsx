@@ -717,7 +717,7 @@ function CampaignModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4">
-      <div className="card w-full sm:max-w-lg max-h-[92vh] overflow-y-auto rounded-t-2xl sm:rounded-xl p-4 sm:p-6">
+      <div className="card modal-card w-full sm:max-w-lg rounded-t-2xl sm:rounded-xl p-4 sm:p-6">
         <h2 className="text-lg font-semibold mb-4">
           {editing ? "Edit Campaign" : "Create Campaign"}
         </h2>
@@ -975,7 +975,7 @@ function CampaignModal({
           </div>
           )}
 
-          <div className="flex flex-col-reverse sm:flex-row gap-2 pt-2">
+          <div className="modal-actions flex flex-col-reverse sm:flex-row gap-2">
             <button type="button" onClick={onClose} className="btn-secondary flex-1">Cancel</button>
             <button type="submit" disabled={submitting} className="btn-primary flex-1">
               {submitting

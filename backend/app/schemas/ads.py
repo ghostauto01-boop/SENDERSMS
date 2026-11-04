@@ -84,8 +84,8 @@ class CampaignIn(BaseModel):
     end_date: Optional[datetime] = None
     send_start_hour: Optional[int] = Field(default=None, ge=0, le=23)
     send_end_hour: Optional[int] = Field(default=None, ge=0, le=23)
-    send_days: Optional[str] = None
-    timezone_name: Optional[str] = None
+    send_days: Optional[str] = Field(default=None, max_length=30)
+    timezone_name: Optional[str] = Field(default=None, max_length=120)
     drip_mode: str = "off"
     drip_batch_size: int = 1
     drip_interval_minutes: int = 0
@@ -136,8 +136,8 @@ class CampaignPatch(BaseModel):
     end_date: Optional[datetime] = None
     send_start_hour: Optional[int] = None
     send_end_hour: Optional[int] = None
-    send_days: Optional[str] = None
-    timezone_name: Optional[str] = None
+    send_days: Optional[str] = Field(default=None, max_length=30)
+    timezone_name: Optional[str] = Field(default=None, max_length=120)
     drip_mode: Optional[str] = None
     drip_batch_size: Optional[int] = None
     drip_interval_minutes: Optional[int] = None

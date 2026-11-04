@@ -69,6 +69,7 @@ const AUTOMATION: NavItem[] = [
 ];
 
 const TOOLS: NavItem[] = [
+  { to: "/ai-agent", label: "AI Agent", icon: Sparkles },
   { to: "/validator", label: "Validator", icon: ShieldCheck },
   { to: "/phone", label: "Phone", icon: Phone },
   { to: "/variables", label: "Variables", icon: Braces },
@@ -89,7 +90,7 @@ const TAB_BAR: NavItem[] = [
   { to: "/send", label: "Send", icon: Send },
   { to: "/inbox", label: "SMS", icon: Inbox },
   { to: "/email-inbox", label: "Mail", icon: MailOpen },
-  { to: "/invoices", label: "Invoices", icon: ReceiptText },
+  { to: "/ai-agent", label: "Agent", icon: Sparkles },
   { to: "/contacts", label: "Contacts", icon: Users },
 ];
 

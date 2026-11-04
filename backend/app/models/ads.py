@@ -141,7 +141,7 @@ class AdsCampaign(Base):
     send_end_hour: Mapped[int | None] = mapped_column(Integer, nullable=True)
     #: CSV of weekday numbers (0=Mon .. 6=Sun). Empty/NULL means every day.
     send_days: Mapped[str | None] = mapped_column(String(30), nullable=True)
-    timezone_name: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    timezone_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
 
     # --- Drip / pacing ---
     #: off | interval | batch | daily | smart
@@ -467,7 +467,7 @@ class AdsAssignment(Base):
 
     #: equal | percentage | weighted | random | manual
     assignment_method: Mapped[str] = mapped_column(String(20), default="equal", nullable=False)
-    experiment_group: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    experiment_group: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     #: pending | ready | sending | sent | delivered | failed | skipped | cancelled | blocked
     send_status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False, index=True)

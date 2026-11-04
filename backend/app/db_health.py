@@ -69,7 +69,10 @@ _PATTERNS: list[tuple[str, re.Pattern[str]]] = [
         r"|function .{0,120} does not exist"
         r"|cannot be cast"
         r"|invalid input syntax"
-        r"|syntax error at or near",
+        r"|syntax error at or near"
+        r"|value too long for type"
+        r"|string data.*too long"
+        r"|violates.*length",
         re.I,
     )),
     (KIND_QUOTA, re.compile(r"exceeded .*quota|quota exceeded|compute time quota|data transfer quota", re.I)),

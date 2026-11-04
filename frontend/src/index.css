@@ -469,6 +469,38 @@
     }
   }
 
+  /* Mobile modal fix: sticky action bar so primary button is always visible even
+     when modal content overflows on small screens (campaign launch bug). */
+  .modal-card {
+    display: flex;
+    flex-direction: column;
+    max-height: 92dvh;
+  }
+  .modal-card > form {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
+  .modal-actions {
+    position: sticky;
+    bottom: 0;
+    background: inherit;
+    padding-top: 0.75rem;
+    margin-top: 1rem;
+    border-top: 1px solid rgb(243 244 246);
+    z-index: 1;
+  }
+  .dark .modal-actions {
+    border-top-color: rgb(55 65 81);
+  }
+  /* Ensure no horizontal overflow on 320-390px phones */
+  @media (max-width: 420px) {
+    .card { padding-left: 0.875rem; padding-right: 0.875rem; }
+    .btn-primary, .btn-secondary, .btn-ghost { min-height: 44px; }
+  }
+
   /* The full-height inbox must behave like a native app: no rubber-band
      bounce on iOS, no pull-to-refresh fighting the scroll areas.
      Position fixed plus a visual-viewport height (set from the inbox) keeps

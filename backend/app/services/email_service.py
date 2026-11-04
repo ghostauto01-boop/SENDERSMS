@@ -3203,7 +3203,7 @@ async def process_inbound_email(db: AsyncSession, payload: dict) -> dict:
             "EMAIL-IN: thread %s (matched by %s) for %s",
             conversation.id, matched_by or "new-thread", from_address,
         )
-        if conversation.status != "opportunity":
+        if conversation.status not in ("opportunity", "interested"):
             conversation.status = "unread"
         conversation.unread_count = (conversation.unread_count or 0) + 1
         if subject:

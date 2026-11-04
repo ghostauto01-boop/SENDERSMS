@@ -63,8 +63,8 @@ class CampaignCreate(BaseModel):
     send_start_hour: Optional[int] = Field(default=None, ge=0, le=23)
     send_end_hour: Optional[int] = Field(default=None, ge=0, le=23)
     allow_weekends: bool = True
-    timezone_name: Optional[str] = None
-    allowed_weekdays: Optional[str] = None
+    timezone_name: Optional[str] = Field(default=None, max_length=120)
+    allowed_weekdays: Optional[str] = Field(default=None, max_length=30)
 
     # --- Email channel -------------------------------------------------
     #: Unified sender id: positive Brevo, negative connected mailbox (NULL = default).
@@ -104,8 +104,8 @@ class CampaignUpdate(BaseModel):
     send_start_hour: Optional[int] = Field(default=None, ge=0, le=23)
     send_end_hour: Optional[int] = Field(default=None, ge=0, le=23)
     allow_weekends: Optional[bool] = None
-    timezone_name: Optional[str] = None
-    allowed_weekdays: Optional[str] = None
+    timezone_name: Optional[str] = Field(default=None, max_length=120)
+    allowed_weekdays: Optional[str] = Field(default=None, max_length=30)
     scheduled_start_at: Optional[datetime] = None
     #: Only changeable while the campaign has no messages queued.
     channel: Optional[str] = None
