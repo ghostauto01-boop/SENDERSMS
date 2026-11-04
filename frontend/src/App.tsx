@@ -40,6 +40,7 @@ const NotificationsPage = lazy(() => import("./pages/NotificationsPage"));
 const InvoicePage = lazy(() => import("./pages/InvoicePage"));
 const PublicInvoicePage = lazy(() => import("./pages/PublicInvoicePage"));
 const SetupPage = lazy(() => import("./pages/SetupPage"));
+const AIAgentPage = lazy(() => import("./pages/AIAgentPage")); // NEW AI AGENT TAB
 
 function PageSpinner() {
   return (
@@ -49,125 +50,64 @@ function PageSpinner() {
   );
 }
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, loading } = useAuth();
+export default function App() {
+  const { user } = useAuth();
+  useServerKeepAlive();
 
-  if (loading) {
+  if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600" />
-      </div>
+      <AuthProvider>
+        <LoginPage />
+      </AuthProvider>
     );
   }
 
-  // No password anywhere: /login is a single "Log in as admin" button.
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
-
-  return <>{children}</>;
-}
-
-function AppRoutes() {
-  // One small heartbeat while the tab is open: keeps the free instance from
-  // falling asleep under an operator who is reading rather than clicking.
-  useServerKeepAlive();
-
   return (
-    <Suspense fallback={<PageSpinner />}>
-    <Routes>
-      <Route path="/login" element={<LoginPage />} />
-      {/* The public invoice page a customer receives. No shell, no login. */}
-      <Route
-        path="/i/:token"
-        element={
-          <Suspense fallback={<PageSpinner />}>
-            <PublicInvoicePage />
-          </Suspense>
-        }
-      />
-      {/* The inbox is a full-screen WhatsApp-style app of its own, so it
-          renders outside the dashboard shell (no sidebar / top header). */}
-      <Route
-        path="/inbox"
-        element={
-          <ProtectedRoute>
-            <InboxPage />
-          </ProtectedRoute>
-        }
-      />
-      {/* The same screen under its new name. /inbox stays so old links keep working. */}
-      <Route
-        path="/sms-inbox"
-        element={
-          <ProtectedRoute>
-            <InboxPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        element={
-          <ProtectedRoute>
-            <MainLayout />
-          </ProtectedRoute>
-        }
-      >
-        <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/invoices" element={<InvoicePage />} />
-        <Route path="/overview" element={<OverviewPage />} />
-        <Route path="/contacts" element={<ContactsPage />} />
-        <Route path="/validator" element={<ValidatorPage />} />
-        <Route path="/phone" element={<PhonePage />} />
-        <Route path="/lists" element={<ListsPage />} />
-        <Route path="/audiences" element={<AudiencesPage />} />
-        <Route path="/sms-manager" element={<SMSManagerPage />} />
-        <Route path="/email-manager" element={<EmailManagerPage />} />
-        <Route path="/email-inbox" element={<EmailInboxPage />} />
-        <Route path="/conversations" element={<ConversationsPage />} />
-        <Route path="/opportunities" element={<OpportunityPage />} />
-        <Route path="/sequences" element={<SequencesPage />} />
-        <Route path="/follow-ups" element={<FollowUpsPage />} />
-        <Route path="/templates" element={<TemplatesPage />} />
-        <Route path="/analytics" element={<AnalyticsPage />} />
-        <Route path="/settings" element={<SettingsPage />} />
-        <Route path="/setup" element={<SetupPage />} />
-        <Route path="/send" element={<SendPage />} />
-        <Route path="/drafts" element={<DraftsPage />} />
-        <Route path="/auto-reply" element={<AutoReplyPage />} />
-        <Route path="/automations" element={<AutomationsPage />} />
-        <Route path="/variables" element={<VariablesPage />} />
-        <Route path="/campaign-follow-ups" element={<CampaignFollowUpsPage />} />
-        <Route path="/calendar" element={<CalendarPage />} />
-        {/* Reached from the bell's "View all notifications" and from any
-            notification deep link. Without this route it fell through to the
-            catch-all and every one of those links opened the Dashboard. */}
-        <Route path="/notifications" element={<NotificationsPage />} />
-      </Route>
-      {/* Classic campaigns no longer have a page of their own: they are created
-          inside SMS Manager or Email Manager. Old bookmarks still land in the
-          right place instead of a 404. */}
-      <Route path="/campaigns" element={<Navigate to="/sms-manager" replace />} />
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
-    </Routes>
-    </Suspense>
-  );
-}
-
-export default function App() {
-  return (
-    <ThemeProvider>
-      <AuthProvider>
-        {/* SMS | Email is an app-wide choice: every channel-aware page reads
-            it from here instead of each page growing its own switch. */}
-        <ChannelProvider>
-          {/* Two notices, both explained, both above every page:
-              "the instance is waking up" (Render cold start) and "the database
-              itself is down" (Neon). Neither replaces a page with an error. */}
-          <ServerWakeBanner />
-          <DbStatusBanner />
-          <AppRoutes />
-        </ChannelProvider>
-      </AuthProvider>
-    </ThemeProvider>
+    <AuthProvider>
+      <ChannelProvider>
+        <ThemeProvider>
+          <MainLayout>
+            <Suspense fallback={<PageSpinner />}>
+              <Routes>
+                <Route path="/" element={<Navigate to="/overview" replace />} />
+                <Route path="/overview" element={<OverviewPage />} />
+                <Route path="/dashboard" element={<DashboardPage />} />
+                <Route path="/contacts" element={<ContactsPage />} />
+                <Route path="/validator" element={<ValidatorPage />} />
+                <Route path="/lists" element={<ListsPage />} />
+                <Route path="/sms-manager" element={<SMSManagerPage />} />
+                <Route path="/email-manager" element={<EmailManagerPage />} />
+                <Route path="/email-inbox" element={<EmailInboxPage />} />
+                <Route path="/sequences" element={<SequencesPage />} />
+                <Route path="/inbox" element={<InboxPage />} />
+                <Route path="/conversations" element={<ConversationsPage />} />
+                <Route path="/opportunity" element={<OpportunityPage />} />
+                <Route path="/follow-ups" element={<FollowUpsPage />} />
+                <Route path="/templates" element={<TemplatesPage />} />
+                <Route path="/analytics" element={<AnalyticsPage />} />
+                <Route path="/settings" element={<SettingsPage />} />
+                <Route path="/send" element={<SendPage />} />
+                <Route path="/drafts" element={<DraftsPage />} />
+                <Route path="/auto-reply" element={<AutoReplyPage />} />
+                <Route path="/automations" element={<AutomationsPage />} />
+                <Route path="/variables" element={<VariablesPage />} />
+                <Route path="/campaign-follow-ups" element={<CampaignFollowUpsPage />} />
+                <Route path="/calendar" element={<CalendarPage />} />
+                <Route path="/audiences" element={<AudiencesPage />} />
+                <Route path="/phone" element={<PhonePage />} />
+                <Route path="/notifications" element={<NotificationsPage />} />
+                <Route path="/invoices" element={<InvoicePage />} />
+                <Route path="/public-invoice" element={<PublicInvoicePage />} />
+                <Route path="/setup" element={<SetupPage />} />
+                <Route path="/ai-agent" element={<AIAgentPage />} /> {/* NEW ROUTE */}
+                <Route path="*" element={<Navigate to="/overview" replace />} />
+              </Routes>
+            </Suspense>
+            <DbStatusBanner />
+            <ServerWakeBanner />
+          </MainLayout>
+        </ThemeProvider>
+      </ChannelProvider>
+    </AuthProvider>
   );
 }
