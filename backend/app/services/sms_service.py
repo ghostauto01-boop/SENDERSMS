@@ -150,7 +150,17 @@ class SMSService:
             # at "unknown" made opted-out contacts indistinguishable from
             # never-asked ones in compliance exports and audits.
             c.consent_status="opted_out";c.has_consented=False
-            self.db.add(SuppressionEntry(phone_number=n,contact_id=c.id,reason=f"Opt-out:{kw}",source="keyword",opt_out_keyword=kw))
+            # ON CONFLICT DO NOTHING: a repeated STOP (or a carrier
+            # opt-out echoing back) must be a no-op, not a unique-constraint
+            # 500 that leaves the webhook session in PendingRollbackError.
+            from app.services.suppression_service import add_suppression
+            await add_suppression(
+                self.db, n,
+                contact_id=c.id,
+                reason=f"Opt-out:{kw}",
+                source="keyword",
+                opt_out_keyword=kw,
+            )
             await self._stop_seq(c.id)
         # An inbound TEXT belongs in the contact's text thread; it used to attach to whichever
         # conversation they had first, so a text could mark an email thread unread.

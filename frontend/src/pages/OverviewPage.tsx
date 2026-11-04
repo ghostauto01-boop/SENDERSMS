@@ -13,6 +13,7 @@ import {
 import type { OverviewCampaign, UnifiedMetrics } from "../types";
 import { campaignColor } from "../components/CampaignChip";
 import ChannelSwitch from "../components/ChannelSwitch";
+import AgentQuickAsk from "../components/agent/AgentQuickAsk";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { useChannel } from "../hooks/useChannel";
 import { inboxLink, inboxPathFor } from "../utils/inboxRoute";
@@ -220,6 +221,12 @@ export default function OverviewPage() {
           </button>
         </div>
       </div>
+
+      {/* ---- The agent, one line away ----------------------------------
+          The overview is the first screen of the day, so the fastest way to
+          act on what it shows is a sentence, not six clicks. The card hands
+          the prompt to the agent page, which sends it. */}
+      <AgentQuickAsk />
 
       {/* ---- Headline metrics ---- */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">

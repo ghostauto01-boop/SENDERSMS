@@ -46,7 +46,9 @@ from app.models.mcp_oauth import (
     McpOAuthCode,
     McpOAuthToken,
 )
-from app.models.ai_agent import AIAgentSession, AIAgentMessage, AIAgentSkill, AIAgentFile
+from app.models.ai_agent import (
+    AIAgentSession, AIAgentMessage, AIAgentSkill, AIAgentFile, AIAgentAction,
+)
 from app.models.ads import (
     AdsAudience,
     AdsCampaign,

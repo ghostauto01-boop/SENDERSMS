@@ -36,6 +36,9 @@ interface NavItem {
 }
 
 const MENU: NavItem[] = [
+  // Overview first: it is the screen the app opens on and the one place that
+  // answers "what is running, how is it doing, who replied".
+  { to: "/overview", label: "Overview", icon: Activity },
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/invoices", label: "Invoices", icon: ReceiptText },
   { to: "/contacts", label: "Contacts", icon: Users },
@@ -73,7 +76,6 @@ const TOOLS: NavItem[] = [
   { to: "/validator", label: "Validator", icon: ShieldCheck },
   { to: "/phone", label: "Phone", icon: Phone },
   { to: "/variables", label: "Variables", icon: Braces },
-  { to: "/overview", label: "Overview", icon: Activity },
 ];
 
 const GENERAL: NavItem[] = [
@@ -86,7 +88,7 @@ const GENERAL: NavItem[] = [
 //: people open twenty times a day. Seven columns still leaves every target
 //: wider than the 44px a fingertip needs, even on a 320px screen.
 const TAB_BAR: NavItem[] = [
-  { to: "/dashboard", label: "Home", icon: LayoutDashboard },
+  { to: "/overview", label: "Home", icon: Activity },
   { to: "/send", label: "Send", icon: Send },
   { to: "/inbox", label: "SMS", icon: Inbox },
   { to: "/email-inbox", label: "Mail", icon: MailOpen },

@@ -149,7 +149,9 @@ function AppRoutes() {
           inside SMS Manager or Email Manager. Old bookmarks still land in the
           right place instead of a 404. */}
       <Route path="/campaigns" element={<Navigate to="/sms-manager" replace />} />
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      {/* Anything unrecognised — including "/" straight after a sign-in —
+          lands on the Overview, which is the screen the operator starts from. */}
+      <Route path="*" element={<Navigate to="/overview" replace />} />
     </Routes>
     </Suspense>
   );

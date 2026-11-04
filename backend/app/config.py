@@ -225,6 +225,16 @@ class Settings(BaseSettings):
     # --- Rate Limiting ---
     #: Brute-force protection on the password endpoints. The wall is back on,
     #: so this is the limit that matters — a human types the password once.
+    # --- AI Agent (Groq + Gemini) ---
+    # Keys saved in Settings → AI Agent win; these are the fallback for a
+    # deployment that would rather configure everything from the environment.
+    GROQ_API_KEY: Optional[str] = None
+    GEMINI_API_KEY: Optional[str] = None
+    # The agent runs tools with the owner's privileges and calls paid models,
+    # so its endpoints get their own budget rather than sharing the global one.
+    RATE_LIMIT_AI_AGENT: str = "60/minute"
+    RATE_LIMIT_AI_TRANSCRIBE: str = "20/minute"
+
     RATE_LIMIT_LOGIN: str = "10/minute"
     #: Global ceiling for API traffic, per client IP. This has to clear one
     #: person using the app normally: a single page load is 5-10 requests, the

@@ -1,3 +1,54 @@
+## Unreleased — the AI Agent can actually run the workspace
+
+- **The 500s are gone.** Every chat failure is now a structured code with a
+  sentence, a cause and a fix (`key_missing`, `key_invalid`, `model_unavailable`,
+  `rate_limited`, `timeout`, `provider_down`, `safety_blocked`, `bad_request`,
+  `upstream_error`). The operator's message is saved before the provider is
+  called, so nothing typed is ever lost.
+- **No model name is hard-coded.** Models are read from the provider's live list
+  (Groq `/models`, Gemini `ListModels`). If a stored id has been retired, the
+  agent picks a working replacement, says so in the conversation, and remembers
+  the choice. `llama-3.3-70b-versatile` and `gemini-1.5-flash` are gone from the
+  source; a test enforces that no dead id can return.
+- **The "Test" button works with the saved key.** It used to demand a key in the
+  request body — while the saved one was only ever returned masked. Health is a
+  real one-token completion through each provider, so the header dot no longer
+  reports "configured" while every chat fails. Keys never leave the server; only
+  `gsk_***ZJGp`-style hints come back.
+- **60 tools across 12 areas** (contacts, lists, files, templates, campaigns,
+  sending, inbox, calendar, invoices, automation, analytics, system) replace a
+  keyword matcher. Eleven of the twelve areas are new.
+- **Approval cards.** The 16 consequential tools (sending, deleting, launching,
+  bulk edits, `app_api_request`) never run inline. They are described first —
+  how many contacts, who is skipped for opting out, the first 280 characters of
+  the message — and queued. Approve runs and logs; cancel leaves nothing behind.
+  A refusal (e.g. no SMS gateway) is recorded as a failure with the gateway's own
+  words, not as a success.
+- **An audit trail with undo.** Every action is stored with its arguments,
+  duration and result; contact deletions can be restored once, and the second
+  attempt is refused rather than silently re-run.
+- **File upload that parses.** CSV, TSV, Excel, PDF and Word, up to 25 MB, parsed
+  server-side into typed columns with a preview, paging and a suggested mapping
+  onto the contact fields. An `.exe` is refused with a reason instead of being
+  accepted and ignored.
+- **Voice, twice.** A recorded note is transcribed (Whisper via Groq, then
+  Gemini) with auto-detected language — pinning `en` mangles Nigerian English and
+  Pidgin — and the words land in the composer for review before they are sent.
+- **A real chat UI.** Streaming ndjson, markdown (headings, lists, tables, fenced
+  code with copy, tappable phone numbers), collapsible tool steps with timings,
+  recovery notices, suggestions, session rename/delete, per-session and global
+  memory, and a skills list. Half-written markdown is balanced so bold text does
+  not flicker mid-stream.
+- **Overview is the front door**, with the agent on it: a one-line "Ask the
+  agent" bar that hands the sentence to `/ai-agent?ask=…` which sends it.
+- `services/ai_agent_service.py` is deleted — the old engine, its hard-coded
+  models and its eight-round loop are gone.
+- **Tests:** 38 backend tests for the above (bare 500s, dead models, leaked keys,
+  opted-out contacts, unapproved sends, imports, voice, memory) and 7 frontend
+  tests for the markdown renderer; the full suites are 1488 backend + 245
+  frontend, all passing. Screens are described, not photographed, in
+  [`docs/AI-AGENT.md`](docs/AI-AGENT.md) — this sandbox cannot run a browser.
+
 ## Unreleased — email reading comes first
 
 - Opening an email now gives the message the full reading pane. The always-open

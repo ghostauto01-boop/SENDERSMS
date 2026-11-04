@@ -150,10 +150,17 @@ export default function ShortcodePicker({
     // user can keep typing mid-sentence.
     const caret = at + snippet.length;
     caretRef.current = caret;
+    const expected = before + snippet + after;
+    // Restore focus and place the caret after what we inserted — but only while
+    // the field still holds exactly that text. The first keystroke after an
+    // insertion may land before the next animation frame; forcing the caret
+    // then would jump it back mid-word (which is how " — quick" ended up with
+    // its space at the end of the message).
     requestAnimationFrame(() => {
       const node = targetRef.current;
       if (!node) return;
       node.focus();
+      if (node.value !== expected) return;  // the operator has already typed on
       try { node.setSelectionRange(caret, caret); } catch { /* input type may not support it */ }
     });
   };

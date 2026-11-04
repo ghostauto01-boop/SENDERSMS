@@ -66,3 +66,44 @@ class AIAgentFile(Base):
     preview: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     size_bytes: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+
+
+class AIAgentAction(Base):
+    """One tool the agent ran, or asked permission to run.
+
+    This table is three things at once, which is why it exists rather than
+    three more tables:
+
+    * the **confirmation queue** — a high-impact tool (start a campaign, bulk
+      delete, change the gateway) is stored here as ``status="pending"`` with
+      the exact arguments, and only executed when the operator presses
+      Approve;
+    * the **agent activity log** — every executed tool leaves a row with its
+      parameters, result, duration and status, shown on the Agent activity page;
+    * the **undo record** — the row keeps enough of the result (ids, counts) for
+      a reversible action to be rolled back from the same screen.
+    """
+
+    __tablename__ = "ai_agent_actions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    session_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("ai_agent_sessions.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    turn_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    tool: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    args: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    #: One human sentence: "Imported 53 contacts into list X".
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    #: pending | running | done | failed | cancelled | rejected
+    status: Mapped[str] = mapped_column(String(20), default="done", nullable=False, index=True)
+    result: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    #: Set when the action can be undone (see services/agent_undo.py).
+    undoable: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    undone_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False, index=True
+    )
+    executed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

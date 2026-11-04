@@ -252,12 +252,13 @@ class AutomationService:
             contact.opt_out_reason = "automation"
             contact.consent_status = "opted_out"
             contact.has_consented = False
-            self.db.add(SuppressionEntry(
-                phone_number=contact.phone_number,
+            from app.services.suppression_service import add_suppression
+            await add_suppression(
+                self.db, contact.phone_number,
                 contact_id=contact.id,
                 reason="Automation opt-out",
                 source="auto",
-            ))
+            )
             from app.services.sms_service import SMSService
             await SMSService(self.db)._stop_seq(contact.id)
             return

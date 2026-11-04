@@ -379,12 +379,36 @@ async def smsgateway_webhook(request: Request, db: AsyncSession = Depends(get_db
             evt.processed_at = datetime.now(timezone.utc)
     except Exception as e:
         # Never 500 back at the device: it would retry this delivery for ~2 days.
-        evt.status = "error"
-        evt.error = str(e)[:1000]
-        evt.processed_at = datetime.now(timezone.utc)
+        #
+        # ROLLBACK FIRST. Any failed statement (the old, real case was
+        # `duplicate key value violates unique constraint
+        # ix_suppression_entries_phone_number` on a carrier opt-out) leaves a
+        # PostgreSQL transaction aborted, so every following statement on this
+        # session — including the `evt.status = "error"` we want to record —
+        # failed with PendingRollbackError and the whole request 500'd. Undo
+        # the failed partial work, then record the failure on a clean session.
+        try:
+            await db.rollback()
+        except Exception:  # pragma: no cover - rollback of a dead session
+            logger.exception("WEBHOOK: rollback failed for %s", event_type)
         logger.exception("WEBHOOK: failed to process %s", event_type)
+        try:
+            evt_row = (
+                await db.execute(select(WebhookEvent).where(WebhookEvent.idempotency_key == idem_key))
+            ).scalar_one_or_none()
+            if evt_row is None:
+                evt_row = evt
+                db.add(evt_row)
+            evt_row.status = "error"
+            evt_row.error = str(e)[:1000]
+            evt_row.processed_at = datetime.now(timezone.utc)
+            await db.commit()
+        except Exception:
+            logger.exception("WEBHOOK: could not record failure for %s", event_type)
+            await db.rollback()
         result["ok"] = True
         result["error"] = "processing failed, logged"
+        return result
 
     await db.flush()
     return result

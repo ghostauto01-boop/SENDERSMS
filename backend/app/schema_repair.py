@@ -85,9 +85,10 @@ def _snapshot_schema(sync_conn: Connection, target_tables: Optional[Iterable[str
             ).all()
         }
         cols_by_table: dict[str, dict[str, dict]] = {}
-        for tname, cname, is_nullable, data_type, udt_name in sync_conn.execute(
+        for tname, cname, is_nullable, data_type, udt_name, char_len in sync_conn.execute(
             text(
-                "SELECT table_name, column_name, is_nullable, data_type, udt_name "
+                "SELECT table_name, column_name, is_nullable, data_type, udt_name, "
+                "character_maximum_length "
                 "FROM information_schema.columns WHERE table_schema = current_schema()"
             )
         ).all():
@@ -96,6 +97,9 @@ def _snapshot_schema(sync_conn: Connection, target_tables: Optional[Iterable[str
                 "nullable": (is_nullable == "YES"),
                 "data_type": (data_type or "").lower(),
                 "udt_name": (udt_name or "").lower(),
+                # Needed by _repair_postgres_varchar_widening: a VARCHAR(60)
+                # column silently truncates the fix that widened the model.
+                "length": char_len,
             }
 
         ucs_by_table: dict[str, list[dict]] = {}
@@ -179,6 +183,7 @@ def _snapshot_schema(sync_conn: Connection, target_tables: Optional[Iterable[str
                 "nullable": bool(col.get("nullable", True)),
                 "data_type": str(col.get("type", "")).lower(),
                 "udt_name": str(col.get("type", "")).lower(),
+                "length": getattr(col.get("type"), "length", None),
             }
             for col in inspector.get_columns(tname)
         }
@@ -702,6 +707,17 @@ def _repair_relaxed_not_null(
     return changes
 
 
+def _live_varchar_length(live: dict) -> Optional[int]:
+    """Best-effort read of a live VARCHAR length from a snapshot column."""
+    raw = live.get("length")
+    if raw is None:
+        raw = live.get("character_maximum_length")
+    try:
+        return int(raw) if raw is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
 def _repair_postgres_varchar_widening(
     sync_conn: Connection,
     metadata: MetaData,
@@ -709,42 +725,58 @@ def _repair_postgres_varchar_widening(
 ) -> List[str]:
     """Widen VARCHAR columns that were created too narrow (e.g. VARCHAR(60) -> 255).
 
-    Production DBs created before the model was widened still have
-    character varying(60) while the model now says VARCHAR(120)/255.
-    Without this, any value longer than 60 chars fails with
-    ``value too long for type character varying(60)`` on INSERT/UPDATE.
+    WHY
+    ---
+    Production DBs created before a model column was widened still carry the
+    old length, while the ORM now says 255. Without repair, the very first
+    value longer than the old limit fails with::
 
-    This is purely additive: PostgreSQL can widen VARCHAR without rewriting
-    the table, and the operation is safe to run on every startup.
+        value too long for type character varying(60)
+
+    The reported case: launching Ads campaign #20 (names up to 255 chars) wrote
+    the creative name into ``ads_assignments.experiment_group``, which was
+    created as ``character varying(60)``. Every launch of that campaign failed.
+
+    Widening is additive: PostgreSQL can raise a VARCHAR limit without
+    rewriting the table, and it is safe to run on every startup.
+
+    The comparison is made against the *model's* declared length (not a
+    hard-coded table) and only fires when the live column is genuinely
+    narrower, so a second boot is a clean no-op and the startup does not
+    perform pointless DDL on a remote database.
     """
     if snapshot.dialect_name != "postgresql":
         return []
     preparer = sync_conn.dialect.identifier_preparer
     changes: List[str] = []
-    # Known columns that grew: (table, column, new_size)
-    widenings = [
-        ("campaigns", "timezone_name", 120),
-        ("ads_campaigns", "timezone_name", 120),
-        ("ads_assignments", "experiment_group", 255),
-        ("quarantined_sms", "reason", 255),
-    ]
-    for table_name, col_name, new_size in widenings:
-        if table_name not in snapshot.tables:
+    for table in metadata.sorted_tables:
+        if table.name not in snapshot.tables:
             continue
-        live = snapshot.columns.get(table_name, {}).get(col_name)
-        if live is None:
-            continue
-        # Only attempt on PostgreSQL; rely on exception handling for idempotency.
-        # If the column is already wide enough, the ALTER is a no-op (or we catch the error).
-        q_table = preparer.quote(table_name)
-        q_col = preparer.quote(col_name)
-        try:
-            with sync_conn.begin_nested():
-                sync_conn.execute(text(f"ALTER TABLE {q_table} ALTER COLUMN {q_col} TYPE VARCHAR({new_size})"))
-            changes.append(f"{table_name}.{col_name}: widened to VARCHAR({new_size})")
-        except Exception:
-            # Already correct size, or transient error — ignore but log
-            logger.debug("Schema repair skip widening %s.%s to VARCHAR(%s)", table_name, col_name, new_size)
+        live_cols = snapshot.columns.get(table.name, {})
+        for column in table.columns:
+            live = live_cols.get(column.name)
+            if live is None:
+                continue
+            wanted = getattr(column.type, "length", None)
+            if not isinstance(wanted, int):
+                continue
+            current = _live_varchar_length(live)
+            if current is None or current >= wanted:
+                continue
+            q_table = preparer.quote(table.name)
+            q_col = preparer.quote(column.name)
+            try:
+                with sync_conn.begin_nested():
+                    sync_conn.execute(
+                        text(f"ALTER TABLE {q_table} ALTER COLUMN {q_col} TYPE VARCHAR({wanted})")
+                    )
+                changes.append(f"{table.name}.{column.name}: widened to VARCHAR({wanted})")
+                live["length"] = wanted
+            except Exception:
+                logger.exception(
+                    "Schema repair failed widening %s.%s to VARCHAR(%s)",
+                    table.name, column.name, wanted,
+                )
     return changes
 
 
