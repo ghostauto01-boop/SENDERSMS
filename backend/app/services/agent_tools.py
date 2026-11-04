@@ -826,18 +826,11 @@ async def read_file_rows(db, args, ctx):
     ).scalar_one_or_none()
     if not record:
         return {"error": "File not found"}
-    parsed = agent_files.parse_file(record.filename, record.content.encode("utf-8", "ignore")) if not record.preview else None
-    rows = (parsed.rows if parsed else None) or (record.preview or {}).get("_all_rows")
-    if rows is None:
-        # Cheap path: re-parse from the stored text.
-        if record.filename.lower().endswith((".csv", ".tsv", ".txt")):
-            reparsed = agent_files.parse_file(record.filename, record.content.encode("utf-8", "ignore"))
-            rows = reparsed.rows
-        else:
-            return {
-                "error": "This file was stored without row data. Ask the operator to re-upload it.",
-                "preview": record.preview,
-            }
+    try:
+        parsed = agent_files.parse_stored(record.filename, record.content)
+    except agent_files.FileParseError as error:
+        return {"error": str(error)}
+    rows = parsed.rows
     window = agent_files.slice_rows(rows, int(args.get("offset") or 0), int(args.get("limit") or 20))
     return {"file": record.filename, "total_rows": len(rows), "rows": window}
 
@@ -861,7 +854,7 @@ async def query_file(db, args, ctx):
     ).scalar_one_or_none()
     if not record:
         return {"error": "File not found"}
-    parsed = agent_files.parse_file(record.filename, record.content.encode("utf-8", "ignore"))
+    parsed = agent_files.parse_stored(record.filename, record.content)
     matches = agent_files.query_rows(parsed.rows, args.get("query") or "", int(args.get("limit") or 20))
     return {
         "file": record.filename,
@@ -1069,7 +1062,7 @@ async def import_csv(db, args, ctx):
     ).scalar_one_or_none()
     if not record:
         return {"error": "File not found"}
-    parsed = agent_files.parse_file(record.filename, record.content.encode("utf-8", "ignore"))
+    parsed = agent_files.parse_stored(record.filename, record.content)
     if not parsed.is_tabular:
         return {"error": f"{record.filename} is not a spreadsheet — nothing to import from it."}
     mapping = args.get("mapping") or (record.preview or {}).get("suggested_mapping") or {}

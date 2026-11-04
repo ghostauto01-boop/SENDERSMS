@@ -706,7 +706,7 @@ async def undo_action(
 # ---------------------------------------------------------------------------
 async def _store_upload(db: AsyncSession, file: UploadFile, session_id: Optional[str]) -> AIAgentFile:
     filename = file.filename or "upload.csv"
-    raw = await file.read()
+    raw = await file.read(agent_files.MAX_BYTES + 1)
     if not raw:
         raise HTTPException(400, "That file is empty.")
     try:
@@ -717,7 +717,7 @@ async def _store_upload(db: AsyncSession, file: UploadFile, session_id: Optional
     record = AIAgentFile(
         session_id=session_id,
         filename=filename[:255],
-        content=(parsed.text or json.dumps(parsed.preview or {}, default=str))[:1_000_000],
+        content=parsed.text or json.dumps(parsed.preview or {}, default=str),
         preview={**parsed.preview, "summary": parsed.summary},
         size_bytes=len(raw),
     )
@@ -788,7 +788,7 @@ async def get_file(
         raise HTTPException(404, "File not found")
     rows: list[dict] = []
     try:
-        parsed = agent_files.parse_file(record.filename, record.content.encode("utf-8", "ignore"))
+        parsed = agent_files.parse_stored(record.filename, record.content)
         rows = agent_files.slice_rows(parsed.rows, offset, limit)
     except agent_files.FileParseError:
         rows = []
@@ -844,7 +844,7 @@ async def transcribe(
         )
     except ai_providers.ProviderError as error:
         raise HTTPException(
-            status_code=200 if error.code in ("key_missing",) else 502,
+            status_code=400 if error.code in ("key_missing",) else 502,
             detail=error.to_dict(),
         ) from error
     return {"text": result["text"], "provider": result["provider"],

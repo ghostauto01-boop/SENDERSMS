@@ -47,6 +47,18 @@ export default function AgentComposer({
   const chunksRef = useRef<BlobPart[]>([]);
   const timerRef = useRef<number | null>(null);
   const cancelRef = useRef(false);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      cancelRef.current = true;
+      const recorder = recorderRef.current;
+      if (recorder && recorder.state !== "inactive") recorder.stop();
+      recorder?.stream.getTracks().forEach((track) => track.stop());
+    };
+  }, []);
 
   // Grow with the content, up to a point, then scroll.
   useEffect(() => {
@@ -83,6 +95,10 @@ export default function AgentComposer({
     }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (!mountedRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
       const preferred = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"].find((type) =>
         MediaRecorder.isTypeSupported(type),
       );
@@ -95,6 +111,7 @@ export default function AgentComposer({
       };
       recorder.onstop = async () => {
         stream.getTracks().forEach((track) => track.stop());
+        if (!mountedRef.current) return;
         setRecording(false);
         if (cancelRef.current) {
           chunksRef.current = [];
@@ -108,6 +125,7 @@ export default function AgentComposer({
         setTranscribing(true);
         try {
           const result = await agentApi.transcribe(blob, recorder.mimeType.includes("mp4") ? "voice.m4a" : "voice.webm");
+          if (!mountedRef.current) return;
           const words = (result.text || "").trim();
           if (!words) {
             toast.error("Nothing was picked up. Try again a little closer to the mic.");
@@ -116,9 +134,10 @@ export default function AgentComposer({
             requestAnimationFrame(() => textareaRef.current?.focus());
           }
         } catch (error: any) {
-          toast.error(error?.response?.data?.detail || "Could not transcribe that recording.");
+          const detail = error?.response?.data?.detail;
+          if (mountedRef.current) toast.error((typeof detail === "string" ? detail : detail?.message) || "Could not transcribe that recording.");
         } finally {
-          setTranscribing(false);
+          if (mountedRef.current) setTranscribing(false);
         }
       };
 
@@ -132,7 +151,7 @@ export default function AgentComposer({
 
   const submit = () => {
     const value = text.trim();
-    if (!value || busy || disabled) return;
+    if (!value || busy || disabled || recording || transcribing) return;
     onSend(value);
     setText("");
   };
@@ -207,7 +226,7 @@ export default function AgentComposer({
               value={text}
               onChange={(e) => setText(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
+                if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                   e.preventDefault();
                   submit();
                 }
@@ -226,7 +245,7 @@ export default function AgentComposer({
           <button
             type="button"
             onClick={() => (recording ? stopRecording(false) : startRecording())}
-            disabled={transcribing || disabled}
+            disabled={transcribing || disabled || busy}
             className={`shrink-0 rounded-xl p-2 transition-colors ${
               recording
                 ? "bg-danger-600 text-white hover:bg-danger-700"

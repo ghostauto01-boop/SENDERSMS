@@ -102,7 +102,7 @@ export default function AIAgentPage() {
     setLoadingList(true);
     try {
       const [list, s, h, sk] = await Promise.all([
-        agentApi.sessions().catch(() => [] as AgentSession[]),
+        agentApi.sessions(),
         agentApi.settings().catch(() => null),
         agentApi.health().catch(() => null),
         agentApi.skills().catch(() => [] as Skill[]),
@@ -112,6 +112,19 @@ export default function AIAgentPage() {
       setHealth(h);
       setSkills(sk);
       if (list.length && !activeId) setActiveId(list[0].id);
+      else if (!list.length && !activeId) {
+        try {
+          const session = await agentApi.createSession({ name: "New chat" });
+          setSessions([session]);
+          setActiveId(session.id);
+        } catch {
+          setLoadingSession(false);
+          toast.error("Could not start a chat. Use New to try again.");
+        }
+      }
+    } catch {
+      setLoadingSession(false);
+      toast.error("Could not load conversations. Refresh the page to retry.");
     } finally {
       setLoadingList(false);
     }
@@ -129,7 +142,7 @@ export default function AIAgentPage() {
       const data = await agentApi.session(id);
       setTurns(messagesToTurns(data.messages, data.pending_actions));
       setFiles(data.files);
-      setMemory(data.session.memory || "");
+      agentApi.memory("global").then(setMemory).catch(() => setMemory(""));
       setAttached(null);
       agentApi.activity(id).then(setActivity).catch(() => setActivity([]));
     } catch (error: any) {
@@ -142,6 +155,12 @@ export default function AIAgentPage() {
 
   useEffect(() => {
     if (activeId) void loadSession(activeId);
+    else if (!loadingList) {
+      setTurns([]);
+      setFiles([]);
+      setAttached(null);
+      setLoadingSession(false);
+    }
   }, [activeId, loadSession]);
 
   // Send the handoff prompt exactly once, after the conversation it belongs to
@@ -150,7 +169,7 @@ export default function AIAgentPage() {
   useEffect(() => {
     if (loadingSession) return;
     const pending = askRef.current;
-    if (!pending) return;
+    if (!pending || loadingList) return;
     if (!activeId) {
       // No conversation yet: make one, which re-enters this effect.
       askRef.current = pending;
@@ -168,7 +187,7 @@ export default function AIAgentPage() {
       retryable: false,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadingSession, activeId, configured]);
+  }, [loadingSession, activeId, configured, loadingList]);
 
   // ---------------------------------------------------------------------
   // sessions
@@ -369,20 +388,19 @@ export default function AIAgentPage() {
       if (!controller.signal.aborted) {
         agentApi.sessions().then(setSessions).catch(() => {});
         agentApi.activity(activeId).then(setActivity).catch(() => {});
-        agentApi.session(activeId).then((data) => setMemory(data.session.memory || "")).catch(() => {});
+        agentApi.memory("global").then(setMemory).catch(() => {});
         agentApi.health().then(setHealth).catch(() => {});
         if (!sawText && !failed) {
           // The turn ended with nothing said (e.g. only an approval card): show
           // the card and leave the bubble alone rather than an empty shell.
         }
-        setAttached(null);
+        if (!failed) setAttached(null);
       }
     }
   };
 
   const stop = () => {
     abortRef.current?.abort();
-    setSending(false);
     toast("Stopped.", { icon: "⏹" });
   };
 
@@ -477,7 +495,7 @@ export default function AIAgentPage() {
   const keyMissing = settings !== null && !configured;
 
   return (
-    <div className="-m-4 flex h-[calc(100dvh-4rem)] flex-col overflow-hidden bg-white dark:bg-gray-900 sm:-m-6 lg:m-0 lg:h-[calc(100dvh-6.5rem)] lg:rounded-3xl lg:border lg:border-gray-200 lg:shadow-card dark:lg:border-gray-800">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-white dark:bg-gray-900 lg:border-t lg:border-gray-200 dark:lg:border-gray-800">
       {/* ---------- header ------------------------------------------- */}
       <header className="flex shrink-0 items-center gap-2 border-b border-gray-200 bg-white/95 px-2.5 py-2 backdrop-blur dark:border-gray-800 dark:bg-gray-900/95 sm:px-4">
         <button
@@ -544,6 +562,7 @@ export default function AIAgentPage() {
           <button
             type="button"
             onClick={createSession}
+            disabled={sending}
             className="btn-primary btn-sm"
             title="Start a new conversation"
           >
@@ -662,6 +681,7 @@ export default function AIAgentPage() {
                   <button
                     type="button"
                     onClick={() => {
+                      if (sending) return;
                       setActiveId(session.id);
                       setDrawer(false);
                     }}
@@ -686,6 +706,7 @@ export default function AIAgentPage() {
                   </button>
                   <button
                     type="button"
+                    disabled={sending}
                     onClick={() => deleteSession(session.id)}
                     className="mt-0.5 rounded p-1 text-gray-300 opacity-0 transition-opacity hover:text-danger-600 group-hover:opacity-100"
                     aria-label={`Delete ${session.name}`}
@@ -759,7 +780,7 @@ export default function AIAgentPage() {
                 sessionId={activeId}
                 files={files}
                 onUploaded={onUploaded}
-                onDeleted={(id) => setFiles((current) => current.filter((f) => f.id !== id))}
+                onDeleted={(id) => { setFiles((current) => current.filter((f) => f.id !== id)); setAttached((current) => current?.id === id ? null : current); }}
                 onUse={useFile}
                 onClose={() => setPanel(null)}
               />

@@ -535,7 +535,7 @@ async def _file_summaries(db: AsyncSession, session_id: str, file_ids: Optional[
     if file_ids:
         records = list(
             (
-                await db.execute(select(AIAgentFile).where(AIAgentFile.id.in_(file_ids)))
+                await db.execute(select(AIAgentFile).where(AIAgentFile.id.in_(file_ids), AIAgentFile.session_id == session_id))
             ).scalars().all()
         )
     else:
@@ -559,7 +559,9 @@ async def _file_summaries(db: AsyncSession, session_id: str, file_ids: Optional[
             f"file_id={record.id} · {record.filename} · "
             f"{preview.get('total_rows_estimate') or 0} rows · columns: {columns or 'n/a'} · "
             f"suggested mapping: {json.dumps(preview.get('suggested_mapping') or {})}. "
-            "Use read_file_rows / query_file / import_csv with this file_id."
+            f"Summary: {preview.get('summary') or 'No summary available'}. "
+            f"Text excerpt: {(preview.get('text_head') or '')[:1500]}. "
+            "Use read_file_rows / query_file / import_csv for tabular files."
         )
     return summaries
 
