@@ -113,7 +113,7 @@ export default function AIAgentPage() {
     const session = sessions.find(s => s.id === activeSessionId);
     if (!session) return;
 
-    const userMsg = { role: "user", content: input, timestamp: Date.now() };
+    const userMsg: Session["messages"][number] = { role: "user", content: input, timestamp: Date.now() };
     const newMessages = [...session.messages, userMsg];
     setSessions(sessions.map(s => s.id === activeSessionId ? { ...s, messages: newMessages } : s));
     setInput("");
@@ -152,7 +152,7 @@ export default function AIAgentPage() {
         // Simulate delay
         await new Promise(r => setTimeout(r, 800));
 
-        const assistantMsg = { role: "assistant", content: response, timestamp: Date.now() };
+        const assistantMsg: Session["messages"][number] = { role: "assistant", content: response, timestamp: Date.now() };
         setSessions(sessions.map(s => s.id === activeSessionId ? { 
           ...s, 
           messages: [...newMessages, assistantMsg],

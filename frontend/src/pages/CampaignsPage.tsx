@@ -28,54 +28,262 @@ const statusBadge = (status: string) => {
 /** Format a stored UTC timestamp in the user's own timezone. */
 const formatWhen = (iso: string) =>
   new Date(iso).toLocaleString(undefined, {
-    dateStyle: "short",
-    timeStyle: "short",
+    weekday: "short", day: "numeric", month: "short",
+    hour: "2-digit", minute: "2-digit",
   });
 
-/** CampaignPage component */
-export default function CampaignsPage() {
-  const { channel: currentChannel } = useChannel();
-  const [unifiedDrafts, setUnifiedDrafts] = useState(true);
-  const [embedded, setEmbedded] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-  const [draftChannel, setDraftChannel] = useState<"all" | "sms" | "email" | "ai-agent">(currentChannel || "all");
-  const [showCreate, setShowCreate] = useState(false);
+/** A UTC ISO string as the value a datetime-local input expects (local time). */
+const toLocalInput = (iso: string | null) => {
+  const d = iso ? new Date(iso) : new Date(Date.now() + 60 * 60 * 1000);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
+function ScheduleModal({
+  campaign, onClose, onSaved,
+}: {
+  campaign: Campaign;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [when, setWhen] = useState(toLocalInput(campaign.scheduled_start_at));
+  const [saving, setSaving] = useState(false);
+
+  const submit = async (clear: boolean) => {
+    setSaving(true);
+    try {
+      // new Date(local string).toISOString() converts to UTC, so a campaign
+      // set for 9am is sent at 9am where the user is, not 9am UTC.
+      const payload = clear
+        ? { scheduled_start_at: null }
+        : { scheduled_start_at: new Date(when).toISOString() };
+      const { data } = await api.post(`/campaigns/${campaign.id}/schedule`, payload);
+      toast.success(data.message || "Schedule updated");
+      onSaved();
+      onClose();
+    } catch (e: any) {
+      toast.error(e.response?.data?.detail || "Could not schedule the campaign");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4">
+      <div className="card w-full sm:max-w-md max-h-[92vh] overflow-y-auto rounded-t-2xl sm:rounded-xl p-4 sm:p-6">
+        <h2 className="text-lg font-semibold mb-1">Schedule Campaign</h2>
+        <p className="text-xs text-gray-500 mb-4">
+          "{campaign.name}" will send by itself at the time you pick. Times are in
+          your local timezone.
+        </p>
+
+        <label className="label">Send at</label>
+        <input
+          type="datetime-local"
+          className="input text-base sm:text-sm"
+          value={when}
+          min={toLocalInput(null)}
+          onChange={(e) => setWhen(e.target.value)}
+        />
+
+        {campaign.scheduled_start_at && (
+          <p className="text-xs text-primary-600 dark:text-primary-400 mt-2">
+            Currently scheduled for {formatWhen(campaign.scheduled_start_at)}.
+          </p>
+        )}
+
+        <div className="flex gap-2 mt-5">
+          <button
+            onClick={() => submit(false)}
+            disabled={saving || !when}
+            className="btn-primary flex-1 min-h-[44px] sm:min-h-0"
+          >
+            {saving ? "Saving..." : "Schedule"}
+          </button>
+          {campaign.scheduled_start_at && (
+            <button
+              onClick={() => submit(true)}
+              disabled={saving}
+              className="btn-secondary min-h-[44px] sm:min-h-0"
+            >
+              Cancel schedule
+            </button>
+          )}
+          <button onClick={onClose} className="btn-ghost min-h-[44px] sm:min-h-0">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Classic campaigns (list, schedule, pause, duplicate, edit, replies, leads).
+ *
+ * This is no longer a destination of its own: the Campaigns tab is gone, and
+ * the same, fully editable list is rendered inside SMS Manager and Email
+ * Manager, scoped to that manager's channel. Existing deep links such as
+ * ``/campaigns?campaign=12`` still work because the page is mounted there.
+ */
+export default function CampaignsPage({
+  embedded = false,
+  fixedChannel,
+  unifiedDrafts = false,
+}: {
+  /** Rendered as a panel inside a manager: no page heading, no channel switch. */
+  embedded?: boolean;
+  /** Pin the list to one channel instead of following the app-wide switch. */
+  fixedChannel?: "sms" | "email";
+  /** One review page for SMS and email campaign drafts. */
+  unifiedDrafts?: boolean;
+} = {}) {
+  const { channel: activeChannel } = useChannel();
+  const [draftChannel, setDraftChannel] = useState<"all" | "sms" | "email">("all");
   const [createChannel, setCreateChannel] = useState<"sms" | "email">("sms");
+  const channel = unifiedDrafts ? draftChannel : fixedChannel ?? activeChannel;
+  const modalChannel: "sms" | "email" = unifiedDrafts
+    ? createChannel
+    : channel === "email" ? "email" : "sms";
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<Campaign | null>(null);
   const [scheduling, setScheduling] = useState<Campaign | null>(null);
-  const [viewing, setViewing] = useState<Campaign | null>(null);
-  const [showRepliesDrawer, setShowRepliesDrawer] = useState(false);
-  const [repliesCampaign, setRepliesCampaign] = useState<Campaign | null>(null);
+  // Which campaign's leads/replies drawer is open, and which tab it opened on.
+  const [viewing, setViewing] = useState<{ campaign: Campaign; tab: "replies" | "leads" } | null>(null);
+  // Live, inbox-derived counts per campaign id. The counters on the campaign
+  // row are webhook-maintained and can drift; these come from the same tables
+  // the inbox renders, so the "N replies" button never lies.
+  const [live, setLive] = useState<Record<number, any>>({});
+
+  useEffect(() => { loadCampaigns(); }, [channel]);
 
   const loadCampaigns = async () => {
-    setLoading(true);
-    setError("");
     try {
-      const params: Record<string, string> = {};
-      if (draftChannel !== "all") params.channel = draftChannel;
-      const { data } = await api.get("/campaigns/", { params });
+      setLoading(true);
+      setError(null);
+      const { data } = await api.get("/campaigns/", {
+        params: { channel, ...(unifiedDrafts ? { status: "draft" } : {}) },
+      });
       setCampaigns(data.items);
+      // Best-effort: the page is fully usable without it.
+      api.get("/overview/campaigns")
+        .then(({ data: ov }) => {
+          const byId: Record<number, any> = {};
+          (ov.items || [])
+            .filter((i: any) => i.kind === "campaign")
+            .forEach((i: any) => { byId[i.id] = i; });
+          setLive(byId);
+        })
+        .catch(() => {});
     } catch (err: any) {
-      setError(err.response?.data?.detail || "Failed to load campaigns");
+      const status = err.response?.status;
+      const detail = err.response?.data?.detail;
+      if (!err.response) {
+        setError("Can't reach the server. Check your connection and try again.");
+      } else if (status >= 500) {
+        setError(
+          "The server hit an error loading campaigns. If this just started " +
+            "after an update, the database may be missing a recent change — " +
+            "restarting the service applies it automatically.",
+        );
+      } else {
+        setError(detail || "Failed to load campaigns");
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    loadCampaigns();
-  }, [draftChannel]);
+  const handleAction = async (id: number, action: string) => {
+    if (unifiedDrafts && action === "start") {
+      const campaign = campaigns.find((item) => item.id === id);
+      const channelLabel = campaign?.channel === "email" ? "email" : "SMS";
+      if (!window.confirm(`Send “${campaign?.name || "this campaign"}” to its selected audience now by ${channelLabel}?`)) return;
+    }
+    try {
+      const { data } = await api.post(`/campaigns/${id}/${action}`);
+      // The server says what actually happened (and when nothing did).
+      toast.success(data?.message || `Campaign ${action} done`);
+      loadCampaigns();
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || `Failed to ${action} campaign`);
+    }
+  };
 
-  if (loading) return <div className="text-center py-12">Loading...</div>;
-  if (error) return (
-    <div className="text-center py-12">
-      <h2 className="text-xl font-semibold mb-2">Error</h2>
-      <p className="text-gray-500 mb-4">{error}</p>
-      <button onClick={loadCampaigns} className="btn-primary">Retry</button>
-    </div>
-  );
+  /** Resume. Nothing stands in the way: a high bounce rate is reported, never enforced. */
+  const handleResume = async (camp: Campaign) => {
+    try {
+      const { data } = await api.post(`/campaigns/${camp.id}/resume`);
+      toast.success(data?.message || "Campaign resumed");
+      loadCampaigns();
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || "Failed to resume campaign");
+    }
+  };
+
+  /** Validate is a report. It never changes the campaign, however often it is clicked. */
+  const handleValidate = async (id: number) => {
+    try {
+      const { data } = await api.post(`/campaigns/${id}/validate`);
+      if (data.valid) {
+        toast.success(data.message || "Campaign is valid. Nothing was changed.");
+      } else {
+        toast.error((data.errors || []).join("\n") || data.message || "Validation found problems", {
+          duration: 9000,
+        });
+      }
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || "Could not validate the campaign");
+    }
+  };
+
+  /** Cancel a schedule: the campaign goes back to draft and will not launch by itself. */
+  const handleUnschedule = async (id: number) => {
+    try {
+      const { data } = await api.post(`/campaigns/${id}/schedule`, { scheduled_start_at: null });
+      toast.success(data?.message || "Schedule cancelled");
+      loadCampaigns();
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || "Could not cancel the schedule");
+    }
+  };
+
+  const handleDuplicate = async (id: number) => {
+    try {
+      const { data } = await api.post(`/campaigns/${id}/duplicate`);
+      toast.success(`Created "${data.name}"`);
+      await loadCampaigns();
+      // Open the copy straight away: duplicating is nearly always the first
+      // half of "duplicate and change something".
+      setEditing(data);
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || "Failed to duplicate");
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    if (!window.confirm("Delete this campaign?")) return;
+    try {
+      await api.delete(`/campaigns/${id}`);
+      toast.success("Campaign deleted");
+      loadCampaigns();
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || "Failed to delete");
+    }
+  };
+
+  if (error) {
+    return (
+      <div className="text-center py-12">
+        <h2 className="text-xl font-semibold mb-2">Error</h2>
+        <p className="text-gray-500 mb-4">{error}</p>
+        <button onClick={loadCampaigns} className="btn-primary">Retry</button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -84,7 +292,7 @@ export default function CampaignsPage() {
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div>
               <h1 className="page-title">Drafts</h1>
-              <p className="page-subtitle">Review and edit SMS, email, or AI agent campaign drafts before you validate, schedule, or send them.</p>
+              <p className="page-subtitle">Review and edit SMS or email campaign drafts before you validate, schedule, or send them.</p>
               <p className="text-xs text-gray-500 mt-1">MCP-created campaigns saved as drafts appear here too.</p>
             </div>
             <div className="flex gap-2">
@@ -94,16 +302,14 @@ export default function CampaignsPage() {
               <button onClick={() => { setCreateChannel("email"); setShowCreate(true); }} className="btn-primary btn-sm">
                 <Plus size={14} className="mr-1" /> Email draft
               </button>
-              <Link to="/ai-agent" className="btn-secondary btn-sm" title="AI Agent Tab">
-                <Sparkles size={14} className="mr-1" /> AI Agent
-              </Link>
+              <Link to="/ai-agent" className="btn-secondary btn-sm"><Sparkles size={14} className="mr-1" /> AI Agent</Link>
             </div>
           </div>
           <div className="flex gap-2" role="tablist" aria-label="Draft channel">
-            {(["all", "sms", "email", "ai-agent"] as const).map((filter) => (
+            {(["all", "sms", "email"] as const).map((filter) => (
               <button key={filter} role="tab" aria-selected={draftChannel === filter}
                 onClick={() => setDraftChannel(filter)} className={`chip ${draftChannel === filter ? "chip-active" : ""}`}>
-                {filter === "all" ? "All drafts" : filter === "sms" ? "SMS" : filter === "email" ? "Email" : "AI Agent"}
+                {filter === "all" ? "All drafts" : filter === "sms" ? "SMS" : "Email"}
               </button>
             ))}
           </div>
@@ -113,52 +319,208 @@ export default function CampaignsPage() {
           <div>
             <h2 className="text-base font-semibold">Bulk campaigns</h2>
             <p className="text-[11px] text-gray-400 mt-0.5">
-              {currentChannel === "email" ? "Email" : "SMS"} blasts to a list or segment. Every campaign stays editable — schedule, pause, duplicate or stop it.
+              {channel === "email" ? "Email" : "SMS"} blasts to a list or segment. Every campaign stays editable — schedule, pause, duplicate or stop it.
             </p>
           </div>
           <div className="flex gap-2">
-            <button onClick={() => { setCreateChannel(currentChannel || "sms"); setShowCreate(true); }} className="btn-primary btn-sm">
-              <Plus size={14} className="mr-1" /> New {currentChannel === "email" ? "Email" : "SMS"} campaign
+            <button onClick={() => setShowCreate(true)} className="btn-primary btn-sm">
+              <Plus size={14} className="mr-1" /> New campaign
             </button>
           </div>
         </div>
-      ) : null}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
-        {campaigns.map((camp) => (
-          <div key={camp.id} className="card p-4 flex flex-col gap-3">
-            <div className="flex items-start justify-between">
-              <div>
-                <h3 className="font-semibold text-lg">{camp.name}</h3>
-                <p className="text-sm text-gray-500">{camp.description || "No description"}</p>
-              </div>
-              <div className={`badge ${statusBadge(camp.status)}`}>{camp.status}</div>
-            </div>
-            <div className="flex items-center justify-between text-xs text-gray-500">
-              <span>{camp.channel === "email" ? "Email" : "SMS"}</span>
-              <span>{formatWhen(camp.updated_at)}</span>
-            </div>
-            <div className="flex flex-col sm:flex-row gap-2 pt-2">
-              <button type="button" onClick={() => { setViewing(camp); setShowRepliesDrawer(true); setRepliesCampaign(camp); }} className="btn-secondary flex-1 min-h-[48px]">
-                <MessageCircle size={14} className="mr-1" /> Replies
-              </button>
-              <button type="button" onClick={() => setEditing(camp)} className="btn-secondary flex-1 min-h-[48px]">
-                <Pencil size={14} className="mr-1" /> Edit
-              </button>
-              <button type="button" onClick={() => setScheduling(camp)} className="btn-primary flex-1 min-h-[48px]">
-                <CalendarClock size={14} className="mr-1" /> Schedule
-              </button>
-              <button type="button" onClick={() => { setCreateChannel(camp.channel || "sms"); setShowCreate(true); }} className="btn-secondary flex-1 min-h-[48px]">
-                <Copy size={14} className="mr-1" /> Duplicate
-              </button>
-            </div>
+      ) : (
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <h1 className="page-title flex items-center gap-2.5">
+            Campaigns
+            <ChannelSwitch size="sm" />
+          </h1>
+          <div className="flex gap-2">
+            <Link to="/overview" className="btn-secondary btn-sm" title="All campaigns and inbox activity in one view">
+              <Activity size={14} className="mr-1" /> Overview
+            </Link>
+            <button onClick={() => setShowCreate(true)} className="btn-primary btn-sm">
+              <Plus size={14} className="mr-1" /> New Campaign
+            </button>
           </div>
-        ))}
+        </div>
+      )}
+
+      <div className="space-y-3">
+        {loading ? (
+          [...Array(4)].map((_, i) => (
+            <div key={i} className="card p-4">
+              <div className="skeleton h-5 w-48 mb-2" />
+              <div className="skeleton h-4 w-32" />
+            </div>
+          ))
+        ) : campaigns.length === 0 ? (
+          <div className="card p-12 text-center text-gray-500">
+            <Megaphone size={48} className="mx-auto mb-2 opacity-30" />
+            <p>
+              {unifiedDrafts
+                ? `No ${channel === "all" ? "" : channel === "email" ? "email " : "SMS "}drafts yet. Create a draft or ask your MCP assistant to prepare one.`
+                : `No ${channel === "email" ? "email" : "SMS"} campaigns yet. Create your first one.`}
+            </p>
+          </div>
+        ) : (
+          campaigns.map((camp) => (
+            <div key={camp.id} className="card p-4">
+              <div className="flex items-start justify-between flex-wrap gap-3">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-semibold text-lg">{camp.name}</h3>
+                    <span className={statusBadge(camp.status)}>{camp.status}</span>
+                  </div>
+                  {camp.description && (
+                    <p className="text-sm text-gray-500 mt-1">{camp.description}</p>
+                  )}
+                  {camp.scheduled_start_at && camp.status === "scheduled" && (
+                    <p className="text-sm text-primary-600 dark:text-primary-400 mt-1 flex items-center gap-1">
+                      <CalendarClock size={14} />
+                      Sends automatically on {formatWhen(camp.scheduled_start_at)}
+                    </p>
+                  )}
+                  {camp.scheduled_start_at && camp.status === "draft" && (
+                    <p className="text-sm text-gray-500 mt-1 flex items-center gap-1">
+                      <CalendarClock size={14} />
+                      Launch time {formatWhen(camp.scheduled_start_at)} is saved but the campaign is
+                      not scheduled yet. Click Schedule to arm it.
+                    </p>
+                  )}
+                  {camp.status === "paused" && (
+                    <p className="text-sm text-warning-600 dark:text-warning-500 mt-1">
+                      {camp.paused_from === "scheduled" ? "Scheduled launch on hold. " : ""}
+                      {camp.paused_reason || ""}
+                    </p>
+                  )}
+                  {(() => {
+                    // Prefer the inbox-derived numbers when we have them.
+                    const l = live[camp.id];
+                    const sent = l?.sent ?? camp.messages_sent;
+                    const delivered = l?.delivered ?? camp.messages_delivered;
+                    const failed = l?.failed ?? camp.messages_failed;
+                    const replies = l?.replied ?? camp.replies;
+                    const interested = l?.interested ?? camp.interested;
+                    return (
+                      <>
+                        <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-sm text-gray-500">
+                          <span>Sent: {sent}</span>
+                          <span>Delivered: {delivered}</span>
+                          <span className={failed > 0 ? "text-danger-600" : ""}>Failed: {failed}</span>
+                          <span>Replies: {replies}</span>
+                          <span>Interested: {interested}</span>
+                          {l?.reply_rate > 0 && <span>Reply rate: {l.reply_rate}%</span>}
+                        </div>
+
+                        {/* Drill-down: leads this campaign produced, and the
+                            replies. Each row inside opens that exact chat. */}
+                        <div className="flex flex-wrap gap-2 mt-3">
+                          <button
+                            onClick={() => setViewing({ campaign: camp, tab: "replies" })}
+                            disabled={!replies}
+                            className="btn-secondary btn-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                            title={replies ? "Read the replies and jump into any chat" : "No replies yet"}
+                          >
+                            <MessageCircle size={13} className="mr-1" />
+                            {replies} {replies === 1 ? "reply" : "replies"}
+                          </button>
+                          <button
+                            onClick={() => setViewing({ campaign: camp, tab: "leads" })}
+                            disabled={!(l?.leads ?? 0)}
+                            className="btn-ghost btn-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                            title="Every lead this campaign produced"
+                          >
+                            <Users size={13} className="mr-1" /> {l?.leads ?? 0} leads
+                          </button>
+                          {(l?.unread ?? 0) > 0 && (
+                            <Link
+                              // The campaign's own channel decides which inbox
+                              // this opens: an email campaign has no SMS thread.
+                              to={inboxLink(camp.channel ?? l?.channel ?? channel, {
+                                campaign_id: camp.id,
+                              })}
+                              className="btn-ghost btn-sm text-warning-600"
+                              title={`Unread replies from this campaign — opens the ${inboxLabelFor(
+                                camp.channel ?? l?.channel ?? channel
+                              )}`}
+                            >
+                              {l.unread} unread
+                            </Link>
+                          )}
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+                <div className="flex gap-1 flex-wrap">
+                  {camp.status === "draft" && (
+                    <>
+                      <button
+                        onClick={() => handleValidate(camp.id)}
+                        className="btn-secondary btn-sm"
+                        title="Check the campaign. Changes nothing."
+                      >
+                        Validate
+                      </button>
+                      <button onClick={() => handleAction(camp.id, "start")} className="btn-primary btn-sm" title="Validates, then sends now">
+                        <Play size={14} className="mr-1" /> Start now
+                      </button>
+                      <button onClick={() => handleDelete(camp.id)} className="btn-ghost btn-sm text-danger-600" title="Delete draft"><Trash2 size={14} /></button>
+                    </>
+                  )}
+                  {camp.status === "scheduled" && (
+                    <>
+                      <button onClick={() => handleAction(camp.id, "start")} className="btn-primary btn-sm"><Play size={14} className="mr-1" /> Start now</button>
+                      <button onClick={() => handleAction(camp.id, "pause")} className="btn-secondary btn-sm" title="Hold the scheduled launch"><Pause size={14} className="mr-1" /> Pause</button>
+                      <button onClick={() => handleUnschedule(camp.id)} className="btn-ghost btn-sm" title="Cancel the schedule and go back to draft">Cancel schedule</button>
+                      {(camp.messages_sent || 0) === 0 && (
+                        <button onClick={() => handleDelete(camp.id)} className="btn-ghost btn-sm text-danger-600" title="Delete campaign"><Trash2 size={14} /></button>
+                      )}
+                    </>
+                  )}
+                  {(camp.status === "draft" || camp.status === "scheduled") && (
+                    <button
+                      onClick={() => setScheduling(camp)}
+                      className="btn-secondary btn-sm"
+                      title="Send automatically at a chosen time"
+                    >
+                      <CalendarClock size={14} className="mr-1" />
+                      {camp.status === "scheduled" ? "Reschedule" : "Schedule"}
+                    </button>
+                  )}
+                  {camp.status === "running" && (
+                    <>
+                      <button onClick={() => handleAction(camp.id, "pause")} className="btn-secondary btn-sm"><Pause size={14} className="mr-1" /> Pause</button>
+                      <button onClick={() => handleAction(camp.id, "stop")} className="btn-danger btn-sm"><Square size={14} className="mr-1" /> Stop</button>
+                    </>
+                  )}
+                  {camp.status === "paused" && (
+                    <>
+                      <button onClick={() => handleResume(camp)} className="btn-primary btn-sm"><Play size={14} className="mr-1" /> Resume</button>
+                      <button onClick={() => handleAction(camp.id, "stop")} className="btn-danger btn-sm"><Square size={14} className="mr-1" /> Stop</button>
+                      {camp.paused_from === "scheduled" && (camp.messages_sent || 0) === 0 && (
+                        <button onClick={() => handleDelete(camp.id)} className="btn-ghost btn-sm text-danger-600" title="Delete campaign"><Trash2 size={14} /></button>
+                      )}
+                    </>
+                  )}
+                  {(camp.status === "draft" || camp.status === "scheduled") && (
+                    <button onClick={() => setEditing(camp)} className="btn-ghost btn-sm" title="Edit campaign">
+                      <Pencil size={14} />
+                    </button>
+                  )}
+                  <button onClick={() => handleDuplicate(camp.id)} className="btn-ghost btn-sm" title="Duplicate campaign">
+                    <Copy size={14} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
       </div>
 
       {showCreate && (
         <CampaignModal
-          channel={createChannel}
+          channel={modalChannel}
           onClose={() => { setShowCreate(false); loadCampaigns(); }}
         />
       )}
@@ -179,30 +541,17 @@ export default function CampaignsPage() {
       )}
       {viewing && (
         <CampaignRepliesDrawer
-          campaignId={viewing.id}
-          campaignName={viewing.name}
-          channel={viewing.channel}
-          initialTab="replies"
-          onClose={() => { setShowRepliesDrawer(false); setViewing(null); setRepliesCampaign(null); }}
+          key={`replies-${viewing.campaign.id}`}
+          campaignId={viewing.campaign.id}
+          campaignName={viewing.campaign.name}
+          channel={viewing.campaign.channel ?? channel}
+          initialTab={viewing.tab}
+          onClose={() => setViewing(null)}
         />
       )}
     </div>
   );
 }
-
-/** Schedule modal (stubbed from existing imports) */
-function ScheduleModal({ campaign, onClose, onSaved }: { campaign: Campaign; onClose: () => void; onSaved: () => void }) {
-  // Simplified stub to resolve compilation errors; actual implementation should match existing ScheduleModal
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="card w-full sm:max-w-lg p-6">
-        <h2 className="text-lg font-semibold mb-4">Schedule {campaign.name}</h2>
-        <button onClick={onClose} className="btn-primary">Close</button>
-      </div>
-    </div>
-  );
-}
-
 function CampaignModal({
   campaign,
   channel = "sms",
@@ -368,7 +717,7 @@ function CampaignModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4">
-      <div className="card w-full sm:max-w-lg max-h-[95vh] overflow-y-auto rounded-t-2xl sm:rounded-xl p-4 sm:p-6">
+      <div className="card w-full sm:max-w-lg max-h-[92vh] overflow-y-auto rounded-t-2xl sm:rounded-xl p-4 sm:p-6">
         <h2 className="text-lg font-semibold mb-4">
           {editing ? "Edit Campaign" : "Create Campaign"}
         </h2>
@@ -392,133 +741,243 @@ function CampaignModal({
               <button
                 type="button"
                 onClick={() => setShowImport(true)}
-                className="btn-ghost btn-sm"
+                className="text-xs font-medium text-primary-600 hover:underline flex items-center gap-1"
               >
-                <Upload size={14} className="mr-1" /> Import
+                <Upload size={12} /> Import contacts
               </button>
             </div>
             <ListPicker
               value={listId}
-              onChange={(v) => setListId(v || "")}
+              onChange={setListId}
+              placeholder="Select list... (or create one)"
+              noneLabel="No list yet"
             />
+            <p className="text-[11px] text-gray-400 mt-1">
+              Missing a list? Search it, or create it inline — no detour needed.
+            </p>
           </div>
-          {/* Channel-specific fields */}
-          {isEmail ? (
+
+          {/* Message: write from scratch, or reuse a saved template. */}
+          <div>
+            <label className="label">Message</label>
+            <div className="flex gap-1 p-1 mb-2 rounded-lg bg-gray-100 dark:bg-gray-700">
+              <button type="button" onClick={() => setMode("write")}
+                className={`flex-1 px-3 py-2 text-sm rounded-md font-medium transition-colors ${mode === "write" ? "bg-white dark:bg-gray-800 shadow-sm text-primary-600" : "text-gray-600 dark:text-gray-300"}`}>
+                Write message
+              </button>
+              <button type="button" onClick={() => setMode("template")}
+                className={`flex-1 px-3 py-2 text-sm rounded-md font-medium transition-colors ${mode === "template" ? "bg-white dark:bg-gray-800 shadow-sm text-primary-600" : "text-gray-600 dark:text-gray-300"}`}>
+                Use template
+              </button>
+            </div>
+
+            {mode === "write" ? (
+              <>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-2">
+                  <span className="text-xs text-gray-500">
+                    Start from a saved template — it fills the box below and stays editable:
+                  </span>
+                  <TemplatePicker
+                    value={fillTemplateId}
+                    onChange={fillFromTemplate}
+                    allowNone
+                    noneLabel="None — typing from scratch"
+                    placeholder="Choose a template to fill…"
+                    showPreview={false}
+                    className="flex-1 min-w-[220px]"
+                  />
+                </div>
+                {isEmail ? (
+                  <RichEmailEditor
+                    body={messageBody}
+                    onBody={setMessageBody}
+                    html={htmlBody}
+                    onHtml={setHtmlBody}
+                    attachments={attachments}
+                    onAttachments={setAttachments}
+                  />
+                ) : (
+                <textarea
+                  ref={messageRef}
+                  className="input font-mono text-sm"
+                  rows={5}
+                  value={messageBody}
+                  onChange={(e) => setMessageBody(e.target.value)}
+                  placeholder={"Hi {{first_name}}, ..."}
+                />
+                )}
+                <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                  <span className="text-xs text-gray-500 mr-1">Insert:</span>
+                  <ShortcodePicker
+                    targetRef={messageRef}
+                    value={messageBody}
+                    onChange={setMessageBody}
+                    label="Shortcode"
+                  />
+                  {["{{first_name}}", "{{business_name}}", "{{city}}", "{{state}}"].map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => setMessageBody((prev) => (prev ? prev + " " + v : v))}
+                      className="text-xs px-2 py-0.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded font-mono text-gray-600 dark:text-gray-300"
+                    >
+                      {v}
+                    </button>
+                  ))}
+                </div>
+                <p className={`text-xs text-gray-400 mt-2 ${isEmail ? "hidden" : ""}`}>
+                  {len} chars · {segments} SMS{segments === 1 ? "" : "s"}
+                  {unicode && " · unicode (70/SMS)"}
+                  {segments > 3 && " · long messages cost more"}
+                  {fillTemplateId && " · template text was copied in — this campaign keeps its own copy"}
+                </p>
+              </>
+            ) : (
+              <>
+                <TemplatePicker
+                  value={templateId}
+                  onChange={setTemplateId}
+                  allowNone={false}
+                  placeholder="Select template..."
+                />
+                <p className="text-xs text-gray-400 mt-2">
+                  This campaign references the saved template live — edits made on the Templates page
+                  later apply to what it sends. Choose “Write message” to paste the text in and keep
+                  your own copy instead.
+                </p>
+              </>
+            )}
+          </div>
+
+          {isEmail && (
             <>
               <div>
                 <label className="label">Subject *</label>
-                <input className="input" value={subject} onChange={(e) => setSubject(e.target.value)} required />
+                <input
+                  className="input"
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  placeholder="Quick question about {{company}}"
+                />
               </div>
-              <div>
-                <label className="label">Email Body</label>
-              <RichEmailEditor
-                body={htmlBody}
-                onBody={setHtmlBody}
-                html={htmlBody}
-                onHtml={setHtmlBody}
-                attachments={attachments}
-                onAttachments={setAttachments}
-              />
+              <div className="grid sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="label">Send through</label>
+                  <select
+                    className="input"
+                    value={emailAccountId}
+                    onChange={(e) => setEmailAccountId(e.target.value)}
+                  >
+                    <option value="">Default sender</option>
+                    {emailAccounts.map((a) => (
+                      <option key={a.id} value={a.id} disabled={!a.is_active}>
+                        {senderOptionLabel(a)}
+                        {a.is_active ? "" : " (off)"}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Fallback sender</label>
+                  <select
+                    className="input"
+                    value={fallbackAccountId}
+                    onChange={(e) => setFallbackAccountId(e.target.value)}
+                  >
+                    <option value="">None</option>
+                    {emailAccounts.map((a) => (
+                      <option
+                        key={a.id}
+                        value={a.id}
+                        disabled={String(a.id) === emailAccountId || !a.is_active}
+                      >
+                        {senderOptionLabel(a)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
-              <div>
-                <label className="label">Sender Account</label>
-                <select className="input" value={emailAccountId} onChange={(e) => setEmailAccountId(e.target.value)}>
-                  <option value="">-- Select --</option>
-                  {emailAccounts.map((acc) => (
-                    <option key={acc.id} value={senderIdToForm(acc.id)}>
-                      {senderOptionLabel(acc)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="label">Fallback Account</label>
-                <select className="input" value={fallbackAccountId} onChange={(e) => setFallbackAccountId(e.target.value)}>
-                  <option value="">-- None --</option>
-                  {emailAccounts.map((acc) => (
-                    <option key={acc.id} value={senderIdToForm(acc.id)}>
-                      {senderOptionLabel(acc)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="label">Sender Pool</label>
               <SenderPoolPicker
                 accounts={emailAccounts}
                 value={senderPool}
                 onChange={setSenderPool}
+                primaryId={emailAccountId || null}
               />
-              </div>
-            </>
-          ) : (
-            <>
-              <div>
-                <label className="label">Message Body *</label>
-                <textarea
-                  ref={messageRef}
-                  className="input"
-                  rows={4}
-                  value={messageBody}
-                  onChange={(e) => setMessageBody(e.target.value)}
-                  placeholder="Type your SMS message here..."
-                />
-                <div className="flex justify-between text-xs text-gray-500 mt-1">
-                  <span>{len} characters</span>
-                  <span>{segments} segment{segments !== 1 ? "s" : ""}</span>
-                </div>
-              </div>
-              <div>
-                <label className="label">Template</label>
-              <TemplatePicker
-                value={templateId}
-                onChange={(v) => {
-                  const id = v || "";
-                  setFillTemplateId(id);
-                  if (id) fillFromTemplate(id);
-                }}
-              />
-              </div>
             </>
           )}
-          {/* Common limits and delays */}
-          <div className="grid grid-cols-2 gap-3 mt-4">
+
+          <section className="rounded-lg border border-gray-200 dark:border-gray-700 p-3 space-y-3">
             <div>
-              <label className="label">Daily Limit</label>
-              <input className="input" type="number" value={dailyLimit} onChange={(e) => setDailyLimit(e.target.value)} />
+              <h3 className="font-semibold text-sm">Campaign sending controls</h3>
+              <p className="text-xs text-gray-500 mt-1">
+                These optional controls affect only this campaign. Leave caps and delays blank for
+                unrestricted pacing; blank sending hours mean 24/7. Direct sends are not restricted
+                by campaign controls. Hours use the app timezone.
+              </p>
             </div>
-            <div>
-              <label className="label">Hourly Limit</label>
-              <input className="input" type="number" value={hourlyLimit} onChange={(e) => setHourlyLimit(e.target.value)} />
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div>
+                <label className="label">Daily cap</label>
+                <input className="input" type="number" min={1} value={dailyLimit}
+                  onChange={(e) => setDailyLimit(e.target.value)} placeholder="Unlimited" />
+              </div>
+              <div>
+                <label className="label">Hourly cap</label>
+                <input className="input" type="number" min={1} value={hourlyLimit}
+                  onChange={(e) => setHourlyLimit(e.target.value)} placeholder="Unlimited" />
+              </div>
+              <div>
+                <label className="label">Per-minute cap</label>
+                <input className="input" type="number" min={1} value={perMinuteLimit}
+                  onChange={(e) => setPerMinuteLimit(e.target.value)} placeholder="Unlimited" />
+              </div>
+              <div>
+                <label className="label">Minimum delay (sec)</label>
+                <input className="input" type="number" min={0} value={minDelay}
+                  onChange={(e) => setMinDelay(e.target.value)} placeholder="None" />
+              </div>
+              <div>
+                <label className="label">Maximum delay (sec)</label>
+                <input className="input" type="number" min={0} value={maxDelay}
+                  onChange={(e) => setMaxDelay(e.target.value)} placeholder="None" />
+              </div>
+              <div>
+                <label className="label">Send from hour (0–23)</label>
+                <input className="input" type="number" min={0} max={23} value={sendStartHour}
+                  onChange={(e) => setSendStartHour(e.target.value)} placeholder="24/7" />
+              </div>
+              <div>
+                <label className="label">Send until hour (0–23)</label>
+                <input className="input" type="number" min={0} max={23} value={sendEndHour}
+                  onChange={(e) => setSendEndHour(e.target.value)} placeholder="24/7" />
+              </div>
+              <label className="flex items-center gap-2 text-sm pt-2">
+                <input type="checkbox" checked={allowWeekends}
+                  onChange={(e) => setAllowWeekends(e.target.checked)} />
+                Allow weekend sending
+              </label>
             </div>
-            <div>
-              <label className="label">Per Minute Limit</label>
-              <input className="input" type="number" value={perMinuteLimit} onChange={(e) => setPerMinuteLimit(e.target.value)} />
-            </div>
-            <div>
-              <label className="label">Min Delay (s)</label>
-              <input className="input" type="number" value={minDelay} onChange={(e) => setMinDelay(e.target.value)} />
-            </div>
-            <div>
-              <label className="label">Max Delay (s)</label>
-              <input className="input" type="number" value={maxDelay} onChange={(e) => setMaxDelay(e.target.value)} />
-            </div>
-            <div>
-              <label className="label">Send Start Hour</label>
-              <input className="input" type="number" value={sendStartHour} onChange={(e) => setSendStartHour(e.target.value)} />
-            </div>
-            <div>
-              <label className="label">Send End Hour</label>
-              <input className="input" type="number" value={sendEndHour} onChange={(e) => setSendEndHour(e.target.value)} />
-            </div>
-            <div>
-              <label className="label">Allow Weekends</label>
-              <input className="input" type="checkbox" checked={allowWeekends} onChange={(e) => setAllowWeekends(e.target.checked)} />
-            </div>
+          </section>
+
+          {!isEmail && (
+          <div>
+            <label className="label">Sequence (optional)</label>
+            <select className="input" value={sequenceId} onChange={(e) => setSequenceId(e.target.value)}>
+              <option value="">No sequence</option>
+              {sequences.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+            {sequenceId && (
+              <p className="text-xs text-gray-400 mt-1">
+                This sequence controls every message and wait. Its wait steps appear in Follow-ups.
+                Campaign-level text above will not be saved.
+              </p>
+            )}
           </div>
-          <div className="flex flex-col sm:flex-row gap-2 pt-2">
-            <button type="button" onClick={onClose} className="btn-secondary flex-1 min-h-[48px]">Cancel</button>
-            <button type="submit" disabled={submitting} className="btn-primary flex-1 min-h-[48px]">
+          )}
+
+          <div className="flex flex-col-reverse sm:flex-row gap-2 pt-2">
+            <button type="button" onClick={onClose} className="btn-secondary flex-1">Cancel</button>
+            <button type="submit" disabled={submitting} className="btn-primary flex-1">
               {submitting
                 ? editing ? "Saving..." : "Creating..."
                 : editing ? "Save Changes" : "Create Draft"}
