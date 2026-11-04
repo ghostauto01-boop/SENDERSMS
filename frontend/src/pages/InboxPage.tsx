@@ -417,6 +417,7 @@ export default function InboxPage() {
       setSelected((s: any) => s ? { ...s, status: data.status ?? s.status } : s);
       toast.success(on ? "Moved to Opportunity" : "Removed from Opportunity");
       loadConvs();
+      setShowActions(false);
     } catch { toast.error("Could not change that chat"); }
   };
 
