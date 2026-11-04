@@ -237,6 +237,10 @@ async def test_health_pings_the_provider_for_real(client, db, fake):
     gemini = next(p for p in payload["providers"] if p["provider"] == "gemini")
     assert gemini["state"] == "key_missing"
     assert payload["state"] == "ok"
+    # The Agent page maps over these names while rendering. Returning the
+    # runtime's area-count dictionary here made React unmount the whole page.
+    from app.services import agent_tools
+    assert payload["tool_areas"] == sorted(agent_tools.areas())
     # A chat completion really was sent, not just a model list.
     assert any("chat/completions" in url for _, url in fake["provider"].calls)
 

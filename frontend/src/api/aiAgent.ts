@@ -45,6 +45,15 @@ export type AgentHealth = {
   checked_at: string;
 };
 
+type ToolAreas = string[] | Record<string, number>;
+type AgentHealthResponse = Omit<AgentHealth, "tool_areas"> & {
+  tool_areas?: ToolAreas | null;
+};
+
+/** Older backends returned { area: toolCount }; the UI only needs the names. */
+const toolAreaNames = (areas: ToolAreas | null | undefined): string[] =>
+  Array.isArray(areas) ? areas : Object.keys(areas || {});
+
 export type AgentSettings = {
   groq_configured: boolean;
   gemini_configured: boolean;
@@ -147,7 +156,13 @@ export type StreamEvent =
 
 export const agentApi = {
   // -- status ---------------------------------------------------------------
-  health: () => api.get<AgentHealth>("/ai-agent/health").then((r) => r.data),
+  health: () =>
+    api.get<AgentHealthResponse>("/ai-agent/health").then((r) => ({
+      ...r.data,
+      // Normalising here protects every consumer, including while an older
+      // backend is still running during a rolling deployment.
+      tool_areas: toolAreaNames(r.data.tool_areas),
+    })),
   models: (provider: Provider, refresh = true) =>
     api
       .get<{ provider: Provider; models: ModelOption[]; selected: string | null; error: any }>(
