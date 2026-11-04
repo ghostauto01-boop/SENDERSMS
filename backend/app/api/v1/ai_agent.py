@@ -164,7 +164,9 @@ async def agent_health(
             else "down"
         ),
         "tools": len(agent_tools.REGISTRY),
-        "tool_areas": agent_tools.areas(),
+        # The browser renders a list of area names. areas() itself is a count
+        # map used by the runtime prompt, so do not leak that shape here.
+        "tool_areas": sorted(agent_tools.areas()),
         "checked_at": datetime.now(timezone.utc).isoformat(),
     }
 
