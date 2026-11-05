@@ -112,3 +112,85 @@ async def message_counts(
         )
     ).one()
     return {key: int(getattr(row, key) or 0) for key in row._fields}
+
+
+async def message_audience_counts(
+    db: AsyncSession,
+    *,
+    channel: Optional[str] = None,
+    days: Optional[int] = None,
+) -> dict:
+    """Unique contacts with a successful outbound send, separated by channel.
+
+    This is intentionally different from ``message_counts()['contacted']``:
+    the latter is a broad operational count of every outgoing record, including
+    failed or queued sends. When somebody asks how many people were actually
+    messaged, only ``sent`` and ``delivered`` message rows count as successful.
+    A person who received both SMS and email is counted once in the combined
+    total and once in each channel subtotal.
+    """
+    successful = Message.status.in_(("sent", "delivered"))
+    filters = [OUTGOING, *message_filters(channel=channel, days=days)]
+
+    def unique_contacts(condition):
+        return func.count(
+            func.distinct(case((condition, Message.contact_id), else_=None))
+        )
+
+    totals = (
+        await db.execute(
+            select(
+                unique_contacts(successful).label("contacts_sent"),
+                func.count(func.distinct(Message.contact_id)).label("contacts_attempted"),
+                func.coalesce(func.sum(case((successful, 1), else_=0)), 0).label("messages_sent"),
+                func.count(Message.id).label("outgoing_messages"),
+            ).where(*filters)
+        )
+    ).one()
+
+    channel_expr = func.coalesce(Message.channel, "sms")
+    rows = (
+        await db.execute(
+            select(
+                channel_expr.label("channel"),
+                unique_contacts(successful).label("contacts_sent"),
+                func.count(func.distinct(Message.contact_id)).label("contacts_attempted"),
+                func.coalesce(func.sum(case((successful, 1), else_=0)), 0).label("messages_sent"),
+                func.count(Message.id).label("outgoing_messages"),
+            )
+            .where(*filters)
+            .group_by(channel_expr)
+        )
+    ).all()
+
+    by_channel = {
+        str(row.channel or "sms"): {
+            "contacts_sent": int(row.contacts_sent or 0),
+            "contacts_attempted": int(row.contacts_attempted or 0),
+            "messages_sent": int(row.messages_sent or 0),
+            "outgoing_messages": int(row.outgoing_messages or 0),
+        }
+        for row in rows
+    }
+    for name in ("sms", "email"):
+        by_channel.setdefault(name, {
+            "contacts_sent": 0,
+            "contacts_attempted": 0,
+            "messages_sent": 0,
+            "outgoing_messages": 0,
+        })
+
+    return {
+        "channel": channel or "all",
+        "days": days,
+        "contacts_sent": int(totals.contacts_sent or 0),
+        "contacts_attempted": int(totals.contacts_attempted or 0),
+        "messages_sent": int(totals.messages_sent or 0),
+        "outgoing_messages": int(totals.outgoing_messages or 0),
+        "by_channel": by_channel,
+        "definition": (
+            "contacts_sent counts distinct contacts with at least one outgoing message "
+            "whose status is sent or delivered. contacts_attempted also includes queued "
+            "and failed outgoing records."
+        ),
+    }

@@ -83,8 +83,11 @@ _GEMINI_EXCLUDE = re.compile(r"(embedding|aqa|imagen|veo|tts|image-generation)",
 #: that matches a live model wins, so the newest capable model is chosen and
 #: nothing is invented. Written as *fragments*, never full names.
 _GROQ_PREFERENCE = (
-    re.compile(r"^openai/gpt-oss-120b$"),
+    # Prefer a responsive, capable tool-calling model for new installations.
+    # Larger models remain available in Settings for tasks that need them.
     re.compile(r"^openai/gpt-oss-20b$"),
+    re.compile(r"^llama-3\.1-8b-instant$"),
+    re.compile(r"^openai/gpt-oss-120b$"),
     re.compile(r"^moonshotai/kimi-k2"),
     re.compile(r"^qwen/qwen3"),
     re.compile(r"llama-3\.3-70b"),
@@ -96,8 +99,8 @@ _GROQ_PREFERENCE = (
     re.compile(r"llama"),
 )
 _GEMINI_PREFERENCE = (
-    re.compile(r"gemini-2\.5-flash$"),
     re.compile(r"gemini-2\.5-flash-lite"),
+    re.compile(r"gemini-2\.5-flash$"),
     re.compile(r"gemini-2\.5-pro"),
     re.compile(r"gemini-2\.0-flash$"),
     re.compile(r"gemini-2\.0-flash"),
@@ -449,6 +452,50 @@ def pick_default(provider: str, models: list[ModelInfo]) -> Optional[str]:
     return (with_tools or ranked)[0].id
 
 
+def is_vision_model(provider: str, model: str) -> bool:
+    """Whether a model id is from a provider family that accepts image input."""
+    model_id = (model or "").lower()
+    if provider == "gemini":
+        return model_id.startswith("gemini-")
+    return bool(re.search(r"(vision|llama-4|qwen[^/]*[-.]vl|/[^/]*vl-)", model_id))
+
+
+def pick_vision_model(provider: str, models: list[ModelInfo]) -> Optional[str]:
+    """Choose an image-capable model from a provider's live catalogue."""
+    candidates = [model for model in models if is_vision_model(provider, model.id)]
+    if not candidates:
+        return None
+    if provider == "gemini":
+        return pick_default(provider, candidates)
+    return min(
+        candidates,
+        key=lambda model: (
+            0 if "llama-4" in model.id.lower() else 1 if "vision" in model.id.lower() else 2,
+            _preference_rank(provider, model.id),
+            model.id,
+        ),
+    ).id
+
+
+async def resolve_vision_model(
+    db: AsyncSession, provider: str, *, api_key: Optional[str] = None
+) -> str:
+    """Resolve an image-capable model from a live provider list when needed."""
+    saved = await get_model(db, provider)
+    if saved and is_vision_model(provider, saved):
+        return saved
+    models = await list_models(db, provider, api_key=api_key)
+    selected = pick_vision_model(provider, models)
+    if selected:
+        return selected
+    raise ProviderError(
+        code="model_unavailable",
+        provider=provider,
+        model=saved,
+        message=f"No vision-capable {provider.title()} model is available for this image. Add a Gemini key or choose another model.",
+    )
+
+
 async def list_models(
     db: AsyncSession,
     provider: str,
@@ -592,7 +639,13 @@ def _messages_for_gemini(messages: list[dict], system_text: str) -> list[dict]:
         if role == "system":
             continue
         if role == "user":
-            contents.append({"role": "user", "parts": [{"text": message.get("content") or ""}]})
+            parts = [{"text": message.get("content") or ""}]
+            for image in message.get("images") or []:
+                data = image.get("data")
+                mime_type = image.get("mime_type")
+                if data and mime_type:
+                    parts.append({"inlineData": {"mimeType": mime_type, "data": data}})
+            contents.append({"role": "user", "parts": parts})
         elif role == "assistant":
             parts: list[dict] = []
             text = message.get("content") or ""
@@ -624,6 +677,31 @@ def _messages_for_gemini(messages: list[dict], system_text: str) -> list[dict]:
                 }
             )
     return contents
+
+
+def _messages_for_groq(messages: list[dict]) -> list[dict]:
+    """Convert our private ``images`` field to OpenAI-compatible image parts."""
+    converted = []
+    for message in messages:
+        images = message.get("images") or []
+        if not images:
+            converted.append(message)
+            continue
+        content = message.get("content") or ""
+        parts = content if isinstance(content, list) else [{"type": "text", "text": str(content)}]
+        parts = list(parts)
+        for image in images:
+            data = image.get("data")
+            mime_type = image.get("mime_type")
+            if data and mime_type:
+                parts.append({
+                    "type": "image_url",
+                    "image_url": {"url": f"data:{mime_type};base64,{data}"},
+                })
+        item = {key: value for key, value in message.items() if key != "images"}
+        item["content"] = parts
+        converted.append(item)
+    return converted
 
 
 def _normalise_gemini(data: dict) -> dict:
@@ -689,7 +767,7 @@ async def complete(
             if provider == "groq":
                 payload: dict[str, Any] = {
                     "model": model,
-                    "messages": messages,
+                    "messages": _messages_for_groq(messages),
                     "temperature": temperature,
                     "max_tokens": max_tokens,
                 }
@@ -1114,7 +1192,7 @@ async def stream_complete(
     if provider == "groq":
         payload: dict[str, Any] = {
             "model": model,
-            "messages": messages,
+            "messages": _messages_for_groq(messages),
             "temperature": temperature,
             "max_tokens": max_tokens,
             "stream": True,
@@ -1227,25 +1305,34 @@ async def stream_with_recovery(
     provider: str,
     **kwargs: Any,
 ) -> AsyncIterator[dict]:
-    """``stream_complete`` plus model recovery and provider fallback.
+    """``stream_complete`` plus stale-model recovery and optional provider fallback.
 
     The generator is *lazy*: nothing is called until the consumer starts
     iterating, so a failure is raised inside the async-for the caller already
-    has around it.
+    has around it. The final event identifies the provider/model that actually
+    answered so the chat can display truthful status after an automatic switch.
     """
     model = kwargs.pop("model")
+    allow_fallback = bool(kwargs.pop("allow_fallback", True))
+    requires_vision = bool(kwargs.pop("requires_vision", False))
     keys = kwargs.get("api_key")
     tried_fallback = False
     while True:
         try:
             async for event in stream_complete(provider, model=model, **kwargs):
+                if event.get("type") == "done":
+                    event = {**event, "provider": provider, "model": model}
                 yield event
             return
         except ProviderError as exc:
             if exc.code == "model_unavailable":
                 try:
                     models = await list_models(db, provider, api_key=keys)
-                    replacement = pick_default(provider, [m for m in models if m.id != model])
+                    remaining = [m for m in models if m.id != model]
+                    replacement = (
+                        pick_vision_model(provider, remaining)
+                        if requires_vision else pick_default(provider, remaining)
+                    )
                 except ProviderError:
                     replacement = None
                 if replacement:
@@ -1257,7 +1344,7 @@ async def stream_with_recovery(
                     yield {"type": "notice", "kind": "recovery", "text": note}
                     model = replacement
                     continue
-            if not tried_fallback:
+            if allow_fallback and not tried_fallback:
                 other = "gemini" if provider == "groq" else "groq"
                 other_key = await get_api_key(db, other)
                 if other_key and exc.code not in ("safety_blocked",):
@@ -1270,6 +1357,8 @@ async def stream_with_recovery(
                         yield {
                             "type": "notice",
                             "kind": "fallback",
+                            "provider": other,
+                            "model": other_model,
                             "text": (
                                 f"{provider.title()} failed ({exc.message}) — "
                                 f"continuing on {other.title()} with {other_model}."
