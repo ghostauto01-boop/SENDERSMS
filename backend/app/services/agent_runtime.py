@@ -41,13 +41,13 @@ from app.models.ai_agent import (
     AIAgentSkill,
 )
 from app.models.system import SystemSetting
-from app.services import agent_files, agent_tools, ai_providers
+from app.services import agent_fast_answers, agent_files, agent_tools, ai_providers
 from app.services.ai_providers import ProviderError
 
 logger = logging.getLogger(__name__)
 
 MAX_STEPS = 15          # tool rounds per turn
-HISTORY_TURNS = 30      # messages replayed to the model verbatim
+HISTORY_TURNS = 20      # recent transcript entries replayed to keep latency bounded
 SUMMARY_TRIGGER = 40    # summarise once the transcript is longer than this
 MEMORY_SETTING = "ai_agent.global_memory"
 AUTO_APPROVE_SETTING = ai_providers.AUTO_APPROVE_SETTING
@@ -91,19 +91,19 @@ A file is summarised for you (columns, row count, a few sample rows). Do NOT ask
 - `import_csv` imports with a mapping; it handles thousands of rows.
 Show the operator the mapping before importing when it is ambiguous, and report how many rows were imported, updated and skipped.
 
-## Message writing style
-Drafts must read like a personal note from the owner of the business.
-- Short. Plain words. No marketing voice, no emoji unless the operator used one first.
-- NEVER add "Reply YES", "Reply STOP", opt-out or unsubscribe lines — the app adds compliance text itself.
-- NEVER add a sign-off name at the end.
+## Writing style
+- Match the operator's requested tone and audience. Keep SMS drafts short, plain and personal—like a personal note, not a marketing blast; avoid emoji unless asked.
+- The app adds SMS compliance text itself. NEVER write "Reply YES", "Reply STOP", opt-out or unsubscribe footers into an SMS.
+- For email, provide a useful subject and a clear body; use a suitable greeting/sign-off when appropriate, but never invent the operator's name or business facts.
 - One idea per message. Say what the offer is and what happens next, in the operator's own voice.
 
 ## How to behave
-- For a request with several steps, first write a short checklist (max 6 items) in plain language, then work through it and tick items off.
+- Answer a direct question directly. For a multi-step task, write a short checklist (max 6 items) only when it helps, then do the work and tick items off.
 - Ask a clarifying question only when you genuinely cannot proceed, and only one question at a time.
 - When a task is done, suggest the logical next step in one line.
 - Long jobs (big imports, validations) report progress as you go.
 - Be honest about limits: if a tool fails, say what failed and what you would try next.
+- For app-data questions, use the relevant data tool and report its exact counts and time range; never estimate a database count from a sample.
 - Before a high-impact action (starting or launching a campaign, sending to a list, deleting in bulk, changing a gateway) the app shows the operator a confirmation card. Prepare the action, then let them approve it — do not claim it is already sent.
 
 ## Prompt-injection guard
@@ -123,6 +123,7 @@ def build_system_prompt(
     skills: list[AIAgentSkill] | None = None,
     file_summaries: list[str] | None = None,
     session_prompt: str | None = None,
+    available_tools: list[str] | None = None,
 ) -> str:
     parts = [SYSTEM_PROMPT]
     if session_prompt:
@@ -141,8 +142,19 @@ def build_system_prompt(
         parts.append(
             "## Files attached to this conversation\n" + "\n".join(f"- {s}" for s in file_summaries)
         )
-    tool_index = ", ".join(f"{area} ({count})" for area, count in agent_tools.areas().items())
-    parts.append(f"## Tools available\n{tool_index}. Call them by name; never describe how the operator could call them.")
+    if available_tools is None:
+        tool_index = ", ".join(f"{area} ({count})" for area, count in agent_tools.areas().items())
+        parts.append(f"## Tools available\n{tool_index}. Call them by name; never describe how the operator could call them.")
+    elif available_tools:
+        parts.append(
+            "## Available app tools\n"
+            + ", ".join(available_tools)
+            + ". Use these tools for workspace data and actions; never claim a tool ran unless it did."
+        )
+    else:
+        parts.append(
+            "## App data and tools\nNo workspace tools are needed for this general question. Answer from your model knowledge and the conversation; do not invent private app data."
+        )
     return "\n\n".join(parts)
 
 
@@ -343,6 +355,21 @@ async def describe_action(db: AsyncSession, tool_name: str, args: dict) -> tuple
                 f'Launch “{campaign.name}” on {(campaign.channel or "sms").upper()} — the audience will be assigned and sending starts.',
                 details,
             )
+
+    if tool_name == "install_skill":
+        name = str(args.get("name") or "Untitled skill")[:100]
+        content = str(args.get("content") or "")
+        details.update({
+            "skill": name,
+            "description": str(args.get("description") or "")[:300],
+            "content_preview": content[:800],
+            "characters": len(content),
+        })
+        return (
+            "Install this AI skill",
+            f'Add or update the workspace skill “{name}”. It will become available in future chats after approval.',
+            details,
+        )
 
     if tool_name == "send_to_list":
         lst = (
@@ -555,15 +582,65 @@ async def _file_summaries(db: AsyncSession, session_id: str, file_ids: Optional[
         columns = ", ".join(
             f"{c.get('name')} ({c.get('type')})" for c in (preview.get("columns") or [])
         )
+        entries = preview.get("entries") or []
+        entry_note = (
+            " Archive members: "
+            + "; ".join(
+                f"{item.get('name')} ({item.get('kind')}, {item.get('total_rows') or 0} rows)"
+                for item in entries[:12]
+            )
+            + "."
+            if entries else ""
+        )
+        image_note = (
+            " An image is attached for visual analysis by a capable model."
+            if preview.get("kind") == "image" else ""
+        )
         summaries.append(
             f"file_id={record.id} · {record.filename} · "
             f"{preview.get('total_rows_estimate') or 0} rows · columns: {columns or 'n/a'} · "
             f"suggested mapping: {json.dumps(preview.get('suggested_mapping') or {})}. "
-            f"Summary: {preview.get('summary') or 'No summary available'}. "
+            f"Summary: {preview.get('summary') or 'No summary available'}.{entry_note}{image_note} "
             f"Text excerpt: {(preview.get('text_head') or '')[:1500]}. "
-            "Use read_file_rows / query_file / import_csv for tabular files."
+            "Use read_file_rows / read_file_text / query_file / import_csv to inspect or import file data."
         )
     return summaries
+
+
+async def _file_images(
+    db: AsyncSession, session_id: str, file_ids: Optional[list[int]]
+) -> list[dict[str, str]]:
+    """Load selected image attachments for a multimodal provider request."""
+    if not file_ids:
+        return []
+    records = list(
+        (
+            await db.execute(
+                select(AIAgentFile).where(
+                    AIAgentFile.id.in_(file_ids), AIAgentFile.session_id == session_id
+                )
+            )
+        ).scalars().all()
+    )
+    by_id = {record.id: record for record in records}
+    images = []
+    image_budget = 14 * 1024 * 1024  # encoded bytes across all images in one provider request
+    allowed_mime = {"image/png", "image/jpeg", "image/webp"}
+    for file_id in file_ids[:4]:
+        record = by_id.get(file_id)
+        if record is None or agent_files.extension_of(record.filename) not in {"png", "jpg", "jpeg", "webp"}:
+            continue
+        try:
+            payload = json.loads(record.content or "{}")
+        except json.JSONDecodeError:
+            continue
+        mime_type = payload.get("mime_type")
+        data = payload.get("data")
+        if payload.get("__ai_image__") == 1 and mime_type in allowed_mime and isinstance(data, str):
+            if data and len(data) <= image_budget:
+                images.append({"mime_type": mime_type, "data": data})
+                image_budget -= len(data)
+    return images
 
 
 async def _active_skills(db: AsyncSession, session: AIAgentSession, text: str) -> list[AIAgentSkill]:
@@ -628,22 +705,67 @@ async def run_turn(
 
     # 1. The operator's own words are saved FIRST. Whatever happens next, the
     #    transcript contains what they asked for.
-    await add_message(db, session.id, "user", user_text, commit=True)
+    user_message = await add_message(db, session.id, "user", user_text, commit=True)
     yield {"type": "turn_start", "turn_id": turn_id}
+
+    # Common exact-count questions do not need an LLM round trip at all. Query
+    # the source tables directly, save the answer, and return it as a stream.
+    try:
+        local_answer = await agent_fast_answers.fast_answer(db, user_text)
+    except Exception:
+        logger.exception("agent: local fast-answer query failed; continuing through the model")
+        local_answer = None
+    if local_answer:
+        yield {"type": "step", "step": 1, "max": 1, "provider": "local", "model": "app data"}
+        await add_message(db, session.id, "assistant", local_answer, commit=True)
+        if (session.name or "New chat") in ("New chat", "New Session", "Session 1"):
+            session.name = _auto_title(user_text)
+        session.memory = f"{(session.memory or '').strip()}\nUser: {user_text[:300]}\nAssistant: {local_answer[:400]}".strip()[-3000:]
+        session.updated_at = datetime.now(timezone.utc)
+        await db.commit()
+        yield {"type": "text", "text": local_answer, "step": 1}
+        yield {
+            "type": "done",
+            "turn_id": turn_id,
+            "provider": "local",
+            "model": "app data",
+            "elapsed_ms": int((time.perf_counter() - started) * 1000),
+            "awaiting_approval": [],
+        }
+        return
 
     provider = provider_override or session.model or await ai_providers.get_default_provider(db)
     if provider not in ai_providers.PROVIDERS:
         provider = "groq"
 
-    # 2. Keys + model, from the live provider list.
+    # 2. Keys + model, from the live provider list. Fallback is deliberately
+    # controlled by the saved setting, including when the preferred key/model
+    # is missing before the first completion is attempted.
     keys = await ai_providers.get_keys(db)
+    auto_approve = await ai_providers.get_flag(db, AUTO_APPROVE_SETTING, False)
+    allow_fallback = await ai_providers.get_flag(db, AUTO_FALLBACK_SETTING, True)
+    requested_provider = provider
     api_key = keys.get(provider)
-    if not api_key:
+    images = await _file_images(db, session.id, file_ids)
+    temporary_image_route = False
+
+    if images and provider == "groq" and keys.get("gemini") and allow_fallback:
+        temporary_image_route = True
+        yield {
+            "type": "notice",
+            "kind": "fallback",
+            "provider": "gemini",
+            "text": "The attached image needs a vision-capable model; using Gemini for this turn.",
+        }
+        provider, api_key = "gemini", keys["gemini"]
+
+    if not api_key and allow_fallback:
         other = "gemini" if provider == "groq" else "groq"
         if keys.get(other):
             yield {
                 "type": "notice",
                 "kind": "fallback",
+                "provider": other,
                 "text": f"No {provider.title()} key is saved — using {other.title()}.",
             }
             provider, api_key = other, keys[other]
@@ -660,26 +782,76 @@ async def run_turn(
         yield {"type": "done", "turn_id": turn_id}
         return
 
+    effective_model_override = model_override if provider == requested_provider else None
     try:
-        model = model_override or await ai_providers.resolve_model(db, provider, api_key=api_key)
+        if images and provider == "groq":
+            if effective_model_override and ai_providers.is_vision_model(provider, effective_model_override):
+                model = effective_model_override
+            else:
+                model = await ai_providers.resolve_vision_model(db, provider, api_key=api_key)
+                effective_model_override = None
+        else:
+            model = effective_model_override or await ai_providers.resolve_model(db, provider, api_key=api_key)
     except ProviderError as error:
-        await _save_error(db, session, error, turn_id)
-        await db.commit()
-        yield {"type": "error", "error": error.to_dict(), "turn_id": turn_id}
-        yield {"type": "done", "turn_id": turn_id}
-        return
+        other = "gemini" if provider == "groq" else "groq"
+        if allow_fallback and keys.get(other):
+            try:
+                replacement = (
+                    await ai_providers.resolve_vision_model(db, other, api_key=keys[other])
+                    if images and other == "groq"
+                    else await ai_providers.resolve_model(db, other, api_key=keys[other])
+                )
+            except ProviderError:
+                replacement = None
+            if replacement:
+                yield {
+                    "type": "notice",
+                    "kind": "fallback",
+                    "provider": other,
+                    "model": replacement,
+                    "text": f"{provider.title()} could not resolve a chat model; continuing on {other.title()}.",
+                }
+                provider, api_key, model = other, keys[other], replacement
+                effective_model_override = None
+            else:
+                await _save_error(db, session, error, turn_id)
+                await db.commit()
+                yield {"type": "error", "error": error.to_dict(), "turn_id": turn_id}
+                yield {"type": "done", "turn_id": turn_id}
+                return
+        else:
+            await _save_error(db, session, error, turn_id)
+            await db.commit()
+            yield {"type": "error", "error": error.to_dict(), "turn_id": turn_id}
+            yield {"type": "done", "turn_id": turn_id}
+            return
 
-    if model_override:
-        await ai_providers.set_model(db, provider, model_override)
-    if provider != session.model:
+    if effective_model_override:
+        await ai_providers.set_model(db, provider, effective_model_override)
+    if provider != session.model and not temporary_image_route:
         session.model = provider
         await db.flush()
 
-    # 3. Context.
+    # 3. Context. Keep only the tools for this request; a general writing or
+    # knowledge question should not carry every workspace schema to the model.
     history = await get_messages(db, session.id)
     if len(history) > SUMMARY_TRIGGER:
         session.memory = await _summarise_history(db, session, history)
         history = history[-HISTORY_TURNS:]
+    recent_user_context = [
+        message.content or "" for message in history if message.role == "user"
+    ]
+    route_text = user_text
+    if len((user_text or "").split()) <= 8 and re.search(
+        r"\b(what about|how about|and for|same|those|them|it|that|there|then|last|another|more|again)\b",
+        user_text or "",
+        re.I,
+    ):
+        route_text = "\n".join(recent_user_context[-3:])
+    selected_tools = agent_tools.tools_for_query(route_text, has_files=bool(file_ids))
+    tools_in_use = [definition.schema() for definition in selected_tools]
+    allowed_tool_names = {definition.name for definition in selected_tools}
+
     skills = await _active_skills(db, session, user_text)
     summaries = await _file_summaries(db, session.id, file_ids)
     global_memory = await get_global_memory(db)
@@ -689,22 +861,49 @@ async def run_turn(
         skills=skills,
         file_summaries=summaries,
         session_prompt=session.system_prompt,
+        available_tools=sorted(allowed_tool_names),
     )
 
+    # Carry valid prior tool exchanges into context. Replaying a function call
+    # without its matching result is invalid for OpenAI-style APIs and often
+    # causes empty or confused responses.
+    included_call_ids = {
+        call.get("id")
+        for message in history
+        if message.role == "assistant"
+        for call in (message.tool_calls or [])
+        if (call.get("function") or {}).get("name") in allowed_tool_names and call.get("id")
+    }
     llm_messages: list[dict] = [{"role": "system", "content": system_text}]
     for message in history:
         if message.role == "system":
             continue
         if message.role == "tool":
-            continue  # tool results are replayed only inside their own round
+            if message.tool_call_id not in included_call_ids:
+                continue
+            tool_name = (message.tool_calls or {}).get("name") if isinstance(message.tool_calls, dict) else None
+            if tool_name:
+                llm_messages.append({
+                    "role": "tool",
+                    "tool_call_id": message.tool_call_id,
+                    "name": tool_name,
+                    "content": message.content or "",
+                })
+            continue
         entry: dict[str, Any] = {"role": message.role, "content": message.content or ""}
         if message.tool_calls:
-            entry["tool_calls"] = message.tool_calls
+            selected_calls = [
+                call for call in message.tool_calls
+                if (call.get("function") or {}).get("name") in allowed_tool_names
+                and call.get("id") in included_call_ids
+            ]
+            if selected_calls:
+                entry["tool_calls"] = selected_calls
+            elif not entry["content"]:
+                continue
+        if message.id == user_message.id and images:
+            entry["images"] = images
         llm_messages.append(entry)
-
-    auto_approve = await ai_providers.get_flag(db, AUTO_APPROVE_SETTING, False)
-    allow_fallback = await ai_providers.get_flag(db, AUTO_FALLBACK_SETTING, True)
-    tools_in_use = agent_tools.openai_schemas()
 
     final_text_parts: list[str] = []
     pending_confirmations: list[ConfirmationCard] = []
@@ -724,43 +923,31 @@ async def run_turn(
                 messages=llm_messages,
                 tools=tools_in_use,
                 system_text=system_text,
+                max_tokens=2048,
+                timeout=60.0,
+                allow_fallback=allow_fallback and not images,
+                requires_vision=bool(images and used_provider == "groq"),
             ):
                 if event["type"] == "text":
                     streamed.append(event["text"])
                     yield {"type": "text", "text": event["text"], "step": step + 1}
                 elif event["type"] == "notice":
+                    if event.get("provider") in ai_providers.PROVIDERS:
+                        used_provider = event["provider"]
+                    if event.get("model"):
+                        used_model = event["model"]
                     yield {"type": "notice", "kind": event.get("kind"), "text": event.get("text")}
                 elif event["type"] == "done":
                     response = event["response"]
+                    if event.get("provider") in ai_providers.PROVIDERS:
+                        used_provider = event["provider"]
+                        api_key = keys.get(used_provider) or api_key
+                    if event.get("model"):
+                        used_model = event["model"]
+                    if used_provider != session.model and not temporary_image_route:
+                        session.model = used_provider
+                        await db.flush()
         except ProviderError as error:
-            # One provider failed. If the other key exists and fallback is on,
-            # switch automatically and tell the operator.
-            other = "gemini" if used_provider == "groq" else "groq"
-            if (
-                allow_fallback
-                and error.code != "safety_blocked"
-                and keys.get(other)
-                and (other, keys.get(other)) != (used_provider, api_key)
-            ):
-                try:
-                    other_model = model_override or await ai_providers.resolve_model(
-                        db, other, api_key=keys[other]
-                    )
-                except ProviderError:
-                    other_model = None
-                if other_model:
-                    yield {
-                        "type": "notice",
-                        "kind": "fallback",
-                        "text": (
-                            f"{used_provider.title()} failed ({error.message}). "
-                            f"Continuing on {other.title()} with {other_model}."
-                        ),
-                    }
-                    used_provider, used_model, api_key = other, other_model, keys[other]
-                    session.model = other
-                    await db.flush()
-                    continue
             await _save_error(db, session, error, turn_id)
             await db.commit()
             yield {"type": "error", "error": error.to_dict(), "turn_id": turn_id}
@@ -768,11 +955,35 @@ async def run_turn(
             return
 
         if response is None:
-            break
+            error = ProviderError(
+                code="upstream_error",
+                provider=used_provider,
+                model=used_model,
+                message=f"{used_provider.title()} ended the stream without a response.",
+            )
+            await _save_error(db, session, error, turn_id)
+            await db.commit()
+            yield {"type": "error", "error": error.to_dict(), "turn_id": turn_id}
+            yield {"type": "done", "turn_id": turn_id}
+            return
         choice = (response.get("choices") or [{}])[0]
         message = choice.get("message") or {}
         content = message.get("content") or "".join(streamed)
         tool_calls = message.get("tool_calls") or []
+
+        if not tool_calls and not str(content).strip():
+            error = ProviderError(
+                code="upstream_error",
+                provider=used_provider,
+                model=used_model,
+                message=f"{used_provider.title()} returned an empty answer. Retry or switch provider.",
+                detail="The provider returned neither text nor a tool call.",
+            )
+            await _save_error(db, session, error, turn_id)
+            await db.commit()
+            yield {"type": "error", "error": error.to_dict(), "turn_id": turn_id}
+            yield {"type": "done", "turn_id": turn_id}
+            return
 
         if not tool_calls:
             final_text_parts.append(content)
@@ -791,7 +1002,7 @@ async def run_turn(
                 args = json.loads(raw_args) if isinstance(raw_args, str) else (raw_args or {})
             except json.JSONDecodeError:
                 args = {}
-            definition = agent_tools.get(name)
+            definition = agent_tools.get(name) if name in allowed_tool_names else None
             if definition is None:
                 result = {"error": f"Unknown tool {name}"}
                 llm_messages.append({

@@ -1,11 +1,11 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import AIAgentPage from "./AIAgentPage";
 
 const api = vi.hoisted(() => ({
   sessions: vi.fn(), settings: vi.fn(), health: vi.fn(), skills: vi.fn(),
-  createSession: vi.fn(), session: vi.fn(), activity: vi.fn(), memory: vi.fn(),
+  createSession: vi.fn(), session: vi.fn(), activity: vi.fn(), memory: vi.fn(), updateSessionProvider: vi.fn(),
 }));
 vi.mock("../api/aiAgent", () => ({ agentApi: api, streamChat: vi.fn() }));
 vi.mock("../components/agent/AgentModelSettings", () => ({ default: () => null, ProviderStatusPill: () => null }));
@@ -20,6 +20,7 @@ beforeEach(() => {
   api.session.mockResolvedValue({ session: {}, messages: [], pending_actions: [], files: [] });
   api.activity.mockResolvedValue([]);
   api.memory.mockResolvedValue("");
+  api.updateSessionProvider.mockResolvedValue({ success: true });
 });
 
 describe("AI agent startup", () => {
@@ -29,6 +30,22 @@ describe("AI agent startup", () => {
     await waitFor(() => expect(api.session).toHaveBeenCalledWith("new"));
     expect(await screen.findByLabelText("Message the agent")).toBeEnabled();
   });
+  it("shows an in-chat Groq/Gemini selector and persists provider changes", async () => {
+    api.sessions.mockResolvedValue([{ id: "session-1", name: "Chat", model: "groq" }]);
+    api.settings.mockResolvedValue({ groq_configured: true, gemini_configured: true, default_provider: "groq" });
+    api.session.mockResolvedValue({ session: { id: "session-1", model: "groq" }, messages: [], pending_actions: [], files: [] });
+
+    render(<MemoryRouter><AIAgentPage /></MemoryRouter>);
+    const groq = await screen.findByRole("button", { name: "Use Groq" });
+    const gemini = screen.getByRole("button", { name: "Use Gemini" });
+    expect(groq).toHaveAttribute("aria-pressed", "true");
+    expect(gemini).toHaveAttribute("aria-pressed", "false");
+
+    fireEvent.click(gemini);
+    await waitFor(() => expect(api.updateSessionProvider).toHaveBeenCalledWith("session-1", "gemini"));
+    await waitFor(() => expect(gemini).toHaveAttribute("aria-pressed", "true"));
+  });
+
   it("does not create a new conversation if the list request fails", async () => {
     api.sessions.mockRejectedValue(new Error("offline"));
     render(<MemoryRouter><AIAgentPage /></MemoryRouter>);

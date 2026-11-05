@@ -1,8 +1,8 @@
 import { useCallback, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import {
-  AlertTriangle, Check, ChevronLeft, ChevronRight, FileSpreadsheet, FileText,
-  Loader2, Paperclip, Table2, Trash2, Upload, X,
+  AlertTriangle, Check, ChevronLeft, ChevronRight, FileArchive, FileSpreadsheet, FileText,
+  Image, Loader2, Paperclip, Table2, Trash2, Upload, X,
 } from "lucide-react";
 import { agentApi, type AgentFile } from "../../api/aiAgent";
 
@@ -32,13 +32,16 @@ const CONTACT_FIELDS = [
   { key: "", label: "— ignore —" },
 ];
 
-const ACCEPT = ".csv,.tsv,.txt,.xlsx,.pdf,.docx,.png,.jpg,.jpeg,.webp";
+const ACCEPT = "*/*";
 const MAX_MB = 25;
 
 const iconFor = (filename: string) => {
   if (/\.(xlsx|xlsm)$/i.test(filename)) return FileSpreadsheet;
-  if (/\.pdf$/i.test(filename)) return FileText;
-  return Table2;
+  if (/\.zip$/i.test(filename)) return FileArchive;
+  if (/\.(png|jpe?g|webp)$/i.test(filename)) return Image;
+  if (/\.(pdf|docx|pptx|md|json|html?|xml|ya?ml|rtf|log)$/i.test(filename)) return FileText;
+  if (/\.(csv|tsv)$/i.test(filename)) return Table2;
+  return FileText;
 };
 
 const humanSize = (bytes: number) => {
@@ -92,7 +95,6 @@ export default function AgentFilesPanel({
         if (inputRef.current) inputRef.current.value = "";
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [sessionId],
   );
 
@@ -185,8 +187,8 @@ export default function AgentFilesPanel({
           <p className="text-[12px] font-medium text-gray-700 dark:text-gray-200">
             Drop a file, or tap to choose
           </p>
-          <p className="text-[10.5px] text-gray-400">CSV · XLSX · TXT · PDF · DOCX · PNG · JPG · WebP · up to {MAX_MB} MB</p>
-          <p className="text-[10.5px] text-gray-500">Images can be attached, but the agent cannot inspect their pixels yet.</p>
+          <p className="text-[10.5px] text-gray-400">Any file type · up to {MAX_MB} MB</p>
+          <p className="text-[10.5px] text-gray-500">PDFs, Office documents, text, spreadsheets and ZIP members are extracted where possible; images use a vision-capable model.</p>
           {progress !== null && (
             <div className="mt-1 w-full max-w-[180px]">
               <div className="h-1 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">

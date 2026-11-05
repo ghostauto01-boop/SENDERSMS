@@ -807,6 +807,33 @@ async def delete_list(db, args, ctx):
 # ===========================================================================
 # FILES + IMPORT
 # ===========================================================================
+async def _get_agent_file(db, args, ctx):
+    from app.models.ai_agent import AIAgentFile
+
+    stmt = select(AIAgentFile).where(AIAgentFile.id == int(args["file_id"]))
+    session_id = getattr(ctx, "session_id", None)
+    if session_id:
+        stmt = stmt.where(AIAgentFile.session_id == session_id)
+    return (await db.execute(stmt)).scalar_one_or_none()
+
+
+def _text_matches(text: str, needle: str, *, limit: int = 20, radius: int = 220) -> list[dict]:
+    text = text or ""
+    if not needle:
+        return [{"offset": 0, "text": text[: min(1500, radius * 4)]}] if text else []
+    results = []
+    cursor = 0
+    while len(results) < limit:
+        index = text.lower().find(needle, cursor)
+        if index < 0:
+            break
+        start = max(0, index - radius)
+        end = min(len(text), index + len(needle) + radius)
+        results.append({"offset": start, "text": text[start:end]})
+        cursor = max(end, index + len(needle))
+    return results
+
+
 @tool(
     "read_file_rows",
     "files",
@@ -815,19 +842,17 @@ async def delete_list(db, args, ctx):
         file_id=I("File id", _required=True),
         offset=I("Start row (0-based)"),
         limit=I("How many rows (default 20, max 200)"),
+        entry=S("Optional archive path when reading one table inside a ZIP"),
     ),
 )
 async def read_file_rows(db, args, ctx):
-    from app.models.ai_agent import AIAgentFile
     from app.services import agent_files
 
-    record = (
-        await db.execute(select(AIAgentFile).where(AIAgentFile.id == int(args["file_id"])))
-    ).scalar_one_or_none()
+    record = await _get_agent_file(db, args, ctx)
     if not record:
         return {"error": "File not found"}
     try:
-        parsed = agent_files.parse_stored(record.filename, record.content)
+        parsed = agent_files.parse_stored(record.filename, record.content, entry=args.get("entry"))
     except agent_files.FileParseError as error:
         return {"error": str(error)}
     rows = parsed.rows
@@ -836,31 +861,106 @@ async def read_file_rows(db, args, ctx):
 
 
 @tool(
-    "query_file",
+    "read_file_text",
     "files",
-    "Search an uploaded file: rows where any column contains the text. Answers 'which rows have 0803 numbers?' and similar.",
+    "Read a window of text from an uploaded PDF, Word, PowerPoint, text, JSON or ZIP document. Use when the file excerpt in the prompt is not enough.",
     _obj(
         file_id=I("File id", _required=True),
-        query=S("Text to look for (empty returns the first rows)"),
-        limit=I("Max matching rows (default 20)"),
+        offset=I("Character offset (default 0)"),
+        limit=I("Characters to return (default 4000, max 8000)"),
+        entry=S("Optional archive path when reading a member inside a ZIP"),
+    ),
+)
+async def read_file_text(db, args, ctx):
+    from app.services import agent_files
+
+    record = await _get_agent_file(db, args, ctx)
+    if not record:
+        return {"error": "File not found"}
+    try:
+        parsed = agent_files.parse_stored(record.filename, record.content, entry=args.get("entry"))
+    except agent_files.FileParseError as error:
+        return {"error": str(error)}
+    text = parsed.text or ""
+    offset = max(0, int(args.get("offset") or 0))
+    limit = max(1, min(int(args.get("limit") or 4000), 8000))
+    end = min(len(text), offset + limit)
+    return {
+        "file": record.filename,
+        "entry": args.get("entry"),
+        "total_characters": len(text),
+        "offset": offset,
+        "next_offset": end if end < len(text) else None,
+        "text": text[offset:end],
+    }
+
+
+@tool(
+    "query_file",
+    "files",
+    "Search an uploaded spreadsheet or document. For tables, return matching rows; for text documents, return relevant excerpts. ZIP archives are searched across readable members.",
+    _obj(
+        file_id=I("File id", _required=True),
+        query=S("Text to look for (empty returns the first rows or document excerpt)"),
+        limit=I("Max matching rows or excerpts (default 20)"),
+        entry=S("Optional archive path to search one member inside a ZIP"),
     ),
 )
 async def query_file(db, args, ctx):
-    from app.models.ai_agent import AIAgentFile
     from app.services import agent_files
 
-    record = (
-        await db.execute(select(AIAgentFile).where(AIAgentFile.id == int(args["file_id"])))
-    ).scalar_one_or_none()
+    record = await _get_agent_file(db, args, ctx)
     if not record:
         return {"error": "File not found"}
-    parsed = agent_files.parse_stored(record.filename, record.content)
-    matches = agent_files.query_rows(parsed.rows, args.get("query") or "", int(args.get("limit") or 20))
+    parsed = agent_files.parse_stored(record.filename, record.content, entry=args.get("entry"))
+    query = str(args.get("query") or "").strip()
+    limit = max(1, min(int(args.get("limit") or 20), 50))
+
+    if parsed.archive_entries:
+        archive_entries = parsed.archive_entries
+        if args.get("entry"):
+            archive_entries = [item for item in archive_entries if item.get("name") == args["entry"]]
+        results = []
+        needle = query.lower()
+        for item in archive_entries:
+            try:
+                member = agent_files._parse_stored_entry(item)
+            except agent_files.FileParseError:
+                continue
+            if member.is_tabular:
+                rows = agent_files.query_rows(member.rows, query, limit)
+                if rows:
+                    results.append({"entry": item.get("name"), "kind": member.kind,
+                                    "total_rows": member.total_rows, "rows": rows})
+            else:
+                text = member.text or ""
+                snippets = _text_matches(text, needle, limit=limit)
+                if snippets:
+                    results.append({"entry": item.get("name"), "kind": member.kind,
+                                    "characters": len(text), "excerpts": snippets})
+            if len(results) >= limit:
+                break
+        return {
+            "file": record.filename,
+            "query": query,
+            "archive_entries_searched": len(archive_entries),
+            "matches": results,
+        }
+
+    if parsed.is_tabular:
+        matches = agent_files.query_rows(parsed.rows, query, limit)
+        return {
+            "file": record.filename,
+            "total_rows": parsed.total_rows,
+            "matched_returned": len(matches),
+            "rows": matches,
+        }
+    excerpts = _text_matches(parsed.text or "", query.lower(), limit=limit)
     return {
         "file": record.filename,
-        "total_rows": parsed.total_rows,
-        "matched_returned": len(matches),
-        "rows": matches,
+        "total_characters": len(parsed.text or ""),
+        "matched_returned": len(excerpts),
+        "excerpts": excerpts,
     }
 
 
@@ -871,11 +971,8 @@ async def query_file(db, args, ctx):
     _obj(file_id=I("File id", _required=True)),
 )
 async def inspect_file(db, args, ctx):
-    from app.models.ai_agent import AIAgentFile
 
-    record = (
-        await db.execute(select(AIAgentFile).where(AIAgentFile.id == int(args["file_id"])))
-    ).scalar_one_or_none()
+    record = await _get_agent_file(db, args, ctx)
     if not record:
         return {"error": "File not found"}
     return {"file": record.filename, "summary": record.preview, "size_bytes": record.size_bytes}
@@ -1044,6 +1141,7 @@ async def run_import(
     "Import an uploaded file into contacts. Pass the mapping shown by inspect_file (or omit it to use the suggested mapping). Handles thousands of rows.",
     _obj(
         file_id=I("File id", _required=True),
+        entry=S("Optional CSV/TSV/XLSX path inside a ZIP archive"),
         list_id=I("List to add every imported contact to (created by create_list if needed)"),
         mapping={
             "type": "object",
@@ -1054,15 +1152,12 @@ async def run_import(
     danger_label="Import contacts from a file",
 )
 async def import_csv(db, args, ctx):
-    from app.models.ai_agent import AIAgentFile
     from app.services import agent_files
 
-    record = (
-        await db.execute(select(AIAgentFile).where(AIAgentFile.id == int(args["file_id"])))
-    ).scalar_one_or_none()
+    record = await _get_agent_file(db, args, ctx)
     if not record:
         return {"error": "File not found"}
-    parsed = agent_files.parse_stored(record.filename, record.content)
+    parsed = agent_files.parse_stored(record.filename, record.content, entry=args.get("entry"))
     if not parsed.is_tabular:
         return {"error": f"{record.filename} is not a spreadsheet — nothing to import from it."}
     mapping = args.get("mapping") or (record.preview or {}).get("suggested_mapping") or {}
@@ -2164,6 +2259,25 @@ async def list_automations(db, args, ctx):
 # ANALYTICS / OVERVIEW / SYSTEM
 # ===========================================================================
 @tool(
+    "get_message_audience_stats",
+    "analytics",
+    "Count unique contacts actually reached by outgoing SMS and/or email. Use for 'how many contacts did I send messages to?' Defaults to all time; queued and failed attempts are reported separately and do not count as successfully sent.",
+    _obj(channel=S("sms | email | all (default all)"), days=I("Optional lookback window in days; omit for all time")),
+)
+async def get_message_audience_stats(db, args, ctx):
+    from app.services.message_metrics import message_audience_counts
+
+    channel = args.get("channel") or None
+    if channel not in (None, "all", "sms", "email"):
+        return {"error": "channel must be sms, email, or all."}
+    if channel == "all":
+        channel = None
+    raw_days = args.get("days")
+    days = max(1, min(int(raw_days), 3650)) if raw_days is not None else None
+    return await message_audience_counts(db, channel=channel, days=days)
+
+
+@tool(
     "get_overview_metrics",
     "analytics",
     "The Overview numbers: sent, delivered, replies, unread, contacts, opt-outs and the daily series.",
@@ -2292,6 +2406,57 @@ async def list_skills(db, args, ctx):
     return {"skills": [{"name": s.name, "description": s.description} for s in rows]}
 
 
+@tool(
+    "install_skill",
+    "system",
+    "Create or update a reusable instruction skill for this workspace. Only use when the operator explicitly asks to install, create, or save a skill; approval is required before it becomes active.",
+    _obj(
+        name=S("Short skill name, e.g. email_writer", _required=True),
+        description=S("One-line description of what the skill does"),
+        content=S("The full reusable instructions for the skill", _required=True),
+    ),
+    danger=True,
+    danger_label="Install an AI skill",
+)
+async def install_skill(db, args, ctx):
+    """Persist an explicitly requested workspace skill after the approval card."""
+    import re
+    import uuid
+
+    from app.models.ai_agent import AIAgentSkill
+
+    raw_name = str(args.get("name") or "").strip()
+    content = str(args.get("content") or "").strip()
+    if not raw_name or not content:
+        return {"error": "A skill needs a name and reusable instructions."}
+    safe_name = re.sub(r"[^A-Za-z0-9_-]", "_", raw_name)[:100].strip("_")
+    if not safe_name:
+        safe_name = f"skill_{uuid.uuid4().hex[:6]}"
+    if len(content) > 20000:
+        return {"error": "Skill instructions must be 20,000 characters or fewer."}
+
+    skill = (
+        await db.execute(select(AIAgentSkill).where(AIAgentSkill.name == safe_name))
+    ).scalar_one_or_none()
+    created = skill is None
+    if created:
+        skill = AIAgentSkill(name=safe_name, content=content, description=args.get("description"))
+        db.add(skill)
+    else:
+        skill.content = content
+        if args.get("description"):
+            skill.description = str(args["description"])[:2000]
+        skill.is_active = True
+    await db.flush()
+    return {
+        "ok": True,
+        "created": created,
+        "name": skill.name,
+        "description": skill.description,
+        "active": bool(skill.is_active),
+    }
+
+
 # ===========================================================================
 # ACCESS TO EVERYTHING ELSE
 # ===========================================================================
@@ -2366,6 +2531,107 @@ def all_tools() -> list[Tool]:
 
 def openai_schemas() -> list[dict]:
     return [t.schema() for t in REGISTRY.values()]
+
+
+_WRITING_REQUEST = re.compile(
+    r"\b(write|draft|compose|rewrite|polish|improve)\b.{0,80}\b(email|sms|text|message|letter|proposal|script)\b",
+    re.I,
+)
+_WORKSPACE_WRITING_CONTEXT = re.compile(
+    r"\b(send|launch|campaign|list|import|upload|inbox|reply|replies|replied|responded|"
+    r"template|my data|workspace|contact database|this month|this week|yesterday|last \d+\b)\b|"
+    r"\b(?:my|all)\s+contacts\b",
+    re.I,
+)
+
+_QUERY_AREAS: dict[str, re.Pattern[str]] = {
+    "contacts": re.compile(
+        r"\b(contacts?|people|persons?|leads?|customers?|clients?|subscribers?|phone numbers?|consent|opt[ -]?outs?)\b",
+        re.I,
+    ),
+    "lists": re.compile(r"\b(lists?|audiences?|segments?)\b", re.I),
+    "campaigns": re.compile(r"\b(campaigns?|ads manager|ad campaigns?)\b", re.I),
+    "sending": re.compile(
+        r"\b(send|sends|sent|sending|messaged|texted|emailed|outbound|delivery|"
+        r"delivered|message history|broadcast|recipient)\b|"
+        r"\b(?:who|which contacts?)\s+(?:got|received)\s+(?:any\s+)?(?:messages?|texts?|emails?)\b",
+        re.I,
+    ),
+    "inbox": re.compile(
+        r"\b(inbox|conversations?|replies|replied|reply|respond|unread|chats?)\b", re.I
+    ),
+    "templates": re.compile(r"\b(templates?|variables|personalization|personalisation)\b", re.I),
+    "files": re.compile(
+        r"\b(files?|upload|uploaded|attachment|document|spreadsheet|csv|tsv|xlsx|pdf|docx|zip|import)\b",
+        re.I,
+    ),
+    "invoices": re.compile(r"\b(invoices?|payments?|paystack|bills?|overdue)\b", re.I),
+    "calendar": re.compile(r"\b(calendar|meetings?|appointments?)\b", re.I),
+    "automation": re.compile(r"\b(automations?|auto[ -]?repl(?:y|ies)|workflows?|sequences?|follow[ -]?ups?)\b", re.I),
+    "system": re.compile(
+        r"\b(settings?|install(?:ing)?|create (?:an? )?(?:ai )?skill|save (?:an? )?(?:ai )?skill|"
+        r"list (?:my )?(?:ai )?skills?|workspace skill|agent skill|gateway|worker|scheduler|notifications?|"
+        r"suppressions?|api endpoints?|app status|system errors?)\b",
+        re.I,
+    ),
+    "analytics": re.compile(
+        r"\b(analytics|metrics|statistics|stats|how many|count|number of|performance|"
+        r"reply rate|delivery rate|trends?)\b",
+        re.I,
+    ),
+}
+
+
+def tools_for_query(text: str, *, has_files: bool = False) -> list[Tool]:
+    """Return a small, relevant tool set instead of sending every schema each turn.
+
+    Unrelated general questions need no app tools at all. Explicit workspace
+    questions get their matching area, with the minimum adjacent areas required
+    for common workflows (for example, sending to a person also needs contact
+    lookup). The full registry remains available through ``openai_schemas`` for
+    management/diagnostics and callers that intentionally need every tool.
+    """
+    query = text or ""
+    if (
+        not has_files
+        and _WRITING_REQUEST.search(query)
+        and not _WORKSPACE_WRITING_CONTEXT.search(query)
+    ):
+        return []
+
+    areas_selected = {
+        area for area, pattern in _QUERY_AREAS.items() if pattern.search(query)
+    }
+    if has_files:
+        areas_selected.add("files")
+
+    lower = (text or "").lower()
+    if "sending" in areas_selected:
+        # Resolve recipients and lists without exposing unrelated admin tools.
+        areas_selected.add("contacts")
+        if re.search(r"\b(list|audience|segment|everyone|all contacts)\b", lower):
+            areas_selected.add("lists")
+        if re.search(r"\b(campaign|blast|bulk|scheduled?)\b", lower):
+            areas_selected.add("campaigns")
+    if "campaigns" in areas_selected and re.search(
+        r"\b(audience|list|contacts?|recipients?|replies|sent|delivery|analytics|performance)\b",
+        lower,
+    ):
+        areas_selected.update(("analytics", "contacts", "lists"))
+    if "inbox" in areas_selected and re.search(r"\b(contact|person|customer|phone|email|reply|respond)\b", lower):
+        areas_selected.add("contacts")
+    if "files" in areas_selected and re.search(r"\b(import|contact|contacts|list|audience)\b", lower):
+        areas_selected.update(("contacts", "lists"))
+    if re.search(r"\b(how many|count|number of)\b", lower):
+        areas_selected.add("analytics")
+
+    if not areas_selected:
+        return []
+    return [tool for tool in REGISTRY.values() if tool.area in areas_selected]
+
+
+def schemas_for_query(text: str, *, has_files: bool = False) -> list[dict]:
+    return [definition.schema() for definition in tools_for_query(text, has_files=has_files)]
 
 
 def gemini_schemas() -> list[dict]:

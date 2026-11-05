@@ -94,7 +94,7 @@ class FakeProvider:
 
     def __init__(self, *, models=None, chat=None, fail=None):
         self.models = models or {
-            "groq": ["openai/gpt-oss-120b", "llama-3.3-70b-versatile", "whisper-large-v3-turbo"],
+            "groq": ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "llama-3.3-70b-versatile", "whisper-large-v3-turbo"],
             "gemini": ["gemini-2.5-flash", "gemini-2.0-flash"],
         }
         #: list of callables returning (status, body) for chat turns
@@ -121,7 +121,7 @@ class FakeProvider:
         except (json.JSONDecodeError, UnicodeDecodeError):
             body = {}  # multipart upload (audio)
 
-        if "models" in url and "generateContent" not in url and "completions" not in url:
+        if "models" in url and "generatecontent" not in url.lower() and "completions" not in url:
             provider = "gemini" if "generativelanguage" in url else "groq"
             if provider in self.fail:
                 return httpx.Response(400, json={"error": {"message": "API key not valid"}})
@@ -175,13 +175,13 @@ async def test_models_come_from_the_live_list(client, db, fake):
     assert response.status_code == 200
     payload = response.json()
     assert [m["id"] for m in payload["models"]] == [
-        "openai/gpt-oss-120b", "llama-3.3-70b-versatile"
+        "openai/gpt-oss-20b", "openai/gpt-oss-120b", "llama-3.3-70b-versatile"
     ]
     # Whisper is filtered out of the *chat* list… check the filter explicitly.
     ids = [m["id"] for m in payload["models"]]
     assert "whisper-large-v3-turbo" not in ids
     # A current default is chosen and stored.
-    assert payload["selected"] == "openai/gpt-oss-120b"
+    assert payload["selected"] == "openai/gpt-oss-20b"
 
 
 async def test_no_hard_coded_model_names_in_code():
@@ -291,7 +291,7 @@ async def test_test_button_uses_the_saved_key(client, db, fake):
     payload = response.json()
     assert payload["success"] is True
     assert payload["using_saved_key"] is True
-    assert payload["suggested_model"] == "openai/gpt-oss-120b"
+    assert payload["suggested_model"] == "openai/gpt-oss-20b"
     assert GROQ_KEY not in response.text
 
 
@@ -422,12 +422,10 @@ async def test_falls_back_to_the_other_provider(client, db, fake):
     session_id = await _new_session(client)
 
     def route(body):
-        if "stream" in body and body.get("model", "").startswith(("openai/", "llama")):
+        if body.get("stream"):
             return httpx.Response(429, json={"error": {"message": "rate limit reached"}})
-        return httpx.Response(
-            200,
-            json={"candidates": [{"content": {"parts": [{"text": "From Gemini"}]}}]},
-        )
+        event = {"candidates": [{"content": {"parts": [{"text": "From Gemini"}]}}]}
+        return httpx.Response(200, text="data: " + json.dumps(event) + chr(10) + chr(10) + "data: [DONE]")
 
     fake["provider"].chat = [route]
     response = await client.post(
@@ -560,7 +558,7 @@ async def test_approval_really_sends_a_valid_campaign(client, db, fake, monkeypa
     session_id = await _new_session(client)
     await client.post(
         f"/api/v1/ai-agent/sessions/{session_id}/chat",
-        json={"message": "go", "stream": False},
+        json={"message": f"Start campaign {campaign.id}", "stream": False},
     )
     pending = list((await db.execute(
         select(AIAgentAction).where(AIAgentAction.status == "pending")
@@ -596,17 +594,17 @@ async def test_activity_log_records_tool_calls(client, db, fake):
     await save_key(db, "groq", GROQ_KEY)
 
     def searches(_body):
-        return streamed_tool_call("count_contacts", {})
+        return streamed_tool_call("search_contacts", {"city": "Abuja"})
 
     fake["provider"].chat = [searches]
     session_id = await _new_session(client)
     await client.post(
         f"/api/v1/ai-agent/sessions/{session_id}/chat",
-        json={"message": "how many contacts do I have?", "stream": False},
+        json={"message": "Find contacts in Abuja", "stream": False},
     )
     activity = (await client.get("/api/v1/ai-agent/activity")).json()
     assert activity["actions"], activity
-    assert activity["actions"][0]["tool"] == "count_contacts"
+    assert activity["actions"][0]["tool"] == "search_contacts"
     assert activity["actions"][0]["status"] == "done"
 
 
@@ -633,14 +631,226 @@ async def test_upload_parses_a_csv_and_suggests_a_mapping(client, db, fake):
     assert file["summary"].startswith("CSV with 2 data rows")
 
 
-async def test_unsupported_file_is_rejected_with_a_reason(client, db, fake):
+def test_word_and_powerpoint_documents_extract_text():
+    import io
+    import zipfile
+
+    from app.services import agent_files
+
+    fixtures = {
+        "brief.docx": {
+            "word/document.xml": '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Quarterly brief</w:t></w:r></w:p></w:body></w:document>',
+        },
+        "slides.pptx": {
+            "ppt/slides/slide1.xml": '<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p:cSld><p:spTree><p:sp><p:txBody><a:p><a:r><a:t>Abuja launch plan</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld></p:sld>',
+        },
+    }
+    for filename, members in fixtures.items():
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w") as archive:
+            for path, content in members.items():
+                archive.writestr(path, content)
+        parsed = agent_files.parse_file(filename, buffer.getvalue())
+        assert parsed.text
+        assert parsed.preview["text_head"] == parsed.text[:1500]
+
+
+async def test_zip_upload_exposes_its_csv_member_for_search_and_import(client, db, fake):
+    import io
+    import zipfile
+
+    from app.services import agent_tools
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        archive.writestr("exports/contacts.csv", "Name,Phone\nAda,08031234567\nBola,08039876543\n")
+        archive.writestr("readme.md", "Imported from the spring event.")
     session_id = await _new_session(client)
     response = await client.post(
         f"/api/v1/ai-agent/sessions/{session_id}/files",
-        files={"file": ("virus.exe", b"MZ\x90\x00", "application/octet-stream")},
+        files={"file": ("contacts.zip", buffer.getvalue(), "application/zip")},
     )
-    assert response.status_code == 400
-    assert "Unsupported" in response.json()["detail"]
+    assert response.status_code == 200, response.text
+    file = response.json()["file"]
+    assert file["preview"]["kind"] == "zip"
+    assert file["preview"]["primary_entry"] == "exports/contacts.csv"
+    assert len(file["preview"]["entries"]) == 2
+
+    result = await agent_tools.REGISTRY["query_file"].handler(
+        db, {"file_id": file["id"], "query": "Ada", "entry": "exports/contacts.csv"}, None
+    )
+    assert result["matches"][0]["rows"][0]["Name"] == "Ada"
+
+    from app.models.contact_list import ContactList
+
+    contact_list = ContactList(name="ZIP imports")
+    db.add(contact_list)
+    await db.flush()
+    imported = await agent_tools.REGISTRY["import_csv"].handler(
+        db, {"file_id": file["id"], "entry": "exports/contacts.csv", "list_id": contact_list.id}, None
+    )
+    assert imported["imported"] == 2
+
+
+async def test_image_upload_is_safe_to_preview_and_attaches_as_provider_image(client, db, fake):
+    import base64
+    from app.services import ai_providers
+    from app.services.agent_runtime import _file_images
+
+    session_id = await _new_session(client)
+    raw = b"\x89PNG\r\n\x1a\nminimal-image-data"
+    response = await client.post(
+        f"/api/v1/ai-agent/sessions/{session_id}/files",
+        files={"file": ("chart.png", raw, "image/png")},
+    )
+    assert response.status_code == 200, response.text
+    file = response.json()["file"]
+    assert file["preview"]["kind"] == "image"
+
+    assert base64.b64encode(raw).decode("ascii") not in json.dumps(file)
+    images = await _file_images(db, session_id, [file["id"]])
+    assert images == [{"mime_type": "image/png", "data": base64.b64encode(raw).decode("ascii")}]
+
+    groq = ai_providers._messages_for_groq([{"role": "user", "content": "Describe this", "images": images}])
+    assert groq[0]["content"][1]["type"] == "image_url"
+    gemini = ai_providers._messages_for_gemini(
+        [{"role": "user", "content": "Describe this", "images": images}], "system"
+    )
+    assert gemini[0]["parts"][1]["inlineData"]["mimeType"] == "image/png"
+
+
+async def test_image_vision_fallback_is_per_turn_and_keeps_the_provider_toggle(client, db, fake):
+    await save_key(db, "groq", GROQ_KEY)
+    await save_key(db, "gemini", GEMINI_KEY)
+    session_id = await _new_session(client)
+    upload = await client.post(
+        f"/api/v1/ai-agent/sessions/{session_id}/files",
+        files={"file": ("chart.png", b"image-bytes", "image/png")},
+    )
+    file_id = upload.json()["file"]["id"]
+
+    def gemini_reply(_body):
+        event = {"candidates": [{"content": {"parts": [{"text": "A chart."}]}}]}
+        return httpx.Response(200, text="data: " + json.dumps(event) + chr(10) + chr(10) + "data: [DONE]")
+
+    fake["provider"].chat = [gemini_reply]
+    response = await client.post(
+        f"/api/v1/ai-agent/sessions/{session_id}/chat",
+        json={"message": "What is in this picture?", "file_ids": [file_id], "stream": False},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["error"] is None
+    assert any("for this turn" in event.get("text", "") for event in response.json()["events"])
+    assert any("streamGenerateContent" in url for _, url in fake["provider"].calls)
+    session = await client.get(f"/api/v1/ai-agent/sessions/{session_id}")
+    assert session.json()["session"]["model"] == "groq"
+
+
+async def test_groq_uses_a_live_vision_model_for_image_turns(client, db, fake):
+    await save_key(db, "groq", GROQ_KEY)
+    fake["provider"].models["groq"].append("meta-llama/llama-4-scout-17b-16e-instruct")
+
+    def describe(body):
+        assert body["model"] == "meta-llama/llama-4-scout-17b-16e-instruct"
+        image_parts = [
+            part for message in body["messages"]
+            if isinstance(message.get("content"), list)
+            for part in message["content"]
+            if part.get("type") == "image_url"
+        ]
+        assert image_parts
+        event = {"choices": [{"delta": {"content": "This looks like a chart."}}]}
+        return httpx.Response(200, text="data: " + json.dumps(event) + chr(10) + chr(10) + "data: [DONE]")
+
+    fake["provider"].chat = [describe]
+    session_id = await _new_session(client)
+    upload = await client.post(
+        f"/api/v1/ai-agent/sessions/{session_id}/files",
+        files={"file": ("chart.png", bytes([137]) + b"PNG" + bytes([13, 10, 26, 10]) + b"image-bytes", "image/png")},
+    )
+    assert upload.status_code == 200, upload.text
+    file_id = upload.json()["file"]["id"]
+    response = await client.post(
+        f"/api/v1/ai-agent/sessions/{session_id}/chat",
+        json={"message": "What is in this picture?", "file_ids": [file_id], "stream": False},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["error"] is None
+    assert "chart" in response.json()["response"].lower()
+
+
+async def test_fast_answers_leave_filtered_contact_counts_to_data_tools(db):
+    from app.services.agent_fast_answers import fast_answer
+
+    assert await fast_answer(db, "How many contacts do I have in my list?") is None
+    assert await fast_answer(db, "How many SMS contacts do I have?") is None
+    assert await fast_answer(db, "How many contacts did I send messages to this month?") is None
+    assert await fast_answer(db, "How many contacts opted out of email?") == "0 contacts are opted out of email."
+    opted_only = await fast_answer(db, "How many contacts do I have who opted out?")
+    assert opted_only == "0 contacts have opted out of SMS; 0 have opted out of email."
+    combined = await fast_answer(db, "How many contacts do I have, and how many opted out?")
+    assert combined.startswith("Your workspace has 0 contacts.")
+
+
+async def test_message_recipient_count_answers_locally_without_a_provider_call(client, db, fake):
+    from app.models.conversation import Conversation, Message
+
+    reached_both = Contact(phone_number="08030000001", first_name="Ada")
+    attempted_only = Contact(phone_number="08030000002", first_name="Bola")
+    reached_sms = Contact(phone_number="08030000003", first_name="Chidi")
+    db.add_all([reached_both, attempted_only, reached_sms])
+    await db.flush()
+    conversations = [
+        Conversation(contact_id=reached_both.id, channel="sms"),
+        Conversation(contact_id=reached_both.id, channel="email"),
+        Conversation(contact_id=attempted_only.id, channel="sms"),
+        Conversation(contact_id=reached_sms.id, channel="sms"),
+    ]
+    db.add_all(conversations)
+    await db.flush()
+    message_rows = [
+        (conversations[0], reached_both, "sms", "sent"),
+        (conversations[0], reached_both, "sms", "delivered"),
+        (conversations[1], reached_both, "email", "delivered"),
+        (conversations[2], attempted_only, "sms", "failed"),
+        (conversations[3], reached_sms, "sms", "sent"),
+    ]
+    db.add_all([
+        Message(
+            conversation_id=conversation.id,
+            contact_id=contact.id,
+            channel=channel,
+            direction="outgoing",
+            status=status,
+            body="Hello",
+            idempotency_key=f"fast-count-{index}",
+        )
+        for index, (conversation, contact, channel, status) in enumerate(message_rows)
+    ])
+    await db.commit()
+
+    session_id = await _new_session(client)
+    response = await client.post(
+        f"/api/v1/ai-agent/sessions/{session_id}/chat",
+        json={"message": "How many contacts did I send messages to?", "stream": False},
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert "4 messages to 2 unique contacts" in payload["response"]
+    assert fake["provider"].calls == []
+    assert any(event.get("provider") == "local" for event in payload["events"])
+
+
+async def test_unknown_binary_file_type_is_accepted_with_an_honest_preview(client, db, fake):
+    session_id = await _new_session(client)
+    response = await client.post(
+        f"/api/v1/ai-agent/sessions/{session_id}/files",
+        files={"file": ("archive.7z", b"7z\xbc\xaf\x27\x1c\x00\x04", "application/x-7z-compressed")},
+    )
+    assert response.status_code == 200, response.text
+    file = response.json()["file"]
+    assert file["preview"]["kind"] == "binary"
+    assert "could not be extracted" in file["summary"]
 
 
 async def test_import_tool_creates_contacts_in_a_new_list(client, db, fake):
@@ -734,7 +944,7 @@ def test_system_prompt_has_the_required_rules():
         "personal note",
     ):
         assert phrase.lower() in SYSTEM_PROMPT.lower(), phrase
-    assert "never add a sign-off name" in SYSTEM_PROMPT.lower()
+    assert "never invent the operator's name" in SYSTEM_PROMPT.lower()
 
 
 def test_tool_coverage_includes_every_area():
@@ -748,6 +958,12 @@ def test_tool_coverage_includes_every_area():
     assert len(agent_tools.REGISTRY) >= 55
     for name in ("start_campaign", "bulk_delete_contacts", "send_to_list", "launch_ads_campaign"):
         assert name in agent_tools.danger_tools()
+
+    assert agent_tools.tools_for_query("Help me write a professional email") == []
+    assert agent_tools.tools_for_query("Write an SMS for restaurants in Abuja") == []
+    assert agent_tools.tools_for_query("Help me develop my negotiation skills") == []
+    data_tools = agent_tools.tools_for_query("How many contacts did I send messages to?")
+    assert "get_message_audience_stats" in {tool.name for tool in data_tools}
 
 
 async def test_spreadsheet_rows_survive_upload_and_are_queryable(client, db, fake):
@@ -785,3 +1001,9 @@ async def test_file_context_is_scoped_to_session_and_includes_document_excerpt(d
     summaries = await _file_summaries(db, "one", [own.id, other.id])
     assert len(summaries) == 1
     assert "hello" in summaries[0] and "secret" not in summaries[0]
+
+    from app.services import agent_tools
+
+    ctx = type("Ctx", (), {"session_id": "one"})()
+    denied = await agent_tools.REGISTRY["read_file_text"].handler(db, {"file_id": other.id}, ctx)
+    assert denied == {"error": "File not found"}

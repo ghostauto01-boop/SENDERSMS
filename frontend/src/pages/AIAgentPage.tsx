@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import {
-  Activity, AlertTriangle, Brain, ChevronDown, ChevronRight, Cpu, History,
-  Menu, MessageSquarePlus, MoreHorizontal, Paperclip, Pencil, Plug, Settings2,
-  Sparkles, Trash2, WifiOff, X,
+  Activity, AlertTriangle, Brain, Cpu, History, Loader2, Menu, MessageSquarePlus,
+  Paperclip, Pencil, Plug, Settings2,
+  Sparkles, Trash2, X,
 } from "lucide-react";
 import {
   agentApi,
@@ -22,7 +22,6 @@ import AgentThread, { ActivityList, type Turn, type TurnBlock } from "../compone
 import AgentComposer from "../components/agent/AgentComposer";
 import AgentFilesPanel from "../components/agent/AgentFilesPanel";
 import AgentModelSettings from "../components/agent/AgentModelSettings";
-import { ProviderStatusPill } from "../components/agent/AgentModelSettings";
 
 /**
  * THE AGENT
@@ -46,15 +45,14 @@ import { ProviderStatusPill } from "../components/agent/AgentModelSettings";
  */
 
 const SUGGESTIONS = [
+  "How many contacts did I send messages to?",
   "How many contacts do I have, and how many opted out?",
-  "Import a CSV — I'll upload it next",
+  "Import a CSV or ZIP — I'll upload it next",
   "Write an SMS for restaurants in Abuja",
   "Which campaign got the most replies this month?",
   "Reply to everyone who asked about pricing",
   "Draft an invoice for a ₦120,000 monthly retainer",
 ];
-
-const starterBlocks = (text: string): TurnBlock[] => [{ kind: "text", text }];
 
 let placeholderId = 0;
 const nextId = (prefix: string) => `${prefix}-${Date.now()}-${(placeholderId += 1)}`;
@@ -76,6 +74,7 @@ export default function AIAgentPage() {
   const [sending, setSending] = useState(false);
   const [streamError, setStreamError] = useState<{ message: string; hint?: string; retryable?: boolean } | null>(null);
   const [busyCard, setBusyCard] = useState<{ id: number; state: "approve" | "cancel" } | null>(null);
+  const [switchingProvider, setSwitchingProvider] = useState<Provider | null>(null);
   const [attached, setAttached] = useState<AgentFile | null>(null);
 
   const [drawer, setDrawer] = useState(false);
@@ -94,6 +93,10 @@ export default function AIAgentPage() {
 
   const active = sessions.find((s) => s.id === activeId) || null;
   const configured = Boolean(settings?.groq_configured || settings?.gemini_configured);
+  const activeProvider: Provider = active?.model || settings?.default_provider || "groq";
+  const activeProviderHealth = health?.providers.find((check) => check.provider === activeProvider);
+  const providerConfigured = (provider: Provider) =>
+    Boolean(provider === "groq" ? settings?.groq_configured : settings?.gemini_configured);
 
   // ---------------------------------------------------------------------
   // load
@@ -101,16 +104,16 @@ export default function AIAgentPage() {
   const loadShell = useCallback(async () => {
     setLoadingList(true);
     try {
-      const [list, s, h, sk] = await Promise.all([
+      const [list, s, sk] = await Promise.all([
         agentApi.sessions(),
         agentApi.settings().catch(() => null),
-        agentApi.health().catch(() => null),
         agentApi.skills().catch(() => [] as Skill[]),
       ]);
       setSessions(list);
       setSettings(s);
-      setHealth(h);
       setSkills(sk);
+      // Health pings make live provider calls; don't hold the chat shell open for them.
+      agentApi.health().then(setHealth).catch(() => setHealth(null));
       if (list.length && !activeId) setActiveId(list[0].id);
       else if (!list.length && !activeId) {
         try {
@@ -132,7 +135,6 @@ export default function AIAgentPage() {
 
   useEffect(() => {
     void loadShell();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadSession = useCallback(async (id: string) => {
@@ -186,7 +188,6 @@ export default function AIAgentPage() {
       hint: "Groq and Gemini are the only providers; either key is enough.",
       retryable: false,
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadingSession, activeId, configured, loadingList]);
 
   // ---------------------------------------------------------------------
@@ -231,6 +232,28 @@ export default function AIAgentPage() {
       toast.error("Could not rename that conversation.");
     } finally {
       setRenaming(false);
+    }
+  };
+
+  const chooseProvider = async (provider: Provider) => {
+    if (!activeId || !active || sending || switchingProvider) return;
+    const available = provider === "groq" ? settings?.groq_configured : settings?.gemini_configured;
+    if (!available) {
+      setPanel("settings");
+      return;
+    }
+    if (active.model === provider) return;
+    const previous = active.model;
+    setSwitchingProvider(provider);
+    setSessions((list) => list.map((s) => (s.id === activeId ? { ...s, model: provider } : s)));
+    try {
+      await agentApi.updateSessionProvider(activeId, provider);
+      toast.success(`${provider === "groq" ? "Groq" : "Gemini"} selected for this chat`);
+    } catch {
+      setSessions((list) => list.map((s) => (s.id === activeId ? { ...s, model: previous } : s)));
+      toast.error("Could not switch the model for this chat.");
+    } finally {
+      setSwitchingProvider(null);
     }
   };
 
@@ -389,7 +412,6 @@ export default function AIAgentPage() {
         agentApi.sessions().then(setSessions).catch(() => {});
         agentApi.activity(activeId).then(setActivity).catch(() => {});
         agentApi.memory("global").then(setMemory).catch(() => {});
-        agentApi.health().then(setHealth).catch(() => {});
         if (!sawText && !failed) {
           // The turn ended with nothing said (e.g. only an approval card): show
           // the card and leave the bubble alone rather than an empty shell.
@@ -483,12 +505,6 @@ export default function AIAgentPage() {
     }
   };
 
-  const toolsByArea = useMemo(() => {
-    const map: Record<string, string[]> = {};
-    for (const area of health?.tool_areas || []) map[area] = [];
-    return map;
-  }, [health?.tool_areas]);
-
   // ---------------------------------------------------------------------
   // render
   // ---------------------------------------------------------------------
@@ -540,25 +556,60 @@ export default function AIAgentPage() {
               )}
             </button>
           )}
-          <div className="mt-0.5 flex items-center gap-1.5">
-            {health ? (
-              <>
-                {(["groq", "gemini"] as Provider[]).map((provider) => (
-                  <ProviderStatusPill
-                    key={provider}
-                    provider={provider}
-                    check={health.providers.find((c) => c.provider === provider)}
-                  />
-                ))}
-              </>
-            ) : (
-              <span className="flex items-center gap-1 text-[11px] text-gray-400">
-                <WifiOff size={10} /> checking…
-              </span>
+          <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[10.5px] text-gray-500 dark:text-gray-400">
+            <span
+              className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                activeProviderHealth?.ok
+                  ? "bg-success-500"
+                  : activeProviderHealth?.state === "key_missing"
+                    ? "bg-gray-300 dark:bg-gray-600"
+                    : "bg-warning-500"
+              }`}
+            />
+            <span className="truncate">
+              {activeProvider === "groq" ? "Groq" : "Gemini"}
+              {settings?.models?.[activeProvider] ? ` · ${settings.models[activeProvider]}` : " · automatic model"}
+            </span>
+            {activeProviderHealth?.latency_ms != null && (
+              <span className="shrink-0 text-gray-400">{activeProviderHealth.latency_ms} ms</span>
             )}
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1">
+          <div
+            className="flex items-center rounded-lg border border-gray-200 bg-gray-50 p-0.5 dark:border-gray-700 dark:bg-gray-800"
+            role="group"
+            aria-label="Choose AI model provider"
+          >
+            {(["groq", "gemini"] as Provider[]).map((provider) => {
+              const selected = activeProvider === provider;
+              const configuredForProvider = providerConfigured(provider);
+              const Icon = provider === "groq" ? Cpu : Brain;
+              return (
+                <button
+                  key={provider}
+                  type="button"
+                  onClick={() => void chooseProvider(provider)}
+                  disabled={!activeId || sending || switchingProvider !== null}
+                  aria-label={`Use ${provider === "groq" ? "Groq" : "Gemini"}`}
+                  aria-pressed={selected}
+                  title={configuredForProvider
+                    ? `Use ${provider === "groq" ? "Groq" : "Gemini"} for this chat`
+                    : `Add a ${provider === "groq" ? "Groq" : "Gemini"} key in settings to use it`}
+                  className={`inline-flex items-center gap-1 rounded-md px-1.5 py-1.5 text-[10.5px] font-semibold transition-colors sm:px-2 ${
+                    selected
+                      ? "bg-white text-primary-800 shadow-sm dark:bg-gray-700 dark:text-primary-200"
+                      : "text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-100"
+                  } ${!configuredForProvider ? "opacity-60" : ""}`}
+                >
+                  {switchingProvider === provider
+                    ? <Loader2 size={11} className="animate-spin" />
+                    : <Icon size={11} />}
+                  <span>{provider === "groq" ? "Groq" : "Gemini"}</span>
+                </button>
+              );
+            })}
+          </div>
           <button
             type="button"
             onClick={createSession}

@@ -107,6 +107,10 @@ export type AgentFile = {
     total_rows_estimate?: number;
     rows?: Record<string, any>[];
     summary?: string;
+    kind?: string;
+    mime_type?: string;
+    entries?: { name: string; kind?: string; summary?: string; total_rows?: number; headers?: string[] }[];
+    primary_entry?: string;
   } | null;
   created_at?: string;
 };
@@ -144,15 +148,15 @@ export type Skill = {
 
 /** One line of the ndjson chat stream. */
 export type StreamEvent =
-  | { type: "turn_start"; turn_id: string; model?: string; provider?: string }
-  | { type: "step"; step: number; max: number; model?: string; provider?: string }
+  | { type: "turn_start"; turn_id: string; model?: string; provider?: Provider | "local" }
+  | { type: "step"; step: number; max: number; model?: string; provider?: Provider | "local" }
   | { type: "text"; text: string; step?: number }
-  | { type: "notice"; kind: "recovery" | "fallback" | "info"; text: string }
+  | { type: "notice"; kind: "recovery" | "fallback" | "info"; text: string; provider?: Provider; model?: string }
   | { type: "tool_start"; tool: string; label: string; args?: Record<string, any> }
   | { type: "tool_end"; tool: string; status: string; label: string; duration_ms?: number; data?: any }
   | (ConfirmationCard & { type: "confirmation" })
   | { type: "error"; error: { code: ProviderState; message: string; hint?: string; retryable?: boolean; provider?: string } }
-  | { type: "done"; awaiting_approval?: number[]; elapsed_ms?: number };
+  | { type: "done"; awaiting_approval?: ConfirmationCard[] | number[]; elapsed_ms?: number; provider?: Provider | "local"; model?: string };
 
 export const agentApi = {
   // -- status ---------------------------------------------------------------
@@ -199,6 +203,8 @@ export const agentApi = {
       .then((r) => r.data),
   renameSession: (id: string, name: string) =>
     api.patch(`/ai-agent/sessions/${id}`, { name }).then((r) => r.data),
+  updateSessionProvider: (id: string, provider: Provider) =>
+    api.patch(`/ai-agent/sessions/${id}`, { model: provider }).then((r) => r.data),
   deleteSession: (id: string) => api.delete(`/ai-agent/sessions/${id}`).then((r) => r.data),
 
   // -- chat -----------------------------------------------------------------

@@ -24,6 +24,7 @@ Everything the browser needs and nothing it must not have:
 Rate limits are set per route (the agent runs tools with owner privileges).
 """
 
+import base64
 import json
 import logging
 from datetime import datetime, timezone
@@ -707,19 +708,33 @@ async def undo_action(
 # files
 # ---------------------------------------------------------------------------
 async def _store_upload(db: AsyncSession, file: UploadFile, session_id: Optional[str]) -> AIAgentFile:
-    filename = file.filename or "upload.csv"
+    filename = (file.filename or "upload.csv").replace("\\", "/").rsplit("/", 1)[-1]
     raw = await file.read(agent_files.MAX_BYTES + 1)
     if not raw:
         raise HTTPException(400, "That file is empty.")
     try:
-        parsed = agent_files.parse_file(filename, raw)
+        parsed = agent_files.parse_file(filename, raw, content_type=file.content_type)
     except agent_files.FileParseError as error:
         raise HTTPException(400, str(error)) from error
+
+    if parsed.kind == "image":
+        content = json.dumps({
+            "__ai_image__": 1,
+            "mime_type": (parsed.preview or {}).get("mime_type") or "application/octet-stream",
+            "data": base64.b64encode(raw).decode("ascii"),
+        })
+    elif parsed.kind == "binary":
+        content = agent_files.BINARY_STORAGE_PREFIX + json.dumps({
+            "summary": parsed.summary,
+            "preview": parsed.preview or {},
+        })
+    else:
+        content = parsed.text or json.dumps(parsed.preview or {}, default=str)
 
     record = AIAgentFile(
         session_id=session_id,
         filename=filename[:255],
-        content=parsed.text or json.dumps(parsed.preview or {}, default=str),
+        content=content,
         preview={**parsed.preview, "summary": parsed.summary},
         size_bytes=len(raw),
     )

@@ -16,8 +16,10 @@ Parsing lives here so both the upload endpoint and the tools use the exact
 same reader, and so a corrupt file produces one clear error rather than a
 stack trace in the middle of a chat.
 
-Supported: CSV/TSV, XLSX, TXT, PDF, DOCX and images (images and PDFs are
-described for the model rather than parsed into rows).
+Supported: CSV/TSV, XLSX, TXT and common text formats, PDF, DOCX, PPTX,
+ZIP archives and images. Archives are read without extracting paths to disk;
+image content is retained for a multimodal provider, while tabular files stay
+queryable/importable as rows.
 """
 
 from __future__ import annotations
@@ -26,8 +28,10 @@ import csv
 import io
 import json
 import logging
+import mimetypes
 import re
 import zipfile
+from pathlib import PurePosixPath
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
@@ -38,9 +42,21 @@ ACCEPTED_EXTENSIONS = {
     "csv": "CSV",
     "tsv": "TSV",
     "xlsx": "Excel",
+    "xlsm": "Macro-enabled Excel",
     "txt": "Text",
+    "md": "Markdown",
+    "json": "JSON",
+    "html": "HTML",
+    "htm": "HTML",
+    "xml": "XML",
+    "yaml": "YAML",
+    "yml": "YAML",
+    "log": "Log",
+    "rtf": "Rich text",
     "pdf": "PDF",
     "docx": "Word",
+    "pptx": "PowerPoint",
+    "zip": "ZIP archive",
     "png": "Image",
     "jpg": "Image",
     "jpeg": "Image",
@@ -48,6 +64,11 @@ ACCEPTED_EXTENSIONS = {
 }
 
 MAX_BYTES = 25 * 1024 * 1024  # 25 MB — a contact export, not a database dump
+MAX_IMAGE_BYTES = 10 * 1024 * 1024
+BINARY_STORAGE_PREFIX = "__ai_agent_binary_v1__:"
+MAX_ARCHIVE_ENTRIES = 100
+MAX_ARCHIVE_UNPACKED_BYTES = 40 * 1024 * 1024
+MAX_ARCHIVE_ENTRY_BYTES = 10 * 1024 * 1024
 
 #: Header names we recognise before asking the model to invent a mapping.
 _HEADER_HINTS: dict[str, tuple[str, ...]] = {
@@ -131,13 +152,14 @@ class FileParseError(Exception):
 
 @dataclass
 class ParsedFile:
-    kind: str                       # csv | xlsx | text | pdf | docx | image
-    text: str = ""                  # stored raw text for csv/text; extracted for pdf/docx
+    kind: str                       # csv | xlsx | text | pdf | docx | pptx | zip | image
+    text: str = ""                  # normalized content or extracted text
     headers: list[str] = field(default_factory=list)
     rows: list[dict] = field(default_factory=list)
     total_rows: int = 0
     summary: str = ""
     preview: dict = field(default_factory=dict)
+    archive_entries: list[dict] = field(default_factory=list)
 
     @property
     def is_tabular(self) -> bool:
@@ -387,63 +409,281 @@ def _parse_pdf(content: bytes) -> ParsedFile:
 
 
 def _parse_docx(content: bytes) -> ParsedFile:
+    from xml.etree import ElementTree as ET
+
     try:
-        archive = zipfile.ZipFile(io.BytesIO(content))
-        xml = archive.read("word/document.xml").decode("utf-8", "ignore")
+        with zipfile.ZipFile(io.BytesIO(content)) as archive:
+            document = ET.fromstring(archive.read("word/document.xml"))
     except Exception as exc:
         raise FileParseError(f"Could not read that .docx file: {exc}") from exc
-    text = re.sub(r"<w:p[ >]", "\n<w:p ", xml)
-    text = re.sub(r"<[^>]+>", "", text)
-    text = re.sub(r"\n{3,}", "\n\n", text).strip()
+
+    word_ns = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+    paragraphs = []
+    for paragraph in document.iter(f"{word_ns}p"):
+        pieces = []
+        for node in paragraph.iter():
+            if node.tag == f"{word_ns}t" and node.text:
+                pieces.append(node.text)
+            elif node.tag in (f"{word_ns}tab", f"{word_ns}br"):
+                pieces.append("\t" if node.tag.endswith("tab") else "\n")
+        line = "".join(pieces).strip()
+        if line:
+            paragraphs.append(line)
+    text = "\n".join(paragraphs).strip()
     return ParsedFile(kind="docx", text=text, summary="Word document text extracted.")
 
 
-def parse_file(filename: str, content: bytes) -> ParsedFile:
-    """Parse any accepted upload. Raises :class:`FileParseError` with a clear why."""
+def _parse_pptx(content: bytes) -> ParsedFile:
+    """Extract slide text from a PowerPoint package using its XML parts."""
+    from xml.etree import ElementTree as ET
+
+    try:
+        with zipfile.ZipFile(io.BytesIO(content)) as archive:
+            slides = sorted(
+                name for name in archive.namelist()
+                if re.fullmatch(r"ppt/slides/slide\d+\.xml", name)
+            )
+            if not slides:
+                raise FileParseError("That PowerPoint file has no readable slides.")
+            paragraphs = []
+            for index, name in enumerate(slides, start=1):
+                root = ET.fromstring(archive.read(name))
+                texts = [node.text or "" for node in root.iter() if node.tag.endswith("}t")]
+                slide_text = " ".join(value.strip() for value in texts if value.strip())
+                if slide_text:
+                    paragraphs.append(f"Slide {index}: {slide_text}")
+    except FileParseError:
+        raise
+    except Exception as exc:
+        raise FileParseError(f"Could not read that PowerPoint file: {exc}") from exc
+    return ParsedFile(kind="pptx", text="\n".join(paragraphs), summary=f"PowerPoint text extracted from {len(slides)} slides.")
+
+
+def _parse_zip(content: bytes) -> ParsedFile:
+    """Read a ZIP's supported files safely without extracting paths to disk."""
+    try:
+        archive = zipfile.ZipFile(io.BytesIO(content))
+    except zipfile.BadZipFile as exc:
+        raise FileParseError("That ZIP archive is corrupt or not a ZIP file.") from exc
+
+    entries: list[dict] = []
+    total_unpacked = 0
+    skipped = 0
+    try:
+        infos = [info for info in archive.infolist() if not info.is_dir()]
+        if len(infos) > MAX_ARCHIVE_ENTRIES:
+            raise FileParseError(
+                f"That archive contains more than {MAX_ARCHIVE_ENTRIES} files. Split it into smaller archives."
+            )
+        if sum(info.file_size for info in infos) > MAX_ARCHIVE_UNPACKED_BYTES:
+            raise FileParseError("That archive expands beyond the 40 MB safety limit.")
+
+        for info in infos:
+            # Never trust archive names. No files are extracted, but rejecting
+            # absolute/traversal paths also keeps the preview unambiguous.
+            safe_path = PurePosixPath(info.filename.replace("\\", "/"))
+            if safe_path.is_absolute() or ".." in safe_path.parts:
+                skipped += 1
+                continue
+            extension = extension_of(info.filename)
+            if extension == "zip":
+                skipped += 1
+                continue
+            if info.file_size > MAX_ARCHIVE_ENTRY_BYTES:
+                skipped += 1
+                continue
+            total_unpacked += info.file_size
+            if total_unpacked > MAX_ARCHIVE_UNPACKED_BYTES:
+                raise FileParseError("That archive expands beyond the 40 MB safety limit.")
+            try:
+                raw = archive.read(info)
+                parsed = parse_file(info.filename, raw)
+            except (OSError, RuntimeError, zipfile.BadZipFile, FileParseError):
+                skipped += 1
+                continue
+            entry = {
+                "name": info.filename,
+                "kind": parsed.kind,
+                "content": parsed.text,
+                "summary": parsed.summary,
+                "preview": parsed.preview,
+                "headers": parsed.headers,
+                "total_rows": parsed.total_rows,
+            }
+            entries.append(entry)
+    finally:
+        archive.close()
+
+    if not entries:
+        raise FileParseError("The ZIP contains no safe, readable file members.")
+
+    primary = next((entry for entry in entries if entry.get("headers")), None)
+    text_head = "\n\n".join(
+        f"{entry['name']}: {(entry.get('content') or '')[:1200]}"
+        for entry in entries
+        if entry.get("content") and not entry.get("headers")
+    )[:6000]
+    summary = (
+        f"ZIP archive with {len(entries)} readable file(s). "
+        + "; ".join(
+            f"{entry['name']} ({entry['kind']}, {entry.get('total_rows', 0)} rows)"
+            for entry in entries[:12]
+        )
+        + (f"; {skipped} unsupported, unsafe, oversized or unreadable file(s) skipped." if skipped else "")
+    )
+    stored = json.dumps({"__ai_archive__": 1, "entries": entries}, ensure_ascii=False)
+    if primary:
+        table_preview = primary.get("preview") or {}
+        preview = {
+            **table_preview,
+            "kind": "zip",
+            "primary_entry": primary["name"],
+            "entries": [
+                {
+                    "name": entry["name"],
+                    "kind": entry["kind"],
+                    "summary": entry.get("summary"),
+                    "total_rows": entry.get("total_rows", 0),
+                    "headers": entry.get("headers") or [],
+                }
+                for entry in entries
+            ],
+            "text_head": text_head,
+        }
+        return ParsedFile(
+            kind="zip",
+            text=stored,
+            headers=list(primary.get("headers") or []),
+            total_rows=int(primary.get("total_rows") or 0),
+            preview=preview,
+            summary=summary,
+            archive_entries=entries,
+        )
+
+    preview = {
+        "kind": "zip",
+        "headers": [],
+        "columns": [],
+        "sample_rows": [],
+        "total_rows_estimate": 0,
+        "suggested_mapping": {},
+        "entries": [
+            {
+                "name": entry["name"],
+                "kind": entry["kind"],
+                "summary": entry.get("summary"),
+                "total_rows": entry.get("total_rows", 0),
+                "headers": entry.get("headers") or [],
+            }
+            for entry in entries
+        ],
+        "text_head": text_head,
+    }
+    return ParsedFile(kind="zip", text=stored, summary=summary, preview=preview, archive_entries=entries)
+
+
+def _parse_rtf(text: str) -> str:
+    """Remove common RTF control words while retaining visible text."""
+    text = re.sub(r"\\'[0-9a-fA-F]{2}", " ", text)
+    text = re.sub(r"\\par[d]?\b", "\n", text)
+    text = re.sub(r"\\tab\b", "\t", text)
+    text = re.sub(r"\\[a-zA-Z]+-?\d* ?", "", text)
+    return re.sub(r"[{}]", "", text).strip()
+
+
+def _decode_text(content: bytes) -> str:
+    try:
+        return content.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        # Nigerian exports are often saved by Excel as Windows-1252.
+        return content.decode("cp1252", errors="replace")
+
+
+def _looks_like_text(content: bytes) -> bool:
+    sample = content[:4096]
+    if not sample or b"\x00" in sample:
+        return False
+    decoded = _decode_text(sample)
+    visible = sum(char.isprintable() or char in "\r\n\t" for char in decoded)
+    return visible / max(1, len(decoded)) >= 0.85
+
+
+def parse_file(filename: str, content: bytes, *, content_type: str | None = None) -> ParsedFile:
+    """Parse common documents and safely accept any other uploaded file type.
+
+    Text-like unknown formats are still searchable. Opaque binary formats are
+    retained as file records with their type/size and an honest note when this
+    agent cannot extract their contents.
+    """
     if len(content) > MAX_BYTES:
         raise FileParseError(
             f"That file is larger than {MAX_BYTES // (1024 * 1024)} MB. Split it into smaller files."
         )
     ext = extension_of(filename)
-    if ext not in ACCEPTED_EXTENSIONS:
-        raise FileParseError(
-            "Unsupported file type. Upload CSV, XLSX, TXT, PDF, DOCX or an image."
-        )
+    if ext == "zip":
+        return _parse_zip(content)
 
-    if ext == "xlsx":
+    if ext in {"xlsx", "xlsm"}:
         parsed = _parse_xlsx(content)
+    elif ext == "pptx":
+        parsed = _parse_pptx(content)
     elif ext in ("png", "jpg", "jpeg", "webp"):
+        if len(content) > MAX_IMAGE_BYTES:
+            raise FileParseError("Images must be 10 MB or smaller so they can be sent to the vision model.")
+        mime = "image/jpeg" if ext in ("jpg", "jpeg") else f"image/{ext}"
+        preview = {
+            "kind": "image",
+            "mime_type": mime,
+            "headers": [],
+            "sample_rows": [],
+            "total_rows_estimate": 0,
+            "text_head": "",
+        }
         return ParsedFile(
             kind="image",
             text="",
-            summary=f"Image ({len(content) // 1024} KB). The agent cannot read pixels; describe it in your message.",
+            summary=f"Image ({len(content) // 1024} KB). Attach it to a message to ask about its contents.",
+            preview=preview,
         )
+    elif ext == "pdf":
+        parsed = _parse_pdf(content)
+    elif ext == "docx":
+        parsed = _parse_docx(content)
+    elif ext in {"csv", "tsv"}:
+        parsed = _parse_delimited(_decode_text(content), delimiter="\t" if ext == "tsv" else None)
+    elif ext == "rtf":
+        parsed = ParsedFile(kind="rtf", text=_parse_rtf(_decode_text(content)), summary="Rich-text document extracted.")
+    elif ext in {"txt", "md", "json", "html", "htm", "xml", "yaml", "yml", "log"}:
+        text = _decode_text(content)
+        parsed = ParsedFile(kind=ext, text=text, summary=f"{ext.upper()} text extracted.")
     else:
-        if ext == "pdf":
-            parsed = _parse_pdf(content)
-        elif ext == "docx":
-            parsed = _parse_docx(content)
+        mime = content_type or mimetypes.guess_type(filename)[0] or "application/octet-stream"
+        office_binary = ext in {"doc", "xls", "ppt", "odt", "ods", "odp"}
+        if not office_binary and (mime.startswith("text/") or _looks_like_text(content)):
+            text = _decode_text(content)
+            kind = "text" if not ext else ext
+            parsed = ParsedFile(kind=kind, text=text, summary=f"Text extracted from {filename}.")
         else:
-            try:
-                text = content.decode("utf-8-sig")
-            except UnicodeDecodeError:
-                # Nigerian exports are often saved by Excel as Windows-1252.
-                text = content.decode("cp1252", errors="replace")
-            if ext == "txt":
-                parsed = ParsedFile(kind="text", text=text)
-            else:
-                parsed = _parse_delimited(text, delimiter="\t" if ext == "tsv" else None)
+            label = f".{ext}" if ext else "unknown file type"
+            parsed = ParsedFile(
+                kind="binary",
+                text="",
+                summary=f"{label} file ({len(content) // 1024} KB). The file is attached, but its contents could not be extracted in this chat.",
+                preview={"kind": "binary", "mime_type": mime, "size_bytes": len(content)},
+            )
 
     if parsed.is_tabular:
         parsed.preview = build_preview(parsed)
         parsed.summary = summarise(parsed)
     else:
-        parsed.summary = parsed.summary or f"{ext.upper()} document, {len(parsed.text)} characters."
+        parsed.summary = parsed.summary or f"{ext.upper() or 'File'} document, {len(parsed.text)} characters."
         parsed.preview = {
             "headers": [],
             "sample_rows": [],
             "total_rows_estimate": 0,
             "text_head": parsed.text[:1500],
+            "kind": parsed.kind,
+            **(parsed.preview or {}),
         }
     return parsed
 
@@ -516,11 +756,95 @@ def columns_of(rows: list[dict]) -> list[str]:
     return seen
 
 
-def parse_stored(filename: str, content: str) -> ParsedFile:
-    """Read the persisted, normalized representation of an uploaded file."""
+def _parse_stored_entry(entry: dict) -> ParsedFile:
+    name = str(entry.get("name") or "file.txt")
+    ext = extension_of(name)
+    stored_content = str(entry.get("content") or "")
+    if entry.get("kind") == "binary":
+        return ParsedFile(
+            kind="binary",
+            text="",
+            summary=str(entry.get("summary") or "Binary file; contents were not extracted."),
+            preview=entry.get("preview") or {"kind": "binary"},
+        )
+    if ext in {"xlsx", "xlsm"}:
+        return parse_file("stored.csv", stored_content.encode("utf-8"))
+    if ext in {"pdf", "docx", "pptx", "txt", "md", "json", "html", "htm", "xml", "yaml", "yml", "log", "rtf"}:
+        return ParsedFile(
+            kind=ext,
+            text=stored_content,
+            summary=str(entry.get("summary") or "Extracted document text."),
+            preview=entry.get("preview") or {},
+            headers=list(entry.get("headers") or []),
+            total_rows=int(entry.get("total_rows") or 0),
+        )
+    if ext in {"png", "jpg", "jpeg", "webp"}:
+        return ParsedFile(
+            kind="image",
+            text="",
+            summary=str(entry.get("summary") or "Image file."),
+            preview=entry.get("preview") or {},
+        )
+    return parse_file(name, stored_content.encode("utf-8"))
+
+
+def parse_stored(filename: str, content: str, *, entry: Optional[str] = None) -> ParsedFile:
+    """Read the persisted, normalized representation of an uploaded file.
+
+    For ZIP uploads, ``entry`` selects a member by its archive path. Omitting it
+    chooses the first tabular member (ideal for the upload preview/import flow).
+    """
     ext = extension_of(filename)
-    if ext == "xlsx":
+    if ext in {"png", "jpg", "jpeg", "webp"}:
+        mime_type = "image/jpeg" if ext in {"jpg", "jpeg"} else f"image/{ext}"
+        return ParsedFile(
+            kind="image",
+            text="",
+            summary="Uploaded image. Attach it to a message to ask about its contents.",
+            preview={
+                "kind": "image",
+                "mime_type": mime_type,
+                "headers": [],
+                "sample_rows": [],
+                "total_rows_estimate": 0,
+                "text_head": "",
+            },
+        )
+    if content.startswith(BINARY_STORAGE_PREFIX):
+        try:
+            binary = json.loads(content[len(BINARY_STORAGE_PREFIX):])
+        except (TypeError, json.JSONDecodeError):
+            raise FileParseError("The saved binary upload could not be read.")
+        return ParsedFile(
+            kind="binary",
+            text="",
+            summary=str(binary.get("summary") or "Binary file; contents were not extracted."),
+            preview=binary.get("preview") or {"kind": "binary"},
+        )
+    if ext == "zip":
+        try:
+            envelope = json.loads(content)
+        except (TypeError, json.JSONDecodeError):
+            raise FileParseError("The saved ZIP archive could not be read.")
+        if not isinstance(envelope, dict) or envelope.get("__ai_archive__") != 1:
+            raise FileParseError("The saved ZIP archive has an unsupported format.")
+        entries = envelope.get("entries") or []
+        selected = None
+        if entry:
+            selected = next((item for item in entries if item.get("name") == entry), None)
+            if selected is None:
+                raise FileParseError(f"No readable file named “{entry}” is in this archive.")
+        else:
+            selected = next((item for item in entries if item.get("headers")), None)
+            selected = selected or (entries[0] if entries else None)
+        if selected is None:
+            return ParsedFile(kind="zip", text="", summary="Empty archive.", archive_entries=entries)
+        parsed = _parse_stored_entry(selected)
+        parsed.archive_entries = entries
+        return parsed
+
+    if ext in {"xlsx", "xlsm"}:
         return parse_file("stored.csv", content.encode("utf-8"))
-    if ext in ("pdf", "docx"):
+    if ext in {"pdf", "docx", "pptx", "txt", "md", "json", "html", "htm", "xml", "yaml", "yml", "log", "rtf"}:
         return ParsedFile(kind=ext, text=content, summary="Extracted document text.")
     return parse_file(filename, content.encode("utf-8"))
