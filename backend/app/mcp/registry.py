@@ -581,9 +581,11 @@ TOOLS: list[Tool] = [
     Tool(
         name="create_campaign",
         description=(
-            "Create a campaign as an unsent draft. It appears in the unified Drafts review page "
-            "alongside SMS and email drafts, where the operator can edit, validate, schedule, or "
-            "send it. Pick ONE channel: 'sms' or 'email'. Provide the audience (list_id) and the "
+            "Create a campaign as an unsent draft inside SMS Manager → Bulk Sends or Email Manager "
+            "→ Bulk Sends, according to its channel. Draft is only its unsent status: NEVER direct "
+            "the operator to the separate Drafts tab. Return the manager_url from the result so "
+            "they land on this exact campaign in the correct manager. Pick ONE channel: 'sms' or "
+            "'email'. Provide the audience (list_id) and the "
             "message — either message_body, or template_id to use a saved "
             "template. Email campaigns also take subject, html_body and email_account_id. "
             "Nothing is sent until you start it (or schedule it for a time). Optional daily, "

@@ -70,7 +70,8 @@ export default function CampaignBuilder({
 
   useEffect(() => {
     if (campaign) {
-      setForm({
+      setForm((current: any) => ({
+        ...current,
         ...campaign,
         start_date: toLocalInput(campaign.start_date),
         end_date: toLocalInput(campaign.end_date),
@@ -83,7 +84,7 @@ export default function CampaignBuilder({
         subject: campaign.subject ?? "",
         track_opens: campaign.track_opens ?? true,
         track_clicks: campaign.track_clicks ?? true,
-      });
+      }));
     }
   }, [campaign?.id]);
 
@@ -164,8 +165,22 @@ export default function CampaignBuilder({
   };
 
   return (
-    <Modal title={campaign ? "Edit campaign" : `New ${isEmail ? "email" : "SMS"} campaign`} close={close} wide>
-      <form onSubmit={submit} className="space-y-5">
+    <Modal
+      title={campaign ? "Edit campaign" : `New ${isEmail ? "email" : "SMS"} campaign`}
+      close={close}
+      wide
+      footer={(
+        <div className="flex flex-col-reverse gap-2 sm:flex-row">
+          <button type="button" className="btn-secondary flex-1" onClick={close}>
+            Cancel
+          </button>
+          <button type="submit" form="campaign-builder-form" className="btn-primary flex-1" disabled={saving}>
+            {saving ? "Saving…" : campaign ? "Save changes" : "Create campaign"}
+          </button>
+        </div>
+      )}
+    >
+      <form id="campaign-builder-form" onSubmit={submit} className="space-y-5">
         <section className="space-y-3">
           <h3 className="font-semibold text-sm text-gray-500 uppercase tracking-wide">Campaign</h3>
           <Field label="Name">
@@ -553,14 +568,6 @@ export default function CampaignBuilder({
           </label>
         </section>
 
-        <div className="flex gap-2 pt-1">
-          <button type="button" className="btn-secondary flex-1" onClick={close}>
-            Cancel
-          </button>
-          <button className="btn-primary flex-1" disabled={saving}>
-            {saving ? "Saving…" : campaign ? "Save changes" : "Create campaign"}
-          </button>
-        </div>
       </form>
     </Modal>
   );

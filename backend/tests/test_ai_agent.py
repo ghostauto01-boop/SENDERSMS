@@ -439,6 +439,37 @@ async def test_falls_back_to_the_other_provider(client, db, fake):
                for n in notices)
 
 
+async def test_groq_rate_limit_recovers_on_another_live_model(client, db, fake):
+    """A model-scoped 429 must not dead-end when no Gemini key is configured."""
+    await save_key(db, "groq", GROQ_KEY)
+    session_id = await _new_session(client)
+
+    def limited_then_fast(body):
+        if body.get("model") == "openai/gpt-oss-20b":
+            assert body.get("reasoning_effort") == "low"
+            return httpx.Response(429, json={"error": {"message": "rate limit reached for this model"}})
+        return httpx.Response(
+            200,
+            text='data: {"choices":[{"delta":{"content":"Recovered quickly"}}]}\n\ndata: [DONE]',
+        )
+
+    fake["provider"].chat = [limited_then_fast]
+    response = await client.post(
+        f"/api/v1/ai-agent/sessions/{session_id}/chat",
+        json={"message": "hello", "stream": False},
+    )
+    payload = response.json()
+
+    assert payload["error"] is None
+    assert "Recovered quickly" in payload["response"]
+    notices = [event for event in payload["events"] if event["type"] == "notice"]
+    assert any("hit a limit" in event["text"] for event in notices)
+    assert payload["events"][-1]["model"] == "openai/gpt-oss-120b"
+    # The next turn starts on the working route instead of repeating the 429.
+    from app.services import ai_providers
+    assert await ai_providers.get_model(db, "groq") == "openai/gpt-oss-120b"
+
+
 # ---------------------------------------------------------------------------
 # tools: consent + approvals
 # ---------------------------------------------------------------------------
@@ -458,6 +489,25 @@ async def test_agent_refuses_to_message_an_opted_out_contact(client, db, fake):
     )
     assert result["refused"] is True
     assert "opted out" in result["error"].lower()
+
+
+async def test_agent_campaign_creation_returns_manager_destination(client, db, fake):
+    from app.services import agent_tools
+
+    class Ctx:
+        user = User(id=1, username="tester", role="admin")
+
+    result = await agent_tools.REGISTRY["create_campaign"].handler(
+        db,
+        {"name": "SMS launch", "channel": "sms", "message_body": "Hello"},
+        Ctx(),
+    )
+
+    assert result["ok"] is True
+    assert result["manager"] == "SMS Manager"
+    assert result["manager_section"] == "Bulk Sends"
+    assert result["manager_url"] == f"/sms-manager?section=Bulk%20Sends&campaign={result['campaign']['id']}"
+    assert "/drafts" not in result["next"]
 
 
 async def test_starting_a_campaign_waits_for_approval(client, db, fake):

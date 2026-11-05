@@ -97,6 +97,7 @@ beforeEach(() => {
   apiGet.mockImplementation((url: string) => {
     if (url === "/campaigns/") return Promise.resolve({ data: { total: ITEMS.length, items: ITEMS } });
     if (url === "/overview/campaigns") return Promise.resolve({ data: { items: [] } });
+    if (url === "/sequences/") return Promise.resolve({ data: { items: [] } });
     return Promise.resolve({ data: {} });
   });
   apiPost.mockResolvedValue({ data: { success: true, message: "ok" } });
@@ -122,6 +123,28 @@ describe("CampaignsPage lifecycle", () => {
       params: { channel: "all", status: "draft" },
     });
     expect(screen.getByRole("heading", { name: "Drafts" })).toBeInTheDocument();
+  });
+
+  it("opens an MCP manager link with Save/Cancel outside the scrolling fields", async () => {
+    render(
+      <MemoryRouter initialEntries={["/sms-manager?section=Bulk%20Sends&campaign=1"]}>
+        <CampaignsPage embedded fixedChannel="sms" />
+      </MemoryRouter>,
+    );
+
+    const dialog = await screen.findByRole("dialog", { name: "Edit Campaign" });
+    const save = within(dialog).getByRole("button", { name: "Save Changes" });
+    const cancel = within(dialog).getByRole("button", { name: "Cancel" });
+    const scrollingFields = dialog.querySelector(".modal-body");
+
+    expect(scrollingFields).not.toBeNull();
+    expect(scrollingFields?.contains(save)).toBe(false);
+    expect(scrollingFields?.contains(cancel)).toBe(false);
+    expect(dialog.querySelector(".modal-actions")?.contains(save)).toBe(true);
+    expect(dialog.parentElement?.parentElement).toBe(document.body);
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Close campaign editor" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Edit Campaign" })).toBeNull());
   });
 
   it("Validate only reports: it calls /validate and never starts or schedules", async () => {

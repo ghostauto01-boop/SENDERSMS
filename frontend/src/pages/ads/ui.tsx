@@ -1,5 +1,6 @@
 import { Trophy, X } from "lucide-react";
 import React from "react";
+import { createPortal } from "react-dom";
 
 /** Shared primitives for the SMS Ads Manager. Mobile-first by default. */
 
@@ -164,28 +165,55 @@ export function Modal({
   close,
   children,
   wide,
+  footer,
 }: {
   title: string;
   close: () => void;
   children: React.ReactNode;
   wide?: boolean;
+  /** Kept outside the scrolling body so the primary action is always visible. */
+  footer?: React.ReactNode;
 }) {
-  return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-end sm:items-center justify-center sm:p-4">
+  const titleId = React.useId();
+
+  React.useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") close();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [close]);
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex h-[100dvh] items-end justify-center overscroll-contain bg-black/50 sm:items-center sm:p-4">
       <div
-        className={`card w-full ${
+        className={`card dialog-card flex max-h-[100dvh] w-full flex-col overflow-hidden rounded-t-2xl sm:max-h-[calc(100dvh-2rem)] sm:rounded-xl ${
           wide ? "sm:max-w-3xl" : "sm:max-w-xl"
-        } max-h-[94vh] overflow-y-auto rounded-t-2xl sm:rounded-xl p-5`}
+        }`}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
       >
-        <div className="flex justify-between items-center mb-4 sticky top-0 bg-white dark:bg-gray-800 z-10">
-          <h2 className="text-lg sm:text-xl font-semibold">{title}</h2>
-          <button className="btn-ghost btn-sm" onClick={close} aria-label="Close">
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-gray-100 px-4 py-3 dark:border-gray-700 sm:px-5">
+          <h2 id={titleId} className="text-lg font-semibold sm:text-xl">{title}</h2>
+          <button type="button" className="btn-ghost btn-sm shrink-0" onClick={close} aria-label="Close">
             <X size={18} />
           </button>
         </div>
-        {children}
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5">
+          {children}
+        </div>
+        {footer && (
+          <div
+            className="shrink-0 border-t border-gray-100 px-4 pt-3 dark:border-gray-700 sm:px-5"
+            style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom, 0px))" }}
+          >
+            {footer}
+          </div>
+        )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

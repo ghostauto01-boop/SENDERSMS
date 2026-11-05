@@ -555,3 +555,22 @@ async def test_guide_and_endpoint_catalogue_tools(monkeypatch):
 def test_tool_is_hashable_by_name():
     assert isinstance(TOOLS_BY_NAME["start_campaign"], Tool)
     assert TOOLS_BY_NAME["start_campaign"].scope == "write"
+
+
+@pytest.mark.asyncio
+async def test_created_campaign_points_to_its_channel_manager(captured):
+    outcome = await _run(
+        "create_campaign", name="Email launch", channel="email", message_body="Hello"
+    )
+    document = json.loads(outcome.result["content"][0]["text"])
+    data = document["data"]
+
+    assert data["manager"] == "Email Manager"
+    assert data["manager_section"] == "Bulk Sends"
+    assert data["manager_url"] == "/email-manager?section=Bulk%20Sends&campaign=7"
+    assert "/drafts" not in data["next_action"]
+    assert outcome.result["structuredContent"]["manager_url"] == data["manager_url"]
+
+    description = TOOLS_BY_NAME["create_campaign"].description
+    assert "SMS Manager" in description and "Email Manager" in description
+    assert "unified Drafts review page" not in description

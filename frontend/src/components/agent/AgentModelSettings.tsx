@@ -68,13 +68,14 @@ export default function AgentModelSettings({
   compact = false,
   onConfigured,
 }: {
-  /** Compact hides the switches and the model card — used inside the chat shell. */
+  /** Compact hides behaviour switches; live model selection stays available. */
   compact?: boolean;
   onConfigured?: (ready: boolean) => void;
 }) {
   const [settings, setSettings] = useState<AgentSettings | null>(null);
   const [health, setHealth] = useState<AgentHealth | null>(null);
   const [models, setModels] = useState<Record<Provider, ModelOption[]>>({ groq: [], gemini: [] });
+  const [loadingModels, setLoadingModels] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<Provider, string>>({ groq: "", gemini: "" });
@@ -84,11 +85,17 @@ export default function AgentModelSettings({
 
   const load = useCallback(async (refreshModels = false) => {
     setLoadError(null);
+    setLoadingModels(true);
     try {
-      const [s, h] = await Promise.all([agentApi.settings(), agentApi.health().catch(() => null)]);
+      // Settings and the live model catalogue are the useful UI. Health pings
+      // consume provider quota, so compact chat settings reuse the page's
+      // existing status instead of firing a second pair of AI requests.
+      const s = await agentApi.settings();
       setSettings(s);
-      setHealth(h);
       onConfigured?.(Boolean(s.groq_configured || s.gemini_configured));
+      if (!compact) {
+        agentApi.health().then(setHealth).catch(() => setHealth(null));
+      }
 
       const providers: Provider[] = ["groq", "gemini"];
       const lists = await Promise.all(
@@ -99,10 +106,11 @@ export default function AgentModelSettings({
         ),
       );
       setModels({ groq: lists[0], gemini: lists[1] });
+      setLoadingModels(false);
     } catch (error: any) {
+      setLoadingModels(false);
       setLoadError(error?.response?.data?.detail || "Could not read the agent settings.");
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -168,7 +176,8 @@ export default function AgentModelSettings({
       setSettings((s) => (s ? { ...s, models: { ...s.models, [provider]: model } } : s));
       toast.success(`Now using ${model}`);
       setOpenModel(null);
-      agentApi.health().then(setHealth).catch(() => {});
+      onConfigured?.(configured);
+      if (!compact) agentApi.health().then(setHealth).catch(() => {});
     } catch {
       toast.error("Could not save the model");
     } finally {
@@ -211,7 +220,9 @@ export default function AgentModelSettings({
                 ? "Connected and answering. Models are read live from the provider."
                 : missingKey
                   ? "Add one key and the agent can run your whole workspace."
-                  : "A key is saved, but the agent cannot reach the provider right now."}
+                  : health
+                    ? "A key is saved, but the agent cannot reach the provider right now."
+                    : "Choose a fast open-weight model below. The agent recovers automatically if a provider or model fails."}
             </p>
           </div>
           <div className="flex items-center gap-1.5">
@@ -382,7 +393,7 @@ export default function AgentModelSettings({
       </div>
 
       {/* ---- models -------------------------------------------------- */}
-      {!compact && configured && (
+      {configured && (
         <div className="card p-3.5 sm:p-4">
           <h3 className="text-[13.5px] font-semibold">Model</h3>
           <p className="mt-0.5 text-[11.5px] text-gray-500 dark:text-gray-400">
@@ -399,14 +410,16 @@ export default function AgentModelSettings({
                   <button
                     type="button"
                     onClick={() => setOpenModel(openModel === provider ? null : provider)}
-                    className="flex w-full items-center justify-between gap-2 rounded-xl border border-gray-200 px-3 py-2 text-left hover:border-primary-300 dark:border-gray-700"
+                    aria-label={`Choose ${PROVIDER_META[provider].label} model`}
+                    aria-expanded={openModel === provider}
+                    className="flex min-h-[44px] w-full items-center justify-between gap-2 rounded-xl border border-gray-200 px-3 py-2 text-left hover:border-primary-300 dark:border-gray-700"
                   >
                     <span className="min-w-0">
                       <span className="block text-[11px] font-medium uppercase tracking-wide text-gray-400">
                         {PROVIDER_META[provider].label}
                       </span>
                       <span className="block truncate font-mono text-[12px]">
-                        {selected || (list.length ? "Choose a model" : "No models listed")}
+                        {selected || (loadingModels ? "Loading live models…" : list.length ? "Choose a model" : "No models listed")}
                       </span>
                     </span>
                     <ChevronDown
@@ -418,7 +431,7 @@ export default function AgentModelSettings({
                     <div className="mt-1.5 max-h-64 space-y-1 overflow-y-auto rounded-xl border border-gray-200 p-1 dark:border-gray-700">
                       {list.length === 0 && (
                         <p className="px-2 py-1.5 text-[12px] text-gray-500">
-                          No models were returned. Use Test to see why.
+                          {loadingModels ? "Loading the provider’s live models…" : "No models were returned. Use Test to see why."}
                         </p>
                       )}
                       {list.map((model) => (
