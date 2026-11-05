@@ -132,8 +132,8 @@ ERROR_CODES = (
 _ERROR_HINTS = {
     "key_missing": "Add a key in Settings → AI Agent. The agent cannot call the model without one.",
     "key_invalid": "The saved key was rejected. Open Settings → AI Agent, paste a fresh key and press Test.",
-    "model_unavailable": "The model no longer exists at the provider. Pick another model in Settings, or let the agent choose one for you.",
-    "rate_limited": "The provider is throttling this key. Wait a moment and retry, or switch provider.",
+    "model_unavailable": "Automatic recovery could not find a working model. Open Agent settings → Model and choose from the live list, or switch provider.",
+    "rate_limited": "The agent already tried automatic recovery. Retry shortly, choose another live model in Agent settings, or switch provider.",
     "timeout": "The provider did not answer in time. Retry, or switch provider.",
     "safety_blocked": "The provider refused this request on safety grounds. Rephrase it and try again.",
     "provider_down": "The provider could not be reached. Check the connection, then retry.",
@@ -774,6 +774,10 @@ async def complete(
                 if tools:
                     payload["tools"] = tools
                     payload["tool_choice"] = "auto"
+                if model.startswith("openai/gpt-oss-"):
+                    # Keep the open-weight model's reasoning useful but bounded;
+                    # medium/high needlessly delays ordinary workspace requests.
+                    payload["reasoning_effort"] = "low"
                 response = await client.post(
                     GROQ_CHAT_URL,
                     headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
@@ -790,6 +794,8 @@ async def complete(
                 body["systemInstruction"] = {"parts": [{"text": system_text}]}
             if tools:
                 body["tools"] = _convert_tools_for_gemini(tools)
+            if "gemini-2.5-flash" in model:
+                body["generationConfig"]["thinkingConfig"] = {"thinkingBudget": 0}
             response = await client.post(
                 f"{GEMINI_BASE}/models/{model}:generateContent",
                 params={"key": api_key},
@@ -979,8 +985,8 @@ async def ping(db: AsyncSession, provider: str) -> ProviderHealth:
 
 
 async def ping_all(db: AsyncSession) -> list[ProviderHealth]:
-    # Sequential on purpose: a shared key can be rate-limited, and two parallel
-    # pings would make the second one lie.
+    # A SQLAlchemy AsyncSession is not safe for concurrent queries, so keep the
+    # two database-backed checks sequential. The UI never waits on this probe.
     return [await ping(db, provider) for provider in PROVIDERS]
 
 
@@ -1200,6 +1206,8 @@ async def stream_complete(
         if tools:
             payload["tools"] = tools
             payload["tool_choice"] = "auto"
+        if model.startswith("openai/gpt-oss-"):
+            payload["reasoning_effort"] = "low"
         url = GROQ_CHAT_URL
         headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
         params = None
@@ -1212,6 +1220,8 @@ async def stream_complete(
             body["systemInstruction"] = {"parts": [{"text": system_text}]}
         if tools:
             body["tools"] = _convert_tools_for_gemini(tools)
+        if "gemini-2.5-flash" in model:
+            body["generationConfig"]["thinkingConfig"] = {"thinkingBudget": 0}
         url = f"{GEMINI_BASE}/models/{model}:streamGenerateContent"
         headers = {"Content-Type": "application/json"}
         params = {"key": api_key, "alt": "sse"}
@@ -1305,18 +1315,21 @@ async def stream_with_recovery(
     provider: str,
     **kwargs: Any,
 ) -> AsyncIterator[dict]:
-    """``stream_complete`` plus stale-model recovery and optional provider fallback.
+    """Stream with bounded model recovery and automatic provider failover.
 
-    The generator is *lazy*: nothing is called until the consumer starts
-    iterating, so a failure is raised inside the async-for the caller already
-    has around it. The final event identifies the provider/model that actually
-    answered so the chat can display truthful status after an automatic switch.
+    A 429 is often scoped to one model, not the whole account. Try one other
+    *live* model before changing provider; a retired model is replaced the same
+    way. Every route is bounded and every attempt is recorded, so a broken
+    catalogue can never leave a chat spinning forever.
     """
     model = kwargs.pop("model")
     allow_fallback = bool(kwargs.pop("allow_fallback", True))
     requires_vision = bool(kwargs.pop("requires_vision", False))
-    keys = kwargs.get("api_key")
+    current_key = kwargs.get("api_key")
+    attempted: set[tuple[str, str]] = {(provider, model)}
+    model_recoveries = 0
     tried_fallback = False
+
     while True:
         try:
             async for event in stream_complete(provider, model=model, **kwargs):
@@ -1325,47 +1338,62 @@ async def stream_with_recovery(
                 yield event
             return
         except ProviderError as exc:
-            if exc.code == "model_unavailable":
+            replacement = None
+            if exc.code in ("model_unavailable", "rate_limited") and model_recoveries < 1:
                 try:
-                    models = await list_models(db, provider, api_key=keys)
-                    remaining = [m for m in models if m.id != model]
+                    models = await list_models(db, provider, api_key=current_key)
+                    remaining = [m for m in models if (provider, m.id) not in attempted]
                     replacement = (
                         pick_vision_model(provider, remaining)
                         if requires_vision else pick_default(provider, remaining)
                     )
                 except ProviderError:
                     replacement = None
-                if replacement:
-                    note = (
-                        f"The saved model “{model}” is no longer available at "
-                        f"{provider.title()}. Switched to “{replacement}”."
-                    )
-                    await set_model(db, provider, replacement)
-                    yield {"type": "notice", "kind": "recovery", "text": note}
-                    model = replacement
-                    continue
-            if allow_fallback and not tried_fallback:
+
+            if replacement:
+                old_model = model
+                model = replacement
+                attempted.add((provider, model))
+                model_recoveries += 1
+                # Remember the working route in either case. Otherwise the very
+                # next message repeats the same known-bad request and pays the
+                # same latency (and often the same 429) again.
+                await set_model(db, provider, model)
+                if exc.code == "model_unavailable":
+                    note = f"The saved model “{old_model}” is no longer available at {provider.title()}. Switched to “{model}”."
+                else:
+                    note = f"{provider.title()} hit a limit on {old_model}; switched to {model}."
+                yield {
+                    "type": "notice", "kind": "recovery", "provider": provider,
+                    "model": model, "text": note,
+                }
+                continue
+
+            if allow_fallback and not tried_fallback and exc.code != "safety_blocked":
                 other = "gemini" if provider == "groq" else "groq"
                 other_key = await get_api_key(db, other)
-                if other_key and exc.code not in ("safety_blocked",):
+                if other_key:
                     try:
-                        other_model = await resolve_model(db, other, api_key=other_key)
+                        other_model = (
+                            await resolve_vision_model(db, other, api_key=other_key)
+                            if requires_vision
+                            else await resolve_model(db, other, api_key=other_key)
+                        )
                     except ProviderError:
                         other_model = None
-                    if other_model:
+                    if other_model and (other, other_model) not in attempted:
                         tried_fallback = True
                         yield {
                             "type": "notice",
                             "kind": "fallback",
                             "provider": other,
                             "model": other_model,
-                            "text": (
-                                f"{provider.title()} failed ({exc.message}) — "
-                                f"continuing on {other.title()} with {other_model}."
-                            ),
+                            "text": f"{provider.title()} was unavailable; continuing on {other.title()} with {other_model}.",
                         }
                         provider = other
                         model = other_model
+                        current_key = other_key
+                        attempted.add((provider, model))
                         kwargs["api_key"] = other_key
                         continue
             raise

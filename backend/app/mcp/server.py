@@ -554,6 +554,14 @@ async def _run_declared(
         files=files or None,
     )
     ok = status < 400
+    if ok and tool.name == "create_campaign" and isinstance(payload, dict) and payload.get("id"):
+        from app.utils.channels import campaign_manager_location
+
+        payload = {
+            **payload,
+            **campaign_manager_location(payload.get("channel") or args.get("channel"), int(payload["id"])),
+            "next_action": "Open manager_url to edit this campaign in its channel manager; do not use the Drafts tab.",
+        }
     await _audit(db, token, tool.name, f"{method} {path}", ok, status,
                  None if ok else _one_line(payload), args, started)
 
@@ -882,8 +890,8 @@ PROMPTS = [
                         "use real HTML: a short opener, one clear ask, one link, and the "
                         "{{first_name}} variable.\n"
                         "4. send_test_email() or preview_template() and show me the result.\n"
-                        "5. create_campaign (draft; visible in the Drafts review page) → validate_campaign() → ask me to confirm "
-                        "→ start_campaign().\n"
+                        "5. create_campaign (unsent; open the returned manager_url in SMS Manager or Email Manager, "
+                        "never the Drafts tab) → validate_campaign() → ask me to confirm → start_campaign().\n"
                         "Then report what was sent and to how many people."
                     ),
                 },
@@ -968,7 +976,9 @@ send anything.
   email and still be textable — never assume one means the other.
 
 Campaigns, templates, conversations, automations and follow-ups are all channel-aware.
-Pass `channel: "sms"` or `"email"` explicitly.
+Pass `channel: "sms"` or `"email"` explicitly. New campaigns belong in **SMS Manager → Bulk Sends**
+or **Email Manager → Bulk Sends**. `draft` only means unsent; do not route campaign creation or
+its editor through the separate Drafts tab. After `create_campaign`, use the returned `manager_url`.
 
 ## The safe order of operations
 1. **Audience** — `search_contacts`, `list_contact_lists`, `create_contact_list`,

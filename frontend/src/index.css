@@ -469,35 +469,41 @@
     }
   }
 
-  /* Mobile modal fix: sticky action bar so primary button is always visible even
-     when modal content overflows on small screens (campaign launch bug). */
+  /* Campaign dialogs have one scrolling region and a footer outside it. The
+     Save/Cancel controls therefore stay reachable at 320px, with a keyboard
+     open, and on short desktop windows — no sticky-footer scroll trap. */
   .modal-card {
     display: flex;
     flex-direction: column;
-    max-height: 92dvh;
+    max-height: 100dvh;
   }
   .modal-card > form {
     display: flex;
     flex-direction: column;
     flex: 1;
     min-height: 0;
-    overflow-y: auto;
+    overflow: hidden;
   }
   .modal-actions {
-    position: sticky;
-    bottom: 0;
-    background: inherit;
-    padding-top: 0.75rem;
-    margin-top: 1rem;
+    margin: 0;
+    padding-bottom: max(0.875rem, env(safe-area-inset-bottom, 0px));
     border-top: 1px solid rgb(243 244 246);
-    z-index: 1;
+    background: inherit;
   }
   .dark .modal-actions {
     border-top-color: rgb(55 65 81);
   }
+  @media (min-width: 640px) {
+    .modal-card {
+      max-height: calc(100dvh - 2rem);
+    }
+    .modal-actions {
+      padding-bottom: 1.25rem;
+    }
+  }
   /* Ensure no horizontal overflow on 320-390px phones */
   @media (max-width: 420px) {
-    .card { padding-left: 0.875rem; padding-right: 0.875rem; }
+    .card:not(.modal-card):not(.dialog-card) { padding-left: 0.875rem; padding-right: 0.875rem; }
     .btn-primary, .btn-secondary, .btn-ghost { min-height: 44px; }
   }
 

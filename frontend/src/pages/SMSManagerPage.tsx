@@ -50,8 +50,13 @@ const SECTIONS = [
   { key: "Activity Log", icon: Activity },
 ];
 
+function sectionFromQuery(): string {
+  const wanted = new URLSearchParams(window.location.search).get("section");
+  return SECTIONS.some((item) => item.key === wanted) ? wanted! : "Overview";
+}
+
 export default function SMSManagerPage() {
-  const [section, setSection] = useState("Overview");
+  const [section, setSection] = useState(sectionFromQuery);
   const [campaigns, setCampaigns] = useState<AdsCampaign[]>([]);
   const [reference, setReference] = useState<any>(null);
   const [overview, setOverview] = useState<any>(null);

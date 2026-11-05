@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import api from "../api/client";
 import { Campaign } from "../types";
 import toast from "react-hot-toast";
-import { Plus, Play, Pause, Square, Trash2, Copy, Megaphone, Pencil, CalendarClock, Upload, MessageCircle, Users, Activity, Sparkles } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Plus, Play, Pause, Square, Trash2, Copy, Megaphone, Pencil, CalendarClock, Upload, MessageCircle, Users, Activity, Sparkles, X } from "lucide-react";
+import { Link, useSearchParams } from "react-router-dom";
 import ListPicker from "../components/ListPicker";
 import TemplatePicker from "../components/TemplatePicker";
 import ShortcodePicker from "../components/ShortcodePicker";
@@ -139,6 +140,7 @@ export default function CampaignsPage({
   unifiedDrafts?: boolean;
 } = {}) {
   const { channel: activeChannel } = useChannel();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [draftChannel, setDraftChannel] = useState<"all" | "sms" | "email">("all");
   const [createChannel, setCreateChannel] = useState<"sms" | "email">("sms");
   const channel = unifiedDrafts ? draftChannel : fixedChannel ?? activeChannel;
@@ -195,6 +197,26 @@ export default function CampaignsPage({
     } finally {
       setLoading(false);
     }
+  };
+
+  // MCP and assistant results link straight to the campaign inside its channel
+  // manager. Open that exact editor instead of dropping the operator on a
+  // generic Drafts screen.
+  const requestedCampaign = searchParams.get("campaign");
+  useEffect(() => {
+    if (!requestedCampaign || loading) return;
+    const match = campaigns.find((item) => String(item.id) === requestedCampaign);
+    if (match) setEditing(match);
+  }, [requestedCampaign, campaigns, loading]);
+
+  const closeEditor = () => {
+    setEditing(null);
+    if (searchParams.has("campaign")) {
+      const next = new URLSearchParams(searchParams);
+      next.delete("campaign");
+      setSearchParams(next, { replace: true });
+    }
+    loadCampaigns();
   };
 
   const handleAction = async (id: number, action: string) => {
@@ -293,7 +315,7 @@ export default function CampaignsPage({
             <div>
               <h1 className="page-title">Drafts</h1>
               <p className="page-subtitle">Review and edit SMS or email campaign drafts before you validate, schedule, or send them.</p>
-              <p className="text-xs text-gray-500 mt-1">MCP-created campaigns saved as drafts appear here too.</p>
+              <p className="text-xs text-gray-500 mt-1">Unsent campaigns from SMS Manager and Email Manager are gathered here for review.</p>
             </div>
             <div className="flex gap-2">
               <button onClick={() => { setCreateChannel("sms"); setShowCreate(true); }} className="btn-secondary btn-sm">
@@ -358,7 +380,7 @@ export default function CampaignsPage({
             <Megaphone size={48} className="mx-auto mb-2 opacity-30" />
             <p>
               {unifiedDrafts
-                ? `No ${channel === "all" ? "" : channel === "email" ? "email " : "SMS "}drafts yet. Create a draft or ask your MCP assistant to prepare one.`
+                ? `No ${channel === "all" ? "" : channel === "email" ? "email " : "SMS "}drafts yet. Create one here or in its channel manager.`
                 : `No ${channel === "email" ? "email" : "SMS"} campaigns yet. Create your first one.`}
             </p>
           </div>
@@ -528,7 +550,7 @@ export default function CampaignsPage({
         <CampaignModal
           key={editing.id}
           campaign={editing}
-          onClose={() => { setEditing(null); loadCampaigns(); }}
+          onClose={closeEditor}
         />
       )}
       {scheduling && (
@@ -715,18 +737,31 @@ function CampaignModal({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4">
-      <div className="card modal-card w-full sm:max-w-lg rounded-t-2xl sm:rounded-xl p-4 sm:p-6">
-        <h2 className="text-lg font-semibold mb-4">
-          {editing ? "Edit Campaign" : "Create Campaign"}
-        </h2>
-        {editing && campaign!.status === "scheduled" && (
-          <p className="text-xs text-warning-600 dark:text-warning-500 -mt-2 mb-3">
-            Saving changes returns this campaign to draft. Schedule it again afterwards.
-          </p>
-        )}
-        <form onSubmit={handleSubmit} className="space-y-3">
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex h-[100dvh] items-end justify-center overscroll-contain bg-black/50 p-0 sm:items-center sm:p-4">
+      <div
+        className="card modal-card w-full overflow-hidden rounded-t-2xl sm:max-w-3xl sm:rounded-xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="campaign-modal-title"
+      >
+        <div className="shrink-0 border-b border-gray-100 px-4 py-3 dark:border-gray-700 sm:px-6 sm:py-4">
+          <div className="flex items-center justify-between gap-3">
+            <h2 id="campaign-modal-title" className="text-lg font-semibold">
+              {editing ? "Edit Campaign" : "Create Campaign"}
+            </h2>
+            <button type="button" onClick={onClose} className="icon-btn h-9 w-9" aria-label="Close campaign editor">
+              <X size={17} />
+            </button>
+          </div>
+          {editing && campaign!.status === "scheduled" && (
+            <p className="mt-1 text-xs text-warning-600 dark:text-warning-500">
+              Saving returns this campaign to draft. Schedule it again afterwards.
+            </p>
+          )}
+        </div>
+        <form onSubmit={handleSubmit} className="min-h-0 flex-1">
+          <div className="modal-body min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-5">
           <div>
             <label className="label">Campaign Name *</label>
             <input className="input" value={name} onChange={(e) => setName(e.target.value)} required autoFocus />
@@ -975,7 +1010,8 @@ function CampaignModal({
           </div>
           )}
 
-          <div className="modal-actions flex flex-col-reverse sm:flex-row gap-2">
+          </div>
+          <div className="modal-actions flex shrink-0 flex-col-reverse gap-2 px-4 pt-3 sm:flex-row sm:px-6">
             <button type="button" onClick={onClose} className="btn-secondary flex-1">Cancel</button>
             <button type="submit" disabled={submitting} className="btn-primary flex-1">
               {submitting
@@ -997,6 +1033,7 @@ function CampaignModal({
           }}
         />
       )}
-    </div>
+    </div>,
+    document.body,
   );
 }

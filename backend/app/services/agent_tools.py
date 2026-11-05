@@ -1349,7 +1349,7 @@ async def get_campaign(db, args, ctx):
 @tool(
     "create_campaign",
     "campaigns",
-    "Create a DRAFT campaign. Nothing is sent until start_campaign (which asks for approval).",
+    "Create an unsent campaign in SMS Manager or Email Manager → Bulk Sends. Draft is a status, not a destination; return the manager_url and never use the separate Drafts tab. Nothing is sent until start_campaign (which asks for approval).",
     _obj(
         name=S("Campaign name", _required=True),
         channel=S("sms | email"),
@@ -1417,8 +1417,11 @@ async def create_campaign(db, args, ctx):
     )
     db.add(campaign)
     await db.flush()
+    from app.utils.channels import campaign_manager_location
+
     return {
         "ok": True,
+        **campaign_manager_location(campaign.channel, campaign.id),
         "campaign": {
             "id": campaign.id,
             "name": campaign.name,
@@ -1427,7 +1430,7 @@ async def create_campaign(db, args, ctx):
             "audience": total_contacts,
             "scheduled_for": scheduled.isoformat() if scheduled else None,
         },
-        "next": "Validate it with validate_campaign, then start_campaign to launch.",
+        "next": "Open manager_url for the operator, validate it with validate_campaign, then start_campaign to launch. Do not send them to the Drafts tab.",
     }
 
 

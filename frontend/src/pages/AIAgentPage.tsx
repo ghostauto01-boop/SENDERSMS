@@ -522,7 +522,7 @@ export default function AIAgentPage() {
         >
           <Menu size={18} />
         </button>
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary-900 text-white dark:bg-primary-800">
+        <div className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary-900 text-white dark:bg-primary-800 sm:flex">
           <Sparkles size={16} />
         </div>
         <div className="min-w-0 flex-1">
@@ -566,10 +566,15 @@ export default function AIAgentPage() {
                     : "bg-warning-500"
               }`}
             />
-            <span className="truncate">
+            <button
+              type="button"
+              onClick={() => setPanel("settings")}
+              className="truncate text-left hover:text-primary-700 dark:hover:text-primary-300"
+              title="Choose a live AI model"
+            >
               {activeProvider === "groq" ? "Groq" : "Gemini"}
               {settings?.models?.[activeProvider] ? ` · ${settings.models[activeProvider]}` : " · automatic model"}
-            </span>
+            </button>
             {activeProviderHealth?.latency_ms != null && (
               <span className="shrink-0 text-gray-400">{activeProviderHealth.latency_ms} ms</span>
             )}
@@ -623,7 +628,7 @@ export default function AIAgentPage() {
           <button
             type="button"
             onClick={() => setPanel(panel === "files" ? null : "files")}
-            className={`rounded-xl p-2 transition-colors ${
+            className={`hidden rounded-xl p-2 transition-colors sm:block ${
               panel === "files"
                 ? "bg-primary-50 text-primary-800 dark:bg-primary-950/50 dark:text-primary-300"
                 : "text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
@@ -636,7 +641,7 @@ export default function AIAgentPage() {
           <button
             type="button"
             onClick={() => setPanel(panel === "activity" ? null : "activity")}
-            className={`rounded-xl p-2 transition-colors ${
+            className={`hidden rounded-xl p-2 transition-colors sm:block ${
               panel === "activity"
                 ? "bg-primary-50 text-primary-800 dark:bg-primary-950/50 dark:text-primary-300"
                 : "text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
@@ -855,11 +860,24 @@ export default function AIAgentPage() {
                 <div className="flex-1 overflow-y-auto p-2.5">
                   <AgentModelSettings
                     compact
-                    onConfigured={() => {
+                    onConfigured={(ready) => {
                       agentApi.settings().then(setSettings).catch(() => {});
-                      agentApi.health().then(setHealth).catch(() => {});
+                      // Do not duplicate the shell's initial health request just
+                      // because the settings drawer mounted. Re-check when a key
+                      // is added or removed and readiness actually changes.
+                      if (ready !== configured) {
+                        agentApi.health().then(setHealth).catch(() => {});
+                      }
                     }}
                   />
+                  <div className="mt-3 grid grid-cols-2 gap-2 sm:hidden">
+                    <button type="button" onClick={() => setPanel("files")} className="btn-secondary btn-sm">
+                      <Paperclip size={12} /> Files
+                    </button>
+                    <button type="button" onClick={() => setPanel("activity")} className="btn-secondary btn-sm">
+                      <History size={12} /> Activity
+                    </button>
+                  </div>
                   <button
                     type="button"
                     onClick={() => navigate("/settings?tab=ai")}
