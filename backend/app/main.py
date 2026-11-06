@@ -1469,13 +1469,16 @@ app.include_router(email_api.router, prefix="/api/v1/email")
 # replies land in the app, and sends one-to-one replies back out through that same
 # mailbox so they stay DMARC-aligned instead of tainting the thread.
 app.include_router(mailbox_api.router, prefix="/api/v1/mailbox")
+# The Mail page: every connected Gmail account as a real mailbox client.
+from app.api.v1 import mail as mail_api
+app.include_router(mail_api.router, prefix="/api/v1/mail")
 # The in-app setup tutorial: a checklist whose status is read live from the
 # database and environment, so a missing PUBLIC_BASE_URL or an unregistered
 # webhook is something the operator is told about instead of something they have
 # to diagnose from a symptom.
 app.include_router(guide_api.router, prefix="/api/v1/guide")
 app.include_router(mcp_api.router, prefix="/api/v1/mcp")
-# In-app AI Agent (Groq/Gemini) with full tool access, sessions, skills, file upload.
+# In-app AI Agent (OpenRouter) with full tool access, sessions, skills, file upload.
 from app.api.v1 import ai_agent as ai_agent_api
 app.include_router(ai_agent_api.router, prefix="/api/v1/ai-agent")
 # The canonical address an AI assistant is pointed at: https://your-app/mcp

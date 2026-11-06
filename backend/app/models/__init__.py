@@ -31,6 +31,7 @@ from app.models.call import CallLog
 from app.models.push import PushSubscription
 from app.models.email import EmailAccount, EmailEvent, EmailSendLog, EmailSuppression
 from app.models.email_inbox import EmailContactAddress, EmailMailbox
+from app.models.mailbox_message import MailboxMessage
 from app.models.invoice import (
     INVOICE_CURRENCIES,
     INVOICE_STATUSES,
@@ -127,6 +128,7 @@ __all__ = [
     "AdsCampaignStateTransition",
     "EmailMailbox",
     "EmailContactAddress",
+    "MailboxMessage",
     "McpCall",
     "McpToken",
     "McpConnection",

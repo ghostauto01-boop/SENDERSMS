@@ -17,7 +17,7 @@ Everything the browser needs and nothing it must not have:
   * GET    /activity                       the audit log, with undo
   * POST   /activity/{id}/undo
   * POST   /files , /sessions/{id}/files   upload with parse + preview
-  * POST   /transcribe                     voice (Whisper, then Gemini)
+  * POST   /transcribe                     voice (an audio-capable OpenRouter model)
   * GET/PUT/DELETE /memory/{scope}          global + per-session memory
   * GET/POST/DELETE /skills                 instruction skills
 
@@ -84,27 +84,48 @@ def _serialise_message(message: AIAgentMessage) -> dict:
 # ---------------------------------------------------------------------------
 # models
 # ---------------------------------------------------------------------------
+def _model_option(model, recommended_id: Optional[str]) -> dict:
+    return {
+        "id": model.id,
+        "label": model.label,
+        "tools": model.tools,
+        "context": model.context,
+        "vendor": model.vendor,
+        "input_modalities": list(model.input_modalities),
+        "prompt_price": model.prompt_price,
+        "completion_price": model.completion_price,
+        # The UI marks this so nobody wonders why it was chosen.
+        "recommended": model.id == recommended_id,
+    }
+
+
 @router.get("/models")
 async def list_models(
-    provider: str = Query("groq", pattern="^(groq|gemini)$"),
-    refresh: bool = Query(True, description="Ask the provider now instead of using a cache"),
+    provider: str = Query("openrouter", pattern="^openrouter$"),
+    refresh: bool = Query(True, description="Ask OpenRouter now instead of using the cache"),
+    vendor: Optional[str] = Query(None, description="Filter to one vendor from the live list"),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """The models the provider currently serves, plus the one selected here.
+    """The models OpenRouter currently serves, plus the one selected here.
 
     This is the only place a model name can come from — there is no default
     model constant anywhere in the codebase, which is what stopped the
-    hard-coded `llama-3.3-70b-versatile` / `gemini-1.5-flash` 404s.
+    hard-coded ``llama-3.3-70b-versatile`` / ``gemini-1.5-flash`` 404s.
+
+    ``vendors`` is the same live list grouped by the provider behind each model
+    (every OpenRouter id is ``vendor/model``), which is what makes "pick the
+    provider" possible without a hard-coded vendor table.
     """
     try:
-        models = await ai_providers.list_models(db, provider)
+        models = await ai_providers.list_models(db, provider, refresh=refresh)
     except ai_providers.ProviderError as error:
         return JSONResponse(
             status_code=200,
             content={
                 "provider": provider,
                 "models": [],
+                "vendors": [],
                 "selected": await ai_providers.get_model(db, provider),
                 "error": error.to_dict(),
             },
@@ -116,21 +137,77 @@ async def list_models(
         if selected:
             await ai_providers.set_model(db, provider, selected)
             await db.commit()
+    recommended = ai_providers.pick_default(provider, models)
+    shown = models
+    wanted_vendor = (vendor or "").strip()
+    if wanted_vendor:
+        shown = [m for m in models if m.vendor.lower() == wanted_vendor.lower()] or models
     return {
         "provider": provider,
-        "models": [
-            {
-                "id": m.id,
-                "label": m.label,
-                "tools": m.tools,
-                "context": m.context,
-                # The UI marks this so nobody wonders why it was chosen.
-                "recommended": m.id == ai_providers.pick_default(provider, models),
-            }
-            for m in models
+        "models": [_model_option(m, recommended) for m in shown],
+        "vendors": [
+            {"vendor": group["vendor"], "count": group["count"]}
+            for group in ai_providers.group_models_by_vendor(models)
         ],
         "selected": selected,
+        "selected_vendor": await ai_providers.get_vendor(db, provider),
+        "preset": await ai_providers.get_preset(db, provider),
+        "total": len(models),
         "error": None,
+    }
+
+
+@router.get("/presets")
+async def list_presets(
+    refresh: bool = Query(True),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """The OpenRouter presets attached to this key, and the one in use.
+
+    ``available`` is false when OpenRouter does not expose a preset listing for
+    this key — normal, not an error. The settings screen then offers a
+    free-text box and the name is proved by a real request.
+    """
+    return await ai_providers.list_presets(db, ai_providers.PROVIDER)
+
+
+class PresetUpdate(BaseModel):
+    preset: Optional[str] = None
+    vendor: Optional[str] = None
+    #: Check the preset name against OpenRouter before saving it. Named
+    #: ``check`` rather than ``validate`` — the latter shadows
+    #: ``BaseModel.validate`` and pydantic warns on every import.
+    check: bool = False
+
+
+@router.put("/presets")
+async def put_preset(
+    body: PresetUpdate,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Pin routing to a vendor and/or attach an OpenRouter preset by name."""
+    warnings: list[str] = []
+    if body.vendor is not None:
+        await ai_providers.set_vendor(db, body.vendor)
+    if body.preset is not None:
+        name = body.preset.strip()
+        if name and body.check:
+            check = await ai_providers.validate_preset(db, name)
+            if not check.get("success") and not check.get("preset_accepted"):
+                await db.commit()
+                return {"success": False, "error": check.get("error"),
+                        "detail": check.get("detail"), "preset": await ai_providers.get_preset(db)}
+            if not check.get("success"):
+                warnings.append(str(check.get("error")))
+        await ai_providers.set_preset(db, name)
+    await db.commit()
+    return {
+        "success": True,
+        "preset": await ai_providers.get_preset(db),
+        "vendor": await ai_providers.get_vendor(db),
+        "warnings": warnings,
     }
 
 
@@ -176,7 +253,7 @@ async def agent_health(
 # settings
 # ---------------------------------------------------------------------------
 class SettingsUpdate(BaseModel):
-    provider: Optional[str] = Field(None, pattern="^(groq|gemini)$")
+    provider: Optional[str] = Field(None, pattern="^openrouter$")
     api_key: Optional[str] = None
     clear_key: bool = False
     model: Optional[str] = None
@@ -192,6 +269,8 @@ async def get_settings(db: AsyncSession = Depends(get_db), user: User = Depends(
         **summary,
         "models": {p: await ai_providers.get_model(db, p) for p in ai_providers.PROVIDERS},
         "default_provider": await ai_providers.get_default_provider(db),
+        "vendor": await ai_providers.get_vendor(db),
+        "preset": await ai_providers.get_preset(db),
         "auto_fallback": await ai_providers.get_flag(db, ai_providers.AUTO_FALLBACK_SETTING, True),
         "auto_approve": await ai_providers.get_flag(db, ai_providers.AUTO_APPROVE_SETTING, False),
         "voice": await _voice_settings(db),
@@ -261,7 +340,7 @@ async def put_voice_settings(
 
 
 class TestKeyRequest(BaseModel):
-    provider: Optional[str] = Field(None, pattern="^(groq|gemini)$")
+    provider: Optional[str] = Field(None, pattern="^openrouter$")
     api_key: Optional[str] = None
 
 
@@ -286,7 +365,7 @@ async def test_key(
                 "provider": provider,
                 "success": False,
                 "state": "key_missing",
-                "message": f"No {provider.title()} key is saved.",
+                "message": f"No {ai_providers.label(provider)} key is saved.",
                 "hint": "Paste a key and press Save.",
             })
             continue
@@ -307,7 +386,7 @@ async def test_key(
             "provider": provider,
             "success": True,
             "state": "ok",
-            "message": f"{provider.title()} OK — {len(models)} models available.",
+            "message": f"{ai_providers.label(provider)} OK — {len(models)} models available.",
             "models": len(models),
             "suggested_model": chosen,
             "using_saved_key": not typed,
@@ -839,7 +918,7 @@ async def transcribe(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """Audio -> text. Whisper via Groq first, Gemini audio second.
+    """Audio -> text, through whichever OpenRouter model accepts audio input.
 
     ``language`` is optional on purpose: forcing ``en`` hurts Nigerian English
     and Pidgin, which auto-detection handles better. The setting exists for

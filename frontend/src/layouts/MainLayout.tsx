@@ -52,6 +52,11 @@ const CHANNELS: NavItem[] = [
   { to: "/email-manager", label: "Email Manager", icon: Mail },
   { to: "/sms-inbox", label: "SMS Inbox", icon: Inbox },
   { to: "/email-inbox", label: "Email Inbox", icon: MailOpen },
+  //: The mail client: every connected Gmail account, its folders, and one
+  //: merged "all inboxes" view. Sits next to the Email Inbox rather than inside
+  //: it because they answer different questions — "what's in my mail" versus
+  //: "what did my prospects reply".
+  { to: "/mail", label: "Mail", icon: Mail },
 ];
 
 const AUDIENCE: NavItem[] = [
@@ -183,7 +188,13 @@ export default function MainLayout() {
    * letterbox — the exact bug people reported as "I cannot read an email full
    * screen". Full-bleed hands it every pixel under the header instead.
    */
-  const fullBleed = location.pathname === "/email-inbox" || location.pathname === "/ai-agent";
+  //: The mail client has the same three-pane geometry as the email inbox — its
+  //: own rail, list and reading pane with independent scroll areas — so it gets
+  //: the same treatment: every pixel under the header, no centred column.
+  const fullBleed =
+    location.pathname === "/email-inbox" ||
+    location.pathname === "/ai-agent" ||
+    location.pathname === "/mail";
 
   const groups = useMemo(
     () => [

@@ -735,47 +735,30 @@ async def run_turn(
         }
         return
 
+    # One provider now. A session created before the switch stores "groq" or
+    # "gemini" in ``session.model``; neither exists any more, so anything that
+    # is not in PROVIDERS resolves to OpenRouter rather than to a dead key.
     provider = provider_override or session.model or await ai_providers.get_default_provider(db)
     if provider not in ai_providers.PROVIDERS:
-        provider = "groq"
+        provider = ai_providers.PROVIDER
+    requested_provider = provider
 
-    # 2. Keys + model, from the live provider list. Fallback is deliberately
-    # controlled by the saved setting, including when the preferred key/model
-    # is missing before the first completion is attempted.
+    # 2. Key + model, from OpenRouter's live list.
     keys = await ai_providers.get_keys(db)
     auto_approve = await ai_providers.get_flag(db, AUTO_APPROVE_SETTING, False)
     allow_fallback = await ai_providers.get_flag(db, AUTO_FALLBACK_SETTING, True)
-    requested_provider = provider
     api_key = keys.get(provider)
     images = await _file_images(db, session.id, file_ids)
+    #: An image on a text-only model used to mean a second provider. Now it means
+    #: one extra step on the same provider: resolve a vision-capable model from
+    #: the live catalogue and use it for this turn.
     temporary_image_route = False
-
-    if images and provider == "groq" and keys.get("gemini") and allow_fallback:
-        temporary_image_route = True
-        yield {
-            "type": "notice",
-            "kind": "fallback",
-            "provider": "gemini",
-            "text": "The attached image needs a vision-capable model; using Gemini for this turn.",
-        }
-        provider, api_key = "gemini", keys["gemini"]
-
-    if not api_key and allow_fallback:
-        other = "gemini" if provider == "groq" else "groq"
-        if keys.get(other):
-            yield {
-                "type": "notice",
-                "kind": "fallback",
-                "provider": other,
-                "text": f"No {provider.title()} key is saved — using {other.title()}.",
-            }
-            provider, api_key = other, keys[other]
 
     if not api_key:
         error = ProviderError(
             code="key_missing",
             provider=provider,
-            message=f"No {provider.title()} API key is configured.",
+            message=f"No {ai_providers.label(provider)} API key is configured.",
         )
         await _save_error(db, session, error, turn_id)
         await db.commit()
@@ -785,47 +768,26 @@ async def run_turn(
 
     effective_model_override = model_override if provider == requested_provider else None
     try:
-        if images and provider == "groq":
-            if effective_model_override and ai_providers.is_vision_model(provider, effective_model_override):
-                model = effective_model_override
-            else:
-                model = await ai_providers.resolve_vision_model(db, provider, api_key=api_key)
-                effective_model_override = None
+        if images and not (
+            effective_model_override
+            and ai_providers.is_vision_model(provider, effective_model_override)
+        ):
+            temporary_image_route = True
+            model = await ai_providers.resolve_vision_model(db, provider, api_key=api_key)
+            effective_model_override = None
         else:
-            model = effective_model_override or await ai_providers.resolve_model(db, provider, api_key=api_key)
+            model = effective_model_override or await ai_providers.resolve_model(
+                db, provider, api_key=api_key
+            )
     except ProviderError as error:
-        other = "gemini" if provider == "groq" else "groq"
-        if allow_fallback and keys.get(other):
-            try:
-                replacement = (
-                    await ai_providers.resolve_vision_model(db, other, api_key=keys[other])
-                    if images and other == "groq"
-                    else await ai_providers.resolve_model(db, other, api_key=keys[other])
-                )
-            except ProviderError:
-                replacement = None
-            if replacement:
-                yield {
-                    "type": "notice",
-                    "kind": "fallback",
-                    "provider": other,
-                    "model": replacement,
-                    "text": f"{provider.title()} could not resolve a chat model; continuing on {other.title()}.",
-                }
-                provider, api_key, model = other, keys[other], replacement
-                effective_model_override = None
-            else:
-                await _save_error(db, session, error, turn_id)
-                await db.commit()
-                yield {"type": "error", "error": error.to_dict(), "turn_id": turn_id}
-                yield {"type": "done", "turn_id": turn_id}
-                return
-        else:
-            await _save_error(db, session, error, turn_id)
-            await db.commit()
-            yield {"type": "error", "error": error.to_dict(), "turn_id": turn_id}
-            yield {"type": "done", "turn_id": turn_id}
-            return
+        # No model could be resolved — most often "this picture needs a
+        # vision-capable model and the catalogue has none for this key". Report
+        # it as the turn's error rather than silently dropping the attachment.
+        await _save_error(db, session, error, turn_id)
+        await db.commit()
+        yield {"type": "error", "error": error.to_dict(), "turn_id": turn_id}
+        yield {"type": "done", "turn_id": turn_id}
+        return
 
     if effective_model_override:
         await ai_providers.set_model(db, provider, effective_model_override)

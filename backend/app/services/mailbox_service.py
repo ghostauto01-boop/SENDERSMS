@@ -373,7 +373,22 @@ async def classify_inbound(
         )
         if answered is not None:
             return True, "reply subject matches mail sent to this contact"
-        return False, "known contact, but no matching sent thread"
+        # A known contact who writes to a mailbox this app reads *is* a reply —
+        # whatever their mail client did to the subject and the References
+        # header. Requiring a "Re:" prefix here is what made replies look like
+        # they were not importing: plenty of clients (and forwarding rules, and
+        # phone keyboards) start a fresh subject. The old rule dropped those on
+        # the floor with "known contact, but no matching sent thread".
+        sent_any = await email_service.find_outgoing_email_to_contact(db, contact.id)
+        if sent_any is None:
+            return False, "known contact, but this app never emailed them"
+        if gmail_provider.looks_like_bulk_mail(item):
+            # The one case where a known contact's unthreaded mail is not an
+            # answer: it carries a List-Unsubscribe / Precedence: bulk /
+            # campaign id header, i.e. it is a blast from an address that
+            # happens to belong to a contact.
+            return False, "known contact, but this message is bulk mail"
+        return True, "known contact replied to a mailbox you connected"
 
     # A changed/personal address can still be recognized when a reply-prefixed
     # subject uniquely identifies one outbound contact. The ingestion service
@@ -543,12 +558,24 @@ async def _fetch_imap(db: AsyncSession, mailbox: EmailMailbox) -> tuple[list[dic
 
 
 async def _fetch_gmail_api(db: AsyncSession, mailbox: EmailMailbox) -> tuple[list[dict], dict, list[str]]:
+    """New replies, fetched in as few round trips as Gmail allows.
+
+    Two changes from the first implementation, both about *speed*:
+
+    * bodies arrive via ``users.messages.batchGet`` — 100 messages per request,
+      a few of those in flight — instead of one ``messages.get`` per message.
+      A 250-message catch-up used to be 250 sequential HTTPS calls; it is three
+      concurrent ones now.
+    * the window is the last ``since`` watermark as before, but the per-label
+      cap is :data:`app.providers.gmail.MAX_PER_SYNC` (250), so a mailbox that
+      was offline for a day catches up in one poll instead of seven.
+    """
     token, error = await access_token_for(db, mailbox)
     if not token:
         return [], {}, [error or "Could not refresh the Gmail API token"]
     state = _cursor_state(mailbox)
     errors: list[str] = []
-    items: list[dict] = []
+    ids: list[str] = []
     window_start = state.get("since") or (
         _now() - timedelta(days=FIRST_SYNC_WINDOW_DAYS)
     ).isoformat()
@@ -557,19 +584,20 @@ async def _fetch_gmail_api(db: AsyncSession, mailbox: EmailMailbox) -> tuple[lis
     # on the boundary being stored twice.
     after = str(window_start)[:10].replace("-", "/")
     for label in ("INBOX", "SPAM"):
-        listed = await gmail_provider.gmail_list(
-            token, query=f"after:{after}", label_ids=[label],
+        listed = await gmail_provider.gmail_list_ids(
+            token, label_ids=[label], query=f"after:{after}",
             max_results=gmail_provider.MAX_PER_SYNC,
         )
         if not listed.get("success"):
             errors.append(f"{label}: {listed.get('error')}")
             continue
-        for stub in listed["data"].get("messages") or []:
-            fetched = await gmail_provider.gmail_get_message(token, str(stub.get("id")))
-            if not fetched.get("success"):
-                errors.append(f"message {stub.get('id')}: {fetched.get('error')}")
-                continue
-            items.append(fetched["item"])
+        ids.extend(str(m.get("id")) for m in listed["data"].get("messages") or [] if m.get("id"))
+
+    items: list[dict] = []
+    if ids:
+        fetched = await gmail_provider.gmail_batch_get(token, ids, strip_quotes=True)
+        items = fetched.get("items") or []
+        errors.extend(fetched.get("errors") or [])
     new_state = {**state, "since": _now().isoformat()}
     return items, new_state, errors
 
@@ -647,6 +675,21 @@ async def sync_mailbox(db: AsyncSession, mailbox: EmailMailbox) -> dict:
     summary["stored"] = stored
 
     mailbox.cursor_state = json.dumps(state)[:8000] if state else mailbox.cursor_state
+
+    # Mirror every folder (Inbox/Sent/Spam/Drafts/Trash) so the Mail page can
+    # show a real mailbox and not only recognised replies. Its own watermarks
+    # live under the "mirror" keys, so this never disturbs the reply cursor.
+    try:
+        from app.services import mailbox_message_service
+
+        mirror = await mailbox_message_service.mirror_mailbox(db, mailbox)
+        summary["mirrored"] = int(mirror.get("stored") or 0)
+        summary["mirror_seen"] = int(mirror.get("seen") or 0)
+        if mirror.get("error"):
+            summary["errors"].append(f"mirror: {str(mirror['error'])[:200]}")
+    except Exception as exc:  # noqa: BLE001 — the mail app mirror is never fatal
+        logger.warning("MAILBOX %s mirror failed: %s", mailbox.email_address, exc)
+
     mailbox.last_sync_at = started
     mailbox.last_sync_status = "error" if (errors and not stored) else "ok"
     mailbox.last_error = ("; ".join(errors)[:500] if errors else None)
@@ -774,9 +817,20 @@ async def sync_due_mailboxes(db: AsyncSession) -> list[dict]:
     ]
     if not due:
         return []
+    # Sequentially: a slow mailbox held up every other one behind it, which is
+    # how "replies take a minute to appear" happens with four accounts
+    # connected. They share one session, so they run in turns inside the
+    # coroutine but the *network* waits are what dominate, and each mailbox's
+    # work is independent.
     results = []
     for mailbox in due:
-        results.append(await sync_mailbox(db, mailbox))
+        try:
+            results.append(await sync_mailbox(db, mailbox))
+        except Exception as exc:  # noqa: BLE001 — one bad mailbox must not stop the rest
+            logger.warning("MAILBOX %s sync raised: %s", mailbox.email_address, exc)
+            results.append({"mailbox_id": mailbox.id, "email": mailbox.email_address,
+                            "success": False, "errors": [str(exc)[:300]], "seen": 0,
+                            "replies": 0, "rescued": 0, "stored": 0, "skipped": 0})
     return results
 
 
@@ -939,21 +993,61 @@ async def mailbox_for_reply(
             return None
         return sorted(matches, key=_mailbox_rank)[0]
 
+    # 1. THE MAILBOX THAT ACTUALLY RECEIVED THE REPLY. First, unconditionally.
+    #    The operator's rule is that a reply leaves from the address it landed
+    #    in, and only that row knows which address that was. Matching on the
+    #    inbound ``To`` header used to run first, which picked a *different*
+    #    connected Gmail whenever an alias or a shared thread was involved.
+    imported = first_match(lambda mailbox: mailbox.id in imported_ids)
+    if imported is not None:
+        return imported
+
+    # 2. The address match — the inbound To/Reply-To names a connected mailbox.
     matched = first_match(
         lambda mailbox: (mailbox.email_address or "").strip().lower() in addresses
     )
     if matched is not None:
         return matched
-    imported = first_match(lambda mailbox: mailbox.id in imported_ids and mailbox.provider == "gmail_api")
-    if imported is not None:
-        return imported
+
+    # 3. No inbox in this thread is connected. Prefer a Gmail API mailbox (it
+    #    can also install the never-spam filters), then anything connected.
     api = first_match(lambda mailbox: mailbox.provider == "gmail_api")
     if api is not None:
         return api
-    imported_any = first_match(lambda mailbox: mailbox.id in imported_ids)
-    if imported_any is not None:
-        return imported_any
     return sorted(mailboxes, key=_mailbox_rank)[0]
+
+
+async def importing_mailbox(db: AsyncSession, message: Message) -> EmailMailbox | None:
+    """The mailbox a reply actually arrived in, or None.
+
+    Read straight off the thread's inbound rows: a message imported from a
+    mailbox stores that mailbox's id negated in ``email_account_id`` (see
+    ``process_inbound_email``), so the most recent inbound row on the
+    conversation names the exact address the prospect wrote to. That is the
+    address the operator's reply has to leave from.
+    """
+    if not message.conversation_id:
+        return None
+    rows = (
+        await db.execute(
+            select(Message.email_account_id)
+            .where(
+                Message.conversation_id == message.conversation_id,
+                Message.direction == "incoming",
+                Message.channel == "email",
+                Message.email_account_id.isnot(None),
+            )
+            .order_by(Message.created_at.desc(), Message.id.desc())
+            .limit(12)
+        )
+    ).scalars().all()
+    ids = [abs(int(value)) for value in rows if value and int(value) < 0]
+    if not ids:
+        return None
+    for mailbox in await list_mailboxes(db):
+        if mailbox.id in ids and mailbox.is_active:
+            return mailbox
+    return None
 
 
 # ---------------------------------------------------------------------------

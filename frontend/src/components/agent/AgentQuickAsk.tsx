@@ -54,7 +54,7 @@ export default function AgentQuickAsk() {
     return () => window.clearInterval(timer);
   }, []);
 
-  const configured = Boolean(settings?.groq_configured || settings?.gemini_configured);
+  const configured = Boolean(settings?.openrouter_configured);
   const ready = health?.state === "ok";
 
   const go = (prompt: string) => {

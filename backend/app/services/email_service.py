@@ -369,6 +369,56 @@ def _sender_is_mailbox(sender) -> bool:
     return isinstance(sender, EmailMailbox)
 
 
+#: The only two transports this app will ever put email on the wire with.
+#:
+#: The operator's rule, encoded: **every campaign and every one-off email
+#: leaves either through Brevo or through Gmail — nothing else, ever.** There is
+#: no generic SMTP relay, no SendGrid/Mailgun/Ses side door, and no way for a
+#: future row to invent one: :func:`transport_for` names the transport a sender
+#: resolves to and :func:`assert_allowed_transport` refuses anything outside
+#: this tuple with a message the operator can act on instead of a mysterious
+#: 500 from a provider nobody configured.
+ALLOWED_EMAIL_TRANSPORTS = ("brevo", "gmail")
+
+
+def transport_for(sender) -> str | None:
+    """Which allowed transport a sender uses: ``"brevo"``, ``"gmail"`` or None.
+
+    ``EmailMailbox`` is Gmail by definition — both of its doors (the OAuth API
+    and the IMAP app password) talk to ``*.gmail.com``. ``EmailAccount`` is
+    Brevo; the ``provider`` column exists only so this stays honest, and any
+    other value in it is treated as not-allowed rather than silently used.
+    """
+    if sender is None:
+        return None
+    if _sender_is_mailbox(sender):
+        return "gmail"
+    provider = str(getattr(sender, "provider", "") or "").strip().lower()
+    if provider == "brevo":
+        return "brevo"
+    if provider in ("gmail", "gmail_api", "imap"):
+        return "gmail"
+    return None
+
+
+def assert_allowed_transport(sender) -> str:
+    """Return the transport, or raise with an operator-readable reason.
+
+    Called on the path every send goes through, so an unsupported sender is
+    caught before anything is queued rather than after a campaign has burned
+    half its contacts.
+    """
+    transport = transport_for(sender)
+    if transport is None:
+        label = getattr(sender, "name", None) or getattr(sender, "from_email", None) or "?"
+        provider = getattr(sender, "provider", None) or "unknown"
+        raise ValueError(
+            f"Sender \"{label}\" uses provider \"{provider}\", which is not allowed. "
+            "Email leaves this app only through Brevo or a connected Gmail account."
+        )
+    return transport
+
+
 def sender_email(sender) -> str:
     return str(getattr(sender, "email_address", None) or getattr(sender, "from_email", None) or "")
 
@@ -1740,6 +1790,10 @@ async def _send_via_mailbox(
     """
     from app.services import mailbox_service
 
+    if transport_for(mailbox) != "gmail":
+        return {"success": False, "error":
+                f"'{getattr(mailbox, 'name', '?')}' is not a Gmail mailbox; this app sends "
+                "email only through Brevo or a connected Gmail account."}
     contact = (
         await db.execute(select(Contact).where(Contact.id == message.contact_id))
     ).scalar_one_or_none()
@@ -1747,6 +1801,10 @@ async def _send_via_mailbox(
     message.provider = mailbox.provider
     message.from_address = mailbox.email_address
     headers = await build_headers(db, message, account, bulk=bool(message.bulk_send))
+    # A reply that leaves from Gmail still has to carry a Reply-To that points
+    # back at this mailbox (so the next answer lands where this app reads it)
+    # with the Brevo sender attached behind it, exactly as on a Brevo send.
+    headers.setdefault("Reply-To", await mailbox_reply_to(db, account, mailbox))
     result = await mailbox_service.send_via_mailbox(
         db,
         mailbox,
@@ -1846,23 +1904,81 @@ async def verified_senders_for(account: EmailAccount, *, refresh: bool = False) 
 
 
 async def operator_reply_address(db: AsyncSession, account: EmailAccount) -> str | None:
-    """Where a human reply to a Brevo send should land.
+    """Where a human reply to a Brevo send should land — the *first* candidate.
 
-    ``@*.brevosend.com`` is the wire From, not an inbox. Prefer the saved
-    Reply-To, then the stored personal From, then a connected mailbox.
+    ``@*.brevosend.com`` is the wire From, not an inbox, so it is never the
+    first choice: a connected mailbox is (a reply that lands in a mailbox this
+    app reads is imported in seconds), then the operator's saved Reply-To, then
+    the stored personal From. The Brevo sender itself is always appended later
+    by :func:`reply_to_chain`, so nothing here needs to return it.
     """
     from app.providers.brevo import is_brevo_relay_address
     from app.services import mailbox_service
 
+    for mailbox in await mailbox_service.list_mailboxes(db):
+        address = (mailbox.email_address or "").strip()
+        if address and "@" in address and not is_brevo_relay_address(address):
+            return address
     for value in (*account_reply_to_addresses(account), (account.from_email or "").strip()):
         clean = (value or "").strip()
         if clean and "@" in clean and not is_brevo_relay_address(clean):
             return clean
-    for mailbox in await mailbox_service.list_mailboxes(db):
-        address = (mailbox.email_address or "").strip()
-        if address and not is_brevo_relay_address(address):
-            return address
     return None
+
+
+async def reply_to_chain(
+    db: AsyncSession, account: EmailAccount, from_email: str | None
+) -> list[str]:
+    """Every address a reply to this send must reach, in priority order.
+
+    The rule the operator asked for, stated precisely:
+
+    **the Brevo sender is attached to Reply-To on every send and every
+    campaign, always** — so a reply can always come back to Brevo's inbound
+    parser, which is one of the two doors that import it. But it is attached
+    *last*, because a real mailbox in front of it is what makes a reply show up
+    inside this app in seconds instead of waiting on a webhook, and it is what
+    lets the outgoing reply leave from the address that actually received it.
+
+    Order: connected mailboxes (Gmail API first) → the sender's configured
+    Reply-To / personal From → the Brevo sender address. Deduplicated, never
+    empty when the account has any From address at all.
+    """
+    from app.providers.brevo import is_brevo_relay_address
+    from app.services import mailbox_service
+
+    chain: list[str] = []
+
+    def add(value: str | None) -> None:
+        clean = (value or "").strip()
+        if not clean or "@" not in clean:
+            return
+        if any(existing.lower() == clean.lower() for existing in chain):
+            return
+        chain.append(clean)
+
+    mailboxes = await mailbox_service.list_mailboxes(db)
+    for mailbox in sorted(
+        (m for m in mailboxes if m.is_active),
+        key=lambda m: (0 if m.provider == "gmail_api" else 1, m.id),
+    ):
+        add(mailbox.email_address)
+
+    for value in account_reply_to_addresses(account):
+        if not is_brevo_relay_address(value):
+            add(value)
+    personal = (account.from_email or "").strip()
+    if not is_brevo_relay_address(personal):
+        add(personal)
+
+    # The Brevo sender — always present, always last. This is the half that
+    # makes "they can receive a reply" true even with no mailbox connected.
+    for value in (from_email, getattr(account, "brevo_from_email", None), personal):
+        clean = (value or "").strip()
+        if clean and "@" in clean:
+            add(clean)
+            break
+    return chain
 
 
 async def brevo_envelope(
@@ -1873,6 +1989,9 @@ async def brevo_envelope(
     From is a listed ``@*.brevosend.com`` address when this key has one.
     Otherwise it stays the stored From. The stored ``from_email`` is never
     rewritten — the relay address is cached on ``brevo_from_email`` instead.
+
+    Reply-To is never blank when the account has a From address: it is the head
+    of :func:`reply_to_chain`. ``reply_to_header`` supplies the rest.
     """
     from app.providers.brevo import is_brevo_relay_address, pick_verified_from
 
@@ -1884,10 +2003,51 @@ async def brevo_envelope(
         and from_email != (getattr(account, "brevo_from_email", None) or "")
     ):
         account.brevo_from_email = from_email
-    reply_to = await operator_reply_address(db, account)
-    if reply_to and is_brevo_relay_address(reply_to):
-        reply_to = None
-    return from_email or configured, reply_to
+    from_email = from_email or configured
+    chain = await reply_to_chain(db, account, from_email)
+    return from_email, (chain[0] if chain else None)
+
+
+async def reply_to_header(
+    db: AsyncSession, account: EmailAccount, from_email: str | None
+) -> str | None:
+    """The full ``Reply-To`` header value, or None when one address suffices.
+
+    Brevo's ``replyTo`` field carries exactly one address, so the remaining
+    addresses of the chain travel as a MIME header. Mail clients read the
+    header, so "Reply" goes to the first address and "Reply all" reaches every
+    address in the chain — Brevo's inbound parser included.
+    """
+    chain = await reply_to_chain(db, account, from_email)
+    if len(chain) < 2:
+        return None
+    return ", ".join(chain)[:900]
+
+
+async def mailbox_reply_to(
+    db: AsyncSession, account: EmailAccount | None, mailbox
+) -> str:
+    """``Reply-To`` for mail that leaves through a connected Gmail.
+
+    The mailbox that sent it comes first — that is the address the next answer
+    must land in — with the Brevo sender attached behind it, because the Brevo
+    sender is attached to Reply-To on *every* send. Never blank.
+    """
+    chain: list[str] = []
+
+    def add(value: str | None) -> None:
+        clean = (value or "").strip()
+        if clean and "@" in clean and not any(c.lower() == clean.lower() for c in chain):
+            chain.append(clean)
+
+    add(getattr(mailbox, "email_address", None))
+    if account is not None:
+        add(getattr(account, "brevo_from_email", None))
+        add(account.from_email)
+    for account_row in await list_accounts(db):
+        add(getattr(account_row, "brevo_from_email", None))
+        add(account_row.from_email)
+    return ", ".join(chain)[:900]
 
 
 def _append_sender(candidates: list, item) -> None:
@@ -1942,9 +2102,19 @@ async def _deliver_via_gmail_reply(db: AsyncSession, message: Message, sender) -
         return None
 
     preferred = sender if explicit_mailbox and sender.is_active else None
+    if preferred is None:
+        # THE RULE: a reply leaves from the address the original landed in.
+        # Nothing else decides — not the account's Reply-To, not "a Gmail that
+        # happens to be connected". When this thread's inbound message was
+        # imported from a mailbox, that mailbox is the sender, tried once and
+        # never rotated onto another one.
+        preferred = await mailbox_service.importing_mailbox(db, message)
     account = sender if isinstance(sender, EmailAccount) else None
     mailbox = preferred or await mailbox_service.mailbox_for_reply(db, message, account)
     if mailbox is None:
+        # No mailbox is in this thread at all: the reply came in through Brevo's
+        # inbound parser, so Brevo is the address that received it and Brevo
+        # sends the answer. That is still "from the address that got the reply".
         return None
 
     if preferred is not None:
@@ -2004,6 +2174,19 @@ async def deliver(db: AsyncSession, message: Message) -> dict:
     not rotate onto an unrelated sender.
     """
     sender = await resolve_sender(db, message.email_account_id)
+    if sender is not None and transport_for(sender) is None:
+        # Brevo or Gmail, nothing else — see ALLOWED_EMAIL_TRANSPORTS. Returned
+        # as a failure rather than raised: a campaign worker that crashed here
+        # would leave the whole campaign stuck instead of pausing it with a
+        # reason the operator can read.
+        try:
+            assert_allowed_transport(sender)
+        except ValueError as exc:
+            message.status = "failed"
+            message.failed_at = _now()
+            message.last_error = str(exc)[:500]
+            await db.flush()
+            return {"success": False, "status_code": 400, "error": str(exc)}
     explicit_mailbox = _sender_is_mailbox(sender) and bool(message.email_account_id)
 
     if wants_mailbox_reply(message):
@@ -2106,6 +2289,10 @@ def _no_sender_error(reasons: list[str]) -> str:
 async def _send_via_account(db: AsyncSession, account: EmailAccount, message: Message) -> dict:
     from app.providers.brevo import send_email as brevo_send, sender_rejected
 
+    if transport_for(account) != "brevo":
+        return {"success": False, "error":
+                f"Sender '{account.name}' uses provider '{account.provider or 'unknown'}'; "
+                "this app sends email only through Brevo or a connected Gmail account."}
     api_key = decrypt_value(account.api_key_encrypted or "")
     if not api_key:
         return {"success": False, "error": "Account has no API key", "_try_next": True}
@@ -2117,6 +2304,13 @@ async def _send_via_account(db: AsyncSession, account: EmailAccount, message: Me
 
     headers = await build_headers(db, message, account, bulk=bool(message.bulk_send))
     from_email, reply_to = await brevo_envelope(db, account)
+    # The whole reply chain rides in the header: Brevo's `replyTo` field takes
+    # one address, and every address in the chain has to be reachable for a
+    # reply — the mailbox this app reads *and* the Brevo sender that parses
+    # inbound mail. Applied to campaigns and one-off sends alike.
+    chain_header = await reply_to_header(db, account, from_email)
+    if chain_header:
+        headers["Reply-To"] = chain_header
     # "Plain personal email" mode means exactly that: no tracking pixel and no
     # link wrapping, so Brevo must not inject them.
     plain = await campaign_plain_mode(db, message.campaign_id, message.ads_campaign_id)
@@ -2789,6 +2983,33 @@ async def find_outgoing_email_by_message_ids(
                 Message.channel == "email",
                 Message.direction == "outgoing",
                 Message.rfc_message_id.in_(ids),
+            )
+            .order_by(Message.id.desc())
+            .limit(1)
+        )
+    ).scalars().first()
+
+
+async def find_outgoing_email_to_contact(
+    db: AsyncSession, contact_id: int | None
+) -> Message | None:
+    """Any email this app sent to one contact, most recent first.
+
+    Used by the mailbox reply recogniser: a person this app has emailed, who
+    then writes back into a mailbox this app reads, is answering — regardless of
+    what their mail client did to the subject line or the ``References`` header.
+    Returning ``None`` means "we never emailed them", so a stranger's cold mail
+    to the same mailbox is still left alone.
+    """
+    if not contact_id:
+        return None
+    return (
+        await db.execute(
+            select(Message)
+            .where(
+                Message.channel == "email",
+                Message.direction == "outgoing",
+                Message.contact_id == int(contact_id),
             )
             .order_by(Message.id.desc())
             .limit(1)

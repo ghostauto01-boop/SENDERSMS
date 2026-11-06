@@ -113,12 +113,16 @@ celery_app.conf.beat_schedule = {
         "schedule": timedelta(minutes=1),
     },
     # Email replies: pull every connected mailbox (Gmail API / IMAP) that is due,
-    # import the replies into the app inbox and move the ones Gmail filed under
-    # Spam back to the primary inbox. Every 60s; each mailbox still applies its
-    # own poll_interval, so an idle mailbox costs one indexed query per minute.
+    # import the replies into the app inbox, mirror every folder for the Mail
+    # page, and move the ones Gmail filed under Spam back to the primary inbox.
+    #
+    # Every 30s, halved from 60s: the ask is that a reply shows up as fast as it
+    # can, and the beat tick is the ceiling on that latency. It stays cheap
+    # because each mailbox applies its own poll_interval and an incremental pass
+    # on an idle mailbox is one small request (a historyId / UIDNEXT watermark).
     "sync-connected-mailboxes": {
         "task": "app.tasks.mailbox_tasks.sync_mailboxes",
-        "schedule": timedelta(seconds=60),
+        "schedule": timedelta(seconds=30),
     },
     "process-scheduled-messages": {
         "task": "app.tasks.sms_tasks.process_scheduled_messages",

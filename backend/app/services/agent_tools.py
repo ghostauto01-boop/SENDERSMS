@@ -39,7 +39,6 @@ from typing import Any, Awaitable, Callable, Optional
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.services.ai_providers import sanitise_schema
 
 logger = logging.getLogger(__name__)
 
@@ -2635,17 +2634,6 @@ def tools_for_query(text: str, *, has_files: bool = False) -> list[Tool]:
 
 def schemas_for_query(text: str, *, has_files: bool = False) -> list[dict]:
     return [definition.schema() for definition in tools_for_query(text, has_files=has_files)]
-
-
-def gemini_schemas() -> list[dict]:
-    return [
-        {
-            "name": t.name,
-            "description": t.description,
-            "parameters": sanitise_schema(t.parameters),
-        }
-        for t in REGISTRY.values()
-    ]
 
 
 def areas() -> dict[str, int]:

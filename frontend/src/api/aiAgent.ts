@@ -8,7 +8,35 @@ import api from "./client";
  * steps and approvals — never provider credentials.
  */
 
-export type Provider = "groq" | "gemini";
+/**
+ * One provider: OpenRouter.
+ *
+ * The agent used to speak Groq and Gemini directly, which meant two keys, two
+ * catalogues and two ways for a chat to fail. OpenRouter routes to every major
+ * lab behind one key, and the *vendor behind each model* is part of the live
+ * model list — so "pick the provider" is a filter over that list, not a second
+ * integration.
+ */
+export type Provider = "openrouter";
+
+/** A vendor (the part before the slash in an OpenRouter model id). */
+export type VendorOption = { vendor: string; count: number };
+
+/** A preset created at openrouter.ai/settings/presets. */
+export type PresetOption = {
+  name: string;
+  description?: string | null;
+  system_prompt?: boolean;
+};
+
+export type PresetList = {
+  /** False when OpenRouter does not list presets for this key — then the name
+   *  is typed by hand and proved by a real request. */
+  available: boolean;
+  items: PresetOption[];
+  saved: string;
+  error?: string;
+};
 
 export type ProviderState =
   | "ok"
@@ -55,12 +83,15 @@ const toolAreaNames = (areas: ToolAreas | null | undefined): string[] =>
   Array.isArray(areas) ? areas : Object.keys(areas || {});
 
 export type AgentSettings = {
-  groq_configured: boolean;
-  gemini_configured: boolean;
-  groq_hint: string | null;
-  gemini_hint: string | null;
-  groq_source?: string;
-  gemini_source?: string;
+  openrouter_configured: boolean;
+  openrouter_hint: string | null;
+  /** Where the key is managed, and where a preset is created. */
+  console_url?: string;
+  preset_console_url?: string;
+  /** The vendor routing is pinned to, or "" to let OpenRouter choose. */
+  vendor?: string;
+  /** The OpenRouter preset attached to every request, or "" for none. */
+  preset?: string;
   models: Record<Provider, string | null>;
   default_provider: Provider;
   auto_fallback: boolean;
@@ -74,6 +105,11 @@ export type ModelOption = {
   tools: boolean;
   context: number | null;
   recommended: boolean;
+  /** The lab behind the model, read off OpenRouter's own catalogue. */
+  vendor?: string;
+  input_modalities?: string[];
+  prompt_price?: string | null;
+  completion_price?: string | null;
 };
 
 export type ConfirmationCard = {
@@ -167,10 +203,37 @@ export const agentApi = {
       // backend is still running during a rolling deployment.
       tool_areas: toolAreaNames(r.data.tool_areas),
     })),
-  models: (provider: Provider, refresh = true) =>
+  /**
+   * The live catalogue, plus the vendor list it groups by.
+   *
+   * `vendor` narrows the returned models to one lab; the full vendor list is
+   * returned either way, so the picker never goes empty when a vendor has no
+   * models left.
+   */
+  models: (provider: Provider = "openrouter", refresh = true, vendor?: string) => {
+    const params = new URLSearchParams({ provider, refresh: String(refresh) });
+    if (vendor) params.set("vendor", vendor);
+    return api
+      .get<{
+        provider: Provider;
+        models: ModelOption[];
+        vendors: VendorOption[];
+        selected: string | null;
+        selected_vendor?: string;
+        preset?: string;
+        total?: number;
+        error: any;
+      }>(`/ai-agent/models?${params.toString()}`)
+      .then((r) => r.data);
+  },
+  /** The operator's OpenRouter presets, and the one currently attached. */
+  presets: () => api.get<PresetList>("/ai-agent/presets").then((r) => r.data),
+  /** Pin routing to a vendor and/or attach a preset by name. */
+  savePresets: (body: { preset?: string; vendor?: string; check?: boolean }) =>
     api
-      .get<{ provider: Provider; models: ModelOption[]; selected: string | null; error: any }>(
-        `/ai-agent/models?provider=${provider}&refresh=${refresh}`,
+      .put<{ success: boolean; preset: string; vendor: string; warnings: string[]; error?: string }>(
+        "/ai-agent/presets",
+        body,
       )
       .then((r) => r.data),
   settings: () => api.get<AgentSettings>("/ai-agent/settings").then((r) => r.data),

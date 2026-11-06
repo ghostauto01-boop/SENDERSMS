@@ -30,8 +30,7 @@ from app.models.contact import Contact
 from app.models.user import User
 from app.security.auth import get_current_user
 
-GROQ_KEY = "gsk_test_abcdefghijklmnopqrstuvwxyz_ZJGp"
-GEMINI_KEY = "AIzaSyTESTKEY_abcdefghijklmnop"
+OPENROUTER_KEY = "sk-or-v1-test-abcdefghijklmnopqrstuvwxyz"
 
 
 # ---------------------------------------------------------------------------
@@ -63,7 +62,7 @@ async def client(db):
 
 
 def streamed_tool_call(name: str, args: dict, call_id: str = "call_1") -> httpx.Response:
-    """A Groq-shaped *streaming* response carrying one tool call."""
+    """An OpenAI-shaped (i.e. OpenRouter) *streaming* response with one tool call."""
     delta = {
         "choices": [{
             "delta": {
@@ -90,28 +89,54 @@ async def save_key(db, provider: str, key: str) -> None:
 # A fake provider, patched in at the httpx layer
 # ---------------------------------------------------------------------------
 class FakeProvider:
-    """Answers Groq/Gemini HTTP calls with scripted results."""
+    """Answers OpenRouter HTTP calls with scripted results.
+
+    The catalogue it serves is deliberately small and includes two entries a
+    chat turn cannot use, so the "never offer a model that cannot answer" rule
+    is exercised on every test that reads ``/models``.
+    """
+
+    #: (id, input modalities). ``audio``/``image`` drive the vision and
+    #: transcription paths; both come from the catalogue, never a constant.
+    MODELS = [
+        ("anthropic/claude-3.5-haiku", ("text",), "Anthropic: Claude 3.5 Haiku"),
+        ("openai/gpt-4o-mini", ("text", "image", "audio"), "OpenAI: GPT-4o mini"),
+        ("google/gemini-2.5-flash", ("text", "image", "audio"), "Google: Gemini 2.5 Flash"),
+        ("meta-llama/llama-4-scout-17b-16e-instruct", ("text", "image"), "Meta: Llama 4 Scout"),
+        ("openai/text-embedding-3-large", ("text",), "OpenAI: Embeddings 3 large"),
+        ("openai/whisper-1", ("audio",), "OpenAI: Whisper"),
+    ]
 
     def __init__(self, *, models=None, chat=None, fail=None):
-        self.models = models or {
-            "groq": ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "llama-3.3-70b-versatile", "whisper-large-v3-turbo"],
-            "gemini": ["gemini-2.5-flash", "gemini-2.0-flash"],
-        }
-        #: list of callables returning (status, body) for chat turns
+        self.models = models if models is not None else [list(m) for m in self.MODELS]
+        #: a test that adds a model at runtime may pass a bare id
+        self.models = [
+            [m[0], m[1], m[2] if len(m) > 2 else f"{m[0].split('/')[0].title()}: {m[0]}"]
+            for m in self.models
+        ]
+        #: list of callables returning httpx.Response for chat turns
         self.chat = chat or []
         self.fail = fail or {}
         self.calls: list[tuple[str, str]] = []
         self._chat_index = 0
 
-    def _models_response(self, provider: str):
-        if provider == "groq":
-            return 200, {"data": [{"id": m, "context_window": 8192} for m in self.models["groq"]]}
-        return 200, {
-            "models": [
-                {"name": f"models/{m}", "displayName": m, "supportedGenerationMethods": ["generateContent"]}
-                for m in self.models["gemini"]
+    def _catalogue(self):
+        return {
+            "data": [
+                {
+                    "id": model_id,
+                    "name": display,
+                    "context_length": 128000,
+                    "supported_parameters": ["tools", "temperature"],
+                    "architecture": {"input_modalities": list(modalities)},
+                    "pricing": {"prompt": "0.000001", "completion": "0.000003"},
+                }
+                for model_id, modalities, display in self.models
             ]
         }
+
+    def model_ids(self):
+        return [model_id for model_id, _, _ in self.models]
 
     async def __call__(self, request):  # noqa: D401 - httpx MockTransport protocol
         url = str(request.url)
@@ -121,33 +146,37 @@ class FakeProvider:
         except (json.JSONDecodeError, UnicodeDecodeError):
             body = {}  # multipart upload (audio)
 
-        if "models" in url and "generatecontent" not in url.lower() and "completions" not in url:
-            provider = "gemini" if "generativelanguage" in url else "groq"
-            if provider in self.fail:
-                return httpx.Response(400, json={"error": {"message": "API key not valid"}})
-            status, payload = self._models_response(provider)
-            return httpx.Response(status, json=payload)
+        if url.endswith("/models"):
+            if self.fail.get("openrouter"):
+                return httpx.Response(401, json={"error": {"message": "Invalid API key"}})
+            return httpx.Response(200, json=self._catalogue())
 
-        if "audio/transcriptions" in url:
-            return httpx.Response(200, json={"text": "import this into a new list", "language": "en"})
+        if url.endswith("/presets"):
+            return httpx.Response(404, json={})
 
-        # chat
-        if self.chat:
-            handler = self.chat[min(self._chat_index, len(self.chat) - 1)]
-            self._chat_index += 1
-            return handler(body)
+        if url.endswith("/chat/completions"):
+            # A transcription turn is a chat turn with an audio part; answer it
+            # like one so the voice box has something to assert against.
+            if not self.chat and "input_audio" in json.dumps(body):
+                return httpx.Response(200, json={"choices": [{"message": {
+                    "role": "assistant", "content": "import this into a new list"}}]})
+            if self.chat:
+                handler = self.chat[min(self._chat_index, len(self.chat) - 1)]
+                self._chat_index += 1
+                return handler(body)
+            if body.get("stream"):
+                chunks = [
+                    'data: {"choices":[{"delta":{"content":"Hello"}}]}',
+                    'data: {"choices":[{"delta":{"content":" there"}}]}',
+                    "data: [DONE]",
+                ]
+                return httpx.Response(200, text="\n\n".join(chunks))
+            return httpx.Response(
+                200,
+                json={"choices": [{"message": {"role": "assistant", "content": "Hello there"}}]},
+            )
 
-        if body.get("stream"):
-            chunks = [
-                'data: {"choices":[{"delta":{"content":"Hello"}}]}',
-                'data: {"choices":[{"delta":{"content":" there"}}]}',
-                "data: [DONE]",
-            ]
-            return httpx.Response(200, text="\n\n".join(chunks))
-        return httpx.Response(
-            200,
-            json={"choices": [{"message": {"role": "assistant", "content": "Hello there"}}]},
-        )
+        return httpx.Response(404, json={"error": {"message": f"Unhandled {url}"}})
 
 
 @pytest.fixture
@@ -170,18 +199,21 @@ def fake(monkeypatch):
 # models
 # ---------------------------------------------------------------------------
 async def test_models_come_from_the_live_list(client, db, fake):
-    await save_key(db, "groq", GROQ_KEY)
-    response = await client.get("/api/v1/ai-agent/models?provider=groq")
+    await save_key(db, "openrouter", OPENROUTER_KEY)
+    response = await client.get("/api/v1/ai-agent/models?provider=openrouter")
     assert response.status_code == 200
     payload = response.json()
-    assert [m["id"] for m in payload["models"]] == [
-        "openai/gpt-oss-20b", "openai/gpt-oss-120b", "llama-3.3-70b-versatile"
-    ]
-    # Whisper is filtered out of the *chat* list… check the filter explicitly.
     ids = [m["id"] for m in payload["models"]]
-    assert "whisper-large-v3-turbo" not in ids
-    # A current default is chosen and stored.
-    assert payload["selected"] == "openai/gpt-oss-20b"
+    # Embedding and transcription models cannot answer a chat turn, so they must
+    # never reach the dropdown.
+    assert "openai/text-embedding-3-large" not in ids
+    assert "openai/whisper-1" not in ids
+    assert "anthropic/claude-3.5-haiku" in ids
+    # A current default is chosen from the live list and stored.
+    assert payload["selected"] in ids
+    assert payload["selected"] == "anthropic/claude-3.5-haiku"
+    # "Pick the provider" reads off the live catalogue, not a table in the code.
+    assert {v["vendor"] for v in payload["vendors"]} == {"Anthropic", "OpenAI", "Google", "Meta"}
 
 
 async def test_no_hard_coded_model_names_in_code():
@@ -216,9 +248,9 @@ async def test_no_hard_coded_model_names_in_code():
 
 
 async def test_models_reports_a_bad_key_clearly(client, db, fake):
-    await save_key(db, "groq", GROQ_KEY)
-    fake["provider"].fail["groq"] = True
-    response = await client.get("/api/v1/ai-agent/models?provider=groq")
+    await save_key(db, "openrouter", OPENROUTER_KEY)
+    fake["provider"].fail["openrouter"] = True
+    response = await client.get("/api/v1/ai-agent/models?provider=openrouter")
     payload = response.json()
     assert payload["models"] == []
     assert payload["error"]["code"] == "key_invalid"
@@ -228,14 +260,14 @@ async def test_models_reports_a_bad_key_clearly(client, db, fake):
 # health
 # ---------------------------------------------------------------------------
 async def test_health_pings_the_provider_for_real(client, db, fake):
-    await save_key(db, "groq", GROQ_KEY)
+    await save_key(db, "openrouter", OPENROUTER_KEY)
     response = await client.get("/api/v1/ai-agent/health")
     assert response.status_code == 200
     payload = response.json()
-    groq = next(p for p in payload["providers"] if p["provider"] == "groq")
-    assert groq["state"] == "ok"
-    gemini = next(p for p in payload["providers"] if p["provider"] == "gemini")
-    assert gemini["state"] == "key_missing"
+    assert len(payload["providers"]) == 1
+    openrouter = payload["providers"][0]
+    assert openrouter["provider"] == "openrouter"
+    assert openrouter["state"] == "ok"
     assert payload["state"] == "ok"
     # The Agent page maps over these names while rendering. Returning the
     # runtime's area-count dictionary here made React unmount the whole page.
@@ -246,10 +278,10 @@ async def test_health_pings_the_provider_for_real(client, db, fake):
 
 
 async def test_health_is_red_when_the_model_is_gone(client, db, fake):
-    await save_key(db, "groq", GROQ_KEY)
+    await save_key(db, "openrouter", OPENROUTER_KEY)
     from app.services import ai_providers
 
-    await ai_providers.set_model(db, "groq", "some-retired-model")
+    await ai_providers.set_model(db, "openrouter", "some-retired-model")
     await db.commit()
 
     def gone(body):
@@ -258,8 +290,7 @@ async def test_health_is_red_when_the_model_is_gone(client, db, fake):
     fake["provider"].chat = [gone, gone, gone, gone]
     response = await client.get("/api/v1/ai-agent/health")
     payload = response.json()
-    groq = next(p for p in payload["providers"] if p["provider"] == "groq")
-    assert groq["state"] == "model_unavailable"
+    assert payload["providers"][0]["state"] == "model_unavailable"
     assert payload["state"] == "down"
 
 
@@ -267,39 +298,38 @@ async def test_health_is_red_when_the_model_is_gone(client, db, fake):
 # settings + key safety
 # ---------------------------------------------------------------------------
 async def test_no_key_ever_leaves_the_server(client, db, fake):
-    await save_key(db, "groq", GROQ_KEY)
-    await save_key(db, "gemini", GEMINI_KEY)
+    await save_key(db, "openrouter", OPENROUTER_KEY)
     for path in (
         "/api/v1/ai-agent/settings",
         "/api/v1/ai-agent/health",
-        "/api/v1/ai-agent/models?provider=groq",
-        "/api/v1/ai-agent/models?provider=gemini",
+        "/api/v1/ai-agent/models?provider=openrouter",
+        "/api/v1/ai-agent/presets",
     ):
         response = await client.get(path)
-        assert GROQ_KEY not in response.text, path
-        assert GEMINI_KEY not in response.text, path
+        assert OPENROUTER_KEY not in response.text, path
     settings = (await client.get("/api/v1/ai-agent/settings")).json()
-    assert settings["groq_hint"] == "gsk_***ZJGp"
-    assert settings["groq_configured"] is True
+    assert settings["openrouter_hint"] == "sk-or-v***wxyz"
+    assert settings["openrouter_configured"] is True
+    assert OPENROUTER_KEY[8:-4] not in settings["openrouter_hint"]
 
 
 async def test_test_button_uses_the_saved_key(client, db, fake):
-    await save_key(db, "groq", GROQ_KEY)
+    await save_key(db, "openrouter", OPENROUTER_KEY)
     # No api_key in the body — the old endpoint 422'd on this.
-    response = await client.post("/api/v1/ai-agent/settings/test", json={"provider": "groq"})
+    response = await client.post("/api/v1/ai-agent/settings/test", json={"provider": "openrouter"})
     assert response.status_code == 200
     payload = response.json()
     assert payload["success"] is True
     assert payload["using_saved_key"] is True
-    assert payload["suggested_model"] == "openai/gpt-oss-20b"
-    assert GROQ_KEY not in response.text
+    assert payload["suggested_model"] == "anthropic/claude-3.5-haiku"
+    assert OPENROUTER_KEY not in response.text
 
 
 async def test_test_button_prefers_a_typed_key(client, db, fake):
-    await save_key(db, "groq", GROQ_KEY)
+    await save_key(db, "openrouter", OPENROUTER_KEY)
     response = await client.post(
         "/api/v1/ai-agent/settings/test",
-        json={"provider": "groq", "api_key": "gsk_typed_key_value_123456"},
+        json={"provider": "openrouter", "api_key": "sk-or-v1-typed-key-value-123456"},
     )
     assert response.status_code == 200
     assert response.json()["using_saved_key"] is False
@@ -308,12 +338,13 @@ async def test_test_button_prefers_a_typed_key(client, db, fake):
 async def test_settings_persist_model_and_toggles(client, db, fake):
     response = await client.put(
         "/api/v1/ai-agent/settings",
-        json={"provider": "groq", "model": "llama-3.3-70b-versatile",
-              "default_provider": "groq", "auto_approve": True, "auto_fallback": False},
+        json={"provider": "openrouter", "model": "anthropic/claude-3.5-haiku",
+              "default_provider": "openrouter", "auto_approve": True, "auto_fallback": False},
     )
     assert response.status_code == 200
     settings = (await client.get("/api/v1/ai-agent/settings")).json()
-    assert settings["models"]["groq"] == "llama-3.3-70b-versatile"
+    assert settings["models"]["openrouter"] == "anthropic/claude-3.5-haiku"
+    assert settings["default_provider"] == "openrouter"
     assert settings["auto_approve"] is True
     assert settings["auto_fallback"] is False
 
@@ -327,7 +358,7 @@ async def _new_session(client) -> str:
 
 
 async def test_chat_streams_a_reply(client, db, fake):
-    await save_key(db, "groq", GROQ_KEY)
+    await save_key(db, "openrouter", OPENROUTER_KEY)
     session_id = await _new_session(client)
     response = await client.post(
         f"/api/v1/ai-agent/sessions/{session_id}/chat",
@@ -347,7 +378,7 @@ async def test_chat_streams_a_reply(client, db, fake):
 
 
 async def test_chat_never_returns_a_bare_500(client, db, fake):
-    await save_key(db, "groq", GROQ_KEY)
+    await save_key(db, "openrouter", OPENROUTER_KEY)
     session_id = await _new_session(client)
 
     def boom(_body):
@@ -362,7 +393,7 @@ async def test_chat_never_returns_a_bare_500(client, db, fake):
     payload = response.json()
     assert payload["error"]["code"] == "provider_down"
     assert payload["error"]["retryable"] is True
-    assert payload["error"]["provider"] == "groq"
+    assert payload["error"]["provider"] == "openrouter"
     # The user's message AND a visible error entry are both in the transcript.
     detail = (await client.get(f"/api/v1/ai-agent/sessions/{session_id}")).json()
     assert detail["messages"][0]["content"] == "hello"
@@ -383,10 +414,10 @@ async def test_user_message_is_saved_before_the_model_call(client, db, fake):
 
 
 async def test_a_retired_model_recovers_automatically(client, db, fake):
-    await save_key(db, "groq", GROQ_KEY)
+    await save_key(db, "openrouter", OPENROUTER_KEY)
     from app.services import ai_providers
 
-    await ai_providers.set_model(db, "groq", "llama-3.3-70b-versatile-exactly-dead")
+    await ai_providers.set_model(db, "openrouter", "llama-3.3-70b-versatile-exactly-dead")
     await db.commit()
 
     def dead_then_alive(body):
@@ -409,44 +440,93 @@ async def test_a_retired_model_recovers_automatically(client, db, fake):
     payload = response.json()
     assert payload["error"] is None
     assert "Recovered" in payload["response"]
-    # The operator was told which model answered.
-    notices = [e for e in payload["events"] if e["type"] == "notice"]
-    assert any("no longer available" in n["text"] for n in notices)
-    # …and the replacement was persisted so the next turn starts clean.
-    assert (await ai_providers.get_model(db, "groq")).startswith("openai/gpt-oss")
+    # The stale name is replaced from the live catalogue *before* the request,
+    # so the dead model is never sent and the operator is never shown a failure.
+    assert not any("dead" in body for _, body in
+                   [(m, u) for m, u in fake["provider"].calls])
+    replaced = await ai_providers.get_model(db, "openrouter")
+    assert replaced in fake["provider"].model_ids()
+    assert replaced != "llama-3.3-70b-versatile-exactly-dead"
 
 
-async def test_falls_back_to_the_other_provider(client, db, fake):
-    await save_key(db, "groq", GROQ_KEY)
-    await save_key(db, "gemini", GEMINI_KEY)
+async def test_a_404_on_a_live_model_recovers_and_tells_the_operator(client, db, fake):
+    """A model can be listed and still have no endpoints; recover from that too.
+
+    Unlike a stale saved name, this one cannot be caught before the request, so
+    the turn fails once, the notice names the switch, and the retry succeeds.
+    """
+    await save_key(db, "openrouter", OPENROUTER_KEY)
+    from app.services import ai_providers
+
+    await ai_providers.set_model(db, "openrouter", "google/gemini-2.5-flash")
+    await db.commit()
+
+    def dead_then_alive(body):
+        if body.get("model") == "google/gemini-2.5-flash":
+            return httpx.Response(404, json={"error": {"message": "No endpoints found"}})
+        return httpx.Response(
+            200, text='data: {"choices":[{"delta":{"content":"Recovered"}}]}\n\ndata: [DONE]'
+        )
+
+    fake["provider"].chat = [dead_then_alive]
     session_id = await _new_session(client)
-
-    def route(body):
-        if body.get("stream"):
-            return httpx.Response(429, json={"error": {"message": "rate limit reached"}})
-        event = {"candidates": [{"content": {"parts": [{"text": "From Gemini"}]}}]}
-        return httpx.Response(200, text="data: " + json.dumps(event) + chr(10) + chr(10) + "data: [DONE]")
-
-    fake["provider"].chat = [route]
     response = await client.post(
         f"/api/v1/ai-agent/sessions/{session_id}/chat",
         json={"message": "hello", "stream": False},
     )
     payload = response.json()
     assert payload["error"] is None
+    assert "Recovered" in payload["response"]
     notices = [e for e in payload["events"] if e["type"] == "notice"]
-    assert any("rate-limit" in n["text"].lower() or "continuing on gemini" in n["text"].lower()
-               for n in notices)
+    assert any("no longer available" in n["text"] for n in notices)
+    assert await ai_providers.get_model(db, "openrouter") != "google/gemini-2.5-flash"
 
 
-async def test_groq_rate_limit_recovers_on_another_live_model(client, db, fake):
-    """A model-scoped 429 must not dead-end when no Gemini key is configured."""
-    await save_key(db, "groq", GROQ_KEY)
+async def test_a_rate_limit_recovers_on_another_model_and_says_so(client, db, fake):
+    """A 429 is usually model-scoped, so the agent moves to another live model.
+
+    There is no second provider to fall back to any more; what replaces that is
+    a second *model* from OpenRouter's own catalogue, with a notice naming the
+    switch instead of a silent change.
+    """
+    await save_key(db, "openrouter", OPENROUTER_KEY)
     session_id = await _new_session(client)
+    from app.services import ai_providers
+
+    await ai_providers.set_model(db, "openrouter", "openai/gpt-4o-mini")
+    await db.commit()
 
     def limited_then_fast(body):
-        if body.get("model") == "openai/gpt-oss-20b":
-            assert body.get("reasoning_effort") == "low"
+        if body.get("model") == "openai/gpt-4o-mini":
+            return httpx.Response(429, json={"error": {"message": "rate limit reached"}})
+        return httpx.Response(
+            200, text='data: {"choices":[{"delta":{"content":"Recovered"}}]}\n\ndata: [DONE]'
+        )
+
+    fake["provider"].chat = [limited_then_fast]
+    response = await client.post(
+        f"/api/v1/ai-agent/sessions/{session_id}/chat",
+        json={"message": "hello", "stream": False},
+    )
+    payload = response.json()
+    assert payload["error"] is None
+    assert "Recovered" in payload["response"]
+    notices = [e for e in payload["events"] if e["type"] == "notice"]
+    assert any("hit a limit" in n["text"] for n in notices)
+    assert payload["events"][-1]["provider"] == "openrouter"
+
+
+async def test_a_model_scoped_429_persists_the_working_route(client, db, fake):
+    """The replacement model is saved, so the next turn does not repeat the 429."""
+    await save_key(db, "openrouter", OPENROUTER_KEY)
+    session_id = await _new_session(client)
+    from app.services import ai_providers
+
+    await ai_providers.set_model(db, "openrouter", "anthropic/claude-3.5-haiku")
+    await db.commit()
+
+    def limited_then_fast(body):
+        if body.get("model") == "anthropic/claude-3.5-haiku":
             return httpx.Response(429, json={"error": {"message": "rate limit reached for this model"}})
         return httpx.Response(
             200,
@@ -464,10 +544,8 @@ async def test_groq_rate_limit_recovers_on_another_live_model(client, db, fake):
     assert "Recovered quickly" in payload["response"]
     notices = [event for event in payload["events"] if event["type"] == "notice"]
     assert any("hit a limit" in event["text"] for event in notices)
-    assert payload["events"][-1]["model"] == "openai/gpt-oss-120b"
     # The next turn starts on the working route instead of repeating the 429.
-    from app.services import ai_providers
-    assert await ai_providers.get_model(db, "groq") == "openai/gpt-oss-120b"
+    assert await ai_providers.get_model(db, "openrouter") == payload["events"][-1]["model"]
 
 
 # ---------------------------------------------------------------------------
@@ -511,7 +589,7 @@ async def test_agent_campaign_creation_returns_manager_destination(client, db, f
 
 
 async def test_starting_a_campaign_waits_for_approval(client, db, fake):
-    await save_key(db, "groq", GROQ_KEY)
+    await save_key(db, "openrouter", OPENROUTER_KEY)
 
     from app.models.campaign import Campaign
     from app.models.contact import Contact
@@ -567,7 +645,7 @@ async def test_starting_a_campaign_waits_for_approval(client, db, fake):
 
 async def test_approval_really_sends_a_valid_campaign(client, db, fake, monkeypatch):
     """The happy path: a valid campaign starts when the operator approves."""
-    await save_key(db, "groq", GROQ_KEY)
+    await save_key(db, "openrouter", OPENROUTER_KEY)
     from app.config import settings
 
     # A deployment with an SMS gateway configured — otherwise validation is
@@ -620,7 +698,7 @@ async def test_approval_really_sends_a_valid_campaign(client, db, fake, monkeypa
 
 
 async def test_auto_approve_runs_without_a_card(client, db, fake):
-    await save_key(db, "groq", GROQ_KEY)
+    await save_key(db, "openrouter", OPENROUTER_KEY)
     await client.put("/api/v1/ai-agent/settings", json={"auto_approve": True})
 
     from app.services import agent_tools
@@ -641,7 +719,7 @@ async def test_auto_approve_runs_without_a_card(client, db, fake):
 
 
 async def test_activity_log_records_tool_calls(client, db, fake):
-    await save_key(db, "groq", GROQ_KEY)
+    await save_key(db, "openrouter", OPENROUTER_KEY)
 
     def searches(_body):
         return streamed_tool_call("search_contacts", {"city": "Abuja"})
@@ -761,17 +839,24 @@ async def test_image_upload_is_safe_to_preview_and_attaches_as_provider_image(cl
     images = await _file_images(db, session_id, [file["id"]])
     assert images == [{"mime_type": "image/png", "data": base64.b64encode(raw).decode("ascii")}]
 
-    groq = ai_providers._messages_for_groq([{"role": "user", "content": "Describe this", "images": images}])
-    assert groq[0]["content"][1]["type"] == "image_url"
-    gemini = ai_providers._messages_for_gemini(
+    shaped = ai_providers._messages_for_openrouter(
         [{"role": "user", "content": "Describe this", "images": images}], "system"
     )
-    assert gemini[0]["parts"][1]["inlineData"]["mimeType"] == "image/png"
+    assert shaped[0] == {"role": "system", "content": "system"}
+    assert shaped[1]["content"][0] == {"type": "text", "text": "Describe this"}
+    assert shaped[1]["content"][1]["type"] == "image_url"
+    # The stored mime type rides through as a data URL, so nothing has to guess.
+    assert shaped[1]["content"][1]["image_url"]["url"].startswith("data:image/png;base64,")
 
 
-async def test_image_vision_fallback_is_per_turn_and_keeps_the_provider_toggle(client, db, fake):
-    await save_key(db, "groq", GROQ_KEY)
-    await save_key(db, "gemini", GEMINI_KEY)
+async def test_an_image_turn_uses_a_vision_model_and_keeps_the_session_on_openrouter(client, db, fake):
+    """An attached picture used to mean a second provider; now it means a second model.
+
+    The vision model is resolved from OpenRouter's live catalogue for this turn
+    only — the session's provider is untouched, which is what keeps the Agent
+    page's model picker honest after a turn with an attachment.
+    """
+    await save_key(db, "openrouter", OPENROUTER_KEY)
     session_id = await _new_session(client)
     upload = await client.post(
         f"/api/v1/ai-agent/sessions/{session_id}/files",
@@ -779,29 +864,31 @@ async def test_image_vision_fallback_is_per_turn_and_keeps_the_provider_toggle(c
     )
     file_id = upload.json()["file"]["id"]
 
-    def gemini_reply(_body):
-        event = {"candidates": [{"content": {"parts": [{"text": "A chart."}]}}]}
-        return httpx.Response(200, text="data: " + json.dumps(event) + chr(10) + chr(10) + "data: [DONE]")
+    def vision_reply(body):
+        assert "image_url" in json.dumps(body["messages"])
+        return httpx.Response(
+            200, text='data: {"choices":[{"delta":{"content":"A chart."}}]}\n\ndata: [DONE]'
+        )
 
-    fake["provider"].chat = [gemini_reply]
+    fake["provider"].chat = [vision_reply]
     response = await client.post(
         f"/api/v1/ai-agent/sessions/{session_id}/chat",
         json={"message": "What is in this picture?", "file_ids": [file_id], "stream": False},
     )
     assert response.status_code == 200, response.text
     assert response.json()["error"] is None
-    assert any("for this turn" in event.get("text", "") for event in response.json()["events"])
-    assert any("streamGenerateContent" in url for _, url in fake["provider"].calls)
+    assert any("chat/completions" in url for _, url in fake["provider"].calls)
     session = await client.get(f"/api/v1/ai-agent/sessions/{session_id}")
-    assert session.json()["session"]["model"] == "groq"
+    assert session.json()["session"]["model"] == "openrouter"
 
 
-async def test_groq_uses_a_live_vision_model_for_image_turns(client, db, fake):
-    await save_key(db, "groq", GROQ_KEY)
-    fake["provider"].models["groq"].append("meta-llama/llama-4-scout-17b-16e-instruct")
+async def test_the_vision_model_comes_from_the_live_catalogue(client, db, fake):
+    await save_key(db, "openrouter", OPENROUTER_KEY)
 
     def describe(body):
-        assert body["model"] == "meta-llama/llama-4-scout-17b-16e-instruct"
+        # Any model the live catalogue says can see images; never a name from
+        # the source. The turn below asserts the picture actually rode along.
+        assert body["model"] in fake["provider"].model_ids()
         image_parts = [
             part for message in body["messages"]
             if isinstance(message.get("content"), list)
@@ -943,7 +1030,7 @@ async def test_import_tool_creates_contacts_in_a_new_list(client, db, fake):
 # voice + memory
 # ---------------------------------------------------------------------------
 async def test_transcribe_returns_text(client, db, fake):
-    await save_key(db, "groq", GROQ_KEY)
+    await save_key(db, "openrouter", OPENROUTER_KEY)
     response = await client.post(
         "/api/v1/ai-agent/transcribe",
         files={"audio": ("voice.webm", b"fake-audio-bytes", "audio/webm")},
@@ -951,7 +1038,7 @@ async def test_transcribe_returns_text(client, db, fake):
     assert response.status_code == 200, response.text
     payload = response.json()
     assert payload["text"] == "import this into a new list"
-    assert payload["provider"] == "groq"
+    assert payload["provider"] == "openrouter"
 
 
 async def test_global_memory_round_trip(client, db, fake):

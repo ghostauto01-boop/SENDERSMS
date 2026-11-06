@@ -92,11 +92,10 @@ export default function AIAgentPage() {
   const streamBuffer = useRef<{ text: string; blocks: TurnBlock[] }>({ text: "", blocks: [] });
 
   const active = sessions.find((s) => s.id === activeId) || null;
-  const configured = Boolean(settings?.groq_configured || settings?.gemini_configured);
-  const activeProvider: Provider = active?.model || settings?.default_provider || "groq";
+  const configured = Boolean(settings?.openrouter_configured);
+  const activeProvider: Provider = "openrouter";
   const activeProviderHealth = health?.providers.find((check) => check.provider === activeProvider);
-  const providerConfigured = (provider: Provider) =>
-    Boolean(provider === "groq" ? settings?.groq_configured : settings?.gemini_configured);
+  const providerConfigured = () => Boolean(settings?.openrouter_configured);
 
   // ---------------------------------------------------------------------
   // load
@@ -185,7 +184,7 @@ export default function AIAgentPage() {
     if (configured) void send(pending);
     else setStreamError({
       message: "Add a key first — then this runs.",
-      hint: "Groq and Gemini are the only providers; either key is enough.",
+      hint: "OpenRouter is the agent's only provider, and one key covers every model.",
       retryable: false,
     });
   }, [loadingSession, activeId, configured, loadingList]);
@@ -235,26 +234,17 @@ export default function AIAgentPage() {
     }
   };
 
-  const chooseProvider = async (provider: Provider) => {
-    if (!activeId || !active || sending || switchingProvider) return;
-    const available = provider === "groq" ? settings?.groq_configured : settings?.gemini_configured;
-    if (!available) {
+  /**
+   * There is one provider now, so this is not a switch — it is the door to the
+   * settings panel where the *model* is chosen. Kept as a named action so the
+   * keyboard affordance and the "add a key" nudge both stay where they were.
+   */
+  const openModelSettings = () => {
+    if (!providerConfigured()) {
       setPanel("settings");
       return;
     }
-    if (active.model === provider) return;
-    const previous = active.model;
-    setSwitchingProvider(provider);
-    setSessions((list) => list.map((s) => (s.id === activeId ? { ...s, model: provider } : s)));
-    try {
-      await agentApi.updateSessionProvider(activeId, provider);
-      toast.success(`${provider === "groq" ? "Groq" : "Gemini"} selected for this chat`);
-    } catch {
-      setSessions((list) => list.map((s) => (s.id === activeId ? { ...s, model: previous } : s)));
-      toast.error("Could not switch the model for this chat.");
-    } finally {
-      setSwitchingProvider(null);
-    }
+    setPanel("settings");
   };
 
   // ---------------------------------------------------------------------
@@ -572,8 +562,9 @@ export default function AIAgentPage() {
               className="truncate text-left hover:text-primary-700 dark:hover:text-primary-300"
               title="Choose a live AI model"
             >
-              {activeProvider === "groq" ? "Groq" : "Gemini"}
+              OpenRouter
               {settings?.models?.[activeProvider] ? ` · ${settings.models[activeProvider]}` : " · automatic model"}
+              {settings?.preset ? ` · ${settings.preset}` : ""}
             </button>
             {activeProviderHealth?.latency_ms != null && (
               <span className="shrink-0 text-gray-400">{activeProviderHealth.latency_ms} ms</span>
@@ -581,40 +572,23 @@ export default function AIAgentPage() {
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1">
-          <div
-            className="flex items-center rounded-lg border border-gray-200 bg-gray-50 p-0.5 dark:border-gray-700 dark:bg-gray-800"
-            role="group"
-            aria-label="Choose AI model provider"
+          {/* One provider, so this is the model chip rather than a toggle.
+              Pressing it opens the settings panel where the live catalogue —
+              grouped by the lab behind each model — is picked. */}
+          <button
+            type="button"
+            onClick={openModelSettings}
+            aria-label="Change the AI model"
+            title={providerConfigured()
+              ? "Change the model — the list is read live from OpenRouter"
+              : "Add an OpenRouter key in settings to use the agent"}
+            className={`inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-gray-50 px-2 py-1.5 text-[10.5px] font-semibold transition-colors hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700 ${
+              providerConfigured() ? "text-primary-800 dark:text-primary-200" : "text-gray-400"
+            }`}
           >
-            {(["groq", "gemini"] as Provider[]).map((provider) => {
-              const selected = activeProvider === provider;
-              const configuredForProvider = providerConfigured(provider);
-              const Icon = provider === "groq" ? Cpu : Brain;
-              return (
-                <button
-                  key={provider}
-                  type="button"
-                  onClick={() => void chooseProvider(provider)}
-                  disabled={!activeId || sending || switchingProvider !== null}
-                  aria-label={`Use ${provider === "groq" ? "Groq" : "Gemini"}`}
-                  aria-pressed={selected}
-                  title={configuredForProvider
-                    ? `Use ${provider === "groq" ? "Groq" : "Gemini"} for this chat`
-                    : `Add a ${provider === "groq" ? "Groq" : "Gemini"} key in settings to use it`}
-                  className={`inline-flex items-center gap-1 rounded-md px-1.5 py-1.5 text-[10.5px] font-semibold transition-colors sm:px-2 ${
-                    selected
-                      ? "bg-white text-primary-800 shadow-sm dark:bg-gray-700 dark:text-primary-200"
-                      : "text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-100"
-                  } ${!configuredForProvider ? "opacity-60" : ""}`}
-                >
-                  {switchingProvider === provider
-                    ? <Loader2 size={11} className="animate-spin" />
-                    : <Icon size={11} />}
-                  <span>{provider === "groq" ? "Groq" : "Gemini"}</span>
-                </button>
-              );
-            })}
-          </div>
+            <Cpu size={11} />
+            <span>OpenRouter</span>
+          </button>
           <button
             type="button"
             onClick={createSession}
@@ -724,7 +698,8 @@ export default function AIAgentPage() {
             )}
             {sessions.map((session) => {
               const isActive = session.id === activeId;
-              const Icon = session.model === "gemini" ? Brain : Cpu;
+              // One provider now, so the session icon no longer encodes a vendor.
+              const Icon = Cpu;
               return (
                 <div
                   key={session.id}
