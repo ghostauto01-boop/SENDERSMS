@@ -13,7 +13,7 @@ vi.mock("../components/agent/AgentModelSettings", () => ({ default: () => null, 
 beforeEach(() => {
   vi.clearAllMocks();
   api.sessions.mockResolvedValue([]);
-  api.settings.mockResolvedValue({ groq_configured: true });
+  api.settings.mockResolvedValue({ openrouter_configured: true, models: { openrouter: "openai/gpt-oss-20b" } });
   api.health.mockResolvedValue(null);
   api.skills.mockResolvedValue([]);
   api.createSession.mockResolvedValue({ id: "new", name: "New chat" });
@@ -30,20 +30,27 @@ describe("AI agent startup", () => {
     await waitFor(() => expect(api.session).toHaveBeenCalledWith("new"));
     expect(await screen.findByLabelText("Message the agent")).toBeEnabled();
   });
-  it("shows an in-chat Groq/Gemini selector and persists provider changes", async () => {
-    api.sessions.mockResolvedValue([{ id: "session-1", name: "Chat", model: "groq" }]);
-    api.settings.mockResolvedValue({ groq_configured: true, gemini_configured: true, default_provider: "groq" });
-    api.session.mockResolvedValue({ session: { id: "session-1", model: "groq" }, messages: [], pending_actions: [], files: [] });
+  it("shows one OpenRouter model chip instead of a two-provider toggle", async () => {
+    api.sessions.mockResolvedValue([{ id: "session-1", name: "Chat", model: "openrouter" }]);
+    api.settings.mockResolvedValue({
+      openrouter_configured: true,
+      default_provider: "openrouter",
+      models: { openrouter: "anthropic/claude-sonnet-4.5" },
+    });
+    api.session.mockResolvedValue({ session: { id: "session-1", model: "openrouter" }, messages: [], pending_actions: [], files: [] });
 
     render(<MemoryRouter><AIAgentPage /></MemoryRouter>);
-    const groq = await screen.findByRole("button", { name: "Use Groq" });
-    const gemini = screen.getByRole("button", { name: "Use Gemini" });
-    expect(groq).toHaveAttribute("aria-pressed", "true");
-    expect(gemini).toHaveAttribute("aria-pressed", "false");
 
-    fireEvent.click(gemini);
-    await waitFor(() => expect(api.updateSessionProvider).toHaveBeenCalledWith("session-1", "gemini"));
-    await waitFor(() => expect(gemini).toHaveAttribute("aria-pressed", "true"));
+    const chip = await screen.findByRole("button", { name: "Change the AI model" });
+    // The chosen model is visible in the header, and there is no second provider
+    // to switch to any more.
+    expect(await screen.findByText(/anthropic\/claude-sonnet-4\.5/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Use Groq" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Use Gemini" })).not.toBeInTheDocument();
+
+    // Pressing it opens the settings panel where the live catalogue is picked.
+    fireEvent.click(chip);
+    await waitFor(() => expect(api.updateSessionProvider).not.toHaveBeenCalled());
   });
 
   it("does not create a new conversation if the list request fails", async () => {

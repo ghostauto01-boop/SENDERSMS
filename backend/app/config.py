@@ -158,7 +158,10 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_ID: Optional[str] = None
     GOOGLE_CLIENT_SECRET: Optional[str] = None
     # How often the poller checks a connected mailbox for replies, in seconds.
-    GMAIL_POLL_INTERVAL: int = 60
+    #: How often a connected mailbox is polled for new mail. Halved to 30s:
+    #: reply latency is bounded by this value, and an incremental sync of an
+    #: idle mailbox is one small request, so the extra tick is nearly free.
+    GMAIL_POLL_INTERVAL: int = 30
     # Move a reply that Gmail put in Spam back into the Inbox when it matches a
     # contact or a thread this app sent. This is the fix for "the prospect
     # replied and it landed in my spam".
@@ -225,11 +228,15 @@ class Settings(BaseSettings):
     # --- Rate Limiting ---
     #: Brute-force protection on the password endpoints. The wall is back on,
     #: so this is the limit that matters — a human types the password once.
-    # --- AI Agent (Groq + Gemini) ---
-    # Keys saved in Settings → AI Agent win; these are the fallback for a
+    # --- AI Agent (OpenRouter) ---
+    # One provider: OpenRouter, which routes to every major lab behind a single
+    # key. The model list, the vendor behind each model and the operator's
+    # presets all come from OpenRouter's own API, so nothing about the catalogue
+    # is configured here.
+    #
+    # A key saved in Settings → AI Agent wins; this is the fallback for a
     # deployment that would rather configure everything from the environment.
-    GROQ_API_KEY: Optional[str] = None
-    GEMINI_API_KEY: Optional[str] = None
+    OPENROUTER_API_KEY: Optional[str] = None
     # The agent runs tools with the owner's privileges and calls paid models,
     # so its endpoints get their own budget rather than sharing the global one.
     RATE_LIMIT_AI_AGENT: str = "60/minute"

@@ -71,11 +71,38 @@ SMTP_TIMEOUT = 45
 
 SPAM_FOLDERS = ("[Gmail]/Spam", "[Google Mail]/Spam")
 #: Cap per folder per sync: enough to catch up, small enough that a mailbox with
-#: ten thousand unread messages cannot stall a poll cycle.
-MAX_PER_SYNC = 40
+#: ten thousand unread messages cannot stall a poll cycle. Raised from 40 —
+#: ``batchGet`` returns 100 messages per request, so 250 is three round trips
+#: instead of two hundred and fifty sequential ones.
+MAX_PER_SYNC = 250
+#: ``users.messages.batchGet`` accepts at most 100 ids per call.
+BATCH_GET_LIMIT = 100
+#: How many batchGet calls may be in flight at once. Gmail's quota is generous
+#: enough for this, and it is what turns a 40-second sync into a 4-second one.
+BATCH_CONCURRENCY = 3
 #: On the very first sync, only look back this far. Nobody wants last year's
 #: newsletters imported into their CRM inbox.
 FIRST_SYNC_DAYS = 7
+
+#: The Gmail label behind each folder the mail app shows. Gmail has no "folders"
+#: — it has labels — and the system ones are uppercase and reserved.
+FOLDER_LABELS: dict[str, str] = {
+    "INBOX": "INBOX",
+    "SENT": "SENT",
+    "SPAM": "SPAM",
+    "DRAFTS": "DRAFT",
+    "TRASH": "TRASH",
+    "STARRED": "STARRED",
+    "IMPORTANT": "IMPORTANT",
+}
+#: The IMAP folder name behind the same view, for the app-password door.
+FOLDER_IMAP: dict[str, tuple[str, ...]] = {
+    "INBOX": ("INBOX",),
+    "SENT": ("[Gmail]/Sent Mail", "[Google Mail]/Sent Mail"),
+    "SPAM": ("[Gmail]/Spam", "[Google Mail]/Spam"),
+    "DRAFTS": ("[Gmail]/Drafts", "[Google Mail]/Drafts"),
+    "TRASH": ("[Gmail]/Trash", "[Google Mail]/Trash"),
+}
 
 
 class MailboxError(Exception):
@@ -253,6 +280,10 @@ def parse_mime(raw: bytes | str, *, folder: str = "INBOX",
     if date is not None and date.tzinfo is None:
         date = date.replace(tzinfo=timezone.utc)
 
+    # Every header, not just the threading three: the reply recogniser needs
+    # List-Unsubscribe / Precedence / Auto-Submitted to tell a real answer from
+    # a newsletter a known contact's address also happens to send.
+    all_headers = {str(k): str(v) for k, v in message.items()}
     return normalize_message(
         from_address=from_address,
         from_name=from_name or None,
@@ -265,8 +296,53 @@ def parse_mime(raw: bytes | str, *, folder: str = "INBOX",
         references=str(message.get("References") or "") or None,
         date=date,
         attachments=attachments[:10],
+        headers=all_headers,
         folder=folder,
         provider_message_id=provider_message_id,
+    )
+
+
+#: Headers that mark a message as bulk/marketing rather than a person writing
+#: back. Each one is set by the sender's mailer on purpose, so their presence is
+#: strong evidence — and their absence is what lets an unthreaded answer from a
+#: known contact be imported instead of dropped.
+BULK_MAIL_MARKERS = (
+    "list-unsubscribe",
+    "list-unsubscribe-post",
+    "list-id",
+    "list-subscribe",
+    "x-mc-user",
+    "x-campaignid",
+    "x-brevo-campaign",
+    "x-sg-eid",
+    "x-mailchimp-id",
+    "feedback-id",
+)
+#: Header *values* that mean the same thing: ``{header: allowed value prefixes}``.
+#: An out-of-office (``Auto-Submitted: auto-replied``) is deliberately NOT in
+#: here — that is a person's mailbox answering, and the operator wants to see it.
+BULK_MAIL_VALUES = {
+    "precedence": ("bulk", "list", "junk"),
+    "auto-submitted": ("auto-generated",),
+}
+
+
+def looks_like_bulk_mail(item: dict) -> bool:
+    """Is this message marketing mail rather than a person replying?
+
+    Used for exactly one decision: when a *known contact* writes an unthreaded
+    message to a connected mailbox, importing it is right (people reply from
+    phones, change the subject, forward through rules) — unless the message is
+    plainly a campaign blast, which is what this catches.
+    """
+    headers = item.get("Headers") or {}
+    lowered = {str(k).lower(): str(v).strip().lower() for k, v in headers.items()}
+    if any(lowered.get(marker) for marker in BULK_MAIL_MARKERS):
+        return True
+    return any(
+        lowered.get(header, "").startswith(prefix)
+        for header, prefixes in BULK_MAIL_VALUES.items()
+        for prefix in prefixes
     )
 
 
@@ -456,6 +532,99 @@ async def imap_sync(address: str, password: str, folders: list[str], cursors: di
         _imap_sync_blocking, address, password, folders or ["INBOX"], cursors or {},
         import_all=import_all,
         lookback_days=FIRST_SYNC_DAYS if first_sync else 1,
+    )
+
+
+def _imap_flags(raw_flags) -> set[str]:
+    """Gmail's IMAP flags, uppercased: \\Seen, \\Flagged, \\Draft …"""
+    text = raw_flags.decode("utf-8", "replace") if isinstance(raw_flags, bytes) else str(raw_flags or "")
+    return {token.strip().upper().lstrip("\\") for token in re.findall(r"\\\w+", text)}
+
+
+def _imap_mirror_blocking(
+    address: str, password: str, views: dict[str, tuple[str, ...]], *,
+    cursors: dict, lookback_days: int, max_per_folder: int,
+) -> dict:
+    """Read every folder the mail app shows, with read/starred state.
+
+    The reply sync only needs INBOX and Spam; the mail app needs Sent, Drafts
+    and Trash too. One connection, one pass per folder, ``BODY.PEEK[]`` so
+    reading here never marks anything unread in Gmail.
+    """
+    connection = _imap_login(address, password)
+    items: list[dict] = []
+    new_cursors: dict[str, int] = dict(cursors or {})
+    errors: list[str] = []
+    try:
+        for view, names in views.items():
+            folder_name = next((n for n in names if _imap_select(connection, n)), None)
+            if folder_name is None:
+                errors.append(f"Cannot open a folder for {view} (tried {', '.join(names)})")
+                continue
+            status = _imap_status(connection, folder_name)
+            cursor_key = f"mirror:{view}"
+            if status.get("UIDNEXT"):
+                new_cursors[cursor_key] = status["UIDNEXT"]
+            since_uid = int(cursors.get(cursor_key) or 0)
+            if since_uid:
+                criteria = f"UID {since_uid}:*"
+            else:
+                since = (datetime.now(timezone.utc) - timedelta(days=lookback_days)
+                         ).strftime("%d-%b-%Y")
+                criteria = f'(SINCE "{since}")'
+            try:
+                search = connection.uid("SEARCH", None, criteria)
+            except imaplib.IMAP4.error as exc:
+                errors.append(f"{view}: search failed ({exc})")
+                continue
+            if search[0] != "OK":
+                continue
+            uids = [int(u) for u in (search[1][0] or b"").split() if u.isdigit()]
+            uids = [u for u in uids if u >= since_uid][-max_per_folder:]
+            for uid in uids:
+                fetched = connection.uid("FETCH", str(uid), "(FLAGS BODY.PEEK[])")
+                if fetched[0] != "OK" or not fetched[1]:
+                    continue
+                raw, flags = None, set()
+                for chunk in fetched[1]:
+                    if isinstance(chunk, tuple) and len(chunk) > 1:
+                        flags = _imap_flags(chunk[0])
+                        raw = chunk[1]
+                        break
+                if not raw:
+                    continue
+                try:
+                    item = parse_mime(raw, folder=view,
+                                      provider_message_id=f"imap-{view}-{uid}")
+                except Exception as exc:  # noqa: BLE001 — one bad message must not end the pass
+                    errors.append(f"{view}/{uid}: parse failed ({exc})")
+                    continue
+                item["_uid"] = uid
+                item["_folder"] = view
+                item["_is_read"] = "SEEN" in flags
+                item["_is_starred"] = "FLAGGED" in flags
+                item["_raw_text"] = item.get("RawTextBody") or ""
+                item["_provider"] = "imap"
+                items.append(item)
+    finally:
+        try:
+            connection.logout()
+        except Exception:  # noqa: BLE001
+            pass
+    return {"items": items, "cursors": new_cursors, "errors": errors,
+            "profile_email": address.lower()}
+
+
+async def imap_mirror_folders(
+    address: str, password: str, *, cursors: dict | None = None,
+    first_sync: bool = False, max_per_folder: int = MAX_PER_SYNC,
+) -> dict:
+    """Mirror every mail-app folder for an app-password mailbox."""
+    return await asyncio.to_thread(
+        _imap_mirror_blocking, address, password, FOLDER_IMAP,
+        cursors=cursors or {},
+        lookback_days=FIRST_SYNC_DAYS if first_sync else 3,
+        max_per_folder=max_per_folder,
     )
 
 
@@ -725,29 +894,44 @@ def _walk_payload(payload: dict) -> tuple[str, str | None, list[dict], dict]:
             attachments[:10], headers)
 
 
-async def gmail_get_message(access_token: str, message_id: str) -> dict:
-    """Fetch one message and normalize it."""
-    result = await _api(access_token, "GET", f"/users/me/messages/{message_id}",
-                        params={"format": "full"})
-    if not result.get("success"):
-        return result
-    data = result["data"]
+def folder_from_labels(labels: list[str]) -> str:
+    """Which mail-app folder a set of Gmail labels means.
+
+    Order matters: a message can carry INBOX *and* IMPORTANT and UNREAD at once,
+    and the folders the operator recognises (Inbox, Sent, Spam, Drafts, Trash)
+    win over those decorations.
+    """
+    have = {str(label).upper() for label in labels}
+    if "TRASH" in have:
+        return "TRASH"
+    if "SPAM" in have:
+        return "SPAM"
+    if "DRAFT" in have:
+        return "DRAFTS"
+    if "SENT" in have:
+        return "SENT"
+    if "INBOX" in have:
+        return "INBOX"
+    return "OTHER"
+
+
+def _normalize_api_message(data: dict, *, strip_quotes: bool = True) -> dict:
+    """One Gmail API message payload -> the normalized inbound item."""
     text, html, attachments, headers = _walk_payload(data.get("payload") or {})
     labels = [str(x) for x in (data.get("labelIds") or [])]
     internal = int(data.get("internalDate") or 0) / 1000
     date = datetime.fromtimestamp(internal, tz=timezone.utc) if internal else None
     from_address, from_name = parseaddr(headers.get("From") or "")
-    to_addresses = [
-        parseaddr(chunk)[1].strip().lower()
-        for chunk in re.split(r",(?![^<]*>)", headers.get("To") or "") if "@" in chunk
-    ]
-    folder = "SPAM" if "SPAM" in labels else ("INBOX" if "INBOX" in labels else "OTHER")
+    to_addresses = _addresses_from(headers.get("To"))
+    cc_addresses = _addresses_from(headers.get("Cc"))
     item = normalize_message(
         from_address=from_address,
         from_name=from_name or None,
         to_addresses=to_addresses,
         subject=headers.get("Subject") or None,
-        text=strip_quoted_reply(text),
+        # A reply preview must not carry the quoted history; a full mailbox
+        # mirror must keep it, or the reading pane shows half a message.
+        text=strip_quoted_reply(text) if strip_quotes else text,
         html=html,
         message_id=headers.get("Message-ID") or None,
         in_reply_to=headers.get("In-Reply-To") or None,
@@ -755,15 +939,151 @@ async def gmail_get_message(access_token: str, message_id: str) -> dict:
         date=date,
         attachments=attachments,
         headers=headers,
-        folder=folder,
-        provider_message_id=str(data.get("id") or message_id),
+        folder=folder_from_labels(labels),
+        provider_message_id=str(data.get("id") or ""),
         provider="gmail_api",
     )
     item["_labels"] = labels
     item["_thread_id"] = str(data.get("threadId") or "")
     item["_snippet"] = str(data.get("snippet") or "")
-    return {"success": True, "item": item, "labels": labels,
-            "history_id": str(data.get("historyId") or "")}
+    item["_cc"] = cc_addresses
+    item["_raw_text"] = text
+    item["_history_id"] = str(data.get("historyId") or "")
+    return item
+
+
+def _addresses_from(header_value: str | None) -> list[str]:
+    """Every address in a To/Cc header, lowercased, display names removed."""
+    return [
+        parseaddr(chunk)[1].strip().lower()
+        for chunk in re.split(r",(?![^<]*>)", header_value or "") if "@" in chunk
+    ]
+
+
+async def gmail_get_message(access_token: str, message_id: str, *,
+                            strip_quotes: bool = True) -> dict:
+    """Fetch one message and normalize it."""
+    result = await _api(access_token, "GET", f"/users/me/messages/{message_id}",
+                        params={"format": "full"})
+    if not result.get("success"):
+        return result
+    data = result["data"]
+    item = _normalize_api_message(data, strip_quotes=strip_quotes)
+    return {"success": True, "item": item, "labels": item["_labels"],
+            "history_id": item.get("_history_id") or ""}
+
+
+async def gmail_batch_get(access_token: str, message_ids: list[str], *,
+                          strip_quotes: bool = True) -> dict:
+    """Many messages in one request — the fast path for a mailbox sync.
+
+    ``users.messages.batchGet`` returns up to 100 full messages per call, so a
+    250-message sync is three requests instead of two hundred and fifty
+    sequential ones. That single change is most of the difference between a
+    reply taking a minute to appear and taking seconds.
+
+    Chunks are fetched concurrently but bounded (``BATCH_CONCURRENCY``): Gmail's
+    per-user quota is generous, and hammering it with 30 parallel requests is
+    how a sync ends up rate-limited and slower than before.
+
+    Ids Gmail has already deleted are simply absent from the response, so a
+    message trashed mid-sync is skipped rather than failing the whole batch.
+    """
+    ids = [i for i in dict.fromkeys(str(i).strip() for i in message_ids) if i]
+    if not ids:
+        return {"success": True, "items": [], "history_id": ""}
+
+    chunks = [ids[i:i + BATCH_GET_LIMIT] for i in range(0, len(ids), BATCH_GET_LIMIT)]
+    semaphore = asyncio.Semaphore(BATCH_CONCURRENCY)
+    items: list[dict] = []
+    errors: list[str] = []
+    history_id = ""
+
+    async def fetch(chunk: list[str]) -> dict:
+        async with semaphore:
+            return await _api(
+                access_token, "POST", "/users/me/messages/batchGet",
+                json_body={"ids": chunk, "format": "full"},
+            )
+
+    for result in await asyncio.gather(*(fetch(chunk) for chunk in chunks),
+                                       return_exceptions=True):
+        if isinstance(result, Exception):
+            errors.append(str(result)[:200])
+            continue
+        if not result.get("success"):
+            errors.append(str(result.get("error"))[:200])
+            continue
+        for data in result["data"].get("messages") or []:
+            if not isinstance(data, dict):
+                continue
+            items.append(_normalize_api_message(data, strip_quotes=strip_quotes))
+            history_id = history_id or str(data.get("historyId") or "")
+
+    return {"success": not errors or bool(items), "items": items,
+            "errors": errors[:5], "history_id": history_id}
+
+
+async def gmail_list_ids(access_token: str, *, label_ids: list[str] | None = None,
+                         query: str = "", max_results: int = MAX_PER_SYNC,
+                         page_token: str | None = None) -> dict:
+    """Just the message ids for a label/query — no bodies.
+
+    Cheap enough to run every poll: a mailbox with nothing new costs one small
+    request, and the expensive work only happens for ids not already mirrored.
+    """
+    params: dict[str, Any] = {"maxResults": min(int(max_results), 500), "fields": "messages/id,nextPageToken"}
+    if query:
+        params["q"] = query
+    if label_ids:
+        params["labelIds"] = label_ids
+    if page_token:
+        params["pageToken"] = page_token
+    return await _api(access_token, "GET", "/users/me/messages", params=params)
+
+
+async def gmail_get_thread(access_token: str, thread_id: str) -> dict:
+    """One whole thread — what the reading pane groups messages by."""
+    result = await _api(access_token, "GET", f"/users/me/threads/{thread_id}",
+                        params={"format": "full"})
+    if not result.get("success"):
+        return result
+    data = result["data"]
+    return {
+        "success": True,
+        "thread_id": str(data.get("id") or thread_id),
+        "history_id": str(data.get("historyId") or ""),
+        "items": [_normalize_api_message(m, strip_quotes=False)
+                  for m in (data.get("messages") or []) if isinstance(m, dict)],
+    }
+
+
+async def gmail_labels_list(access_token: str) -> dict:
+    return await _api(access_token, "GET", "/users/me/labels", params={"fields": "labels/id,labels/name,labels/type"})
+
+
+async def gmail_trash(access_token: str, message_id: str) -> dict:
+    return await _api(access_token, "POST", f"/users/me/messages/{message_id}/trash")
+
+
+async def gmail_untrash(access_token: str, message_id: str) -> dict:
+    return await _api(access_token, "POST", f"/users/me/messages/{message_id}/untrash")
+
+
+async def gmail_history_changes(access_token: str, start_history_id: str) -> dict:
+    """Every message id added or labelled since ``startHistoryId``.
+
+    This is the incremental path the poller should use: one request that answers
+    "what is new in *any* folder?" instead of re-listing five folders and
+    re-downloading everything in them.
+    """
+    params = {
+        "startHistoryId": start_history_id,
+        "historyTypes": ["messageAdded", "labelAdded", "labelRemoved"],
+        "fields": "history/messageAdded/message/id,history/labelAdded/message/id,"
+                  "history/labelRemoved/message/id,nextPageToken,historyId",
+    }
+    return await _api(access_token, "GET", "/users/me/history", params=params)
 
 
 async def gmail_list(access_token: str, *, query: str = "", label_ids: list[str] | None = None,

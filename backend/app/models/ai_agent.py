@@ -12,7 +12,10 @@ class AIAgentSession(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True)  # uuid
     user_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False, default="New Session")
-    model: Mapped[str] = mapped_column(String(30), nullable=False, default="groq")  # groq | gemini
+    #: Which provider the session was created against. "openrouter" now; older
+    #: rows say "groq"/"gemini" and resolve to OpenRouter at read time
+    #: (``ai_providers.get_default_provider``), so no migration is needed.
+    model: Mapped[str] = mapped_column(String(30), nullable=False, default="openrouter")
     # Accumulated memory summary for the session (compressed history)
     memory: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Active skills for this session (JSON list of skill names)

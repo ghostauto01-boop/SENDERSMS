@@ -80,7 +80,7 @@ class EmailMailbox(Base):
     #: through Gmail's spoofing filter.
     send_replies: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
-    poll_interval: Mapped[int] = mapped_column(Integer, nullable=False, default=60)
+    poll_interval: Mapped[int] = mapped_column(Integer, nullable=False, default=30)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     #: Watermarks so a sync is incremental: IMAP UIDNEXT per folder, or the

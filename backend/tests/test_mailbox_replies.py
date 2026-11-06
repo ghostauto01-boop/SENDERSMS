@@ -472,18 +472,63 @@ async def test_our_own_sent_copy_is_never_imported(db):
 
 
 @pytest.mark.asyncio
-async def test_known_contact_promotional_mail_is_not_accepted(db):
-    """A contact match alone must not import their unrelated newsletter."""
+async def test_known_contact_unthreaded_mail_is_imported_as_a_reply(db):
+    """A contact who writes to a connected mailbox is answering — import it.
+
+    The old rule required a ``Re:`` subject *or* a matching References header,
+    and dropped everything else with "known contact, but no matching sent
+    thread". That is the single biggest reason replies looked like they were not
+    importing: phones, forwarding rules and "compose new" all start a fresh
+    subject, and the answer is real either way. Only a stranger's cold mail to
+    the same mailbox is still left alone (next test).
+    """
+    contact = await _contact(db)
+    await _outgoing(db, contact, subject="Quick question")
+    mailbox = await _mailbox(db, address="me@gmail.com")
+    item = gmail_provider.parse_mime(
+        b"From: Ada <prospect@acme.com>\r\nTo: me@gmail.com\r\nSubject: Thursday works\r\n"
+        b"Message-ID: <fresh1@acme.com>\r\nContent-Type: text/plain\r\n\r\nSend it over\r\n"
+    )
+    wanted, reason = await mailbox_service.classify_inbound(db, item, mailbox, {"me@gmail.com"})
+    assert wanted is True
+    assert reason == "known contact replied to a mailbox you connected"
+    assert contact.email == "prospect@acme.com"
+
+
+@pytest.mark.asyncio
+async def test_known_contact_bulk_blast_is_still_not_imported(db):
+    """The newsletter stays out — but on evidence, not on the subject line.
+
+    A message carrying ``List-Unsubscribe`` / ``Precedence: bulk`` is a campaign
+    blast from an address that happens to belong to a contact. Guessing from
+    "50% off" in the subject would also drop real replies ("can you do 50%
+    off?"), so the marker headers are the discriminator instead.
+    """
     contact = await _contact(db)
     await _outgoing(db, contact, subject="Quick question")
     mailbox = await _mailbox(db, address="me@gmail.com")
     item = gmail_provider.parse_mime(
         b"From: Ada <prospect@acme.com>\r\nTo: me@gmail.com\r\nSubject: 50% off today\r\n"
-        b"Message-ID: <promo1@acme.com>\r\nContent-Type: text/plain\r\n\r\nBuy now\r\n"
+        b"Message-ID: <promo1@acme.com>\r\nList-Unsubscribe: <https://x/u>\r\n"
+        b"Precedence: bulk\r\nContent-Type: text/plain\r\n\r\nBuy now\r\n"
     )
     wanted, reason = await mailbox_service.classify_inbound(db, item, mailbox, {"me@gmail.com"})
     assert wanted is False
-    assert reason == "known contact, but no matching sent thread"
+    assert reason == "known contact, but this message is bulk mail"
+
+
+@pytest.mark.asyncio
+async def test_stranger_who_was_never_emailed_is_not_imported(db):
+    """Cold mail into a connected mailbox is not a reply to anything."""
+    contact = await _contact(db)
+    mailbox = await _mailbox(db, address="me@gmail.com")
+    item = gmail_provider.parse_mime(
+        b"From: Ada <prospect@acme.com>\r\nTo: me@gmail.com\r\nSubject: Hello\r\n"
+        b"Message-ID: <cold1@acme.com>\r\nContent-Type: text/plain\r\n\r\nWho are you\r\n"
+    )
+    wanted, reason = await mailbox_service.classify_inbound(db, item, mailbox, {"me@gmail.com"})
+    assert wanted is False
+    assert "never emailed" in reason
     assert contact.email == "prospect@acme.com"
 
 
