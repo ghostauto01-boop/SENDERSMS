@@ -708,6 +708,7 @@ async def run_turn(
     #    transcript contains what they asked for.
     user_message = await add_message(db, session.id, "user", user_text, commit=True)
     yield {"type": "turn_start", "turn_id": turn_id}
+    yield {"type": "status", "phase": "routing", "text": "Checking fast workspace cache & routing OpenRouter preset…"}
 
     # Common exact-count questions do not need an LLM round trip at all. Query
     # the source tables directly, save the answer, and return it as a stream.
@@ -818,6 +819,21 @@ async def run_turn(
     skills = await _active_skills(db, session, user_text)
     summaries = await _file_summaries(db, session.id, file_ids)
     global_memory = await get_global_memory(db)
+    preset_locked = await ai_providers.get_preset_locked(db)
+    preset_models = await ai_providers.get_preset_models(db)
+    yield {
+        "type": "status",
+        "phase": "context_ready",
+        "model": model,
+        "preset_locked": preset_locked,
+        "preset_count": len(preset_models),
+        "tools_count": len(tools_in_use),
+        "text": (
+            f"Prepared {len(tools_in_use)} workspace tool(s) · Locked preset chain ({len(preset_models)} model(s), starting with {model})"
+            if preset_locked and preset_models
+            else f"Prepared {len(tools_in_use)} workspace tool(s) · Connecting to OpenRouter ({model})"
+        ),
+    }
     system_text = build_system_prompt(
         memory=session.memory or "",
         global_memory=global_memory,
@@ -875,6 +891,17 @@ async def run_turn(
     for step in range(MAX_STEPS):
         yield {"type": "step", "step": step + 1, "max": MAX_STEPS, "model": used_model,
                "provider": used_provider}
+        yield {
+            "type": "status",
+            "phase": "generating" if step == 0 else "synthesizing",
+            "step": step + 1,
+            "model": used_model,
+            "text": (
+                f"Thinking with {used_model}…"
+                if step == 0
+                else f"Analyzing tool results with {used_model} (step {step + 1})…"
+            ),
+        }
         streamed: list[str] = []
         response: dict[str, Any] | None = None
         try:
@@ -891,7 +918,9 @@ async def run_turn(
                 allow_fallback=allow_fallback,
                 requires_vision=bool(images),
             ):
-                if event["type"] == "text":
+                if event["type"] == "thinking":
+                    yield {"type": "thinking", "text": event["text"], "step": step + 1}
+                elif event["type"] == "text":
                     streamed.append(event["text"])
                     yield {"type": "text", "text": event["text"], "step": step + 1}
                 elif event["type"] == "notice":
@@ -899,7 +928,19 @@ async def run_turn(
                         used_provider = event["provider"]
                     if event.get("model"):
                         used_model = event["model"]
-                    yield {"type": "notice", "kind": event.get("kind"), "text": event.get("text")}
+                    yield {
+                        "type": "notice",
+                        "kind": event.get("kind"),
+                        "from_model": event.get("from_model"),
+                        "model": event.get("model"),
+                        "text": event.get("text"),
+                    }
+                    yield {
+                        "type": "status",
+                        "phase": "fallback",
+                        "model": used_model,
+                        "text": f"Switched seamlessly to {used_model} — continuing…",
+                    }
                 elif event["type"] == "done":
                     response = event["response"]
                     if event.get("provider") in ai_providers.PROVIDERS:
@@ -975,10 +1016,18 @@ async def run_turn(
                 continue
 
             needs_approval = definition.danger and not auto_approve
+            progress_text = _progress_label(name, args)
+            yield {
+                "type": "status",
+                "phase": "tool_running",
+                "step": step + 1,
+                "tool": name,
+                "text": f"Running {progress_text}…",
+            }
             yield {
                 "type": "tool_start",
                 "tool": name,
-                "label": _progress_label(name, args),
+                "label": progress_text,
                 "step": step + 1,
                 "needs_approval": needs_approval,
             }

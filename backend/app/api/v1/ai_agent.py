@@ -175,9 +175,10 @@ async def list_presets(
 class PresetUpdate(BaseModel):
     preset: Optional[str] = None
     vendor: Optional[str] = None
-    #: Check the preset name against OpenRouter before saving it. Named
-    #: ``check`` rather than ``validate`` — the latter shadows
-    #: ``BaseModel.validate`` and pydantic warns on every import.
+    preset_locked: Optional[bool] = None
+    preset_models: Optional[list[str]] = None
+    saved_presets: Optional[list[dict[str, Any]]] = None
+    active_saved_preset: Optional[str] = None
     check: bool = False
 
 
@@ -187,10 +188,18 @@ async def put_preset(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """Pin routing to a vendor and/or attach an OpenRouter preset by name."""
+    """Pin routing to a vendor, attach an OpenRouter preset, and/or lock an ordered fallback chain."""
     warnings: list[str] = []
     if body.vendor is not None:
         await ai_providers.set_vendor(db, body.vendor)
+    if body.preset_locked is not None:
+        await ai_providers.set_preset_locked(db, body.preset_locked)
+    if body.preset_models is not None:
+        await ai_providers.set_preset_models(db, body.preset_models)
+    if body.saved_presets is not None:
+        await ai_providers.set_saved_presets(db, body.saved_presets)
+    if body.active_saved_preset is not None:
+        await ai_providers.set_active_saved_preset(db, body.active_saved_preset)
     if body.preset is not None:
         name = body.preset.strip()
         if name and body.check:
@@ -207,6 +216,10 @@ async def put_preset(
         "success": True,
         "preset": await ai_providers.get_preset(db),
         "vendor": await ai_providers.get_vendor(db),
+        "preset_locked": await ai_providers.get_preset_locked(db),
+        "preset_models": await ai_providers.get_preset_models(db),
+        "saved_presets": await ai_providers.get_saved_presets(db),
+        "active_saved_preset": await ai_providers.get_active_saved_preset(db),
         "warnings": warnings,
     }
 
@@ -260,6 +273,10 @@ class SettingsUpdate(BaseModel):
     default_provider: Optional[str] = None
     auto_fallback: Optional[bool] = None
     auto_approve: Optional[bool] = None
+    preset_locked: Optional[bool] = None
+    preset_models: Optional[list[str]] = None
+    saved_presets: Optional[list[dict[str, Any]]] = None
+    active_saved_preset: Optional[str] = None
 
 
 @router.get("/settings")
@@ -315,6 +332,14 @@ async def put_settings(
         await ai_providers.set_flag(db, ai_providers.AUTO_FALLBACK_SETTING, body.auto_fallback)
     if body.auto_approve is not None:
         await ai_providers.set_flag(db, ai_providers.AUTO_APPROVE_SETTING, body.auto_approve)
+    if body.preset_locked is not None:
+        await ai_providers.set_preset_locked(db, body.preset_locked)
+    if body.preset_models is not None:
+        await ai_providers.set_preset_models(db, body.preset_models)
+    if body.saved_presets is not None:
+        await ai_providers.set_saved_presets(db, body.saved_presets)
+    if body.active_saved_preset is not None:
+        await ai_providers.set_active_saved_preset(db, body.active_saved_preset)
     await db.commit()
     return {"success": True, **(await ai_providers.keys_summary(db)),
             "models": {p: await ai_providers.get_model(db, p) for p in ai_providers.PROVIDERS}}

@@ -215,11 +215,52 @@ export function ErrorNote({
   );
 }
 
-export function StepProgress({ step, max }: { step: number; max: number }) {
+export function ThinkingBlock({ text, streaming }: { text: string; streaming?: boolean }) {
+  const [open, setOpen] = useState(Boolean(streaming));
   return (
-    <p className="flex items-center gap-1.5 text-[11px] font-medium text-gray-400">
-      <Loader2 size={10} className="animate-spin" />
-      Step {step} of {max}
-    </p>
+    <div className="rounded-xl border border-gray-200/80 bg-gray-50/70 px-2.5 py-1.5 text-[12px] dark:border-gray-700/80 dark:bg-gray-800/40">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-1.5 text-left font-medium text-gray-600 dark:text-gray-300"
+      >
+        {streaming ? <Loader2 size={12} className="animate-spin text-primary-600" /> : <Check size={12} className="text-success-600" />}
+        <span>{streaming ? "Reasoning live…" : "Reasoning trace"}</span>
+        <span className="ml-auto text-gray-400">
+          {open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+        </span>
+      </button>
+      {open && (
+        <p className="mt-1.5 whitespace-pre-wrap border-l-2 border-primary-300 pl-2.5 text-[11.5px] leading-relaxed text-gray-500 dark:border-primary-700 dark:text-gray-400">
+          {text}
+        </p>
+      )}
+    </div>
+  );
+}
+
+export function StepProgress({
+  step,
+  max,
+  statusText,
+  model,
+}: {
+  step: number;
+  max: number;
+  statusText?: string;
+  model?: string;
+}) {
+  return (
+    <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-primary-200/70 bg-primary-50/80 px-3 py-1 text-[11.5px] font-medium text-primary-800 dark:border-primary-800/60 dark:bg-primary-950/50 dark:text-primary-200">
+      <Loader2 size={11} className="shrink-0 animate-spin text-primary-600 dark:text-primary-400" />
+      <span className="truncate">
+        {statusText || (step > 0 ? `Working · Step ${step} of ${max}` : "Connecting to OpenRouter…")}
+      </span>
+      {model ? (
+        <span className="hidden shrink-0 rounded bg-white/80 px-1.5 py-0.5 font-mono text-[10px] text-gray-600 sm:inline dark:bg-gray-900/70 dark:text-gray-300">
+          {model}
+        </span>
+      ) : null}
+    </div>
   );
 }

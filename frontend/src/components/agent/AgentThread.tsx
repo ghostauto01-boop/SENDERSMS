@@ -5,7 +5,7 @@ import {
 import Markdown from "../Markdown";
 import type { ConfirmationCard } from "../../api/aiAgent";
 import {
-  ConfirmationPrompt, ErrorNote, Notice, StepProgress, ToolStep,
+  ConfirmationPrompt, ErrorNote, Notice, StepProgress, ThinkingBlock, ToolStep,
 } from "./AgentTurn";
 
 /**
@@ -19,6 +19,7 @@ import {
  */
 
 export type TurnBlock =
+  | { kind: "thinking"; text: string }
   | { kind: "text"; text: string }
   | { kind: "notice"; noticeKind: string; text: string }
   | { kind: "tool"; tool: string; label: string; status: string; durationMs?: number; data?: any }
@@ -32,6 +33,8 @@ export type Turn = {
   createdAt?: string;
   streaming?: boolean;
   step?: { current: number; max: number } | null;
+  statusText?: string | null;
+  activeModel?: string | null;
 };
 
 export function useAutoScroll(dependency: unknown) {
@@ -88,6 +91,15 @@ function AssistantBubble({
       </div>
       <div className="min-w-0 flex-1 space-y-1.5">
         {turn.blocks.map((block, index) => {
+          if (block.kind === "thinking") {
+            return (
+              <ThinkingBlock
+                key={index}
+                text={block.text}
+                streaming={turn.streaming && index === turn.blocks.length - 1}
+              />
+            );
+          }
           if (block.kind === "text") {
             return (
               <div key={index} className="text-gray-800 dark:text-gray-100">
@@ -132,8 +144,13 @@ function AssistantBubble({
           );
         })}
 
-        {turn.streaming && turn.step && (
-          <StepProgress step={turn.step.current} max={turn.step.max} />
+        {turn.streaming && (turn.step || turn.statusText) && (
+          <StepProgress
+            step={turn.step?.current ?? 0}
+            max={turn.step?.max ?? 15}
+            statusText={turn.statusText || undefined}
+            model={turn.activeModel || undefined}
+          />
         )}
 
         {!turn.streaming && plain && (
