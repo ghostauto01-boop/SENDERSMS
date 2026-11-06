@@ -136,13 +136,13 @@ class CampaignService:
                 return "Selected SMS gateway is disabled"
             return None
 
-        # No explicit gateway: fall back to the environment-configured one.
-        from app.config import settings
+        # No explicit gateway: fall back to Render env OR any active connected sender phone.
+        from app.services.gateway_service import has_any_usable_sms_sender
 
-        if not settings.smsgate_configured:
+        if not await has_any_usable_sms_sender(self.db):
             return (
                 "No SMS gateway configured. Set SMSGATE_BASE_URL, SMSGATE_USERNAME "
-                "and SMSGATE_PASSWORD, or select a gateway for this campaign."
+                "and SMSGATE_PASSWORD, or connect a phone in Settings -> SMS Gateway."
             )
         return None
 

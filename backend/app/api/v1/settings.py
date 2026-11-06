@@ -43,8 +43,25 @@ async def put_access(body:SiteAccessUpdate, response:Response, db:AsyncSession=D
 
 @router.get("/gateway")
 async def get_gw(db:AsyncSession=Depends(get_db)):
+    from app.services import gateway_service
     from app.services.system_settings import get_sim_number
-    return{"configured":settings.smsgate_configured,"is_enabled":True,"username":settings.SMSGATE_USERNAME or"","password":mask_value(settings.SMSGATE_PASSWORD or""),"base_url":settings.SMSGATE_BASE_URL or"","sim_number":await get_sim_number(db),"connection_status":"unknown","last_error":None}
+    phones = await gateway_service.list_sender_phones(db)
+    routing = await gateway_service.get_routing_config(db)
+    any_active_db = any(not p.get("is_render_env") and p.get("is_enabled") for p in phones)
+    return {
+        "configured": bool(settings.smsgate_configured or any_active_db),
+        "render_sender_active": bool(settings.smsgate_configured),
+        "is_enabled": True,
+        "username": settings.SMSGATE_USERNAME or "",
+        "password": mask_value(settings.SMSGATE_PASSWORD or ""),
+        "base_url": settings.SMSGATE_BASE_URL or "",
+        "sim_number": await get_sim_number(db),
+        "connection_status": "unknown",
+        "last_error": None,
+        "phones": phones,
+        "routing_mode": routing["routing_mode"],
+        "sim_failover": routing["sim_failover"],
+    }
 
 @router.put("/gateway/sim")
 async def set_sim(sim:int=1,db:AsyncSession=Depends(get_db),cu:User=Depends(get_current_user)):
@@ -380,3 +397,273 @@ async def put_google_oauth(body: GoogleOAuthUpdate, db: AsyncSession = Depends(g
 
     return {"success": True, "warnings": warnings, **{k: v for k, v in saved.items()
                                                       if k != "client_id"}}
+
+
+# ---------------------------------------------------------------------------
+# Multi-Phone SMS Sender Management (Non-destructive to Render Primary)
+# ---------------------------------------------------------------------------
+class SenderPhoneCreate(BaseModel):
+    name: str = "Connected Android Phone"
+    mode: str = "cloud"
+    is_enabled: bool = True
+    is_default: bool = False
+    phone_number: Optional[str] = None
+    device_id: Optional[str] = None
+    base_url: Optional[str] = None
+    username: str
+    password: str
+    webhook_secret: Optional[str] = None
+    sim_number: int = 1
+    sim_slot: Optional[int] = None
+    priority: int = 10
+    daily_limit: int = 0
+    notes: Optional[str] = None
+
+
+class SenderPhoneUpdate(BaseModel):
+    name: Optional[str] = None
+    mode: Optional[str] = None
+    is_enabled: Optional[bool] = None
+    is_default: Optional[bool] = None
+    phone_number: Optional[str] = None
+    device_id: Optional[str] = None
+    base_url: Optional[str] = None
+    username: Optional[str] = None
+    password: Optional[str] = None
+    webhook_secret: Optional[str] = None
+    sim_number: Optional[int] = None
+    priority: Optional[int] = None
+    daily_limit: Optional[int] = None
+    notes: Optional[str] = None
+
+
+class SenderPhoneTestRequest(BaseModel):
+    test_recipient: Optional[str] = None
+    test_message: Optional[str] = None
+
+
+class GatewayRoutingUpdate(BaseModel):
+    routing_mode: Optional[str] = None
+    sim_failover: Optional[bool] = None
+
+
+@router.get("/gateway/phones")
+async def list_gateway_phones(
+    db: AsyncSession = Depends(get_db),
+    cu: User = Depends(get_current_user),
+):
+    from app.services import gateway_service
+
+    routing = await gateway_service.get_routing_config(db)
+    return {
+        "phones": await gateway_service.list_sender_phones(db),
+        "render_sender_active": bool(settings.smsgate_configured),
+        **routing,
+    }
+
+
+@router.post("/gateway/phones")
+async def add_gateway_phone(
+    body: SenderPhoneCreate,
+    db: AsyncSession = Depends(get_db),
+    cu: User = Depends(get_current_user),
+):
+    from app.services import gateway_service
+
+    try:
+        phone = await gateway_service.create_sender_phone(db, body.model_dump())
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return {"success": True, "phone": phone, "phones": await gateway_service.list_sender_phones(db)}
+
+
+@router.put("/gateway/phones/{phone_id}")
+async def edit_gateway_phone(
+    phone_id: str,
+    body: SenderPhoneUpdate,
+    db: AsyncSession = Depends(get_db),
+    cu: User = Depends(get_current_user),
+):
+    from app.services import gateway_service
+
+    try:
+        phone = await gateway_service.update_sender_phone(
+            db, phone_id, body.model_dump(exclude_unset=True)
+        )
+    except LookupError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return {"success": True, "phone": phone, "phones": await gateway_service.list_sender_phones(db)}
+
+
+@router.delete("/gateway/phones/{phone_id}")
+async def remove_gateway_phone(
+    phone_id: str,
+    db: AsyncSession = Depends(get_db),
+    cu: User = Depends(get_current_user),
+):
+    from app.services import gateway_service
+
+    try:
+        await gateway_service.delete_sender_phone(db, phone_id)
+    except LookupError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return {"success": True, "phones": await gateway_service.list_sender_phones(db)}
+
+
+@router.post("/gateway/phones/{phone_id}/test")
+async def test_gateway_phone(
+    phone_id: str,
+    body: Optional[SenderPhoneTestRequest] = None,
+    db: AsyncSession = Depends(get_db),
+    cu: User = Depends(get_current_user),
+):
+    from app.services import gateway_service
+
+    try:
+        return await gateway_service.test_sender_phone(
+            db,
+            phone_id,
+            test_recipient=body.test_recipient if body else None,
+            test_message=body.test_message if body else None,
+        )
+    except LookupError as exc:
+        raise HTTPException(404, str(exc)) from exc
+
+
+@router.post("/gateway/phones/{phone_id}/register-webhook")
+async def register_gateway_phone_webhook(
+    phone_id: str,
+    url: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    cu: User = Depends(get_current_user),
+):
+    from app.services import gateway_service
+
+    try:
+        res = await gateway_service.register_sender_phone_webhook(db, phone_id, custom_url=url)
+    except LookupError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    if not res.get("success"):
+        raise HTTPException(502, res.get("error") or "Gateway rejected webhook registration")
+    return res
+
+
+@router.put("/gateway/routing")
+async def update_gateway_routing(
+    body: GatewayRoutingUpdate,
+    db: AsyncSession = Depends(get_db),
+    cu: User = Depends(get_current_user),
+):
+    from app.services import gateway_service
+
+    try:
+        saved = await gateway_service.set_routing_config(
+            db, routing_mode=body.routing_mode, sim_failover=body.sim_failover
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return {"success": True, **saved}
+
+
+# ---------------------------------------------------------------------------
+# Appearance & Professional Theme Preferences (App Settings -> Appearance)
+# ---------------------------------------------------------------------------
+APPEARANCE_SETTING_KEY = "appearance.preferences"
+VALID_PALETTES = {
+    "emerald",
+    "sapphire",
+    "indigo",
+    "obsidian",
+    "teal",
+    "amber",
+    "crimson",
+    "plum",
+    "nordic",
+    "terracotta",
+}
+VALID_MODES = {"light", "dark", "system"}
+VALID_DENSITIES = {"compact", "comfortable", "spacious"}
+VALID_RADII = {"sharp", "rounded", "soft"}
+VALID_FONTS = {"default", "inter", "editorial", "mono"}
+
+
+class AppearanceUpdate(BaseModel):
+    mode: Optional[str] = None
+    palette: Optional[str] = None
+    density: Optional[str] = None
+    radius: Optional[str] = None
+    font: Optional[str] = None
+    font_scale: Optional[str] = None
+
+
+@router.get("/appearance")
+async def get_appearance(
+    db: AsyncSession = Depends(get_db),
+    cu: User = Depends(get_current_user),
+):
+    from app.models.system import SystemSetting
+
+    row = (
+        await db.execute(select(SystemSetting).where(SystemSetting.key == APPEARANCE_SETTING_KEY))
+    ).scalar_one_or_none()
+    defaults = {
+        "mode": "system",
+        "palette": "emerald",
+        "density": "comfortable",
+        "radius": "rounded",
+        "font": "default",
+    }
+    if row and row.value:
+        try:
+            parsed = json.loads(row.value)
+            if isinstance(parsed, dict):
+                defaults.update({k: v for k, v in parsed.items() if k in defaults and v})
+        except Exception:
+            pass
+    return defaults
+
+
+@router.put("/appearance")
+async def put_appearance(
+    body: AppearanceUpdate,
+    db: AsyncSession = Depends(get_db),
+    cu: User = Depends(get_current_user),
+):
+    from app.models.system import SystemSetting
+
+    if body.palette is not None and body.palette not in VALID_PALETTES:
+        raise HTTPException(400, f"Unsupported palette '{body.palette}'")
+    if body.mode is not None and body.mode not in VALID_MODES:
+        raise HTTPException(400, f"Unsupported mode '{body.mode}'")
+    if body.density is not None and body.density not in VALID_DENSITIES:
+        raise HTTPException(400, f"Unsupported density '{body.density}'")
+    if body.radius is not None and body.radius not in VALID_RADII:
+        raise HTTPException(400, f"Unsupported radius '{body.radius}'")
+    if body.font is not None and body.font not in VALID_FONTS:
+        raise HTTPException(400, f"Unsupported font '{body.font}'")
+
+    current = await get_appearance(db=db, cu=cu)
+    patch = {k: v for k, v in body.model_dump(exclude_none=True).items() if k in current}
+    current.update(patch)
+    row = (
+        await db.execute(select(SystemSetting).where(SystemSetting.key == APPEARANCE_SETTING_KEY))
+    ).scalar_one_or_none()
+    if row is None:
+        db.add(
+            SystemSetting(
+                key=APPEARANCE_SETTING_KEY,
+                value=json.dumps(current),
+                category="appearance",
+                description="Workspace theme, color palette, density, radius, and typography",
+            )
+        )
+    else:
+        row.value = json.dumps(current)
+    await db.commit()
+    return {"success": True, **current, "appearance": current}

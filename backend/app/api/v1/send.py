@@ -171,7 +171,7 @@ async def send_sms_now(
     # loop or pasted blob — refuse rather than burn credit on 6+ SMS each.
     if segment_count > 5:
         raise HTTPException(400, f"Message is {segment_count} segments ({char_count} chars). Split it — messages over 5 segments are blocked to protect your credit.")
-    from app.providers.smsgate import send_sms_direct
+    from app.services.gateway_service import dispatch_sms_multi_phone
     results = []
 
     for contact in recipients:
@@ -202,17 +202,7 @@ async def send_sms_now(
         )
         db.add(message)
         await db.flush()
-        r = await send_sms_direct(contact.phone_number, msg, sim)
-        if not r["success"]:
-            # SIM failover: retry once on the other slot (one billable attempt max).
-            other = 2 if sim == 1 else 1
-            r2 = await send_sms_direct(contact.phone_number, msg, other)
-            if r2["success"]:
-                r = r2
-            else:
-                r = {"success": False,
-                     "error": f"SIM{sim}: {r.get('error','')} | SIM{other}: {r2.get('error','')}"[:500],
-                     "raw": r2.get("raw") or r.get("raw")}
+        r = await dispatch_sms_multi_phone(db, contact.phone_number, msg, sim_override=sim)
         if r["success"]:
             message.status = "sent"
             message.provider_message_id = r.get("provider_message_id", "")
@@ -492,10 +482,10 @@ async def retry_message(mid: int, db: AsyncSession = Depends(get_db), cu: User =
     if contact.is_opted_out:
         raise HTTPException(400, "Contact opted out")
 
-    from app.providers.smsgate import send_sms_direct
+    from app.services.gateway_service import dispatch_sms_multi_phone
     from app.services.system_settings import get_sim_number
     sim = await get_sim_number(db)
-    result = await send_sms_direct(contact.phone_number, m.body, sim)
+    result = await dispatch_sms_multi_phone(db, contact.phone_number, m.body, sim_override=sim)
     if result["success"]:
         m.status = "sent"
         m.provider_message_id = result.get("provider_message_id", "")

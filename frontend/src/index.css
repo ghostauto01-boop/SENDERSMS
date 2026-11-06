@@ -21,21 +21,61 @@
    query below also covers any surface rendered before that class is set.
    --------------------------------------------------------------------------- */
 :root {
-  --email-text-primary: #202823;
-  --email-text-secondary: #626c64;
+  --c-primary-50: 240 246 242;
+  --c-primary-100: 220 235 225;
+  --c-primary-200: 186 216 197;
+  --c-primary-300: 143 189 165;
+  --c-primary-400: 95 156 128;
+  --c-primary-500: 63 128 100;
+  --c-primary-600: 42 104 78;
+  --c-primary-700: 33 84 64;
+  --c-primary-800: 26 69 52;
+  --c-primary-900: 18 60 43;
+  --c-primary-950: 8 37 26;
+  --c-gray-50: 248 248 246;
+  --c-gray-100: 242 242 239;
+  --c-gray-200: 231 232 228;
+  --c-gray-300: 214 216 211;
+  --c-gray-400: 173 179 172;
+  --c-gray-500: 130 139 131;
+  --c-gray-600: 98 108 100;
+  --c-gray-700: 76 86 78;
+  --c-gray-800: 52 61 54;
+  --c-gray-900: 32 40 35;
+  --c-gray-950: 17 23 18;
+  --c-canvas: 236 236 234;
+  --c-canvas-dark: 12 20 16;
+  --c-shell: 250 250 248;
+  --c-shell-muted: 241 242 238;
+  --c-surface-dark: 18 28 22;
+  --c-surface-dark-muted: 24 36 29;
+  --email-text-primary: rgb(var(--c-gray-900));
+  --email-text-secondary: rgb(var(--c-gray-600));
   --email-bg-primary: #ffffff;
-  --email-bg-secondary: #f7f8f5;
-  --email-link: #215440;
-  --email-border: #e7e8e4;
+  --email-bg-secondary: rgb(var(--c-gray-50));
+  --email-link: rgb(var(--c-primary-700));
+  --email-border: rgb(var(--c-gray-200));
 }
 .dark {
   --email-text-primary: #e6ece7;
   --email-text-secondary: #aab4ac;
-  --email-bg-primary: #121c16;
-  --email-bg-secondary: #18241d;
-  --email-link: #8fc7a8;
-  --email-border: #2b3a30;
+  --email-bg-primary: rgb(var(--c-surface-dark));
+  --email-bg-secondary: rgb(var(--c-surface-dark-muted));
+  --email-link: rgb(var(--c-primary-300));
+  --email-border: rgb(var(--c-gray-800));
 }
+
+/* Appearance geometry, density & typography modifiers */
+html[data-density="compact"] { font-size: 14.5px; }
+html[data-density="spacious"] { font-size: 16.5px; }
+html[data-radius="sharp"] .card { border-radius: 0.625rem !important; }
+html[data-radius="soft"] .card { border-radius: 1.75rem !important; }
+html[data-font="inter"] body { font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+html[data-font="editorial"] h1, html[data-font="editorial"] h2, html[data-font="editorial"] .page-title {
+  font-family: Georgia, "Iowan Old Style", "Times New Roman", serif;
+  letter-spacing: -0.02em;
+}
+html[data-font="mono"] body { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
 @media (prefers-color-scheme: dark) {
   :root:not(.light) {
     --email-text-primary: #e6ece7;

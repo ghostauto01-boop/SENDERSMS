@@ -288,6 +288,10 @@ async def get_settings(db: AsyncSession = Depends(get_db), user: User = Depends(
         "default_provider": await ai_providers.get_default_provider(db),
         "vendor": await ai_providers.get_vendor(db),
         "preset": await ai_providers.get_preset(db),
+        "preset_locked": await ai_providers.get_preset_locked(db),
+        "preset_models": await ai_providers.get_preset_models(db),
+        "saved_presets": await ai_providers.get_saved_presets(db),
+        "active_saved_preset": await ai_providers.get_active_saved_preset(db),
         "auto_fallback": await ai_providers.get_flag(db, ai_providers.AUTO_FALLBACK_SETTING, True),
         "auto_approve": await ai_providers.get_flag(db, ai_providers.AUTO_APPROVE_SETTING, False),
         "voice": await _voice_settings(db),
@@ -319,13 +323,14 @@ async def put_settings(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    if body.provider and (body.api_key is not None or body.clear_key):
+    prov = body.provider or "openrouter"
+    if body.api_key is not None or body.clear_key:
         if body.clear_key:
-            await ai_providers.set_api_key(db, body.provider, "")
+            await ai_providers.set_api_key(db, prov, "")
         elif body.api_key and body.api_key.strip():
-            await ai_providers.set_api_key(db, body.provider, body.api_key)
-    if body.provider and body.model:
-        await ai_providers.set_model(db, body.provider, body.model)
+            await ai_providers.set_api_key(db, prov, body.api_key)
+    if body.model:
+        await ai_providers.set_model(db, prov, body.model)
     if body.default_provider in ai_providers.PROVIDERS:
         await ai_providers._set_value(db, ai_providers.DEFAULT_PROVIDER_SETTING, body.default_provider)
     if body.auto_fallback is not None:
@@ -335,14 +340,24 @@ async def put_settings(
     if body.preset_locked is not None:
         await ai_providers.set_preset_locked(db, body.preset_locked)
     if body.preset_models is not None:
-        await ai_providers.set_preset_models(db, body.preset_models)
+        cleaned_models = await ai_providers.set_preset_models(db, body.preset_models)
+        if cleaned_models and not body.model and (body.preset_locked or await ai_providers.get_preset_locked(db)):
+            await ai_providers.set_model(db, "openrouter", cleaned_models[0])
     if body.saved_presets is not None:
         await ai_providers.set_saved_presets(db, body.saved_presets)
     if body.active_saved_preset is not None:
         await ai_providers.set_active_saved_preset(db, body.active_saved_preset)
     await db.commit()
-    return {"success": True, **(await ai_providers.keys_summary(db)),
-            "models": {p: await ai_providers.get_model(db, p) for p in ai_providers.PROVIDERS}}
+    return {
+        "success": True,
+        "provider": "openrouter",
+        **(await ai_providers.keys_summary(db)),
+        "models": {p: await ai_providers.get_model(db, p) for p in ai_providers.PROVIDERS},
+        "preset_locked": await ai_providers.get_preset_locked(db),
+        "preset_models": await ai_providers.get_preset_models(db),
+        "saved_presets": await ai_providers.get_saved_presets(db),
+        "active_saved_preset": await ai_providers.get_active_saved_preset(db),
+    }
 
 
 @router.put("/settings/voice")

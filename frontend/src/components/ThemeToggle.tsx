@@ -1,4 +1,4 @@
-import { Moon, Sun } from "lucide-react";
+import { Monitor, Moon, Sun } from "lucide-react";
 import { useTheme } from "../hooks/useTheme";
 
 /**
@@ -17,6 +17,7 @@ import { useTheme } from "../hooks/useTheme";
 const OPTIONS = [
   { value: "light" as const, label: "Light", icon: Sun },
   { value: "dark" as const, label: "Dark", icon: Moon },
+  { value: "system" as const, label: "System", icon: Monitor },
 ];
 
 export function ThemeToggle({
@@ -26,7 +27,7 @@ export function ThemeToggle({
   className?: string;
   showLabel?: boolean;
 }) {
-  const { theme, setTheme } = useTheme();
+  const { mode, setMode } = useTheme();
 
   return (
     <div
@@ -35,7 +36,7 @@ export function ThemeToggle({
       aria-label="Appearance"
     >
       {OPTIONS.map((option) => {
-        const active = theme === option.value;
+        const active = mode === option.value;
         const Icon = option.icon;
         return (
           <button
@@ -43,7 +44,7 @@ export function ThemeToggle({
             type="button"
             role="radio"
             aria-checked={active}
-            onClick={() => setTheme(option.value)}
+            onClick={() => setMode(option.value)}
             title={`${option.label} mode`}
             className={`inline-flex items-center gap-1.5 rounded-full px-3 min-h-[36px] text-[12.5px] font-semibold
                         transition-all duration-200 ease-gentle active:scale-[0.97] focus-visible:ring-2

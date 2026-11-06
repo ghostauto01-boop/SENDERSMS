@@ -129,21 +129,16 @@ async def _send_one(mid, final_on_failure=False, rate_wait_cap=_INLINE_RATE_WAIT
             await _record_campaign_outcome(db,m,False)
             await db.commit()
             return False
-        from app.providers.smsgate import send_sms_direct
+        from app.services.gateway_service import dispatch_sms_multi_phone
         from app.services.system_settings import get_sim_number
         sim=await get_sim_number(db)
-        r=await send_sms_direct(c.phone_number,m.body,sim)
-        if not r["success"]:
-            # SIM failover: a dead/no-credit SIM fails fast — retry once on
-            # the other slot before giving up. Only one attempt can bill.
-            other=2 if sim==1 else 1
-            r2=await send_sms_direct(c.phone_number,m.body,other)
-            if r2["success"]:
-                r=r2
-            else:
-                r={"success":False,
-                   "error":f"SIM{sim}: {r.get('error','')} | SIM{other}: {r2.get('error','')}"[:500],
-                   "raw":r2.get("raw") or r.get("raw")}
+        preferred_gw=None
+        if m.campaign_id:
+            from app.models.campaign import Campaign as _Camp
+            _c_row=(await db.execute(select(_Camp).where(_Camp.id==m.campaign_id))).scalar_one_or_none()
+            if _c_row is not None:
+                preferred_gw=getattr(_c_row,"gateway_setting_id",None)
+        r=await dispatch_sms_multi_phone(db,c.phone_number,m.body,preferred_gateway_id=preferred_gw,sim_override=sim)
         if r["success"]:
             m.status = "sent"
             m.provider_message_id = r.get("provider_message_id", "")

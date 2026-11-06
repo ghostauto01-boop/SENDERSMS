@@ -79,8 +79,14 @@ class SMSService:
                     msg.last_error = f"Campaign rule: {gate['reason']} Retry is scheduled automatically."
                     await self.db.flush()
                     return msg
-        from app.providers.smsgate import send_sms_direct
-        r=await send_sms_direct(c.phone_number,body,await self._get_sim())
+        preferred_gw = None
+        if campaign_id is not None:
+            from app.models.campaign import Campaign as _Camp
+            _c_row = (await self.db.execute(select(_Camp).where(_Camp.id == campaign_id))).scalar_one_or_none()
+            if _c_row is not None:
+                preferred_gw = getattr(_c_row, "gateway_setting_id", None)
+        from app.services.gateway_service import dispatch_sms_multi_phone
+        r=await dispatch_sms_multi_phone(self.db, c.phone_number, body, preferred_gateway_id=preferred_gw, sim_override=await self._get_sim())
         if r["success"]:msg.status="sent";msg.provider_message_id=r.get("provider_message_id","");msg.sent_at=datetime.now(timezone.utc)
         else:
             msg.status="failed";msg.last_error=r.get("error","");msg.failed_at=datetime.now(timezone.utc)

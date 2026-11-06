@@ -18,11 +18,20 @@
          src/hooks/useTheme.tsx. */
       (function () {
         try {
-          var saved = localStorage.getItem("theme");
+          var prefsRaw = localStorage.getItem("sendersms.appearance.v1");
+          var prefs = prefsRaw ? JSON.parse(prefsRaw) : null;
+          var saved = (prefs && prefs.mode) || localStorage.getItem("theme");
           var dark = saved === "dark" || (saved !== "light" &&
             window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
-          document.documentElement.classList.add(dark ? "dark" : "light");
-          document.documentElement.style.colorScheme = dark ? "dark" : "light";
+          var root = document.documentElement;
+          root.classList.add(dark ? "dark" : "light");
+          root.style.colorScheme = dark ? "dark" : "light";
+          if (prefs) {
+            if (prefs.palette) root.dataset.palette = prefs.palette;
+            if (prefs.density) root.dataset.density = prefs.density;
+            if (prefs.radius) root.dataset.radius = prefs.radius;
+            if (prefs.font) root.dataset.font = prefs.font;
+          }
           var meta = document.querySelector('meta[name="theme-color"]');
           if (meta) meta.setAttribute("content", dark ? "#0c1712" : "#f6f5f1");
         } catch (e) {}
