@@ -623,6 +623,23 @@ TOOLS: list[Tool] = [
             Param("scheduled_start_at", description="ISO-8601 time to launch automatically.",
                   where="body"),
             Param("description", where="body"),
+            Param("idempotency_key",
+                  description="Optional unique client key so retrying create_campaign after a network interruption never creates a duplicate campaign.",
+                  where="body"),
+        ],
+    ),
+    Tool(
+        name="reconcile_campaign_state",
+        description=(
+            "Inspect live campaign status, sent/delivered/failed counts, active follow-up rules, "
+            "and pending scheduled messages BEFORE retrying any campaign or follow-up mutation "
+            "after a dropped connection or sandbox restart. Read-only and safe to call anytime."
+        ),
+        method="GET", path="/api/v1/campaigns/reconcile", scope="read", group="campaigns",
+        params=[
+            Param("campaign_ids",
+                  description="Optional comma-separated campaign IDs to inspect (e.g. '25,26'). Omit to inspect active/pending campaigns.",
+                  where="query"),
         ],
     ),
     Tool(

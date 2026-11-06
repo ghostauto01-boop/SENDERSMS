@@ -206,6 +206,32 @@ async def _dispatch(db: AsyncSession, token: mcp_server.TokenView, message: dict
 
 async def _handle(request: Request, profile: C.ConnectorProfile) -> Response:
     """One MCP POST, on whichever connector endpoint it arrived at."""
+    from app.mcp.execution_guard import (
+        check_clock_skew,
+        detect_sigv4_contamination,
+        redact_headers,
+    )
+
+    sigv4 = detect_sigv4_contamination(request.headers)
+    if sigv4:
+        logger.warning(
+            "MCP request rejected due to SigV4 credential contamination headers=%s",
+            json.dumps(redact_headers(request.headers)),
+        )
+        return JSONResponse(
+            status_code=400,
+            content={
+                "jsonrpc": "2.0",
+                "id": None,
+                "error": {
+                    "code": -32001,
+                    "message": sigv4["remediation"],
+                    "data": sigv4,
+                },
+            },
+        )
+    check_clock_skew(request.headers)
+
     raw_token = mcp_server.token_from_request(request)
 
     # 1. Identify the caller and read this connector's switches, then let that
@@ -287,6 +313,25 @@ async def mcp_stream(request: Request) -> Response:
 async def mcp_teardown() -> Response:
     """Session teardown — nothing to tear down, but clients expect a 200."""
     return Response(status_code=200)
+
+
+@protocol_router.get("/health")
+async def mcp_protocol_health(request: Request) -> JSONResponse:
+    """Lightweight unauthenticated clock & credential-isolation probe for MCP bridges."""
+    from app.mcp.execution_guard import check_clock_skew, detect_sigv4_contamination
+
+    sigv4 = detect_sigv4_contamination(request.headers)
+    clock = check_clock_skew(request.headers)
+    return JSONResponse(
+        status_code=200 if (sigv4 is None and clock["healthy"]) else 400,
+        content={
+            "ok": sigv4 is None and clock["healthy"],
+            "service": "sendersms-mcp",
+            "auth_scheme": "Bearer",
+            "credential_isolation_ok": sigv4 is None,
+            "clock": clock,
+        },
+    )
 
 
 @public_router.post("/connectors/{key}/mcp")
@@ -1220,3 +1265,15 @@ async def connector_endpoints(cu: User = Depends(get_current_user)):
             for p in C.CONNECTORS
         ],
     }
+
+
+@router.get("/execution-health")
+async def get_mcp_execution_health(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    cu: User = Depends(get_current_user),
+):
+    """Redacted execution health, clock skew, and credential-separation diagnostics."""
+    from app.mcp.execution_guard import execution_health_report
+
+    return await execution_health_report(db, headers=request.headers)

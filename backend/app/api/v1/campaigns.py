@@ -5,7 +5,7 @@ Campaigns API routes.
 from datetime import timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -102,6 +102,31 @@ def _campaign_out(campaign) -> dict:
     return data
 
 
+@router.get("/reconcile")
+async def reconcile_campaign_state_endpoint(
+    campaign_ids: Optional[str] = Query(
+        None,
+        description="Optional comma-separated campaign IDs to inspect (e.g. '25,26')",
+    ),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Reconcile remote campaign, follow-up, and scheduled-message state before retrying mutations."""
+    from app.mcp.execution_guard import reconcile_campaigns_and_followups
+
+    parsed_ids: list[int] = []
+    if campaign_ids:
+        for tok in str(campaign_ids).split(","):
+            tok = tok.strip()
+            if tok.isdigit():
+                parsed_ids.append(int(tok))
+    return await reconcile_campaigns_and_followups(
+        db,
+        campaign_ids=parsed_ids or None,
+        include_scheduled_messages=True,
+    )
+
+
 @router.get("/{campaign_id}", response_model=CampaignOut)
 async def get_campaign(
     campaign_id: int,
@@ -134,11 +159,23 @@ def _unique_copy_name(name: str, existing: set[str]) -> str:
 @router.post("/", response_model=CampaignOut, status_code=201)
 async def create_campaign(
     data: CampaignCreate,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Create a new campaign (draft)."""
-    payload = data.model_dump()
+    """Create a new campaign (draft) with idempotency replay protection."""
+    from app.mcp.execution_guard import get_idempotent_replay, record_idempotent_result
+
+    idem_key = (
+        data.idempotency_key
+        or request.headers.get("x-idempotency-key")
+        or request.headers.get("idempotency-key")
+    )
+    cached = await get_idempotent_replay(db, "campaign.create", idem_key)
+    if cached is not None:
+        return cached
+
+    payload = data.model_dump(exclude={"idempotency_key"})
     if payload.get("channel") not in ("sms", "email"):
         raise HTTPException(status_code=422, detail="channel must be 'sms' or 'email'")
     if payload.get("channel") == "email":
@@ -173,7 +210,10 @@ async def create_campaign(
         payload["email_account_ids"] = pool or None
     service = CampaignService(db)
     campaign = await service.create_campaign(payload)
-    return _campaign_out(campaign)
+    out = _campaign_out(campaign)
+    await record_idempotent_result(db, "campaign.create", idem_key, out)
+    await db.commit()
+    return out
 
 
 @router.put("/{campaign_id}", response_model=CampaignOut)
@@ -300,17 +340,33 @@ async def validate_campaign(
 async def schedule_campaign(
     campaign_id: int,
     data: CampaignScheduleRequest,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Set the time a campaign should launch by itself, or cancel the schedule.
+    """Set the time a campaign should launch by itself, or cancel the schedule."""
+    from app.mcp.execution_guard import get_idempotent_replay, record_idempotent_result
 
-    With a time: validates the campaign (same checks as ``/validate``) so a
-    scheduled launch cannot fail at 3am for a reason we could have caught now,
-    then moves it to ``scheduled``. With ``scheduled_start_at: null``: cancels
-    the schedule and returns the campaign to ``draft``. ``changed`` says whether
-    the call altered anything.
-    """
+    idem_key = (
+        data.idempotency_key
+        or request.headers.get("x-idempotency-key")
+        or request.headers.get("idempotency-key")
+    )
+    cached = await get_idempotent_replay(db, f"campaign.schedule.{campaign_id}", idem_key)
+    if cached is not None:
+        return {**cached, "replayed": True}
+
+    expected = data.expected_status or request.headers.get("x-expected-status")
+    if expected:
+        cur = (await db.execute(select(Campaign).where(Campaign.id == campaign_id))).scalar_one_or_none()
+        if cur is None:
+            raise HTTPException(status_code=404, detail="Campaign not found")
+        if cur.status != expected:
+            raise HTTPException(
+                status_code=409,
+                detail=f"State conflict: campaign {campaign_id} is '{cur.status}', expected '{expected}'. Reconcile remote state first.",
+            )
+
     service = CampaignService(db)
     try:
         outcome = await service.set_schedule(campaign_id, data.scheduled_start_at)
@@ -318,35 +374,53 @@ async def schedule_campaign(
         raise _problem(e)
 
     campaign = outcome["campaign"]
-    await db.commit()
-    await db.refresh(campaign)
-    # Stamp UTC if the driver gave the value back naive, so the browser does
-    # not read the timestamp as local time.
     when = campaign.scheduled_start_at
     if when is not None and when.tzinfo is None:
         when = when.replace(tzinfo=timezone.utc)
-    return {
+    resp = {
         "success": True,
         "changed": outcome["changed"],
         "status": campaign.status,
         "scheduled_start_at": when.isoformat() if when else None,
         "message": outcome["message"],
     }
+    await record_idempotent_result(db, f"campaign.schedule.{campaign_id}", idem_key, resp)
+    await db.commit()
+    await db.refresh(campaign)
+    return resp
 
 
 @router.post("/{campaign_id}/start")
 async def start_campaign(
     campaign_id: int,
+    request: Request,
+    expected_status: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Start a campaign now (a draft is validated as part of starting)."""
+    from app.mcp.execution_guard import get_idempotent_replay, record_idempotent_result
+
+    idem_key = request.headers.get("x-idempotency-key") or request.headers.get("idempotency-key")
+    cached = await get_idempotent_replay(db, f"campaign.start.{campaign_id}", idem_key)
+    if cached is not None:
+        return {**cached, "replayed": True}
+
     service = CampaignService(db)
     existing = (
         await db.execute(select(Campaign).where(Campaign.id == campaign_id))
     ).scalar_one_or_none()
     if existing is None:
         raise HTTPException(status_code=404, detail="Campaign not found")
+    exp = expected_status or request.headers.get("x-expected-status")
+    if exp and existing.status != exp:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"State conflict: campaign {campaign_id} is '{existing.status}', expected '{exp}'. "
+                "Call GET /api/v1/campaigns/reconcile before retrying."
+            ),
+        )
     previous = {
         "status": existing.status,
         "paused_from": existing.paused_from,
@@ -359,24 +433,14 @@ async def start_campaign(
     except ValueError as e:
         raise _problem(e)
 
-    # Trigger campaign processing via Celery. If the broker is down we must
-    # not leave the campaign stranded in "running" with nothing processing it.
     from app.tasks.campaign_tasks import process_campaign
     from app.tasks.queue import QueueUnavailable, enqueue
 
-    # Commit BEFORE enqueuing. The worker is a separate process reading its own
-    # connection: if the task is dispatched while this transaction is still
-    # open, the worker can look up the campaign before the CampaignContact rows
-    # (and the "running" status) are visible, find nothing to do, and exit --
-    # leaving the campaign stuck at 0 sent until the next beat cycle, or
-    # forever if beat is not running. This was reproducible on a fast broker.
     await db.commit()
 
     try:
         enqueue(process_campaign, campaign_id)
     except QueueUnavailable as e:
-        # Compensating undo, not a lifecycle move: put back exactly what the
-        # campaign was before this request touched it.
         for name, value in previous.items():
             setattr(campaign, name, value)
         await db.commit()
@@ -385,7 +449,6 @@ async def start_campaign(
     message = "Campaign started"
     waiting = None
     try:
-        # Tell the operator when this campaign's own controls mean it will wait.
         from app.services.campaign_sending import CampaignSendingGate
 
         check = await CampaignSendingGate(db, campaign).check()
@@ -402,13 +465,16 @@ async def start_campaign(
             ).strip()
     except Exception:  # noqa: BLE001 — the hint must never fail the start
         pass
-    return {
+    resp = {
         "success": True,
         "changed": True,
         "status": campaign.status,
         "message": message,
         "waiting": waiting,
     }
+    await record_idempotent_result(db, f"campaign.start.{campaign_id}", idem_key, resp)
+    await db.commit()
+    return resp
 
 
 @router.post("/{campaign_id}/pause")
