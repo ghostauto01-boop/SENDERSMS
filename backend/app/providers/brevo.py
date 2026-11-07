@@ -27,6 +27,8 @@ from typing import Any, Optional
 
 import httpx
 
+from app.utils.contact_identity import normalize_email
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_BASE = "https://api.brevo.com/v3"
@@ -193,9 +195,11 @@ async def send_email(
     * ``attachments`` — ``[{"name": "quote.pdf", "content": "<base64>"}]``.
       Brevo caps a message at ~10MB once encoded, so callers must size-check
       before queueing (the API layer does).
-    * ``headers`` — ``In-Reply-To`` / ``References`` keep a reply inside the
-      recipient's existing thread; ``List-Unsubscribe`` +
-      ``List-Unsubscribe-Post`` are what Gmail/Yahoo require from bulk senders.
+    * ``reply_to`` — the endpoint's dedicated ``replyTo`` object containing one
+      normalized email address. Do not pass a standard ``Reply-To``
+      header in ``headers``; Brevo rejects standard headers there.
+    * ``headers`` — custom headers and threading metadata such as
+      ``In-Reply-To`` / ``References`` and bulk unsubscribe headers.
     * ``cc`` / ``bcc`` — copied recipients, same as any mail client.
 
     Returns ``{"success": True, "provider_message_id": ..., "raw": {...}}`` or
@@ -206,6 +210,11 @@ async def send_email(
         return {"success": False, "error": "No recipient address"}
     if not from_email:
         return {"success": False, "error": "No From address configured on this account"}
+
+    reply_to_value = reply_to.strip() if isinstance(reply_to, str) else ""
+    reply_to_address = normalize_email(reply_to_value) if reply_to_value else None
+    if reply_to_value and not reply_to_address:
+        return {"success": False, "error": "Invalid Reply-To email address"}
 
     sender = {"email": from_email}
     if from_name:
@@ -242,8 +251,11 @@ async def send_email(
         blind = _parse_recipients(bcc)
         if blind:
             payload["bcc"] = blind
-    if reply_to:
-        payload["replyTo"] = {"email": reply_to}
+    if reply_to_address:
+        # Brevo's v3 schema requires an object here; a string or a comma-joined
+        # header is rejected as invalid_parameter. Keep it a single normalized
+        # address, and omit the property entirely when no Reply-To is set.
+        payload["replyTo"] = {"email": reply_to_address}
     if tags:
         payload["tags"] = [t for t in tags if t][:10]
     if headers:

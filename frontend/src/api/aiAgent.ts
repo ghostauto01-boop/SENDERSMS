@@ -9,22 +9,16 @@ import api from "./client";
  */
 
 /**
- * One provider: OpenRouter.
- *
- * The agent used to speak Groq and Gemini directly, which meant two keys, two
- * catalogues and two ways for a chat to fail. OpenRouter routes to every major
- * lab behind one key, and the *vendor behind each model* is part of the live
- * model list — so "pick the provider" is a filter over that list, not a second
- * integration.
+ * OpenRouter is the only AI integration. Users choose OpenRouter presets only;
+ * each preset owns its model, provider routing, and fallback configuration.
  */
 export type Provider = "openrouter";
 
-/** A vendor (the part before the slash in an OpenRouter model id). */
-export type VendorOption = { vendor: string; count: number };
-
 /** A preset created at openrouter.ai/settings/presets. */
 export type PresetOption = {
+  /** Preset slug used in OpenRouter's `@preset/<slug>` model reference. */
   name: string;
+  label?: string;
   description?: string | null;
   system_prompt?: boolean;
 };
@@ -59,7 +53,6 @@ export type ProviderCheck = {
   hint?: string | null;
   model?: string | null;
   latency_ms?: number | null;
-  suggested_model?: string | null;
   models_available?: number | null;
 };
 
@@ -82,50 +75,17 @@ type AgentHealthResponse = Omit<AgentHealth, "tool_areas"> & {
 const toolAreaNames = (areas: ToolAreas | null | undefined): string[] =>
   Array.isArray(areas) ? areas : Object.keys(areas || {});
 
-export type SavedModelPreset = {
-  id: string;
-  name: string;
-  models: string[];
-  openrouter_preset?: string;
-  vendor?: string;
-};
-
 export type AgentSettings = {
   openrouter_configured: boolean;
   openrouter_hint: string | null;
   /** Where the key is managed, and where a preset is created. */
   console_url?: string;
   preset_console_url?: string;
-  /** The vendor routing is pinned to, or "" to let OpenRouter choose. */
-  vendor?: string;
-  /** The OpenRouter preset attached to every request, or "" for none. */
+  /** Selected OpenRouter preset slug, or an empty string when unset. */
   preset?: string;
-  /** When true, ONLY models in preset_models run (in exact fallback order). */
-  preset_locked?: boolean;
-  /** Ordered OpenRouter model IDs tried sequentially on failure. */
-  preset_models?: string[];
-  /** Custom named model-chain presets saved in the workspace. */
-  saved_presets?: SavedModelPreset[];
-  /** Currently active workspace preset ID. */
-  active_saved_preset?: string;
-  models: Record<Provider, string | null>;
-  default_provider: Provider;
   auto_fallback: boolean;
   auto_approve: boolean;
   voice: { auto_send: boolean; language: string; read_aloud: boolean };
-};
-
-export type ModelOption = {
-  id: string;
-  label: string;
-  tools: boolean;
-  context: number | null;
-  recommended: boolean;
-  /** The lab behind the model, read off OpenRouter's own catalogue. */
-  vendor?: string;
-  input_modalities?: string[];
-  prompt_price?: string | null;
-  completion_price?: string | null;
 };
 
 export type ConfirmationCard = {
@@ -140,7 +100,6 @@ export type ConfirmationCard = {
 export type AgentSession = {
   id: string;
   name: string;
-  model: Provider;
   skills?: string[];
   message_count?: number;
   last_message?: string;
@@ -201,7 +160,7 @@ export type Skill = {
 /** One line of the ndjson chat stream. */
 export type StreamEvent =
   | { type: "turn_start"; turn_id: string; model?: string; provider?: Provider | "local" }
-  | { type: "status"; phase?: string; text: string; model?: string; step?: number; tool?: string; preset_locked?: boolean; preset_count?: number }
+  | { type: "status"; phase?: string; text: string; model?: string; step?: number; tool?: string }
   | { type: "step"; step: number; max: number; model?: string; provider?: Provider | "local" }
   | { type: "thinking"; text: string; step?: number }
   | { type: "text"; text: string; step?: number }
@@ -221,79 +180,33 @@ export const agentApi = {
       // backend is still running during a rolling deployment.
       tool_areas: toolAreaNames(r.data.tool_areas),
     })),
-  /**
-   * The live catalogue, plus the vendor list it groups by.
-   *
-   * `vendor` narrows the returned models to one lab; the full vendor list is
-   * returned either way, so the picker never goes empty when a vendor has no
-   * models left.
-   */
-  models: (provider: Provider = "openrouter", refresh = true, vendor?: string) => {
-    const params = new URLSearchParams({ provider, refresh: String(refresh) });
-    if (vendor) params.set("vendor", vendor);
-    return api
-      .get<{
-        provider: Provider;
-        models: ModelOption[];
-        vendors: VendorOption[];
-        selected: string | null;
-        selected_vendor?: string;
-        preset?: string;
-        total?: number;
-        error: any;
-      }>(`/ai-agent/models?${params.toString()}`)
-      .then((r) => r.data);
-  },
   /** The operator's OpenRouter presets, and the one currently attached. */
   presets: () => api.get<PresetList>("/ai-agent/presets").then((r) => r.data),
-  /** Pin routing to a vendor, attach a preset, and/or lock an ordered fallback chain. */
-  savePresets: (body: {
-    preset?: string;
-    vendor?: string;
-    preset_locked?: boolean;
-    preset_models?: string[];
-    saved_presets?: SavedModelPreset[];
-    active_saved_preset?: string;
-    check?: boolean;
-  }) =>
+  /** Select or clear an OpenRouter preset. Presets own model/provider routing. */
+  savePresets: (body: { preset?: string; check?: boolean }) =>
     api
       .put<{
         success: boolean;
         preset: string;
-        vendor: string;
-        preset_locked?: boolean;
-        preset_models?: string[];
-        saved_presets?: SavedModelPreset[];
-        active_saved_preset?: string;
         warnings: string[];
         error?: string;
-      }>(
-        "/ai-agent/presets",
-        body,
-      )
+      }>("/ai-agent/presets", body)
       .then((r) => r.data),
   settings: () => api.get<AgentSettings>("/ai-agent/settings").then((r) => r.data),
   saveSettings: (body: Partial<{
-    provider: Provider;
     api_key: string;
     clear_key: boolean;
-    model: string;
-    default_provider: Provider;
     auto_fallback: boolean;
     auto_approve: boolean;
-    preset_locked: boolean;
-    preset_models: string[];
-    saved_presets: SavedModelPreset[];
-    active_saved_preset: string;
   }>) => api.put("/ai-agent/settings", body).then((r) => r.data),
-  testKey: (body: { provider?: Provider; api_key?: string }) =>
+  testKey: (body: { api_key?: string } = {}) =>
     api.post("/ai-agent/settings/test", body).then((r) => r.data),
   saveVoice: (body: { auto_send?: boolean; language?: string; read_aloud?: boolean }) =>
     api.put("/ai-agent/settings/voice", body).then((r) => r.data),
 
   // -- sessions -------------------------------------------------------------
   sessions: () => api.get<{ sessions: AgentSession[] }>("/ai-agent/sessions").then((r) => r.data.sessions),
-  createSession: (body: { name?: string; model?: Provider } = {}) =>
+  createSession: (body: { name?: string } = {}) =>
     api.post<{ session: AgentSession }>("/ai-agent/sessions", body).then((r) => r.data.session),
   session: (id: string) =>
     api
@@ -306,8 +219,6 @@ export const agentApi = {
       .then((r) => r.data),
   renameSession: (id: string, name: string) =>
     api.patch(`/ai-agent/sessions/${id}`, { name }).then((r) => r.data),
-  updateSessionProvider: (id: string, provider: Provider) =>
-    api.patch(`/ai-agent/sessions/${id}`, { model: provider }).then((r) => r.data),
   deleteSession: (id: string) => api.delete(`/ai-agent/sessions/${id}`).then((r) => r.data),
 
   // -- chat -----------------------------------------------------------------

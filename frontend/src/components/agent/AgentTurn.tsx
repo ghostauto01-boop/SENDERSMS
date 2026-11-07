@@ -243,12 +243,12 @@ export function StepProgress({
   step,
   max,
   statusText,
-  model,
+  routeLabel,
 }: {
   step: number;
   max: number;
   statusText?: string;
-  model?: string;
+  routeLabel?: string;
 }) {
   return (
     <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-primary-200/70 bg-primary-50/80 px-3 py-1 text-[11.5px] font-medium text-primary-800 dark:border-primary-800/60 dark:bg-primary-950/50 dark:text-primary-200">
@@ -256,9 +256,9 @@ export function StepProgress({
       <span className="truncate">
         {statusText || (step > 0 ? `Working · Step ${step} of ${max}` : "Connecting to OpenRouter…")}
       </span>
-      {model ? (
+      {routeLabel ? (
         <span className="hidden shrink-0 rounded bg-white/80 px-1.5 py-0.5 font-mono text-[10px] text-gray-600 sm:inline dark:bg-gray-900/70 dark:text-gray-300">
-          {model}
+          {routeLabel}
         </span>
       ) : null}
     </div>

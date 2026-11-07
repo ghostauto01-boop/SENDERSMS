@@ -548,58 +548,106 @@ async def _fetch_imap(db: AsyncSession, mailbox: EmailMailbox) -> tuple[list[dic
     if not password:
         return [], {}, ["This mailbox has no stored app password"]
     state = _cursor_state(mailbox)
-    first_sync = not bool(state.get("folders"))
+    saved_cursors = state.get("folders") if isinstance(state.get("folders"), dict) else {}
+    first_sync = not bool(saved_cursors)
     result = await gmail_provider.imap_sync(
-        mailbox.email_address, password, mailbox.folder_list(), state.get("folders") or {},
+        mailbox.email_address, password, mailbox.folder_list(), saved_cursors,
         import_all=bool(mailbox.import_all), first_sync=first_sync,
     )
-    new_state = {**state, "folders": {**state.get("folders", {}), **(result.get("cursors") or {})}}
-    return result.get("items") or [], new_state, result.get("errors") or []
+    errors = [str(error)[:300] for error in (result.get("errors") or []) if error]
+    cursor_updates = result.get("cursor_updates")
+    if cursor_updates is None:
+        # Older integrations/fakes return only an aggregate map. Trust it only
+        # when their pass completed without an error.
+        cursor_updates = (
+            (result.get("cursors") or {})
+            if result.get("success") is not False and not errors else {}
+        )
+    new_state = {
+        **state,
+        "folders": {**saved_cursors, **dict(cursor_updates or {})},
+    }
+    return result.get("items") or [], new_state, errors
 
 
 async def _fetch_gmail_api(db: AsyncSession, mailbox: EmailMailbox) -> tuple[list[dict], dict, list[str]]:
-    """New replies, fetched in as few round trips as Gmail allows.
+    """Fetch new reply candidates without losing changes on API errors.
 
-    Two changes from the first implementation, both about *speed*:
-
-    * bodies arrive via ``users.messages.batchGet`` — 100 messages per request,
-      a few of those in flight — instead of one ``messages.get`` per message.
-      A 250-message catch-up used to be 250 sequential HTTPS calls; it is three
-      concurrent ones now.
-    * the window is the last ``since`` watermark as before, but the per-label
-      cap is :data:`app.providers.gmail.MAX_PER_SYNC` (250), so a mailbox that
-      was offline for a day catches up in one poll instead of seven.
+    Incremental sync uses Gmail's paginated history API. A first sync, or an
+    expired historyId (Google returns 404), falls back to a paginated INBOX +
+    SPAM list from the saved date window. The history watermark is captured
+    before that list, so messages arriving during the scan are picked up on the
+    next history pass. Any incomplete list/fetch leaves the old cursor intact.
     """
     token, error = await access_token_for(db, mailbox)
     if not token:
-        return [], {}, [error or "Could not refresh the Gmail API token"]
+        return [], _cursor_state(mailbox), [error or "Could not refresh the Gmail API token"]
+
     state = _cursor_state(mailbox)
     errors: list[str] = []
     ids: list[str] = []
-    window_start = state.get("since") or (
-        _now() - timedelta(days=FIRST_SYNC_WINDOW_DAYS)
-    ).isoformat()
-    # Gmail search cannot take an RFC3339 timestamp, only a date, and it is
-    # inclusive — so the dedupe in process_inbound_email is what stops a message
-    # on the boundary being stored twice.
-    after = str(window_start)[:10].replace("-", "/")
-    for label in ("INBOX", "SPAM"):
-        listed = await gmail_provider.gmail_list_ids(
-            token, label_ids=[label], query=f"after:{after}",
-            max_results=gmail_provider.MAX_PER_SYNC,
-        )
-        if not listed.get("success"):
-            errors.append(f"{label}: {listed.get('error')}")
-            continue
-        ids.extend(str(m.get("id")) for m in listed["data"].get("messages") or [] if m.get("id"))
+    cursor_history = str(state.get("reply_history_id") or "")
+    next_history = cursor_history
+    needs_full_list = not bool(cursor_history)
 
+    if cursor_history:
+        changes = await gmail_provider.gmail_history_changes(token, cursor_history)
+        if changes.get("success"):
+            data = changes.get("data") or {}
+            for entry in data.get("history") or []:
+                for field in ("messagesAdded", "messagesDeleted", "labelsAdded", "labelsRemoved"):
+                    for record in (entry or {}).get(field) or []:
+                        message = (record or {}).get("message") or {}
+                        if message.get("id"):
+                            ids.append(str(message["id"]))
+            next_history = str(data.get("historyId") or cursor_history)
+        elif int(changes.get("status_code") or 0) == 404:
+            # Google documents a full sync as recovery for an expired watermark.
+            needs_full_list = True
+        else:
+            return [], state, [f"history: {str(changes.get('error') or 'Gmail history failed')[:200]}"]
+
+    if needs_full_list:
+        profile = await gmail_provider.gmail_profile(token)
+        if profile.get("success"):
+            next_history = str(profile.get("history_id") or "")
+        else:
+            errors.append(f"profile: {str(profile.get('error') or 'Gmail profile failed')[:200]}")
+
+        window_start = state.get("since") or (
+            _now() - timedelta(days=FIRST_SYNC_WINDOW_DAYS)
+        ).isoformat()
+        # Gmail search accepts a date, not an RFC3339 timestamp. Inclusive
+        # boundaries are safe because process_inbound_email deduplicates IDs.
+        after = str(window_start)[:10].replace("-", "/")
+        for label in ("INBOX", "SPAM"):
+            listed = await gmail_provider.gmail_list_all_ids(
+                token, label_ids=[label], query=f"after:{after}", page_size=500,
+            )
+            if not listed.get("success"):
+                errors.append(f"{label}: {str(listed.get('error') or 'Gmail list failed')[:200]}")
+            ids.extend(
+                str(row.get("id")) for row in (listed.get("data") or {}).get("messages") or []
+                if isinstance(row, dict) and row.get("id")
+            )
+
+    ids = list(dict.fromkeys(ids))
     items: list[dict] = []
     if ids:
         fetched = await gmail_provider.gmail_batch_get(token, ids, strip_quotes=True)
         items = fetched.get("items") or []
         errors.extend(fetched.get("errors") or [])
-    new_state = {**state, "since": _now().isoformat()}
-    return items, new_state, errors
+
+    if errors:
+        # Do not advance history or since when any page/body failed. The next
+        # sync can safely retry; already imported messages are idempotent.
+        return items, state, errors[:10]
+    new_state = {
+        **state,
+        "reply_history_id": next_history,
+        "since": _now().isoformat(),
+    }
+    return items, new_state, []
 
 
 async def sync_mailbox(db: AsyncSession, mailbox: EmailMailbox) -> dict:
@@ -687,12 +735,19 @@ async def sync_mailbox(db: AsyncSession, mailbox: EmailMailbox) -> dict:
         summary["mirror_seen"] = int(mirror.get("seen") or 0)
         if mirror.get("error"):
             summary["errors"].append(f"mirror: {str(mirror['error'])[:200]}")
+        summary["errors"].extend(
+            f"mirror: {str(item)[:180]}" for item in (mirror.get("errors") or [])[:5]
+        )
+        if mirror.get("success") is False and not mirror.get("error") and not mirror.get("errors"):
+            summary["errors"].append("mirror: Gmail mailbox mirror did not complete")
     except Exception as exc:  # noqa: BLE001 — the mail app mirror is never fatal
         logger.warning("MAILBOX %s mirror failed: %s", mailbox.email_address, exc)
+        summary["errors"].append(f"mirror: {str(exc)[:200]}")
 
+    final_errors = list(dict.fromkeys(str(item) for item in summary["errors"] if item))
     mailbox.last_sync_at = started
-    mailbox.last_sync_status = "error" if (errors and not stored) else "ok"
-    mailbox.last_error = ("; ".join(errors)[:500] if errors else None)
+    mailbox.last_sync_status = "error" if final_errors else "ok"
+    mailbox.last_error = ("; ".join(final_errors)[:500] if final_errors else None)
     mailbox.total_synced = (mailbox.total_synced or 0) + len(items)
     mailbox.total_replies = (mailbox.total_replies or 0) + stored
     await db.flush()

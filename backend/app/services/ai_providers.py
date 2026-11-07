@@ -13,24 +13,20 @@ The rule this module still encodes, unchanged: **the app never guesses a model
 name.** A model is only ever chosen from OpenRouter's live ``/models`` list, so
 a retired model cannot come back from the dead through a constant.
 
-TWO WAYS TO PICK, BOTH FROM OPENROUTER ITSELF
----------------------------------------------
-* **Provider (vendor)** — every model id on OpenRouter is ``vendor/model``, so
-  the live list is grouped by vendor and the operator can pin routing to one of
-  them (``provider.only`` on the request). Choosing a vendor never invents a
-  model name: it filters the live list.
-* **Preset** — a preset created at ``openrouter.ai/settings/presets`` carries
-  the system prompt, temperature and tool settings the operator already tuned.
-  Naming one here adds ``presets: "<name>"`` to every request, so the agent
-  behaves exactly as configured on OpenRouter. Presets are discovered from the
-  API when OpenRouter serves that listing, and can always be typed by name.
+ONE USER-FACING CHOICE: AN OPENROUTER PRESET
+--------------------------------------------
+A preset created at ``openrouter.ai/settings/presets`` owns its model, model
+fallbacks, provider routing and prompt configuration. The UI lets the operator
+choose only a preset; requests reference it using OpenRouter's documented
+``model: "@preset/<slug>"`` syntax. Legacy model/vendor settings are retained
+for compatibility but never steer requests.
 
 Everything provider-specific lives here:
 
   * key storage (encrypted, never returned; only a masked hint leaves the API)
-  * live model listing (``GET /models``), grouped by vendor
+  * live model listing for automatic recovery and health checks
   * preset discovery (``GET /presets``) and validation
-  * model / vendor / preset selection, persisted in ``system_settings``
+  * preset selection, persisted in ``system_settings``
   * one ``complete()`` and one ``stream_complete()`` (OpenAI wire shape)
   * classification of every failure into one of eight stable codes
   * automatic recovery: a stale model is replaced from the live list and the
@@ -90,7 +86,7 @@ AUTO_FALLBACK_SETTING = "ai_agent.auto_fallback"
 AUTO_APPROVE_SETTING = "ai_agent.auto_approve"
 VOICE_SETTING = "ai_agent.voice"
 GLOBAL_MEMORY_SETTING = "ai_agent.global_memory"  # legacy single-string memory
-#: Which vendor the operator pinned routing to ("" = OpenRouter chooses).
+#: Legacy vendor pin retained for compatibility; requests never read it.
 VENDOR_SETTING = "ai_agent.vendor.openrouter"
 #: Which OpenRouter preset to attach to every request ("" = none).
 PRESET_SETTING = "ai_agent.preset.openrouter"
@@ -107,11 +103,6 @@ ACTIVE_SAVED_PRESET_SETTING = "ai_agent.active_saved_preset"
 #: per request, and a chat turn must not pay a listing round trip every time.
 _MODEL_CACHE: dict[str, tuple[float, list["ModelInfo"]]] = {}
 _MODEL_TTL = 900.0
-
-#: Temporary per-model cooldowns (model_id -> unix_expiry) so a failing model
-#: in a fallback chain is skipped immediately on subsequent steps.
-_MODEL_COOLDOWNS: dict[str, float] = {}
-_COOLDOWN_SECONDS = 90.0
 
 #: Shared keep-alive AsyncClient pool keyed by timeout (used only when
 #: httpx.AsyncClient has not been monkeypatched by unit tests).
@@ -139,32 +130,15 @@ async def _http_client(timeout: float):
     yield client
 
 
-def clear_model_cooldowns() -> None:
-    _MODEL_COOLDOWNS.clear()
-
-
-def _mark_model_cooldown(model: str, seconds: float = _COOLDOWN_SECONDS) -> None:
-    if model:
-        _MODEL_COOLDOWNS[model] = time.time() + seconds
-
-
-def _is_model_cooling_down(model: str) -> bool:
-    exp = _MODEL_COOLDOWNS.get(model)
-    if not exp:
-        return False
-    if exp <= time.time():
-        _MODEL_COOLDOWNS.pop(model, None)
-        return False
-    return True
 
 #: Models a chat turn cannot use. OpenRouter lists embedding, moderation, image
-#: and TTS models alongside chat ones; offering them in a dropdown means the
-#: dropdown offers a 400.
+#: and TTS models alongside chat ones; including them in the automatic chat
+#: candidate list would cause avoidable 400 responses.
 _EXCLUDE = re.compile(
     r"(embedding|embeddings|-embed|moderation|guard|tts|speech|imagen|image-gen|"
     r"image-generation|sora|veo|music|audio-generation|reranker|rerank|"
     # Transcription models are used by the voice box (``transcribe``) and cannot
-    # answer a chat turn; offering one in the dropdown offers a 400.
+    # answer a chat turn; including one as an automatic chat candidate is invalid.
     r"whisper|transcrib|transcription|paraformer|seamless)", re.I
 )
 #: Auto-select preference, as *fragments* of a live id — never a full name. The
@@ -464,12 +438,7 @@ async def keys_summary(db: AsyncSession) -> dict:
         out[f"{provider}_hint"] = mask(key)
     out["console_url"] = OPENROUTER_CONSOLE_URL
     out["preset_console_url"] = OPENROUTER_PRESET_CONSOLE_URL
-    out["vendor"] = await get_vendor(db)
     out["preset"] = await get_preset(db)
-    out["preset_locked"] = await get_preset_locked(db)
-    out["preset_models"] = await get_preset_models(db)
-    out["saved_presets"] = await get_saved_presets(db)
-    out["active_saved_preset"] = await get_active_saved_preset(db)
     return out
 
 
@@ -496,26 +465,39 @@ async def get_default_provider(db: AsyncSession) -> str:
 
 
 async def get_vendor(db: AsyncSession, provider: str = PROVIDER) -> str:
-    """The vendor routing is pinned to, or "" to let OpenRouter choose."""
+    """Read the legacy vendor preference for migration/diagnostic use only."""
     return (await _get_value(db, VENDOR_SETTING) or "").strip()
 
 
 async def set_vendor(db: AsyncSession, vendor: str | None) -> None:
+    """Persist a legacy value without applying it to OpenRouter requests."""
     await _set_value(
         db, VENDOR_SETTING, (vendor or "").strip(),
-        description="OpenRouter vendor routing is pinned to (empty = OpenRouter chooses)",
+        description="Legacy OpenRouter vendor preference (not applied to requests)",
     )
 
 
+def _preset_slug(value: str | None) -> str:
+    """Normalize either a slug or an already-qualified OpenRouter preset ref."""
+    clean = (value or "").strip()
+    return clean[len("@preset/"):] if clean.startswith("@preset/") else clean
+
+
+def _preset_reference(value: str | None) -> str:
+    """OpenRouter's documented model reference for a saved preset slug."""
+    slug = _preset_slug(value)
+    return f"@preset/{slug}" if slug else ""
+
+
 async def get_preset(db: AsyncSession, provider: str = PROVIDER) -> str:
-    """The OpenRouter preset name attached to every request, or "" for none."""
-    return (await _get_value(db, PRESET_SETTING) or "").strip()
+    """The OpenRouter preset slug attached to every request, or "" for none."""
+    return _preset_slug(await _get_value(db, PRESET_SETTING))
 
 
 async def set_preset(db: AsyncSession, preset: str | None) -> None:
     await _set_value(
-        db, PRESET_SETTING, (preset or "").strip(),
-        description="OpenRouter preset name attached to every AI Agent request",
+        db, PRESET_SETTING, _preset_slug(preset),
+        description="OpenRouter preset slug attached to every AI Agent request",
     )
 
 
@@ -653,10 +635,9 @@ class ModelInfo:
     completion_price: Optional[str] = None
 
 
-#: Capitalisation only, for when the catalogue gives no display name. OpenRouter's
-#: own ``name`` field is the real source (see :func:`_vendor_of`) — "OpenAI:
-#: GPT-4o mini" carries the vendor spelled the way the vendor spells it, which
-#: title-casing the id author ("openai" -> "Openai") would get wrong.
+#: Capitalisation only, for diagnostic metadata when the catalogue gives no
+#: display name. OpenRouter's own ``name`` field is the real source (see
+#: :func:`_vendor_of`) — "OpenAI: GPT-4o mini" carries the vendor's spelling.
 _VENDOR_ACRONYMS = {"openai": "OpenAI", "openrouter": "OpenRouter", "deepseek": "DeepSeek",
                     "mistralai": "Mistral", "meta-llama": "Meta", "x-ai": "xAI",
                     "ai21": "AI21", "ibm": "IBM", "aws": "AWS"}
@@ -665,10 +646,9 @@ _VENDOR_ACRONYMS = {"openai": "OpenAI", "openrouter": "OpenRouter", "deepseek": 
 def _vendor_of(model_id: str, display_name: str | None = None) -> str:
     """The vendor behind a model: ``openai/gpt-4o-mini`` -> ``OpenAI``.
 
-    Read off OpenRouter's own data, never a lookup table, so a vendor added next
-    month appears in the picker with no code change. The catalogue's display
-    name ("OpenAI: GPT-4o mini") is preferred because it carries the vendor's
-    own spelling; the id's author is the fallback.
+    Read OpenRouter's own metadata, never a lookup table, so a vendor added
+    later appears in catalogue diagnostics without a code change. The catalogue
+    display name's spelling is preferred; the model id's author is the fallback.
     """
     name = str(display_name or "")
     if ":" in name:
@@ -733,7 +713,10 @@ def pick_vision_model(provider: str, models: list[ModelInfo]) -> Optional[str]:
 async def resolve_vision_model(
     db: AsyncSession, provider: str, *, api_key: Optional[str] = None
 ) -> str:
-    """Resolve an image-capable model from the live list when one is needed."""
+    """Use the selected preset, or automatically resolve a live vision model."""
+    preset = await get_preset(db, provider)
+    if preset:
+        return _preset_reference(preset)
     saved = await get_model(db, provider)
     if saved and is_vision_model(provider, saved):
         return saved
@@ -743,13 +726,13 @@ async def resolve_vision_model(
         return selected
     raise ProviderError(
         code="model_unavailable", provider=provider, model=saved,
-        message=("No image-capable model is available for this picture. Choose a model "
-                 "that accepts image input in Agent settings."),
+        message=("No image-capable OpenRouter route is available for this picture. Configure "
+                 "a preset that accepts image input, or check the models enabled for your key."),
     )
 
 
 def _models_from_payload(payload: dict) -> list[ModelInfo]:
-    """OpenRouter's ``/models`` body -> the curated list the UI shows."""
+    """OpenRouter's ``/models`` body -> candidates for internal automatic routing."""
     entries = payload.get("data") if isinstance(payload, dict) else None
     out: list[ModelInfo] = []
     for entry in entries or []:
@@ -813,12 +796,11 @@ async def list_models(
     """Ask OpenRouter what it currently serves.
 
     Cached for 15 minutes because a chat turn must not pay a catalogue round
-    trip every message; ``refresh=True`` (the Settings screen's Refresh button,
-    and automatic recovery) bypasses the cache.
+    trip every message; ``refresh=True`` and automatic recovery bypass the cache.
 
     Raises :class:`ProviderError` with ``key_missing`` / ``key_invalid`` /
     ``provider_down`` so callers can show the right message instead of an empty
-    dropdown.
+    catalogue.
     """
     key = api_key or await get_api_key(db, provider)
     if not key:
@@ -859,10 +841,9 @@ async def list_models(
 
 
 def group_models_by_vendor(models: list[ModelInfo]) -> list[dict]:
-    """The vendor picker: every vendor in the live catalogue, with its models.
+    """Group catalogue metadata by vendor for diagnostics; this is not routing.
 
-    Vendors are ordered by how many models they serve, then by name, so the
-    picker reads like OpenRouter's own list rather than alphabetically.
+    Vendors are ordered by how many models they serve, then by name.
     """
     buckets: dict[str, list[ModelInfo]] = {}
     for model in models:
@@ -916,11 +897,12 @@ async def list_presets(db: AsyncSession, provider: str = PROVIDER, *,
     for entry in (payload.get("data") or payload.get("presets") or []):
         if not isinstance(entry, dict):
             continue
-        name = str(entry.get("name") or entry.get("title") or entry.get("id") or "").strip()
-        if not name:
+        slug = str(entry.get("slug") or entry.get("id") or entry.get("name") or "").strip()
+        if not slug:
             continue
         items.append({
-            "name": name[:200],
+            "name": slug[:200],
+            "label": str(entry.get("name") or entry.get("title") or slug)[:200],
             "description": str(entry.get("description") or "")[:300] or None,
             "system_prompt": bool(entry.get("system_prompt") or entry.get("instructions")),
         })
@@ -936,26 +918,18 @@ async def validate_preset(db: AsyncSession, preset: str, *,
     preset is unknown. That distinguishes a typo from a working preset, which is
     the only thing the settings screen actually needs to know.
     """
-    name = (preset or "").strip()
+    name = _preset_slug(preset)
     if not name:
-        return {"success": False, "error": "Enter the preset's name exactly as it appears "
+        return {"success": False, "error": "Enter the preset slug exactly as it appears "
                                            "on openrouter.ai/settings/presets."}
     key = api_key or await get_api_key(db, PROVIDER)
     if not key:
         return {"success": False, "error": f"No {label(PROVIDER)} API key is configured."}
-    model = await get_model(db, PROVIDER)
-    if not model:
-        try:
-            model = pick_default(PROVIDER, await list_models(db, PROVIDER, api_key=key))
-        except ProviderError as exc:
-            return {"success": False, "error": exc.message}
-    if not model:
-        return {"success": False, "error": "No model is available to test the preset with."}
+    model = _preset_reference(name)
     body: dict[str, Any] = {
         "model": model,
         "messages": [{"role": "user", "content": "ping"}],
         "max_tokens": 8,
-        "presets": name,
     }
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -985,27 +959,21 @@ async def validate_preset(db: AsyncSession, preset: str, *,
 
 async def resolve_model(db: AsyncSession, provider: str, *,
                         api_key: Optional[str] = None) -> str:
-    """The model to use: the locked preset chain's first ready model when locked,
-    else the saved one if OpenRouter still serves it, else a fresh pick.
+    """Resolve a preset reference, or automatically choose a live model.
+
+    Saved model/vendor and workspace model-chain values are legacy settings;
+    they do not override the OpenRouter preset now that presets own routing.
+    Without a preset, a live catalogue choice remains as an automatic fallback.
     """
-    locked = await get_preset_locked(db)
-    chain = await get_preset_models(db)
-    if locked and chain:
-        for candidate in chain:
-            if not _is_model_cooling_down(candidate):
-                return candidate
-        return chain[0]
+    preset = await get_preset(db, provider)
+    if preset:
+        return _preset_reference(preset)
 
     saved = await get_model(db, provider)
     models = await list_models(db, provider, api_key=api_key)
     ids = {m.id for m in models}
     if saved and saved in ids:
         return saved
-    if chain:
-        valid_chain = [m for m in chain if m in ids]
-        if valid_chain:
-            await set_model(db, provider, valid_chain[0])
-            return valid_chain[0]
     replacement = pick_default(provider, models)
     if not replacement:
         raise ProviderError(
@@ -1014,13 +982,15 @@ async def resolve_model(db: AsyncSession, provider: str, *,
         )
     await set_model(db, provider, replacement)
     if saved:
-        logger.info("AI Agent: saved model %s is gone; selected %s", saved, replacement)
+        logger.info("AI Agent: saved automatic model %s is gone; selected %s", saved, replacement)
     return replacement
 
 
 async def ensure_model(db: AsyncSession, provider: str, *,
                        api_key: Optional[str] = None) -> tuple[str, bool]:
     """``(model, was_recovered)`` — never raises for a merely-stale model."""
+    if await get_preset(db, provider):
+        return _preset_reference(await get_preset(db, provider)), False
     saved = await get_model(db, provider)
     try:
         resolved = await resolve_model(db, provider, api_key=api_key)
@@ -1131,37 +1101,20 @@ def _messages_for_openrouter(messages: list[dict], system_text: str = "") -> lis
     return out
 
 
-def _routing(provider: dict | None, vendor: str | None) -> dict | None:
-    """OpenRouter's ``provider`` object: pin routing to one vendor.
-
-    Only sent when the operator picked a vendor, and only the parts that are
-    unambiguous: ``only`` names the vendor and ``order`` puts it first. The
-    model id already pins the model exactly, so this is a routing *preference*
-    on top — which is why a rejection of it is retried without it (see
-    :func:`complete`).
-    """
-    routing = dict(provider or {})
-    name = (vendor or "").strip()
-    if name:
-        order = [name] + [v for v in (routing.get("order") or []) if v != name]
-        routing["order"] = order
-        only = list(dict.fromkeys([name, *(routing.get("only") or [])]))
-        routing["only"] = only
-        routing.setdefault("allow_fallbacks", True)
-    return routing or None
-
-
 def _request_body(*, model: str, messages: list[dict], tools: Optional[list[dict]],
                   system_text: str, temperature: float, max_tokens: int,
                   preset: str = "", vendor: str = "",
                   extra: Optional[dict] = None, stream: bool = False) -> dict[str, Any]:
-    """One OpenRouter chat-completions body, built in exactly one place.
+    """Build the OpenRouter body, using only a preset or automatic model.
 
-    Every path (ping, chat, stream, transcription, preset validation) uses this,
-    so a change to how the app talks to OpenRouter cannot drift between them.
+    A selected preset is the model reference itself (``@preset/<slug>``). No
+    separate provider-routing control or unsupported ``presets`` field is sent;
+    OpenRouter owns all model and provider routing configured in the preset.
+    ``vendor`` remains an ignored argument for callers from older code.
     """
+    preset_model = _preset_reference(preset)
     body: dict[str, Any] = {
-        "model": model,
+        "model": preset_model or model,
         "messages": _messages_for_openrouter(messages, system_text),
         "temperature": temperature,
         "max_tokens": max_tokens,
@@ -1177,12 +1130,6 @@ def _request_body(*, model: str, messages: list[dict], tools: Optional[list[dict
                                            or {"type": "object", "properties": {}})}}
                          for t in tools]
         body["tool_choice"] = "auto"
-    routing = _routing(None, vendor)
-    if routing:
-        body["provider"] = routing
-    preset_name = (preset or "").strip()
-    if preset_name:
-        body["presets"] = preset_name
     if extra:
         body.update(extra)
     return body
@@ -1220,13 +1167,6 @@ async def complete(
         async with _http_client(timeout) as client:
             response = await client.post(OPENROUTER_CHAT_URL, headers=_headers(api_key),
                                          json=body)
-            if response.status_code != 200 and "provider" in body:
-                # A vendor pin OpenRouter cannot honour is a routing complaint,
-                # not a broken agent. Drop it and retry once — the model id
-                # still pins the model exactly.
-                retry = {k: v for k, v in body.items() if k != "provider"}
-                response = await client.post(OPENROUTER_CHAT_URL, headers=_headers(api_key),
-                                             json=retry)
             if response.status_code != 200:
                 raise _classify(provider, response.status_code, response.text, model)
             return response.json()
@@ -1236,20 +1176,6 @@ async def complete(
         raise _timeout(provider, model, exc) from exc
     except Exception as exc:
         raise _unreachable(provider, model, exc) from exc
-
-
-def _build_preset_candidate_chain(primary: str, preset_models: list[str], *, preset_locked: bool) -> list[str]:
-    if preset_locked and preset_models:
-        ordered = [m for m in preset_models if not _is_model_cooling_down(m)]
-        cooled = [m for m in preset_models if _is_model_cooling_down(m)]
-        return ordered + cooled
-    seen: set[str] = set()
-    out: list[str] = []
-    for candidate in [primary, *preset_models]:
-        if candidate and candidate not in seen:
-            seen.add(candidate)
-            out.append(candidate)
-    return out
 
 
 async def complete_with_recovery(
@@ -1265,54 +1191,62 @@ async def complete_with_recovery(
     max_tokens: int = 4096,
     timeout: float = 90.0,
     on_notice=None,
+    allow_fallback: bool | None = None,
 ) -> tuple[dict, str]:
-    """Call the model; walk the permanent preset fallback chain (or live catalogue when unlocked)."""
-    preset, vendor = await get_preset(db, provider), await get_vendor(db, provider)
-    preset_locked = await get_preset_locked(db)
-    preset_models = await get_preset_models(db)
-    candidates = _build_preset_candidate_chain(model, preset_models, preset_locked=preset_locked)
+    """Use the selected preset, or recover a retired automatic model once.
 
-    last_exc: Optional[ProviderError] = None
-    for idx, candidate in enumerate(candidates):
-        try:
-            resp = await complete(
-                provider, api_key=api_key, model=candidate, messages=messages, tools=tools,
-                system_text=system_text, temperature=temperature, max_tokens=max_tokens,
-                timeout=timeout, preset=preset, vendor=vendor,
-            )
-            if idx > 0 and not preset_locked:
-                await set_model(db, provider, candidate)
-            return resp, candidate
-        except ProviderError as exc:
-            last_exc = exc
-            if exc.code in ("key_missing", "key_invalid", "safety_blocked"):
-                raise
-            _mark_model_cooldown(candidate)
-            if idx + 1 < len(candidates):
-                nxt = candidates[idx + 1]
-                note = f"Model “{candidate}” failed ({exc.code}); falling back to preset model “{nxt}”."
-                if on_notice is not None:
-                    res = on_notice(note)
-                    if asyncio.iscoroutine(res):
-                        await res
-                continue
-            if preset_locked or exc.code != "model_unavailable":
-                raise
+    Preset fallback/routing lives in OpenRouter; we must not override it with
+    legacy per-model chains or vendor pins. With no preset, one recovery retry
+    is allowed only when ``auto_fallback`` is enabled and the failure is a
+    retired model or rate limit.
+    """
+    preset = await get_preset(db, provider)
+    if preset:
+        preset_model = _preset_reference(preset)
+        response = await complete(
+            provider, api_key=api_key, model=preset_model, messages=messages, tools=tools,
+            system_text=system_text, temperature=temperature, max_tokens=max_tokens,
+            timeout=timeout, preset=preset,
+        )
+        return response, preset_model
 
-    # Unlocked fallback to live catalogue when model_unavailable and no preset chain left
-    assert last_exc is not None
-    logger.warning("AI Agent: model %s/%s unavailable, refreshing list", provider, model)
-    replacement: Optional[str] = None
+    if allow_fallback is None:
+        allow_fallback = await get_flag(db, AUTO_FALLBACK_SETTING, True)
     try:
-        models = await list_models(db, provider, api_key=api_key, refresh=True)
-        replacement = pick_default(provider, [m for m in models if m.id not in set(candidates)])
+        response = await complete(
+            provider, api_key=api_key, model=model, messages=messages, tools=tools,
+            system_text=system_text, temperature=temperature, max_tokens=max_tokens,
+            timeout=timeout,
+        )
+        return response, model
+    except ProviderError as exc:
+        if exc.code in ("key_missing", "key_invalid", "safety_blocked"):
+            raise
+        if (
+            not allow_fallback
+            or exc.code not in ("model_unavailable", "rate_limited")
+        ):
+            raise
+        last_exc = exc
+
+    logger.warning("AI Agent: model %s/%s requires recovery", provider, model)
+    try:
+        models = await list_models(
+            db, provider, api_key=api_key, refresh=last_exc.code == "model_unavailable",
+        )
+        replacement = pick_default(provider, [item for item in models if item.id != model])
     except ProviderError:
         replacement = None
     if not replacement:
         raise last_exc
+
     await set_model(db, provider, replacement)
-    note = (f"The saved model “{model}” is no longer available on {label(provider)}. "
-            f"Switched to “{replacement}” and retried.")
+    note = (
+        f"The automatic model “{model}” is no longer available on {label(provider)}. "
+        f"Switched to “{replacement}” and retried."
+        if last_exc.code == "model_unavailable"
+        else f"{label(provider)} hit a limit on {model}; switched to {replacement} and retried."
+    )
     if on_notice is not None:
         result = on_notice(note)
         if asyncio.iscoroutine(result):
@@ -1322,12 +1256,12 @@ async def complete_with_recovery(
         response = await complete(
             provider, api_key=api_key, model=replacement, messages=messages, tools=tools,
             system_text=system_text, temperature=temperature, max_tokens=max_tokens,
-            timeout=timeout, preset=preset, vendor=vendor,
+            timeout=timeout,
         )
         return response, replacement
     except ProviderError as retry_exc:
         retry_exc.recovered_from = model
-        raise retry_exc from retry_exc
+        raise
 
 
 # ---------------------------------------------------------------------------
@@ -1399,16 +1333,14 @@ async def ping(db: AsyncSession, provider: str = PROVIDER) -> ProviderHealth:
         health.model = model
         if was_recovered:
             health.extra["note"] = "The previously saved model was retired; a current one was selected."
-        vendor, preset = await get_vendor(db, provider), await get_preset(db, provider)
-        if vendor:
-            health.extra["vendor"] = vendor
+        preset = await get_preset(db, provider)
         if preset:
             health.extra["preset"] = preset
         await complete(
             provider, api_key=key, model=model,
             messages=[{"role": "user", "content": "ping"}],
             tools=None, system_text="Reply with the single word: pong",
-            max_tokens=16, timeout=25.0, preset=preset, vendor=vendor,
+            max_tokens=16, timeout=25.0, preset=preset,
         )
         health.state = "ok"
         health.message = f"{label(provider)} answered with {model}."
@@ -1488,12 +1420,13 @@ async def transcribe(
             code="bad_request", provider=PROVIDER,
             message="The recording is empty.",
         )
-    model = await audio_model(db, api_key=key)
+    preset = await get_preset(db, PROVIDER)
+    model = _preset_reference(preset) if preset else await audio_model(db, api_key=key)
     if not model:
         raise ProviderError(
             code="model_unavailable", provider=PROVIDER,
-            message=("No model on this OpenRouter key accepts audio input. Choose one in "
-                     "openrouter.ai/models that lists audio as an input modality."),
+            message=("No audio-capable OpenRouter route is available. Configure an audio-capable "
+                     "preset or check the models enabled for your key."),
         )
 
     encoded = base64.b64encode(audio).decode()
@@ -1514,7 +1447,7 @@ async def transcribe(
         data = await complete(
             PROVIDER, api_key=key, model=model, messages=messages, tools=None,
             system_text=instruction, temperature=0.0, max_tokens=2048, timeout=120.0,
-            preset=await get_preset(db, PROVIDER), vendor=await get_vendor(db, PROVIDER),
+            preset=preset,
         )
     except ProviderError:
         raise
@@ -1650,81 +1583,36 @@ async def stream_with_recovery(
     provider: str,
     **kwargs: Any,
 ) -> AsyncIterator[dict]:
-    """Stream with ordered preset fallback chain or bounded live-catalogue recovery.
+    """Stream a selected preset, or recover one automatically chosen model.
 
-    When ``preset_locked`` is True and ``preset_models`` is non-empty, ONLY the
-    operator's selected preset models run in exact order — if one fails with any
-    retryable error (rate limit, timeout, upstream error, retired model, 5xx),
-    execution switches immediately to the next model in the preset list without
-    ever leaving the operator's approved chain or overwriting their primary model.
+    A preset owns its model/provider fallback rules in OpenRouter. Legacy local
+    model chains and provider pins are ignored so they cannot silently override
+    the user's preset-only configuration.
     """
     model = kwargs.pop("model")
-    kwargs.pop("allow_fallback", None)
+    allow_fallback = kwargs.pop("allow_fallback", None)
     requires_vision = bool(kwargs.pop("requires_vision", False))
     current_key = kwargs.get("api_key")
-    kwargs.setdefault("preset", await get_preset(db, provider))
-    kwargs.setdefault("vendor", await get_vendor(db, provider))
+    preset = _preset_slug(kwargs.pop("preset", None) or await get_preset(db, provider))
+    kwargs.pop("vendor", None)
 
-    preset_locked = await get_preset_locked(db)
-    preset_models = await get_preset_models(db)
+    if preset:
+        preset_model = _preset_reference(preset)
+        async for event in stream_complete(
+            provider, model=preset_model, preset=preset, **kwargs
+        ):
+            if event.get("type") == "done":
+                event = {**event, "provider": provider, "model": preset_model}
+            yield event
+        return
 
-    if preset_models:
-        chain = _build_preset_candidate_chain(model, preset_models, preset_locked=preset_locked)
-        if requires_vision:
-            vision_in_chain = [m for m in chain if is_vision_model(provider, m)]
-            if vision_in_chain:
-                chain = vision_in_chain + [m for m in chain if m not in vision_in_chain]
+    if allow_fallback is None:
+        allow_fallback = await get_flag(db, AUTO_FALLBACK_SETTING, True)
+    else:
+        allow_fallback = bool(allow_fallback)
 
-        for idx, candidate in enumerate(chain):
-            emitted_content = False
-            try:
-                async for event in stream_complete(provider, model=candidate, **kwargs):
-                    if event.get("type") == "text":
-                        emitted_content = True
-                    if event.get("type") == "done":
-                        event = {**event, "provider": provider, "model": candidate}
-                    yield event
-                if idx > 0 and not preset_locked:
-                    await set_model(db, provider, candidate)
-                return
-            except ProviderError as exc:
-                if emitted_content or exc.code in ("key_missing", "key_invalid", "safety_blocked"):
-                    raise
-                _mark_model_cooldown(candidate)
-                if idx + 1 < len(chain):
-                    nxt = chain[idx + 1]
-                    note = (
-                        f"Model “{candidate}” failed ({exc.code}); automatically switching to "
-                        f"preset fallback “{nxt}” ({idx + 2}/{len(chain)})."
-                    )
-                    yield {
-                        "type": "notice",
-                        "kind": "fallback",
-                        "provider": provider,
-                        "from_model": candidate,
-                        "model": nxt,
-                        "text": note,
-                    }
-                    continue
-                if preset_locked:
-                    raise ProviderError(
-                        code=exc.code,
-                        provider=provider,
-                        model=candidate,
-                        status=exc.status,
-                        message=(
-                            f"All {len(chain)} model(s) in your locked preset failed "
-                            f"(last: {candidate} — {exc.message})"
-                        ),
-                        detail=exc.detail,
-                    ) from exc
-                # Unlocked and preset list exhausted: allow one live-catalogue recovery below
-                model = candidate
-                if exc.code not in ("model_unavailable", "rate_limited"):
-                    raise
-                break
-
-    attempted: set[str] = {model, *preset_models}
+    kwargs["preset"] = ""
+    attempted: set[str] = {model}
     recoveries = 0
 
     while True:
@@ -1740,16 +1628,18 @@ async def stream_with_recovery(
         except ProviderError as exc:
             if (
                 emitted_content
+                or not allow_fallback
                 or exc.code not in ("model_unavailable", "rate_limited")
                 or recoveries >= 1
             ):
                 raise
-            _mark_model_cooldown(model)
             replacement = None
             try:
-                models = await list_models(db, provider, api_key=current_key,
-                                           refresh=exc.code == "model_unavailable")
-                remaining = [m for m in models if m.id not in attempted]
+                models = await list_models(
+                    db, provider, api_key=current_key,
+                    refresh=exc.code == "model_unavailable",
+                )
+                remaining = [item for item in models if item.id not in attempted]
                 replacement = (
                     pick_vision_model(provider, remaining)
                     if requires_vision else pick_default(provider, remaining)
@@ -1764,7 +1654,7 @@ async def stream_with_recovery(
             recoveries += 1
             await set_model(db, provider, model)
             note = (
-                f"The saved model “{old_model}” is no longer available on {label(provider)}. "
+                f"The automatic model “{old_model}” is no longer available on {label(provider)}. "
                 f"Switched to “{model}”."
                 if exc.code == "model_unavailable"
                 else f"{label(provider)} hit a limit on {old_model}; switched to {model}."

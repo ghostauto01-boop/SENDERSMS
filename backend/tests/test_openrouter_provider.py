@@ -2,13 +2,10 @@
 
 The rules under test are the ones the operator set:
 
-* one key, one provider; Groq and Gemini are gone from the code path entirely;
-* no model name is ever invented — every model comes from OpenRouter's live
-  ``/models`` list, and the vendor (the part before the slash in the id) is read
-  off that list too, so "pick the provider" needs no hard-coded vendor table;
-* a preset created on openrouter.ai is attached to every request by name;
-* pinning a vendor is a routing preference, and one OpenRouter rejects is
-  retried without it rather than turned into a failed chat.
+* one key and one provider; Groq and Gemini are gone from the request path;
+* users select OpenRouter presets only, with no model/vendor picker;
+* preset requests use OpenRouter's documented ``@preset/<slug>`` model form;
+* legacy vendor/model-chain settings cannot override a selected preset.
 """
 
 import json
@@ -226,10 +223,12 @@ async def test_a_saved_preset_is_attached_to_every_request(db, monkeypatch):
         messages=[{"role": "user", "content": "hi"}], preset="my-sales-preset",
     )
     body = responder.requests[-1][1]["json"]
-    assert body["presets"] == "my-sales-preset"
+    assert body["model"] == "@preset/my-sales-preset"
+    assert "presets" not in body
+    assert "provider" not in body
 
 
-async def test_pinning_a_vendor_sets_openrouters_provider_filter(db, monkeypatch):
+async def test_legacy_vendor_pin_is_ignored(db, monkeypatch):
     await ai_providers.set_api_key(db, "openrouter", "sk-or-v1-key")
     responder = _Responder().client(monkeypatch)
     await ai_providers.complete(
@@ -237,47 +236,21 @@ async def test_pinning_a_vendor_sets_openrouters_provider_filter(db, monkeypatch
         messages=[{"role": "user", "content": "hi"}], vendor="Anthropic",
     )
     body = responder.requests[-1][1]["json"]
-    assert body["provider"]["only"] == ["Anthropic"]
-    assert body["provider"]["order"][0] == "Anthropic"
+    assert body["model"] == "anthropic/claude-3.5-sonnet"
+    assert "provider" not in body
+    assert "presets" not in body
 
 
-async def test_a_vendor_pin_openrouter_rejects_is_retried_without_it(db, monkeypatch):
-    """A routing preference must not cost the operator a failed chat."""
+async def test_resolve_model_prefers_saved_preset_over_legacy_model_settings(db, monkeypatch):
     await ai_providers.set_api_key(db, "openrouter", "sk-or-v1-key")
-    seen: list[dict] = []
+    await ai_providers.set_model(db, "openrouter", "openai/gpt-4o-mini")
+    await ai_providers.set_vendor(db, "Anthropic")
+    await ai_providers.set_preset(db, "@preset/my-sales-preset")
 
-    class _Response:
-        def __init__(self, status, payload):
-            self.status_code = status
-            self.text = json.dumps(payload)
-
-        def json(self):
-            return json.loads(self.text)
-
-    class _Client:
-        def __init__(self, *args, **kwargs):
-            pass
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *exc):
-            return False
-
-        async def post(self, url, headers=None, json=None, params=None):
-            seen.append(json)
-            if "provider" in json:
-                return _Response(400, {"error": {"message": "Unknown provider"}})
-            return _Response(200, {"choices": [{"message": {"content": "ok"}}]})
-
-    monkeypatch.setattr(ai_providers.httpx, "AsyncClient", _Client)
-    result = await ai_providers.complete(
-        "openrouter", api_key="sk-or-v1-key", model="anthropic/claude-3.5-sonnet",
-        messages=[{"role": "user", "content": "hi"}], vendor="Anthropic",
-    )
-    assert len(seen) == 2
-    assert "provider" in seen[0] and "provider" not in seen[1]
-    assert result["choices"][0]["message"]["content"] == "ok"
+    assert await ai_providers.resolve_model(db, "openrouter") == "@preset/my-sales-preset"
+    model, recovered = await ai_providers.ensure_model(db, "openrouter")
+    assert model == "@preset/my-sales-preset"
+    assert recovered is False
 
 
 async def test_preset_listing_degrades_to_typing_the_name(db, monkeypatch):
@@ -328,7 +301,10 @@ async def test_a_typo_preset_name_is_caught_by_a_real_request(db, monkeypatch):
     result = await ai_providers.validate_preset(db, "sales-voiice")
     assert result["success"] is False
     assert "does not know a preset" in result["error"]
-    assert responder.requests[-1][1]["json"]["presets"] == "sales-voiice"
+    body = responder.requests[-1][1]["json"]
+    assert body["model"] == "@preset/sales-voiice"
+    assert "presets" not in body
+    assert "provider" not in body
 
 
 # ===========================================================================

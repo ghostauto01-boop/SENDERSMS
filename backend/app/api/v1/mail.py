@@ -219,13 +219,18 @@ async def refresh(
             await mailbox_message_service.mirror_mailbox(db, mailbox, force_full=full)
             if full else {"stored": reply_summary.get("mirrored") or 0}
         )
+        mirror_errors = [str(error)[:300] for error in (mirror.get("errors") or []) if error]
+        if mirror.get("error"):
+            mirror_errors.insert(0, str(mirror["error"])[:300])
+        if mirror.get("success") is False and not mirror_errors:
+            mirror_errors.append("Mailbox mirror did not complete")
         results.append({
             "mailbox_id": mailbox.id,
             "email": mailbox.email_address,
             "replies": int(reply_summary.get("stored") or 0),
             "rescued": int(reply_summary.get("rescued") or 0),
             "mirrored": int(mirror.get("stored") or 0),
-            "errors": (reply_summary.get("errors") or []) + ([mirror.get("error")] if mirror.get("error") else []),
+            "errors": (reply_summary.get("errors") or []) + mirror_errors,
         })
     await db.commit()
     return {

@@ -135,6 +135,25 @@ async def test_brevo_payload_carries_body_and_refuses_blank(monkeypatch):
     assert sent["textContent"] == "Hi Ada, this is my message."
     assert sent["htmlContent"] == "<p>Hi Ada, this is my message.</p>"
     assert sent["subject"] == "Hi Ada"
+    # Absent Reply-To is omitted; Brevo does not receive an empty object/header.
+    assert "replyTo" not in sent
+
+    with_reply_to = await brevo.send_email(
+        "key", to_email="ada@example.com", to_name=None, subject="Reply routing",
+        html=None, text="Hello", from_email="sender@acme-leads.io", from_name="Main",
+        reply_to=" Ada@Example.COM ",
+    )
+    assert with_reply_to["success"] is True
+    assert sent["replyTo"] == {"email": "ada@example.com"}
+    assert "Reply-To" not in sent.get("headers", {})
+
+    invalid_reply_to = await brevo.send_email(
+        "key", to_email="ada@example.com", to_name=None, subject="Reply routing",
+        html=None, text="Hello", from_email="sender@acme-leads.io", from_name="Main",
+        reply_to="not-an-email",
+    )
+    assert invalid_reply_to["success"] is False
+    assert "reply-to" in invalid_reply_to["error"].lower()
 
     blank = await brevo.send_email(
         "key", to_email="ada@example.com", to_name=None, subject="Hi",

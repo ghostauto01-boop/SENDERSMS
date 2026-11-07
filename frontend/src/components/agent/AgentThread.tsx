@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  Bot, Check, ChevronDown, Copy, RefreshCw, Sparkles, ThumbsUp, User as UserIcon,
+  Bot, Check, ChevronDown, Copy, Sparkles, User as UserIcon,
 } from "lucide-react";
 import Markdown from "../Markdown";
 import type { ConfirmationCard } from "../../api/aiAgent";
@@ -34,7 +34,7 @@ export type Turn = {
   streaming?: boolean;
   step?: { current: number; max: number } | null;
   statusText?: string | null;
-  activeModel?: string | null;
+  activeRoute?: string | null;
 };
 
 export function useAutoScroll(dependency: unknown) {
@@ -149,7 +149,7 @@ function AssistantBubble({
             step={turn.step?.current ?? 0}
             max={turn.step?.max ?? 15}
             statusText={turn.statusText || undefined}
-            model={turn.activeModel || undefined}
+            routeLabel={turn.activeRoute || undefined}
           />
         )}
 

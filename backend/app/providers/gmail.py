@@ -33,6 +33,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import email
+import email.header
 import email.policy  # `email.policy.default` is not pulled in by `import email`
 import imaplib
 import json
@@ -42,8 +43,9 @@ import smtplib
 import socket
 from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
-from email.utils import formatdate, make_msgid, parseaddr, parsedate_to_datetime
+from email.utils import formatdate, getaddresses, make_msgid, parseaddr, parsedate_to_datetime
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 
@@ -70,16 +72,21 @@ IMAP_TIMEOUT = 30
 SMTP_TIMEOUT = 45
 
 SPAM_FOLDERS = ("[Gmail]/Spam", "[Google Mail]/Spam")
-#: Cap per folder per sync: enough to catch up, small enough that a mailbox with
-#: ten thousand unread messages cannot stall a poll cycle. Raised from 40 —
-#: ``batchGet`` returns 100 messages per request, so 250 is three round trips
-#: instead of two hundred and fifty sequential ones.
+#: Page size used for Gmail message-list requests. The Gmail REST API has no
+#: messages.batchGet method, so message bodies are fetched with messages.get.
 MAX_PER_SYNC = 250
-#: ``users.messages.batchGet`` accepts at most 100 ids per call.
+#: Work in bounded groups to limit transient task/memory growth; each id is
+#: still fetched with its own documented users.messages.get request.
 BATCH_GET_LIMIT = 100
-#: How many batchGet calls may be in flight at once. Gmail's quota is generous
-#: enough for this, and it is what turns a 40-second sync into a 4-second one.
+#: At most this many messages.get requests run concurrently per mailbox sync.
 BATCH_CONCURRENCY = 3
+#: Guard against a broken/repeating nextPageToken while listing or reading history.
+MAX_LIST_PAGES = 1000
+#: Keep Gmail reply attachment downloads inside the email-service safety limits.
+MAX_IMPORT_ATTACHMENTS = 10
+MAX_IMPORT_ATTACHMENT_BYTES = 4 * 1024 * 1024
+MAX_IMPORT_ATTACHMENTS_TOTAL_BYTES = 8 * 1024 * 1024
+MAX_GMAIL_TEXT_PART_BYTES = 8 * 1024 * 1024
 #: On the very first sync, only look back this far. Nobody wants last year's
 #: newsletters imported into their CRM inbox.
 FIRST_SYNC_DAYS = 7
@@ -466,10 +473,11 @@ def _imap_sync_blocking(
     address: str, password: str, folders: list[str], cursors: dict, *, import_all: bool,
     lookback_days: int,
 ) -> dict:
-    """One blocking IMAP pass. Runs in a worker thread."""
+    """One blocking IMAP pass; cursors stop at the first unprocessed UID."""
     connection = _imap_login(address, password)
     items: list[dict] = []
-    new_cursors: dict[str, int] = {}
+    new_cursors: dict[str, int] = dict(cursors or {})
+    cursor_updates: dict[str, int] = {}
     errors: list[str] = []
     try:
         for folder in folders:
@@ -478,9 +486,7 @@ def _imap_sync_blocking(
                 continue
             status = _imap_status(connection, folder)
             uid_next = status.get("UIDNEXT")
-            if uid_next:
-                new_cursors[folder] = uid_next
-            since_uid = int(cursors.get(folder) or 0)
+            since_uid = int((cursors or {}).get(folder) or 0)
             if since_uid:
                 criteria = f"UID {since_uid}:*"
             else:
@@ -492,42 +498,93 @@ def _imap_sync_blocking(
             except imaplib.IMAP4.error as exc:
                 errors.append(f"{folder}: search failed ({exc})")
                 continue
-            if search[0] != "OK":
+            if not search or search[0] != "OK":
+                status_text = search[0] if search else "no response"
+                errors.append(f"{folder}: search failed ({status_text})")
                 continue
-            uids = [int(u) for u in (search[1][0] or b"").split() if u.isdigit()]
-            # UID n:* always returns at least the last message, even when there
-            # is nothing new; drop anything we have already seen.
-            uids = [u for u in uids if u >= since_uid][-MAX_PER_SYNC:]
+
+            search_data = search[1][0] if len(search) > 1 and search[1] else b""
+            found_uids = sorted(
+                int(uid) for uid in (search_data or b"").split() if uid.isdigit()
+            )
+            # UID n:* can include the last message even when there is nothing
+            # new; the cursor is stored as the next UID to process.
+            found_uids = [uid for uid in found_uids if uid >= since_uid]
+            uids = found_uids[:MAX_PER_SYNC]
+            has_more = len(found_uids) > len(uids)
+            last_processed_uid: int | None = None
+            folder_failed = False
+
             for uid in uids:
-                fetched = connection.uid("FETCH", str(uid), "(RFC822)")
-                if fetched[0] != "OK" or not fetched[1]:
-                    continue
+                try:
+                    fetched = connection.uid("FETCH", str(uid), "(RFC822)")
+                except Exception as exc:  # noqa: BLE001 — retain this UID for retry
+                    errors.append(f"{folder}/{uid}: fetch failed ({type(exc).__name__})")
+                    folder_failed = True
+                    break
+                if not fetched or fetched[0] != "OK" or len(fetched) < 2 or not fetched[1]:
+                    status_text = fetched[0] if fetched else "no response"
+                    errors.append(f"{folder}/{uid}: fetch failed ({status_text})")
+                    folder_failed = True
+                    break
                 raw = None
                 for chunk in fetched[1]:
                     if isinstance(chunk, tuple) and len(chunk) > 1:
                         raw = chunk[1]
                         break
                 if not raw:
-                    continue
+                    errors.append(f"{folder}/{uid}: fetch returned no message body")
+                    folder_failed = True
+                    break
                 try:
-                    item = parse_mime(raw, folder=folder, provider_message_id=f"imap-{folder}-{uid}")
-                except Exception as exc:  # noqa: BLE001
+                    item = parse_mime(
+                        raw, folder=folder, provider_message_id=f"imap-{folder}-{uid}",
+                    )
+                except Exception as exc:  # noqa: BLE001 — don't skip an unparsed message
                     errors.append(f"{folder}/{uid}: parse failed ({exc})")
-                    continue
+                    folder_failed = True
+                    break
                 item["_uid"] = uid
                 items.append(item)
+                last_processed_uid = uid
+
+            if folder_failed:
+                if last_processed_uid is not None:
+                    next_uid = last_processed_uid + 1
+                    cursor_updates[folder] = next_uid
+                    new_cursors[folder] = next_uid
+                continue
+
+            if has_more:
+                if last_processed_uid is not None:
+                    next_uid = last_processed_uid + 1
+                    cursor_updates[folder] = next_uid
+                    new_cursors[folder] = next_uid
+            elif uid_next:
+                cursor_updates[folder] = uid_next
+                new_cursors[folder] = uid_next
+            elif last_processed_uid is not None:
+                next_uid = last_processed_uid + 1
+                cursor_updates[folder] = next_uid
+                new_cursors[folder] = next_uid
     finally:
         try:
             connection.logout()
         except Exception:  # noqa: BLE001
             pass
-    return {"items": items, "cursors": new_cursors, "errors": errors,
-            "profile_email": address.lower()}
+    return {
+        "success": not errors,
+        "items": items,
+        "cursors": new_cursors,
+        "cursor_updates": cursor_updates,
+        "errors": errors,
+        "profile_email": address.lower(),
+    }
 
 
 async def imap_sync(address: str, password: str, folders: list[str], cursors: dict | None,
                     *, import_all: bool = False, first_sync: bool = False) -> dict:
-    """Fetch new messages from each folder, newest-first, off the event loop."""
+    """Fetch new messages with a bounded, resumable backlog off the event loop."""
     return await asyncio.to_thread(
         _imap_sync_blocking, address, password, folders or ["INBOX"], cursors or {},
         import_all=import_all,
@@ -549,12 +606,16 @@ def _imap_mirror_blocking(
 
     The reply sync only needs INBOX and Spam; the mail app needs Sent, Drafts
     and Trash too. One connection, one pass per folder, ``BODY.PEEK[]`` so
-    reading here never marks anything unread in Gmail.
+    reading here never marks anything unread in Gmail. Per-folder cursors move
+    only past messages we have fetched successfully; a capped pass leaves the
+    older backlog for the next run.
     """
     connection = _imap_login(address, password)
     items: list[dict] = []
     new_cursors: dict[str, int] = dict(cursors or {})
+    cursor_updates: dict[str, int] = {}
     errors: list[str] = []
+    max_per_folder = max(1, int(max_per_folder or 1))
     try:
         for view, names in views.items():
             folder_name = next((n for n in names if _imap_select(connection, n)), None)
@@ -563,9 +624,8 @@ def _imap_mirror_blocking(
                 continue
             status = _imap_status(connection, folder_name)
             cursor_key = f"mirror:{view}"
-            if status.get("UIDNEXT"):
-                new_cursors[cursor_key] = status["UIDNEXT"]
-            since_uid = int(cursors.get(cursor_key) or 0)
+            uid_next = status.get("UIDNEXT")
+            since_uid = int((cursors or {}).get(cursor_key) or 0)
             if since_uid:
                 criteria = f"UID {since_uid}:*"
             else:
@@ -577,14 +637,33 @@ def _imap_mirror_blocking(
             except imaplib.IMAP4.error as exc:
                 errors.append(f"{view}: search failed ({exc})")
                 continue
-            if search[0] != "OK":
+            if not search or search[0] != "OK":
+                status_text = search[0] if search else "no response"
+                errors.append(f"{view}: search failed ({status_text})")
                 continue
-            uids = [int(u) for u in (search[1][0] or b"").split() if u.isdigit()]
-            uids = [u for u in uids if u >= since_uid][-max_per_folder:]
+
+            found_uids = [
+                int(uid) for uid in ((search[1][0] or b"") if len(search) > 1 and search[1] else b"").split()
+                if uid.isdigit()
+            ]
+            found_uids = [uid for uid in found_uids if uid >= since_uid]
+            uids = found_uids[:max_per_folder]
+            has_more = len(found_uids) > len(uids)
+            last_processed_uid: int | None = None
+            folder_failed = False
+
             for uid in uids:
-                fetched = connection.uid("FETCH", str(uid), "(FLAGS BODY.PEEK[])")
-                if fetched[0] != "OK" or not fetched[1]:
-                    continue
+                try:
+                    fetched = connection.uid("FETCH", str(uid), "(FLAGS BODY.PEEK[])")
+                except imaplib.IMAP4.error as exc:
+                    errors.append(f"{view}/{uid}: fetch failed ({exc})")
+                    folder_failed = True
+                    break
+                if not fetched or fetched[0] != "OK" or len(fetched) < 2 or not fetched[1]:
+                    status_text = fetched[0] if fetched else "no response"
+                    errors.append(f"{view}/{uid}: fetch failed ({status_text})")
+                    folder_failed = True
+                    break
                 raw, flags = None, set()
                 for chunk in fetched[1]:
                     if isinstance(chunk, tuple) and len(chunk) > 1:
@@ -592,13 +671,16 @@ def _imap_mirror_blocking(
                         raw = chunk[1]
                         break
                 if not raw:
-                    continue
+                    errors.append(f"{view}/{uid}: fetch returned no message body")
+                    folder_failed = True
+                    break
                 try:
                     item = parse_mime(raw, folder=view,
                                       provider_message_id=f"imap-{view}-{uid}")
-                except Exception as exc:  # noqa: BLE001 — one bad message must not end the pass
+                except Exception as exc:  # noqa: BLE001 — don't advance past an unparsed message
                     errors.append(f"{view}/{uid}: parse failed ({exc})")
-                    continue
+                    folder_failed = True
+                    break
                 item["_uid"] = uid
                 item["_folder"] = view
                 item["_is_read"] = "SEEN" in flags
@@ -606,13 +688,44 @@ def _imap_mirror_blocking(
                 item["_raw_text"] = item.get("RawTextBody") or ""
                 item["_provider"] = "imap"
                 items.append(item)
+                last_processed_uid = uid
+
+            # A failed fetch/parse can still move a cursor past earlier messages
+            # that completed in this pass, but never past the failed UID.
+            if folder_failed:
+                if last_processed_uid is not None:
+                    next_uid = last_processed_uid + 1
+                    cursor_updates[cursor_key] = next_uid
+                    new_cursors[cursor_key] = next_uid
+                continue
+
+            if has_more:
+                # Consume the oldest part of a backlog first so a per-pass cap
+                # cannot skip older mail by jumping straight to UIDNEXT.
+                if last_processed_uid is not None:
+                    next_uid = last_processed_uid + 1
+                    cursor_updates[cursor_key] = next_uid
+                    new_cursors[cursor_key] = next_uid
+            elif uid_next:
+                cursor_updates[cursor_key] = uid_next
+                new_cursors[cursor_key] = uid_next
+            elif last_processed_uid is not None:
+                next_uid = last_processed_uid + 1
+                cursor_updates[cursor_key] = next_uid
+                new_cursors[cursor_key] = next_uid
     finally:
         try:
             connection.logout()
         except Exception:  # noqa: BLE001
             pass
-    return {"items": items, "cursors": new_cursors, "errors": errors,
-            "profile_email": address.lower()}
+    return {
+        "success": not errors,
+        "items": items,
+        "cursors": new_cursors,
+        "cursor_updates": cursor_updates,
+        "errors": errors,
+        "profile_email": address.lower(),
+    }
 
 
 async def imap_mirror_folders(
@@ -819,14 +932,51 @@ async def google_refresh_access_token(client_id: str, client_secret: str,
 
 
 async def _api(access_token: str, method: str, path: str, *,
-               params: dict | None = None, json_body: Any = None) -> dict:
-    """One Gmail API call, with the error body turned into one readable line."""
+               params: dict | None = None, json_body: Any = None,
+               _client: httpx.AsyncClient | None = None) -> dict:
+    """One Gmail API call, with bounded retries and a safe, readable error.
+
+    ``_client`` is shared only inside one bounded message-fetch operation, which
+    avoids opening hundreds of TLS connections during a mailbox sync. The
+    bearer token is never included in a log or returned error.
+    """
     url = path if path.startswith("http") else f"{GMAIL_API}{path}"
-    async with httpx.AsyncClient(timeout=45.0) as client:
-        response = await client.request(
-            method.upper(), url, params=params or None, json=json_body,
-            headers={"authorization": f"Bearer {access_token}", "accept": "application/json"},
+    headers = {"authorization": f"Bearer {access_token}", "accept": "application/json"}
+    # GET is safe to retry. Never retry Gmail sends, label modifications, filter
+    # creation, or other side-effecting requests: a timeout can happen after the
+    # server has accepted the first request.
+    attempts = 3 if method.upper() in {"GET", "HEAD"} else 1
+
+    async def request(client: httpx.AsyncClient):
+        return await client.request(
+            method.upper(), url, params=params or None, json=json_body, headers=headers,
         )
+
+    response = None
+    for attempt in range(attempts):
+        try:
+            if _client is not None:
+                response = await request(_client)
+            else:
+                async with httpx.AsyncClient(timeout=45.0) as client:
+                    response = await request(client)
+        except httpx.RequestError as exc:
+            if attempt + 1 >= attempts:
+                return {"success": False, "error": f"Gmail request failed: {type(exc).__name__}"}
+            await asyncio.sleep(0.2 * (2 ** attempt))
+            continue
+
+        if response.status_code not in {429, 500, 502, 503, 504} or attempt + 1 >= attempts:
+            break
+        retry_after = (response.headers.get("retry-after") or "").strip()
+        try:
+            delay = min(max(float(retry_after), 0.0), 2.0) if retry_after else 0.2 * (2 ** attempt)
+        except ValueError:
+            delay = 0.2 * (2 ** attempt)
+        await asyncio.sleep(delay)
+
+    if response is None:
+        return {"success": False, "error": "Gmail request failed"}
     try:
         payload = response.json()
     except ValueError:
@@ -853,45 +1003,116 @@ async def gmail_profile(access_token: str) -> dict:
             "history_id": str(profile.get("historyId") or "")}
 
 
-def _walk_payload(payload: dict) -> tuple[str, str | None, list[dict], dict]:
-    """Flatten a Gmail API message payload into (text, html, attachments, headers)."""
-    headers = {str(h.get("name") or ""): str(h.get("value") or "")
-               for h in (payload.get("headers") or []) if isinstance(h, dict)}
+def _decode_mime_header(value: str) -> str:
+    """Decode RFC 2047 encoded words without losing malformed header text."""
+    try:
+        return str(email.header.make_header(email.header.decode_header(value or "")))
+    except (LookupError, TypeError, ValueError):
+        return value or ""
+
+
+def _estimated_decoded_bytes(encoded: str | None) -> int:
+    """Upper bound decoded base64 size without allocating the decoded bytes."""
+    compact = str(encoded or "").rstrip("=")
+    return (len(compact) * 3 + 3) // 4
+
+
+def _walk_payload(
+    payload: dict, *, include_file_attachments: bool = True,
+) -> tuple[str, str | None, list[dict], dict, list[dict], list[str]]:
+    """Flatten Gmail MIME parts while enforcing body and attachment size caps."""
+    canonical_names = {
+        "from": "From", "to": "To", "cc": "Cc", "bcc": "Bcc",
+        "reply-to": "Reply-To", "subject": "Subject", "date": "Date",
+        "message-id": "Message-ID", "in-reply-to": "In-Reply-To",
+        "references": "References", "delivered-to": "Delivered-To",
+        "list-unsubscribe": "List-Unsubscribe",
+    }
+    headers: dict[str, str] = {}
+    for header in payload.get("headers") or []:
+        if not isinstance(header, dict):
+            continue
+        original_name = str(header.get("name") or "").strip()
+        if not original_name:
+            continue
+        name = canonical_names.get(original_name.casefold(), original_name)
+        value = _decode_mime_header(str(header.get("value") or ""))
+        headers[name] = f"{headers[name]}, {value}" if headers.get(name) else value
+
     text_parts: list[str] = []
     html_parts: list[str] = []
     attachments: list[dict] = []
+    body_attachment_refs: list[dict] = []
+    body_errors: list[str] = []
+    inline_attachment_bytes = 0
+
+    def part_size(body: dict, data: str | None) -> int:
+        try:
+            declared = int(body.get("size") or 0)
+        except (TypeError, ValueError):
+            declared = 0
+        return max(declared, _estimated_decoded_bytes(data) if data else 0)
 
     def visit(part: dict) -> None:
+        nonlocal inline_attachment_bytes
         if not isinstance(part, dict):
             return
         mime = str(part.get("mimeType") or "")
         filename = part.get("filename")
         body = part.get("body") or {}
-        data = body.get("data")
+        data = str(body.get("data") or "")
+        size = part_size(body, data)
         if filename:
-            record = {
-                "name": str(filename)[:255],
-                "contentType": mime or "application/octet-stream",
-                "size": int(body.get("size") or 0) or None,
-            }
+            # Metadata beyond the import count may be large too; keep only the
+            # first supported records and never decode content that will be dropped.
+            if len(attachments) < MAX_IMPORT_ATTACHMENTS:
+                record = {
+                    "name": str(filename)[:255],
+                    "contentType": mime or "application/octet-stream",
+                    "size": size or None,
+                }
+                if include_file_attachments and data:
+                    estimated = _estimated_decoded_bytes(data)
+                    if (
+                        size <= MAX_IMPORT_ATTACHMENT_BYTES
+                        and estimated <= MAX_IMPORT_ATTACHMENT_BYTES
+                        and inline_attachment_bytes + estimated <= MAX_IMPORT_ATTACHMENTS_TOTAL_BYTES
+                    ):
+                        raw_attachment = _b64url_decode(data)
+                        if (
+                            len(raw_attachment) <= MAX_IMPORT_ATTACHMENT_BYTES
+                            and inline_attachment_bytes + len(raw_attachment)
+                            <= MAX_IMPORT_ATTACHMENTS_TOTAL_BYTES
+                        ):
+                            inline_attachment_bytes += len(raw_attachment)
+                            record["content"] = base64.b64encode(raw_attachment).decode()
+                elif include_file_attachments and body.get("attachmentId"):
+                    # The caller decides whether to fetch this separately; oversized
+                    # files are retained as metadata only and never downloaded.
+                    if (
+                        size <= MAX_IMPORT_ATTACHMENT_BYTES
+                        and inline_attachment_bytes + size <= MAX_IMPORT_ATTACHMENTS_TOTAL_BYTES
+                    ):
+                        record["_attachment_id"] = str(body["attachmentId"])
+                attachments.append(record)
+        elif mime in ("text/plain", "text/html"):
             if data:
-                record["content"] = base64.b64encode(_b64url_decode(data)).decode()
+                if size > MAX_GMAIL_TEXT_PART_BYTES:
+                    body_errors.append("Gmail text body part exceeds the import size limit")
+                else:
+                    decoded = _b64url_decode(data).decode("utf-8", errors="replace")
+                    (text_parts if mime == "text/plain" else html_parts).append(decoded)
             elif body.get("attachmentId"):
-                # A large attachment is fetched separately; record the id so the
-                # caller can decide whether the download is worth it.
-                record["_attachment_id"] = str(body["attachmentId"])
-            attachments.append(record)
-        elif mime == "text/plain" and data:
-            text_parts.append(_b64url_decode(data).decode("utf-8", errors="replace"))
-        elif mime == "text/html" and data:
-            html_parts.append(_b64url_decode(data).decode("utf-8", errors="replace"))
+                body_attachment_refs.append({"id": str(body["attachmentId"]), "mime": mime,
+                                            "size": size or None})
         for child in part.get("parts") or []:
             visit(child)
 
     visit(payload)
     return ("\n".join(t for t in text_parts if t).strip(),
             "\n".join(h for h in html_parts if h).strip() or None,
-            attachments[:10], headers)
+            attachments[:MAX_IMPORT_ATTACHMENTS], headers,
+            body_attachment_refs[:4], body_errors[:4])
 
 
 def folder_from_labels(labels: list[str]) -> str:
@@ -915,13 +1136,18 @@ def folder_from_labels(labels: list[str]) -> str:
     return "OTHER"
 
 
-def _normalize_api_message(data: dict, *, strip_quotes: bool = True) -> dict:
+def _normalize_api_message(
+    data: dict, *, strip_quotes: bool = True, include_file_attachments: bool = True,
+) -> dict:
     """One Gmail API message payload -> the normalized inbound item."""
-    text, html, attachments, headers = _walk_payload(data.get("payload") or {})
+    text, html, attachments, headers, body_attachment_refs, body_errors = _walk_payload(
+        data.get("payload") or {}, include_file_attachments=include_file_attachments,
+    )
     labels = [str(x) for x in (data.get("labelIds") or [])]
     internal = int(data.get("internalDate") or 0) / 1000
     date = datetime.fromtimestamp(internal, tz=timezone.utc) if internal else None
-    from_address, from_name = parseaddr(headers.get("From") or "")
+    from_parsed = getaddresses([headers.get("From") or ""])
+    from_name, from_address = from_parsed[0] if from_parsed else ("", "")
     to_addresses = _addresses_from(headers.get("To"))
     cc_addresses = _addresses_from(headers.get("Cc"))
     item = normalize_message(
@@ -949,79 +1175,231 @@ def _normalize_api_message(data: dict, *, strip_quotes: bool = True) -> dict:
     item["_cc"] = cc_addresses
     item["_raw_text"] = text
     item["_history_id"] = str(data.get("historyId") or "")
+    if body_attachment_refs:
+        item["_body_attachment_refs"] = body_attachment_refs
+    if body_errors:
+        item["_body_errors"] = body_errors
     return item
 
 
 def _addresses_from(header_value: str | None) -> list[str]:
-    """Every address in a To/Cc header, lowercased, display names removed."""
-    return [
-        parseaddr(chunk)[1].strip().lower()
-        for chunk in re.split(r",(?![^<]*>)", header_value or "") if "@" in chunk
-    ]
+    """Every To/Cc address; ``getaddresses`` handles groups and quoted commas."""
+    addresses: list[str] = []
+    for _name, address in getaddresses([header_value or ""]):
+        clean = address.strip().lower()
+        if "@" in clean and clean not in addresses:
+            addresses.append(clean)
+    return addresses
+
+
+async def _hydrate_gmail_attachments(
+    access_token: str, message_id: str, item: dict, *,
+    strip_quotes: bool, include_file_attachments: bool,
+    _client: httpx.AsyncClient | None,
+) -> list[str]:
+    """Fetch Gmail attachment IDs only when safe to import them inline.
+
+    In Gmail's full format, non-text attachments (and occasionally very large
+    text parts) contain only an ``attachmentId``. A message is not considered
+    complete for reply-import until those eligible parts have been fetched.
+    """
+    errors: list[str] = [str(error)[:180] for error in item.pop("_body_errors", [])]
+    message_path = quote(str(message_id), safe="")
+    body_text: list[str] = []
+    body_html: list[str] = []
+    refs = item.pop("_body_attachment_refs", [])
+
+    async def attachment_bytes(
+        attachment_id: str, *, max_bytes: int,
+    ) -> tuple[bytes | None, str | None]:
+        safe_attachment = quote(str(attachment_id), safe="")
+        result = await _api(
+            access_token, "GET",
+            f"/users/me/messages/{message_path}/attachments/{safe_attachment}",
+            _client=_client,
+        )
+        if not result.get("success"):
+            return None, str(result.get("error") or "Gmail attachment fetch failed")[:180]
+        encoded = str((result.get("data") or {}).get("data") or "")
+        if _estimated_decoded_bytes(encoded) > max_bytes:
+            return None, "Gmail attachment exceeds the import size limit"
+        return _b64url_decode(encoded), None
+
+    for ref in refs:
+        try:
+            declared_size = int(ref.get("size") or 0)
+        except (TypeError, ValueError):
+            declared_size = 0
+        if declared_size > MAX_GMAIL_TEXT_PART_BYTES:
+            errors.append("Gmail text body part exceeds the import size limit")
+            continue
+        raw, error = await attachment_bytes(
+            str(ref.get("id") or ""), max_bytes=MAX_GMAIL_TEXT_PART_BYTES,
+        )
+        if error:
+            errors.append(error)
+            continue
+        if len(raw or b"") > MAX_GMAIL_TEXT_PART_BYTES:
+            errors.append("Gmail text body part exceeds the import size limit")
+            continue
+        decoded = (raw or b"").decode("utf-8", errors="replace")
+        if ref.get("mime") == "text/plain":
+            body_text.append(decoded)
+        elif ref.get("mime") == "text/html":
+            body_html.append(decoded)
+
+    if body_text or body_html:
+        raw_text = "\n".join(
+            part for part in [str(item.get("_raw_text") or ""), *body_text] if part
+        ).strip()
+        item["_raw_text"] = raw_text
+        item["RawTextBody"] = strip_quoted_reply(raw_text) if strip_quotes else raw_text
+        html = "\n".join(
+            part for part in [str(item.get("RawHtmlBody") or ""), *body_html] if part
+        ).strip()
+        if html:
+            item["RawHtmlBody"] = html
+
+    if include_file_attachments:
+        imported: list[dict] = []
+        total_size = 0
+        for record in item.get("Attachments") or []:
+            if not isinstance(record, dict):
+                continue
+            name = str(record.get("name") or "").strip()
+            if not name or len(imported) >= MAX_IMPORT_ATTACHMENTS:
+                continue
+            try:
+                declared_size = int(record.get("size") or 0)
+            except (TypeError, ValueError):
+                declared_size = 0
+            remaining = MAX_IMPORT_ATTACHMENTS_TOTAL_BYTES - total_size
+            max_bytes = min(MAX_IMPORT_ATTACHMENT_BYTES, remaining)
+            if max_bytes <= 0 or declared_size > max_bytes:
+                continue
+            content = record.get("content")
+            if content:
+                encoded_content = str(content)
+                if _estimated_decoded_bytes(encoded_content) > max_bytes:
+                    continue
+                try:
+                    raw = base64.b64decode(encoded_content, validate=False)
+                except Exception:  # noqa: BLE001 — malformed attachment is ignored
+                    continue
+            elif record.get("_attachment_id"):
+                raw, error = await attachment_bytes(
+                    str(record["_attachment_id"]), max_bytes=max_bytes,
+                )
+                if error:
+                    if "exceeds the import size limit" not in error:
+                        errors.append(error)
+                    continue
+            else:
+                continue
+            raw = raw or b""
+            if len(raw) > MAX_IMPORT_ATTACHMENT_BYTES:
+                continue
+            if total_size + len(raw) > MAX_IMPORT_ATTACHMENTS_TOTAL_BYTES:
+                continue
+            total_size += len(raw)
+            imported.append({
+                "name": name[:255],
+                "contentType": str(record.get("contentType") or "application/octet-stream")[:120],
+                "size": len(raw),
+                "content": base64.b64encode(raw).decode("ascii"),
+            })
+        item["Attachments"] = imported
+    else:
+        # Mailbox mirroring/full-body reads need message text, not file contents.
+        # Retain names/sizes for the mirror's count while stripping inline data.
+        item["Attachments"] = [
+            {key: value for key, value in record.items()
+             if key not in {"content", "_attachment_id"}}
+            for record in (item.get("Attachments") or []) if isinstance(record, dict)
+        ]
+    return errors
 
 
 async def gmail_get_message(access_token: str, message_id: str, *,
-                            strip_quotes: bool = True) -> dict:
-    """Fetch one message and normalize it."""
-    result = await _api(access_token, "GET", f"/users/me/messages/{message_id}",
-                        params={"format": "full"})
+                            strip_quotes: bool = True,
+                            include_attachments: bool = False,
+                            _client: httpx.AsyncClient | None = None) -> dict:
+    """Fetch one message through Gmail's documented ``messages.get`` method."""
+    safe_id = quote(str(message_id), safe="")
+    result = await _api(
+        access_token, "GET", f"/users/me/messages/{safe_id}",
+        params={"format": "full"}, _client=_client,
+    )
     if not result.get("success"):
         return result
     data = result["data"]
-    item = _normalize_api_message(data, strip_quotes=strip_quotes)
+    item = _normalize_api_message(
+        data, strip_quotes=strip_quotes, include_file_attachments=include_attachments,
+    )
+    attachment_errors = await _hydrate_gmail_attachments(
+        access_token, message_id, item, strip_quotes=strip_quotes,
+        include_file_attachments=include_attachments, _client=_client,
+    )
+    if attachment_errors:
+        return {"success": False, "error": "; ".join(attachment_errors[:3])[:400]}
     return {"success": True, "item": item, "labels": item["_labels"],
             "history_id": item.get("_history_id") or ""}
 
 
 async def gmail_batch_get(access_token: str, message_ids: list[str], *,
-                          strip_quotes: bool = True) -> dict:
-    """Many messages in one request — the fast path for a mailbox sync.
+                          strip_quotes: bool = True,
+                          include_attachments: bool = True) -> dict:
+    """Fetch many messages with bounded, concurrent ``users.messages.get`` calls.
 
-    ``users.messages.batchGet`` returns up to 100 full messages per call, so a
-    250-message sync is three requests instead of two hundred and fifty
-    sequential ones. That single change is most of the difference between a
-    reply taking a minute to appear and taking seconds.
-
-    Chunks are fetched concurrently but bounded (``BATCH_CONCURRENCY``): Gmail's
-    per-user quota is generous, and hammering it with 30 parallel requests is
-    how a sync ends up rate-limited and slower than before.
-
-    Ids Gmail has already deleted are simply absent from the response, so a
-    message trashed mid-sync is skipped rather than failing the whole batch.
+    Gmail has no ``users.messages.batchGet`` REST endpoint. This compatibility
+    helper keeps existing call sites stable while issuing one documented GET
+    per ID, sharing an HTTP connection pool and limiting in-flight requests.
+    A stale ID that Gmail has deleted is skipped; other failures are returned
+    and must not advance the caller's sync cursor.
     """
     ids = [i for i in dict.fromkeys(str(i).strip() for i in message_ids) if i]
     if not ids:
-        return {"success": True, "items": [], "history_id": ""}
+        return {"success": True, "items": [], "errors": [], "missing_ids": [], "history_id": ""}
 
-    chunks = [ids[i:i + BATCH_GET_LIMIT] for i in range(0, len(ids), BATCH_GET_LIMIT)]
     semaphore = asyncio.Semaphore(BATCH_CONCURRENCY)
     items: list[dict] = []
     errors: list[str] = []
+    missing_ids: list[str] = []
     history_id = ""
+    limits = httpx.Limits(max_connections=BATCH_CONCURRENCY,
+                          max_keepalive_connections=BATCH_CONCURRENCY)
 
-    async def fetch(chunk: list[str]) -> dict:
-        async with semaphore:
-            return await _api(
-                access_token, "POST", "/users/me/messages/batchGet",
-                json_body={"ids": chunk, "format": "full"},
-            )
+    async with httpx.AsyncClient(timeout=45.0, limits=limits) as client:
+        async def fetch(message_id: str):
+            async with semaphore:
+                return await gmail_get_message(
+                    access_token, message_id, strip_quotes=strip_quotes,
+                    include_attachments=include_attachments, _client=client,
+                )
 
-    for result in await asyncio.gather(*(fetch(chunk) for chunk in chunks),
-                                       return_exceptions=True):
-        if isinstance(result, Exception):
-            errors.append(str(result)[:200])
-            continue
-        if not result.get("success"):
-            errors.append(str(result.get("error"))[:200])
-            continue
-        for data in result["data"].get("messages") or []:
-            if not isinstance(data, dict):
-                continue
-            items.append(_normalize_api_message(data, strip_quotes=strip_quotes))
-            history_id = history_id or str(data.get("historyId") or "")
+        for start in range(0, len(ids), BATCH_GET_LIMIT):
+            group = ids[start:start + BATCH_GET_LIMIT]
+            results = await asyncio.gather(*(fetch(message_id) for message_id in group),
+                                           return_exceptions=True)
+            for message_id, result in zip(group, results):
+                if isinstance(result, Exception):
+                    errors.append(f"{message_id}: {type(result).__name__}")
+                    continue
+                if not result.get("success"):
+                    if int(result.get("status_code") or 0) == 404:
+                        missing_ids.append(message_id)
+                    else:
+                        errors.append(f"{message_id}: {str(result.get('error') or 'Gmail fetch failed')[:160]}")
+                    continue
+                item = result.get("item")
+                if not isinstance(item, dict):
+                    errors.append(f"{message_id}: Gmail returned an empty message")
+                    continue
+                items.append(item)
+                history_id = str(result.get("history_id") or history_id)
 
-    return {"success": not errors or bool(items), "items": items,
-            "errors": errors[:5], "history_id": history_id}
+    return {"success": not errors, "items": items, "errors": errors[:10],
+            "missing_ids": missing_ids, "history_id": history_id}
 
 
 async def gmail_list_ids(access_token: str, *, label_ids: list[str] | None = None,
@@ -1042,6 +1420,49 @@ async def gmail_list_ids(access_token: str, *, label_ids: list[str] | None = Non
     return await _api(access_token, "GET", "/users/me/messages", params=params)
 
 
+async def gmail_list_all_ids(access_token: str, *, label_ids: list[str] | None = None,
+                             query: str = "", page_size: int = 500) -> dict:
+    """Follow every ``nextPageToken`` and return a deduplicated ID list.
+
+    Gmail's ``maxResults`` is a per-page size (up to 500), not a total-result
+    limit. A repeated/invalid page token is surfaced as an error so callers keep
+    their old watermark and can retry safely.
+    """
+    ids: list[str] = []
+    seen_ids: set[str] = set()
+    seen_tokens: set[str] = set()
+    page_token: str | None = None
+
+    for _page in range(MAX_LIST_PAGES):
+        result = await gmail_list_ids(
+            access_token, label_ids=label_ids, query=query,
+            max_results=min(max(1, int(page_size)), 500), page_token=page_token,
+        )
+        if not result.get("success"):
+            return {"success": False, "status_code": result.get("status_code"),
+                    "error": result.get("error") or "Gmail message list failed",
+                    "data": {"messages": ids}}
+        data = result.get("data") or {}
+        for row in data.get("messages") or []:
+            if not isinstance(row, dict):
+                continue
+            message_id = str(row.get("id") or "").strip()
+            if message_id and message_id not in seen_ids:
+                seen_ids.add(message_id)
+                ids.append(message_id)
+        next_token = str(data.get("nextPageToken") or "").strip()
+        if not next_token:
+            return {"success": True, "data": {"messages": [{"id": mid} for mid in ids]}}
+        if next_token in seen_tokens or next_token == page_token:
+            return {"success": False, "error": "Gmail message list repeated a page token",
+                    "data": {"messages": [{"id": mid} for mid in ids]}}
+        seen_tokens.add(next_token)
+        page_token = next_token
+
+    return {"success": False, "error": "Gmail message list exceeded the page safety limit",
+            "data": {"messages": [{"id": mid} for mid in ids]}}
+
+
 async def gmail_get_thread(access_token: str, thread_id: str) -> dict:
     """One whole thread — what the reading pane groups messages by."""
     result = await _api(access_token, "GET", f"/users/me/threads/{thread_id}",
@@ -1053,7 +1474,7 @@ async def gmail_get_thread(access_token: str, thread_id: str) -> dict:
         "success": True,
         "thread_id": str(data.get("id") or thread_id),
         "history_id": str(data.get("historyId") or ""),
-        "items": [_normalize_api_message(m, strip_quotes=False)
+        "items": [_normalize_api_message(m, strip_quotes=False, include_file_attachments=False)
                   for m in (data.get("messages") or []) if isinstance(m, dict)],
     }
 
@@ -1071,30 +1492,28 @@ async def gmail_untrash(access_token: str, message_id: str) -> dict:
 
 
 async def gmail_history_changes(access_token: str, start_history_id: str) -> dict:
-    """Every message id added or labelled since ``startHistoryId``.
-
-    This is the incremental path the poller should use: one request that answers
-    "what is new in *any* folder?" instead of re-listing five folders and
-    re-downloading everything in them.
-    """
-    params = {
-        "startHistoryId": start_history_id,
-        "historyTypes": ["messageAdded", "labelAdded", "labelRemoved"],
-        "fields": "history/messageAdded/message/id,history/labelAdded/message/id,"
-                  "history/labelRemoved/message/id,nextPageToken,historyId",
-    }
-    return await _api(access_token, "GET", "/users/me/history", params=params)
+    """All message additions, deletions and label changes since a watermark."""
+    return await gmail_history(
+        access_token, start_history_id,
+        history_types=["messageAdded", "messageDeleted", "labelAdded", "labelRemoved"],
+    )
 
 
 async def gmail_list(access_token: str, *, query: str = "", label_ids: list[str] | None = None,
                      max_results: int = MAX_PER_SYNC, after: str | None = None) -> dict:
+    """Compatibility wrapper for messages.list; ``after`` is a Gmail search date.
+
+    ``startHistoryId`` belongs to ``users.history.list``, not ``messages.list``.
+    """
     params: dict[str, Any] = {"maxResults": min(int(max_results), 500)}
-    if query:
-        params["q"] = query
+    query_parts = [query.strip()] if query.strip() else []
+    if after:
+        date = str(after).strip()[:10].replace("-", "/")
+        query_parts.append(f"after:{date}")
+    if query_parts:
+        params["q"] = " ".join(query_parts)
     if label_ids:
         params["labelIds"] = label_ids
-    if after:
-        params["startHistoryId"] = after
     return await _api(access_token, "GET", "/users/me/messages", params=params)
 
 
@@ -1180,7 +1599,46 @@ async def gmail_watch(access_token: str, topic_name: str, *, label_ids: list[str
 
 async def gmail_history(access_token: str, start_history_id: str, *,
                         history_types: list[str] | None = None) -> dict:
-    """Changes since a historyId — the incremental sync path for the API door."""
-    params: dict[str, Any] = {"startHistoryId": start_history_id,
-                              "historyTypes": history_types or ["messageAdded"]}
-    return await _api(access_token, "GET", "/users/me/history", params=params)
+    """Page through Gmail history and return the complete incremental change set."""
+    allowed = {"messageAdded", "messageDeleted", "labelAdded", "labelRemoved"}
+    requested = [kind for kind in (history_types or ["messageAdded"]) if kind in allowed]
+    params: dict[str, Any] = {
+        "startHistoryId": start_history_id,
+        "historyTypes": requested or ["messageAdded"],
+        "maxResults": 500,
+        "fields": (
+            "history(id,messagesAdded(message(id,threadId,labelIds)),"
+            "messagesDeleted(message(id,threadId,labelIds)),"
+            "labelsAdded(message(id,threadId,labelIds),labelIds),"
+            "labelsRemoved(message(id,threadId,labelIds),labelIds)),"
+            "nextPageToken,historyId"
+        ),
+    }
+    history: list[dict] = []
+    seen_tokens: set[str] = set()
+    page_token: str | None = None
+    current_history_id = str(start_history_id or "")
+
+    for _page in range(MAX_LIST_PAGES):
+        if page_token:
+            params["pageToken"] = page_token
+        result = await _api(access_token, "GET", "/users/me/history", params=params)
+        if not result.get("success"):
+            return {"success": False, "status_code": result.get("status_code"),
+                    "error": result.get("error") or "Gmail history request failed",
+                    "data": {"history": history, "historyId": current_history_id}}
+        data = result.get("data") or {}
+        history.extend(item for item in (data.get("history") or []) if isinstance(item, dict))
+        current_history_id = str(data.get("historyId") or current_history_id)
+        next_token = str(data.get("nextPageToken") or "").strip()
+        if not next_token:
+            return {"success": True,
+                    "data": {"history": history, "historyId": current_history_id}}
+        if next_token in seen_tokens or next_token == page_token:
+            return {"success": False, "error": "Gmail history repeated a page token",
+                    "data": {"history": history, "historyId": current_history_id}}
+        seen_tokens.add(next_token)
+        page_token = next_token
+
+    return {"success": False, "error": "Gmail history exceeded the page safety limit",
+            "data": {"history": history, "historyId": current_history_id}}

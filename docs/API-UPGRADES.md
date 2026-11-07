@@ -75,7 +75,7 @@ Every response includes an `X-Request-ID` header. API errors use `code`, `messag
 
 ## Email reply routing compatibility
 
-The Email Senders API accepts `reply_to` as the legacy single string, a comma-delimited string, or an array of up to 10 addresses. Responses preserve `reply_to` as the primary address and add `reply_to_addresses`. The existing Brevo sender, From address, primary Reply-To header, and send flow remain unchanged; all configured addresses are considered when matching inbound mailboxes.
+The Email Senders API accepts `reply_to` as the legacy single string, a comma-delimited string, or an array of up to 10 addresses. Responses preserve `reply_to` as the primary address and add `reply_to_addresses`. Brevo sends use the first valid address in the endpoint's dedicated `replyTo: { email }` field; the standard `Reply-To` header is not sent in Brevo's custom `headers` map because the provider rejects standard headers there. A missing/blank Reply-To is omitted. All configured addresses are still considered when matching inbound mailboxes.
 
 ## Migration
 
