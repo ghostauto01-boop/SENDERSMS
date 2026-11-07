@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import {
-  AlertTriangle, Boxes, Check, ChevronDown, Eye, EyeOff, Gauge, KeyRound, Loader2,
-  RefreshCw, ShieldCheck, Sparkles, Wand2, XCircle,
+  AlertTriangle, ArrowDown, ArrowUp, Boxes, Check, ChevronDown, Eye, EyeOff, Gauge, KeyRound, Loader2,
+  Lock, Plus, RefreshCw, ShieldCheck, Sparkles, Trash2, Unlock, Wand2, XCircle,
 } from "lucide-react";
 import {
   agentApi,
@@ -11,6 +11,7 @@ import {
   type ModelOption,
   type PresetList,
   type Provider,
+  type SavedModelPreset,
   type VendorOption,
 } from "../../api/aiAgent";
 
@@ -107,6 +108,12 @@ export default function AgentModelSettings({
   const [presets, setPresets] = useState<PresetList | null>(null);
   const [vendorFilter, setVendorFilter] = useState<string>("");
   const [presetDraft, setPresetDraft] = useState<string>("");
+  const [chainDraft, setChainDraft] = useState<string[]>([]);
+  const [presetLockedDraft, setPresetLockedDraft] = useState<boolean>(false);
+  const [savedPresets, setSavedPresets] = useState<SavedModelPreset[]>([]);
+  const [activeSavedId, setActiveSavedId] = useState<string>("");
+  const [newPresetName, setNewPresetName] = useState<string>("");
+  const [modelToAdd, setModelToAdd] = useState<string>("");
   const [loadingModels, setLoadingModels] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -125,6 +132,10 @@ export default function AgentModelSettings({
       const s = await agentApi.settings();
       setSettings(s);
       setPresetDraft(s.preset || "");
+      setPresetLockedDraft(Boolean(s.preset_locked));
+      setChainDraft(s.preset_models || []);
+      setSavedPresets(s.saved_presets || []);
+      setActiveSavedId(s.active_saved_preset || "");
       onConfigured?.(Boolean(s.openrouter_configured));
       if (!compact) {
         agentApi.health().then(setHealth).catch(() => setHealth(null));
@@ -267,6 +278,95 @@ export default function AgentModelSettings({
       toast.error("Could not save that setting");
       await load();
     }
+  };
+
+  const persistChainConfig = async (next: {
+    preset_locked?: boolean;
+    preset_models?: string[];
+    saved_presets?: SavedModelPreset[];
+    active_saved_preset?: string;
+  }) => {
+    setBusy("chain");
+    try {
+      const data = await agentApi.savePresets(next);
+      if (data.preset_locked !== undefined) setPresetLockedDraft(Boolean(data.preset_locked));
+      if (data.preset_models) setChainDraft(data.preset_models);
+      if (data.saved_presets) setSavedPresets(data.saved_presets);
+      if (data.active_saved_preset !== undefined) setActiveSavedId(data.active_saved_preset || "");
+      setSettings((prev) =>
+        prev
+          ? {
+              ...prev,
+              preset_locked: data.preset_locked ?? prev.preset_locked,
+              preset_models: data.preset_models ?? prev.preset_models,
+              saved_presets: data.saved_presets ?? prev.saved_presets,
+              active_saved_preset: data.active_saved_preset ?? prev.active_saved_preset,
+              models:
+                data.preset_models && data.preset_models[0]
+                  ? { ...prev.models, [PROVIDER]: data.preset_models[0] }
+                  : prev.models,
+            }
+          : prev,
+      );
+      toast.success("Permanent preset & fallback chain saved");
+    } catch (error: any) {
+      toast.error(error?.response?.data?.detail || "Could not save preset chain");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const addModelToChain = (modelId: string) => {
+    const clean = modelId.trim();
+    if (!clean || chainDraft.includes(clean)) return;
+    const next = [...chainDraft, clean];
+    setChainDraft(next);
+    setModelToAdd("");
+  };
+
+  const moveChainItem = (index: number, delta: -1 | 1) => {
+    const target = index + delta;
+    if (target < 0 || target >= chainDraft.length) return;
+    const next = [...chainDraft];
+    const [item] = next.splice(index, 1);
+    next.splice(target, 0, item);
+    setChainDraft(next);
+  };
+
+  const removeChainItem = (modelId: string) => {
+    setChainDraft((curr) => curr.filter((m) => m !== modelId));
+  };
+
+  const saveNamedWorkspacePreset = async () => {
+    const name = newPresetName.trim();
+    const modelsToSave = chainDraft.length ? chainDraft : selectedModel ? [selectedModel] : [];
+    if (!name || !modelsToSave.length) {
+      toast.error("Name your preset and select at least one OpenRouter model");
+      return;
+    }
+    const id = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || `preset-${Date.now()}`;
+    const updated = [
+      ...savedPresets.filter((p) => p.id !== id),
+      { id, name, models: modelsToSave, openrouter_preset: presetDraft.trim(), vendor: settings?.vendor || "" },
+    ];
+    setNewPresetName("");
+    await persistChainConfig({
+      preset_locked: true,
+      preset_models: modelsToSave,
+      saved_presets: updated,
+      active_saved_preset: id,
+    });
+  };
+
+  const activateWorkspacePreset = async (preset: SavedModelPreset) => {
+    setChainDraft(preset.models);
+    setPresetLockedDraft(true);
+    setActiveSavedId(preset.id);
+    await persistChainConfig({
+      preset_locked: true,
+      preset_models: preset.models,
+      active_saved_preset: preset.id,
+    });
   };
 
   const checkedAt = useMemo(() => {
@@ -599,6 +699,181 @@ export default function AgentModelSettings({
               {PROVIDER_META.presetConsole}
             </a>
           </div>
+        </div>
+      </div>
+
+      {/* ---- Permanent Preset Lock & Ordered Fallback Chain ---------- */}
+      <div className="card space-y-3 p-3.5">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="flex items-center gap-1.5 text-[13.5px] font-semibold">
+              {presetLockedDraft ? (
+                <Lock size={13} className="text-primary-600 dark:text-primary-400" />
+              ) : (
+                <Unlock size={13} className="text-gray-400" />
+              )}
+              Permanent Preset &amp; Ordered Model Fallback
+            </p>
+            <p className="mt-0.5 text-[11.5px] text-gray-500 dark:text-gray-400">
+              Lock your exact OpenRouter model chain. Only your chosen models run in order — if #1 fails or hits a rate limit, #2 takes over seamlessly.
+            </p>
+          </div>
+          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-gray-200 px-2.5 py-1 text-[11.5px] font-semibold dark:border-gray-700">
+            <input
+              type="checkbox"
+              checked={presetLockedDraft}
+              disabled={!configured || busy === "chain"}
+              onChange={(e) => {
+                const locked = e.target.checked;
+                const seeded =
+                  chainDraft.length > 0
+                    ? chainDraft
+                    : selectedModel
+                      ? [selectedModel]
+                      : [];
+                setPresetLockedDraft(locked);
+                setChainDraft(seeded);
+                void persistChainConfig({ preset_locked: locked, preset_models: seeded });
+              }}
+            />
+            <span>{presetLockedDraft ? "Locked to Preset" : "Lock Preset"}</span>
+          </label>
+        </div>
+
+        {savedPresets.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            {savedPresets.map((sp) => (
+              <div
+                key={sp.id}
+                className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium ${
+                  activeSavedId === sp.id
+                    ? "border-primary-500 bg-primary-50 text-primary-800 dark:bg-primary-950/60 dark:text-primary-200"
+                    : "border-gray-200 bg-white text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                }`}
+              >
+                <button type="button" onClick={() => activateWorkspacePreset(sp)} className="font-semibold">
+                  {sp.name} ({sp.models.length})
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Delete preset ${sp.name}`}
+                  onClick={() => {
+                    const remaining = savedPresets.filter((item) => item.id !== sp.id);
+                    void persistChainConfig({
+                      saved_presets: remaining,
+                      active_saved_preset: activeSavedId === sp.id ? "" : activeSavedId,
+                    });
+                  }}
+                  className="text-gray-400 hover:text-danger-600"
+                >
+                  <Trash2 size={11} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Ordered chain rows */}
+        <div className="space-y-1.5">
+          {chainDraft.length === 0 ? (
+            <p className="rounded-lg border border-dashed border-gray-200 px-3 py-2 text-[11.5px] text-gray-400 dark:border-gray-700">
+              Add 1–6 models below to build your permanent fallback chain (e.g. Claude Sonnet → GPT-4o → Gemini Flash).
+            </p>
+          ) : (
+            chainDraft.map((mid, index) => (
+              <div
+                key={mid}
+                className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50/70 px-2.5 py-1.5 text-[12px] dark:border-gray-700 dark:bg-gray-800/50"
+              >
+                <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary-900 text-[10.5px] font-bold text-white dark:bg-primary-700">
+                  {index + 1}
+                </span>
+                <span className="min-w-0 flex-1 truncate font-mono">{mid}</span>
+                <span className="hidden text-[10.5px] text-gray-400 sm:inline">
+                  {index === 0 ? "Primary" : `Fallback #${index}`}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => moveChainItem(index, -1)}
+                  disabled={index === 0}
+                  className="p-0.5 text-gray-400 hover:text-gray-700 disabled:opacity-30"
+                  title="Move up"
+                >
+                  <ArrowUp size={12} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => moveChainItem(index, 1)}
+                  disabled={index === chainDraft.length - 1}
+                  className="p-0.5 text-gray-400 hover:text-gray-700 disabled:opacity-30"
+                  title="Move down"
+                >
+                  <ArrowDown size={12} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => removeChainItem(mid)}
+                  className="p-0.5 text-gray-400 hover:text-danger-600"
+                  title="Remove from chain"
+                >
+                  <Trash2 size={12} />
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="flex flex-wrap gap-1.5">
+          <select
+            className="input min-w-0 flex-1 text-[12px]"
+            value={modelToAdd}
+            disabled={!configured || models.length === 0}
+            onChange={(e) => {
+              setModelToAdd(e.target.value);
+              if (e.target.value) addModelToChain(e.target.value);
+            }}
+          >
+            <option value="">+ Add OpenRouter model to fallback chain…</option>
+            {models
+              .filter((m) => !chainDraft.includes(m.id))
+              .map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.id}
+                </option>
+              ))}
+          </select>
+          <button
+            type="button"
+            disabled={!configured || busy === "chain"}
+            onClick={() =>
+              persistChainConfig({
+                preset_locked: presetLockedDraft,
+                preset_models: chainDraft,
+              })
+            }
+            className="btn-primary btn-sm shrink-0"
+          >
+            {busy === "chain" ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+            Apply Chain
+          </button>
+        </div>
+
+        <div className="flex flex-wrap gap-1.5 pt-1">
+          <input
+            className="input min-w-0 flex-1 text-[12px]"
+            placeholder="Save chain as named preset (e.g. Fast Sales Stack)"
+            value={newPresetName}
+            disabled={!configured}
+            onChange={(e) => setNewPresetName(e.target.value)}
+          />
+          <button
+            type="button"
+            disabled={!configured || busy === "chain" || !newPresetName.trim()}
+            onClick={saveNamedWorkspacePreset}
+            className="btn-secondary btn-sm shrink-0"
+          >
+            <Plus size={12} /> Save Named Preset
+          </button>
         </div>
       </div>
 

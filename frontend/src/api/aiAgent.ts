@@ -82,6 +82,14 @@ type AgentHealthResponse = Omit<AgentHealth, "tool_areas"> & {
 const toolAreaNames = (areas: ToolAreas | null | undefined): string[] =>
   Array.isArray(areas) ? areas : Object.keys(areas || {});
 
+export type SavedModelPreset = {
+  id: string;
+  name: string;
+  models: string[];
+  openrouter_preset?: string;
+  vendor?: string;
+};
+
 export type AgentSettings = {
   openrouter_configured: boolean;
   openrouter_hint: string | null;
@@ -92,6 +100,14 @@ export type AgentSettings = {
   vendor?: string;
   /** The OpenRouter preset attached to every request, or "" for none. */
   preset?: string;
+  /** When true, ONLY models in preset_models run (in exact fallback order). */
+  preset_locked?: boolean;
+  /** Ordered OpenRouter model IDs tried sequentially on failure. */
+  preset_models?: string[];
+  /** Custom named model-chain presets saved in the workspace. */
+  saved_presets?: SavedModelPreset[];
+  /** Currently active workspace preset ID. */
+  active_saved_preset?: string;
   models: Record<Provider, string | null>;
   default_provider: Provider;
   auto_fallback: boolean;
@@ -185,9 +201,11 @@ export type Skill = {
 /** One line of the ndjson chat stream. */
 export type StreamEvent =
   | { type: "turn_start"; turn_id: string; model?: string; provider?: Provider | "local" }
+  | { type: "status"; phase?: string; text: string; model?: string; step?: number; tool?: string; preset_locked?: boolean; preset_count?: number }
   | { type: "step"; step: number; max: number; model?: string; provider?: Provider | "local" }
+  | { type: "thinking"; text: string; step?: number }
   | { type: "text"; text: string; step?: number }
-  | { type: "notice"; kind: "recovery" | "fallback" | "info"; text: string; provider?: Provider; model?: string }
+  | { type: "notice"; kind: "recovery" | "fallback" | "info"; text: string; provider?: Provider; from_model?: string; model?: string }
   | { type: "tool_start"; tool: string; label: string; args?: Record<string, any> }
   | { type: "tool_end"; tool: string; status: string; label: string; duration_ms?: number; data?: any }
   | (ConfirmationCard & { type: "confirmation" })
@@ -228,10 +246,28 @@ export const agentApi = {
   },
   /** The operator's OpenRouter presets, and the one currently attached. */
   presets: () => api.get<PresetList>("/ai-agent/presets").then((r) => r.data),
-  /** Pin routing to a vendor and/or attach a preset by name. */
-  savePresets: (body: { preset?: string; vendor?: string; check?: boolean }) =>
+  /** Pin routing to a vendor, attach a preset, and/or lock an ordered fallback chain. */
+  savePresets: (body: {
+    preset?: string;
+    vendor?: string;
+    preset_locked?: boolean;
+    preset_models?: string[];
+    saved_presets?: SavedModelPreset[];
+    active_saved_preset?: string;
+    check?: boolean;
+  }) =>
     api
-      .put<{ success: boolean; preset: string; vendor: string; warnings: string[]; error?: string }>(
+      .put<{
+        success: boolean;
+        preset: string;
+        vendor: string;
+        preset_locked?: boolean;
+        preset_models?: string[];
+        saved_presets?: SavedModelPreset[];
+        active_saved_preset?: string;
+        warnings: string[];
+        error?: string;
+      }>(
         "/ai-agent/presets",
         body,
       )
@@ -245,6 +281,10 @@ export const agentApi = {
     default_provider: Provider;
     auto_fallback: boolean;
     auto_approve: boolean;
+    preset_locked: boolean;
+    preset_models: string[];
+    saved_presets: SavedModelPreset[];
+    active_saved_preset: string;
   }>) => api.put("/ai-agent/settings", body).then((r) => r.data),
   testKey: (body: { provider?: Provider; api_key?: string }) =>
     api.post("/ai-agent/settings/test", body).then((r) => r.data),

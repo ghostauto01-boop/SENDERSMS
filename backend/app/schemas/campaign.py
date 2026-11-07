@@ -82,6 +82,7 @@ class CampaignCreate(BaseModel):
     track_opens: bool = True
     track_clicks: bool = True
     plain_personal_email: bool = False
+    idempotency_key: Optional[str] = Field(default=None, max_length=200)
 
     _check_future = field_validator("scheduled_start_at")(_require_future)
     _check_distribution = field_validator("sender_distribution")(_clean_sender_distribution)
@@ -264,5 +265,7 @@ class CampaignScheduleRequest(BaseModel):
     """Set (or clear) a campaign's automatic launch time."""
 
     scheduled_start_at: Optional[datetime] = None
+    idempotency_key: Optional[str] = Field(default=None, max_length=200)
+    expected_status: Optional[str] = Field(default=None, max_length=40)
 
     _check_future = field_validator("scheduled_start_at")(_require_future)

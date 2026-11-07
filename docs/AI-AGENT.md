@@ -46,18 +46,20 @@ delete_contact, delete_list, import_csv, launch_ads_campaign, pause_campaign,
 reply_to_conversation, resume_campaign, schedule_campaign, send_email, send_sms,
 send_to_list, start_campaign`
 
-## 3. How a turn works
+## 3. How a turn works (OpenRouter-Exclusive + Permanent Preset Fallback)
 
-1. The user's message is written to the database **before** the provider is
+1. The user's message is written to the database **before** OpenRouter is
    called, so a failed model call never loses what was typed.
-2. A provider and model are resolved: the stored model, checked against the
-   live list, replaced and reported (`notice`) if it has been retired; a second
-   provider is tried if the first is rate-limited or down and fallback is on.
-3. The model streams. Tool calls are executed in a loop of at most 15 steps.
-4. A danger tool is described — how many contacts, which list, the first 280
+2. **OpenRouter-Exclusive Provider & Permanent Preset Lock**:
+   - The agent runs exclusively through OpenRouter (`https://openrouter.ai/api/v1`) with HTTP keep-alive connection pooling.
+   - Operators can enable **Permanent Preset Lock** with an ordered model fallback chain (`preset_models`, plus named saved workspace presets). When locked, **only** the selected models run in exact order — if Model #1 fails (rate-limited, timed out, retired, or upstream error), Model #2 takes over automatically and emits a live fallback `notice` + `status` pill without overwriting the primary model.
+3. **Fast Live Step-by-Step Progress**:
+   - Real-time NDJSON stream emits `status` phases (`routing`, `context_ready`, `generating`, `tool_running`, `synthesizing`, `fallback`), live `thinking` reasoning traces, `tool_start`/`tool_end` timings, and `text` chunks.
+4. Tool calls are executed in a loop of at most 15 steps.
+5. A danger tool is described — how many contacts, which list, the first 280
    characters of the message, who opted out — and queued as a **pending action**.
    The model is told "WAITING FOR APPROVAL" and the turn stops there.
-5. Approving runs it and logs the result, duration and (where possible) an undo
+6. Approving runs it and logs the result, duration and (where possible) an undo
    payload. Cancelling leaves nothing behind.
 6. Long histories are folded into the session memory instead of being re-sent.
 7. Everything is committed once, at the end, so a stream that dies mid-way

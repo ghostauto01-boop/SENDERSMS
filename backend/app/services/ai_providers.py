@@ -94,11 +94,68 @@ GLOBAL_MEMORY_SETTING = "ai_agent.global_memory"  # legacy single-string memory
 VENDOR_SETTING = "ai_agent.vendor.openrouter"
 #: Which OpenRouter preset to attach to every request ("" = none).
 PRESET_SETTING = "ai_agent.preset.openrouter"
+#: When true, ONLY models in PRESET_MODELS_SETTING are used (in exact order).
+PRESET_LOCKED_SETTING = "ai_agent.preset_locked"
+#: JSON array of ordered OpenRouter model IDs for permanent preset fallback.
+PRESET_MODELS_SETTING = "ai_agent.preset_models"
+#: JSON array of named custom model-chain presets saved in the workspace.
+SAVED_PRESETS_SETTING = "ai_agent.saved_presets"
+#: ID of the currently active named workspace preset (if any).
+ACTIVE_SAVED_PRESET_SETTING = "ai_agent.active_saved_preset"
 
 #: Cache for the live model list. OpenRouter's catalogue changes weekly, not
 #: per request, and a chat turn must not pay a listing round trip every time.
 _MODEL_CACHE: dict[str, tuple[float, list["ModelInfo"]]] = {}
 _MODEL_TTL = 900.0
+
+#: Temporary per-model cooldowns (model_id -> unix_expiry) so a failing model
+#: in a fallback chain is skipped immediately on subsequent steps.
+_MODEL_COOLDOWNS: dict[str, float] = {}
+_COOLDOWN_SECONDS = 90.0
+
+#: Shared keep-alive AsyncClient pool keyed by timeout (used only when
+#: httpx.AsyncClient has not been monkeypatched by unit tests).
+_ORIGINAL_ASYNC_CLIENT = httpx.AsyncClient
+_SHARED_CLIENTS: dict[float, httpx.AsyncClient] = {}
+
+
+from contextlib import asynccontextmanager
+
+
+@asynccontextmanager
+async def _http_client(timeout: float):
+    if httpx.AsyncClient is not _ORIGINAL_ASYNC_CLIENT:
+        async with httpx.AsyncClient(timeout=timeout) as c:
+            yield c
+        return
+    bucket = float(timeout)
+    client = _SHARED_CLIENTS.get(bucket)
+    if client is None or client.is_closed:
+        client = _ORIGINAL_ASYNC_CLIENT(
+            timeout=timeout,
+            limits=httpx.Limits(max_keepalive_connections=12, max_connections=24),
+        )
+        _SHARED_CLIENTS[bucket] = client
+    yield client
+
+
+def clear_model_cooldowns() -> None:
+    _MODEL_COOLDOWNS.clear()
+
+
+def _mark_model_cooldown(model: str, seconds: float = _COOLDOWN_SECONDS) -> None:
+    if model:
+        _MODEL_COOLDOWNS[model] = time.time() + seconds
+
+
+def _is_model_cooling_down(model: str) -> bool:
+    exp = _MODEL_COOLDOWNS.get(model)
+    if not exp:
+        return False
+    if exp <= time.time():
+        _MODEL_COOLDOWNS.pop(model, None)
+        return False
+    return True
 
 #: Models a chat turn cannot use. OpenRouter lists embedding, moderation, image
 #: and TTS models alongside chat ones; offering them in a dropdown means the
@@ -240,6 +297,22 @@ def _classify(provider: str, status: Optional[int], body: str,
     text = (body or "")[:2000]
     low = text.lower()
     status = status or 0
+
+    # Upstream AWS Bedrock / S3 SigV4 signature errors surfaced through OpenRouter
+    # are transient upstream provider failures, NOT an invalid OpenRouter API key.
+    if (
+        "signaturedoesnotmatch" in low
+        or "the request signature we calculated does not match" in low
+        or "aws4-hmac-sha256" in low
+    ):
+        return ProviderError(
+            code="upstream_error",
+            provider=provider,
+            status=status,
+            model=model,
+            message=f"{label(provider)}'s upstream model host failed signature verification on “{model}”.",
+            detail=text[:600] or None,
+        )
 
     if status in (401, 403) or "invalid api key" in low or "invalid_api_key" in low:
         return ProviderError(
@@ -393,6 +466,10 @@ async def keys_summary(db: AsyncSession) -> dict:
     out["preset_console_url"] = OPENROUTER_PRESET_CONSOLE_URL
     out["vendor"] = await get_vendor(db)
     out["preset"] = await get_preset(db)
+    out["preset_locked"] = await get_preset_locked(db)
+    out["preset_models"] = await get_preset_models(db)
+    out["saved_presets"] = await get_saved_presets(db)
+    out["active_saved_preset"] = await get_active_saved_preset(db)
     return out
 
 
@@ -439,6 +516,108 @@ async def set_preset(db: AsyncSession, preset: str | None) -> None:
     await _set_value(
         db, PRESET_SETTING, (preset or "").strip(),
         description="OpenRouter preset name attached to every AI Agent request",
+    )
+
+
+def _clean_model_chain(raw: Any) -> list[str]:
+    items: list[str] = []
+    if isinstance(raw, str):
+        try:
+            parsed = json.loads(raw)
+            raw = parsed if isinstance(parsed, list) else [s.strip() for s in raw.split(",")]
+        except Exception:
+            raw = [s.strip() for s in raw.split(",")]
+    if isinstance(raw, list):
+        seen: set[str] = set()
+        for item in raw:
+            mid = str(item or "").strip()
+            if mid and mid not in seen:
+                seen.add(mid)
+                items.append(mid[:200])
+    return items[:12]
+
+
+def _clean_saved_presets(raw: Any) -> list[dict[str, Any]]:
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except Exception:
+            raw = []
+    if not isinstance(raw, list):
+        return []
+    cleaned: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    for entry in raw[:25]:
+        if not isinstance(entry, dict):
+            continue
+        pid = re.sub(r"[^a-zA-Z0-9_-]", "-", str(entry.get("id") or "").strip())[:64]
+        name = str(entry.get("name") or "").strip()[:100]
+        models = _clean_model_chain(entry.get("models") or [])
+        if not pid or not name or not models or pid in seen_ids:
+            continue
+        seen_ids.add(pid)
+        cleaned.append({
+            "id": pid,
+            "name": name,
+            "models": models,
+            "openrouter_preset": str(entry.get("openrouter_preset") or "").strip()[:120],
+            "vendor": str(entry.get("vendor") or "").strip()[:80],
+        })
+    return cleaned
+
+
+async def get_preset_locked(db: AsyncSession) -> bool:
+    return await get_flag(db, PRESET_LOCKED_SETTING, False)
+
+
+async def set_preset_locked(db: AsyncSession, locked: bool) -> None:
+    await set_flag(db, PRESET_LOCKED_SETTING, bool(locked))
+
+
+async def get_preset_models(db: AsyncSession) -> list[str]:
+    raw = await _get_value(db, PRESET_MODELS_SETTING)
+    return _clean_model_chain(raw) if raw else []
+
+
+async def set_preset_models(db: AsyncSession, models: list[str] | str | None) -> list[str]:
+    cleaned = _clean_model_chain(models or [])
+    await _set_value(
+        db,
+        PRESET_MODELS_SETTING,
+        json.dumps(cleaned),
+        description="Ordered OpenRouter model fallback chain for permanent preset mode",
+    )
+    if cleaned:
+        await set_model(db, PROVIDER, cleaned[0])
+    return cleaned
+
+
+async def get_saved_presets(db: AsyncSession) -> list[dict[str, Any]]:
+    raw = await _get_value(db, SAVED_PRESETS_SETTING)
+    return _clean_saved_presets(raw) if raw else []
+
+
+async def set_saved_presets(db: AsyncSession, presets: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
+    cleaned = _clean_saved_presets(presets or [])
+    await _set_value(
+        db,
+        SAVED_PRESETS_SETTING,
+        json.dumps(cleaned),
+        description="Saved workspace OpenRouter model-chain presets",
+    )
+    return cleaned
+
+
+async def get_active_saved_preset(db: AsyncSession) -> str:
+    return (await _get_value(db, ACTIVE_SAVED_PRESET_SETTING) or "").strip()
+
+
+async def set_active_saved_preset(db: AsyncSession, preset_id: str | None) -> None:
+    await _set_value(
+        db,
+        ACTIVE_SAVED_PRESET_SETTING,
+        (preset_id or "").strip()[:64],
+        description="Active saved workspace model-chain preset ID",
     )
 
 
@@ -653,7 +832,7 @@ async def list_models(
         return cached[1]
 
     try:
-        async with httpx.AsyncClient(timeout=timeout) as client:
+        async with _http_client(timeout) as client:
             response = await client.get(OPENROUTER_MODELS_URL, headers=_headers(key))
     except httpx.TimeoutException as exc:
         raise _timeout(provider, None, exc) from exc
@@ -806,12 +985,27 @@ async def validate_preset(db: AsyncSession, preset: str, *,
 
 async def resolve_model(db: AsyncSession, provider: str, *,
                         api_key: Optional[str] = None) -> str:
-    """The model to use: the saved one if OpenRouter still serves it, else a new one."""
+    """The model to use: the locked preset chain's first ready model when locked,
+    else the saved one if OpenRouter still serves it, else a fresh pick.
+    """
+    locked = await get_preset_locked(db)
+    chain = await get_preset_models(db)
+    if locked and chain:
+        for candidate in chain:
+            if not _is_model_cooling_down(candidate):
+                return candidate
+        return chain[0]
+
     saved = await get_model(db, provider)
     models = await list_models(db, provider, api_key=api_key)
     ids = {m.id for m in models}
     if saved and saved in ids:
         return saved
+    if chain:
+        valid_chain = [m for m in chain if m in ids]
+        if valid_chain:
+            await set_model(db, provider, valid_chain[0])
+            return valid_chain[0]
     replacement = pick_default(provider, models)
     if not replacement:
         raise ProviderError(
@@ -1023,7 +1217,7 @@ async def complete(
         temperature=temperature, max_tokens=max_tokens, preset=preset, vendor=vendor,
     )
     try:
-        async with httpx.AsyncClient(timeout=timeout) as client:
+        async with _http_client(timeout) as client:
             response = await client.post(OPENROUTER_CHAT_URL, headers=_headers(api_key),
                                          json=body)
             if response.status_code != 200 and "provider" in body:
@@ -1044,6 +1238,20 @@ async def complete(
         raise _unreachable(provider, model, exc) from exc
 
 
+def _build_preset_candidate_chain(primary: str, preset_models: list[str], *, preset_locked: bool) -> list[str]:
+    if preset_locked and preset_models:
+        ordered = [m for m in preset_models if not _is_model_cooling_down(m)]
+        cooled = [m for m in preset_models if _is_model_cooling_down(m)]
+        return ordered + cooled
+    seen: set[str] = set()
+    out: list[str] = []
+    for candidate in [primary, *preset_models]:
+        if candidate and candidate not in seen:
+            seen.add(candidate)
+            out.append(candidate)
+    return out
+
+
 async def complete_with_recovery(
     db: AsyncSession,
     provider: str,
@@ -1058,49 +1266,68 @@ async def complete_with_recovery(
     timeout: float = 90.0,
     on_notice=None,
 ) -> tuple[dict, str]:
-    """Call the model; if the model name is stale, replace it and retry once.
-
-    Returns ``(response, model_used)``. ``on_notice`` (sync or async callable)
-    is invoked with a human sentence when a recovery happened, so the chat can
-    say *which* model answered instead of silently switching.
-    """
+    """Call the model; walk the permanent preset fallback chain (or live catalogue when unlocked)."""
     preset, vendor = await get_preset(db, provider), await get_vendor(db, provider)
-    try:
-        return await complete(
-            provider, api_key=api_key, model=model, messages=messages, tools=tools,
-            system_text=system_text, temperature=temperature, max_tokens=max_tokens,
-            timeout=timeout, preset=preset, vendor=vendor,
-        ), model
-    except ProviderError as exc:
-        if exc.code != "model_unavailable":
-            raise
-        logger.warning("AI Agent: model %s/%s unavailable, refreshing list", provider, model)
-        replacement: Optional[str] = None
+    preset_locked = await get_preset_locked(db)
+    preset_models = await get_preset_models(db)
+    candidates = _build_preset_candidate_chain(model, preset_models, preset_locked=preset_locked)
+
+    last_exc: Optional[ProviderError] = None
+    for idx, candidate in enumerate(candidates):
         try:
-            models = await list_models(db, provider, api_key=api_key, refresh=True)
-            replacement = pick_default(provider, [m for m in models if m.id != model])
-        except ProviderError:
-            replacement = None
-        if not replacement:
-            raise
-        await set_model(db, provider, replacement)
-        note = (f"The saved model “{model}” is no longer available on {label(provider)}. "
-                f"Switched to “{replacement}” and retried.")
-        if on_notice is not None:
-            result = on_notice(note)
-            if asyncio.iscoroutine(result):
-                await result
-        logger.info("AI Agent: recovered %s from %s -> %s", provider, model, replacement)
-        try:
-            response = await complete(
-                provider, api_key=api_key, model=replacement, messages=messages, tools=tools,
+            resp = await complete(
+                provider, api_key=api_key, model=candidate, messages=messages, tools=tools,
                 system_text=system_text, temperature=temperature, max_tokens=max_tokens,
                 timeout=timeout, preset=preset, vendor=vendor,
             )
-            return response, replacement
-        except ProviderError as retry_exc:
-            retry_exc.recovered_from = model
-            raise retry_exc from retry_exc
+            if idx > 0 and not preset_locked:
+                await set_model(db, provider, candidate)
+            return resp, candidate
+        except ProviderError as exc:
+            last_exc = exc
+            if exc.code in ("key_missing", "key_invalid", "safety_blocked"):
+                raise
+            _mark_model_cooldown(candidate)
+            if idx + 1 < len(candidates):
+                nxt = candidates[idx + 1]
+                note = f"Model “{candidate}” failed ({exc.code}); falling back to preset model “{nxt}”."
+                if on_notice is not None:
+                    res = on_notice(note)
+                    if asyncio.iscoroutine(res):
+                        await res
+                continue
+            if preset_locked or exc.code != "model_unavailable":
+                raise
+
+    # Unlocked fallback to live catalogue when model_unavailable and no preset chain left
+    assert last_exc is not None
+    logger.warning("AI Agent: model %s/%s unavailable, refreshing list", provider, model)
+    replacement: Optional[str] = None
+    try:
+        models = await list_models(db, provider, api_key=api_key, refresh=True)
+        replacement = pick_default(provider, [m for m in models if m.id not in set(candidates)])
+    except ProviderError:
+        replacement = None
+    if not replacement:
+        raise last_exc
+    await set_model(db, provider, replacement)
+    note = (f"The saved model “{model}” is no longer available on {label(provider)}. "
+            f"Switched to “{replacement}” and retried.")
+    if on_notice is not None:
+        result = on_notice(note)
+        if asyncio.iscoroutine(result):
+            await result
+    logger.info("AI Agent: recovered %s from %s -> %s", provider, model, replacement)
+    try:
+        response = await complete(
+            provider, api_key=api_key, model=replacement, messages=messages, tools=tools,
+            system_text=system_text, temperature=temperature, max_tokens=max_tokens,
+            timeout=timeout, preset=preset, vendor=vendor,
+        )
+        return response, replacement
+    except ProviderError as retry_exc:
+        retry_exc.recovered_from = model
+        raise retry_exc from retry_exc
 
 
 # ---------------------------------------------------------------------------
@@ -1343,7 +1570,7 @@ async def stream_complete(
     usage: dict = {}
 
     try:
-        async with httpx.AsyncClient(timeout=timeout) as client:
+        async with _http_client(timeout) as client:
             async with client.stream("POST", OPENROUTER_CHAT_URL, headers=_headers(api_key),
                                      json=body) as response:
                 if response.status_code != 200:
@@ -1372,6 +1599,13 @@ async def stream_complete(
                         )
                     for choice in chunk.get("choices") or []:
                         delta = choice.get("delta") or {}
+                        thought = (
+                            delta.get("reasoning")
+                            or delta.get("reasoning_content")
+                            or delta.get("thinking")
+                        )
+                        if thought:
+                            yield {"type": "thinking", "text": str(thought)}
                         piece = delta.get("content")
                         if piece:
                             text_parts.append(str(piece))
@@ -1416,33 +1650,101 @@ async def stream_with_recovery(
     provider: str,
     **kwargs: Any,
 ) -> AsyncIterator[dict]:
-    """Stream with bounded model recovery.
+    """Stream with ordered preset fallback chain or bounded live-catalogue recovery.
 
-    A 429 is often scoped to one model, not the whole account, and a retired
-    model is a certainty on a catalogue this large. One replacement from the
-    live list is tried, the working route is saved so the next message does not
-    repeat the known-bad request, and everything is bounded so a broken
-    catalogue can never leave a chat spinning forever.
+    When ``preset_locked`` is True and ``preset_models`` is non-empty, ONLY the
+    operator's selected preset models run in exact order — if one fails with any
+    retryable error (rate limit, timeout, upstream error, retired model, 5xx),
+    execution switches immediately to the next model in the preset list without
+    ever leaving the operator's approved chain or overwriting their primary model.
     """
     model = kwargs.pop("model")
-    kwargs.pop("allow_fallback", None)  # one provider now: nothing to fall back to
+    kwargs.pop("allow_fallback", None)
     requires_vision = bool(kwargs.pop("requires_vision", False))
     current_key = kwargs.get("api_key")
     kwargs.setdefault("preset", await get_preset(db, provider))
     kwargs.setdefault("vendor", await get_vendor(db, provider))
-    attempted: set[str] = {model}
+
+    preset_locked = await get_preset_locked(db)
+    preset_models = await get_preset_models(db)
+
+    if preset_models:
+        chain = _build_preset_candidate_chain(model, preset_models, preset_locked=preset_locked)
+        if requires_vision:
+            vision_in_chain = [m for m in chain if is_vision_model(provider, m)]
+            if vision_in_chain:
+                chain = vision_in_chain + [m for m in chain if m not in vision_in_chain]
+
+        for idx, candidate in enumerate(chain):
+            emitted_content = False
+            try:
+                async for event in stream_complete(provider, model=candidate, **kwargs):
+                    if event.get("type") == "text":
+                        emitted_content = True
+                    if event.get("type") == "done":
+                        event = {**event, "provider": provider, "model": candidate}
+                    yield event
+                if idx > 0 and not preset_locked:
+                    await set_model(db, provider, candidate)
+                return
+            except ProviderError as exc:
+                if emitted_content or exc.code in ("key_missing", "key_invalid", "safety_blocked"):
+                    raise
+                _mark_model_cooldown(candidate)
+                if idx + 1 < len(chain):
+                    nxt = chain[idx + 1]
+                    note = (
+                        f"Model “{candidate}” failed ({exc.code}); automatically switching to "
+                        f"preset fallback “{nxt}” ({idx + 2}/{len(chain)})."
+                    )
+                    yield {
+                        "type": "notice",
+                        "kind": "fallback",
+                        "provider": provider,
+                        "from_model": candidate,
+                        "model": nxt,
+                        "text": note,
+                    }
+                    continue
+                if preset_locked:
+                    raise ProviderError(
+                        code=exc.code,
+                        provider=provider,
+                        model=candidate,
+                        status=exc.status,
+                        message=(
+                            f"All {len(chain)} model(s) in your locked preset failed "
+                            f"(last: {candidate} — {exc.message})"
+                        ),
+                        detail=exc.detail,
+                    ) from exc
+                # Unlocked and preset list exhausted: allow one live-catalogue recovery below
+                model = candidate
+                if exc.code not in ("model_unavailable", "rate_limited"):
+                    raise
+                break
+
+    attempted: set[str] = {model, *preset_models}
     recoveries = 0
 
     while True:
+        emitted_content = False
         try:
             async for event in stream_complete(provider, model=model, **kwargs):
+                if event.get("type") == "text":
+                    emitted_content = True
                 if event.get("type") == "done":
                     event = {**event, "provider": provider, "model": model}
                 yield event
             return
         except ProviderError as exc:
-            if exc.code not in ("model_unavailable", "rate_limited") or recoveries >= 1:
+            if (
+                emitted_content
+                or exc.code not in ("model_unavailable", "rate_limited")
+                or recoveries >= 1
+            ):
                 raise
+            _mark_model_cooldown(model)
             replacement = None
             try:
                 models = await list_models(db, provider, api_key=current_key,

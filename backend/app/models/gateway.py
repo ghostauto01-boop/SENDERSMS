@@ -10,7 +10,15 @@ class GatewaySetting(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(100), nullable=False, default="SMS-Gate.app")
     provider: Mapped[str] = mapped_column(String(50), nullable=False, default="smsgate")
+    mode: Mapped[str] = mapped_column(String(30), nullable=False, default="cloud")
     is_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    phone_number: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    device_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    priority: Mapped[int] = mapped_column(Integer, default=10, nullable=False)
+    daily_limit: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    notes: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     base_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     username: Mapped[str | None] = mapped_column(String(255), nullable=True)

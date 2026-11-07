@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import {
-  Activity, AlertTriangle, Brain, Cpu, History, Loader2, Menu, MessageSquarePlus,
+  Activity, AlertTriangle, Brain, Cpu, History, Loader2, Lock, Menu, MessageSquarePlus,
   Paperclip, Pencil, Plug, Settings2,
   Sparkles, Trash2, X,
 } from "lucide-react";
@@ -263,7 +263,9 @@ export default function AIAgentPage() {
       role: "assistant",
       blocks: [],
       streaming: true,
-      step: null,
+      step: { current: 0, max: 15 },
+      statusText: "Routing via OpenRouter…",
+      activeModel: settings?.models?.openrouter || null,
     };
     streamBuffer.current = { text: "", blocks: [] };
     setTurns((current) => [...current, userTurn, assistantTurn]);
@@ -288,11 +290,39 @@ export default function AIAgentPage() {
         onEvent: (event: StreamEvent) => {
           switch (event.type) {
             case "turn_start":
-              patchAssistant((turn) => ({ ...turn, step: { current: 0, max: 15 } }));
+              patchAssistant((turn) => ({
+                ...turn,
+                step: { current: 0, max: 15 },
+                statusText: "Initializing OpenRouter session…",
+              }));
+              break;
+            case "status":
+              patchAssistant((turn) => ({
+                ...turn,
+                statusText: event.text,
+                activeModel: event.model || turn.activeModel,
+              }));
               break;
             case "step":
-              patchAssistant((turn) => ({ ...turn, step: { current: event.step, max: event.max } }));
+              patchAssistant((turn) => ({
+                ...turn,
+                step: { current: event.step, max: event.max },
+                activeModel: event.model || turn.activeModel,
+              }));
               break;
+            case "thinking": {
+              patchAssistant((turn) => {
+                const blocks = [...turn.blocks];
+                const last = blocks[blocks.length - 1];
+                if (last && last.kind === "thinking") {
+                  blocks[blocks.length - 1] = { kind: "thinking", text: last.text + event.text };
+                } else {
+                  blocks.push({ kind: "thinking", text: event.text });
+                }
+                return { ...turn, blocks, statusText: "Reasoning live…" };
+              });
+              break;
+            }
             case "text": {
               sawText = true;
               streamBuffer.current.text += event.text;
@@ -302,15 +332,26 @@ export default function AIAgentPage() {
                 const last = blocks[blocks.length - 1];
                 if (last && last.kind === "text") blocks[blocks.length - 1] = { kind: "text", text: buffered };
                 else blocks.push({ kind: "text", text: buffered });
-                return { ...turn, blocks };
+                return { ...turn, blocks, statusText: "Writing response…" };
               });
               break;
             }
             case "notice":
               streamBuffer.current.text = "";
+              if (event.model) {
+                patchAssistant((turn) => ({
+                  ...turn,
+                  activeModel: event.model || turn.activeModel,
+                  statusText: `Switched to ${event.model}…`,
+                }));
+              }
               appendBlock({ kind: "notice", noticeKind: event.kind, text: event.text });
               break;
             case "tool_start":
+              patchAssistant((turn) => ({
+                ...turn,
+                statusText: `Running ${event.label}…`,
+              }));
               appendBlock({
                 kind: "tool",
                 tool: event.tool,
@@ -369,7 +410,13 @@ export default function AIAgentPage() {
               }
               break;
             case "done":
-              patchAssistant((turn) => ({ ...turn, streaming: false, step: null }));
+              patchAssistant((turn) => ({
+                ...turn,
+                streaming: false,
+                step: null,
+                statusText: null,
+                activeModel: event.model || turn.activeModel,
+              }));
               break;
             default:
               break;
@@ -566,6 +613,14 @@ export default function AIAgentPage() {
               {settings?.models?.[activeProvider] ? ` · ${settings.models[activeProvider]}` : " · automatic model"}
               {settings?.preset ? ` · ${settings.preset}` : ""}
             </button>
+            {settings?.preset_locked && (settings?.preset_models?.length || 0) > 0 && (
+              <span
+                className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary-100 px-2 py-0.5 text-[10px] font-semibold text-primary-800 dark:bg-primary-950/70 dark:text-primary-200"
+                title="Permanent Preset Lock active — only your selected models run, with automatic fallback"
+              >
+                <Lock size={10} /> Preset Locked ({settings.preset_models!.length})
+              </span>
+            )}
             {activeProviderHealth?.latency_ms != null && (
               <span className="shrink-0 text-gray-400">{activeProviderHealth.latency_ms} ms</span>
             )}
@@ -645,7 +700,7 @@ export default function AIAgentPage() {
         <div className="flex shrink-0 items-start gap-2 border-b border-warning-200 bg-warning-50 px-3 py-2 text-[12.5px] dark:border-warning-900 dark:bg-warning-950/30">
           <AlertTriangle size={14} className="mt-0.5 shrink-0 text-warning-600" />
           <p className="min-w-0 flex-1 text-warning-900 dark:text-warning-100">
-            <b>No key yet.</b> Add a Groq or Gemini key and the agent can run your
+            <b>No key yet.</b> Add an OpenRouter key and the agent can run your
             workspace.{" "}
             <button
               type="button"

@@ -2,7 +2,7 @@
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -144,10 +144,18 @@ async def list_campaign_followups(
 async def create_campaign_followup(
     campaign_id: int,
     data: CampaignFollowUpCreate,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Add a follow-up step to a campaign."""
+    """Add a follow-up step to a campaign (with idempotency replay protection)."""
+    from app.mcp.execution_guard import get_idempotent_replay, record_idempotent_result
+
+    idem_key = request.headers.get("x-idempotency-key") or request.headers.get("idempotency-key")
+    cached = await get_idempotent_replay(db, f"followup.create.{campaign_id}", idem_key)
+    if cached is not None:
+        return cached
+
     await _get_campaign(db, campaign_id)
 
     if not data.message_text and not data.template_id:
@@ -194,6 +202,9 @@ async def create_campaign_followup(
     db.add(rule)
     await db.flush()
     await db.refresh(rule)
+    out = CampaignFollowUpOut.model_validate(rule).model_dump(mode="json")
+    await record_idempotent_result(db, f"followup.create.{campaign_id}", idem_key, out)
+    await db.commit()
     return rule
 
 
@@ -252,27 +263,41 @@ async def delete_campaign_followup(
 @router.post("/{followup_id}/run")
 async def run_campaign_followup(
     followup_id: int,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Process this rule now instead of waiting for the sweep."""
+    from app.mcp.execution_guard import get_idempotent_replay, record_idempotent_result
+
+    idem_key = request.headers.get("x-idempotency-key") or request.headers.get("idempotency-key")
+    cached = await get_idempotent_replay(db, f"followup.run.{followup_id}", idem_key)
+    if cached is not None:
+        return {**cached, "replayed": True}
+
     rule = await _get_rule(db, followup_id)
     result = await process_rule(db, rule)
-    return {"success": True, **result}
+    resp = {"success": True, **result}
+    await record_idempotent_result(db, f"followup.run.{followup_id}", idem_key, resp)
+    await db.commit()
+    return resp
 
 
 @router.post("/campaigns/{campaign_id}/process-now")
 async def process_campaign_followups_now(
     campaign_id: int,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Process every follow-up rule of one campaign now.
+    """Process every follow-up rule of one campaign now."""
+    from app.mcp.execution_guard import get_idempotent_replay, record_idempotent_result
 
-    The overdue backlog escape hatch: the sweep runs all rules for the
-    campaign immediately instead of waiting for its next scheduled pass.
-    Stop conditions (reply / opt-out / lead status) are still enforced.
-    """
+    idem_key = request.headers.get("x-idempotency-key") or request.headers.get("idempotency-key")
+    cached = await get_idempotent_replay(db, f"followup.process_now.{campaign_id}", idem_key)
+    if cached is not None:
+        return {**cached, "replayed": True}
+
     campaign = await _get_campaign(db, campaign_id)
     rules = (
         await db.execute(
@@ -288,7 +313,10 @@ async def process_campaign_followups_now(
             continue
         for key in ("sent", "stopped", "skipped", "failed"):
             totals[key] += int(result.get(key, 0) or 0)
-    return {"success": True, "campaign_id": campaign.id, **totals}
+    resp = {"success": True, "campaign_id": campaign.id, **totals}
+    await record_idempotent_result(db, f"followup.process_now.{campaign_id}", idem_key, resp)
+    await db.commit()
+    return resp
 
 
 @router.get("/{followup_id}/preview")

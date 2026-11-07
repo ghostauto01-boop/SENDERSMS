@@ -35,6 +35,138 @@ def _creds():
     p=(settings.SMSGATE_PASSWORD or "").strip()
     return u,p
 
+async def send_sms_with_credentials(
+    phone: str,
+    body: str,
+    *,
+    base_url: str,
+    username: str,
+    password: str,
+    sim: int = 1,
+    device_id: Optional[str] = None,
+) -> dict:
+    """Send an SMS using explicit per-phone credentials (without touching Render SMSGATE_* env vars)."""
+    u = (username or "").strip()
+    p = (password or "").strip()
+    if not u or not p:
+        return {"success": False, "error": "No credentials"}
+    root = (base_url or DEFAULT_BASE).strip().rstrip("/")
+    auth = base64.b64encode(f"{u}:{p}".encode()).decode()
+    payload: dict = {"textMessage": {"text": body}, "phoneNumbers": [phone], "simNumber": sim, "ttl": 3600}
+    if device_id:
+        payload["deviceId"] = device_id
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(45)) as c:
+            r = await c.post(
+                f"{root}/messages",
+                headers={"Content-Type": "application/json", "Authorization": f"Basic {auth}"},
+                json=payload,
+            )
+            d = r.json() if r.text else {}
+            logger.info("SMS(phone): HTTP %s %s", r.status_code, json.dumps(d)[:200])
+            if r.status_code < 400:
+                mid = d.get("id") or d.get("messageId", str(uuid.uuid4()))
+                return {"success": True, "provider_message_id": mid, "status": d.get("state", "sent"), "raw": d}
+            return {
+                "success": False,
+                "error": str(d.get("message") or d.get("error") or f"HTTP {r.status_code}")[:500],
+                "raw": d,
+            }
+    except httpx.TimeoutException:
+        return {"success": False, "error": "Timed out"}
+    except Exception as e:
+        return {"success": False, "error": str(e)[:500]}
+
+
+async def test_connection_with_credentials(
+    *,
+    base_url: str,
+    username: str,
+    password: str,
+    sim: int = 1,
+) -> dict:
+    """Probe reachability and credentials of a connected SMS-Gate phone."""
+    u = (username or "").strip()
+    p = (password or "").strip()
+    if not u or not p:
+        return {"success": False, "online": False, "message": "No credentials"}
+    root = (base_url or DEFAULT_BASE).strip().rstrip("/")
+    auth = base64.b64encode(f"{u}:{p}".encode()).decode()
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(15)) as c:
+            r = await c.post(
+                f"{root}/messages?skipPhoneValidation=true",
+                headers={"Content-Type": "application/json", "Authorization": f"Basic {auth}"},
+                json={
+                    "textMessage": {"text": "test"},
+                    "phoneNumbers": ["+2348000000000"],
+                    "simNumber": sim,
+                    "ttl": 60,
+                },
+            )
+            return {
+                "success": r.status_code < 500 and r.status_code not in (401, 403),
+                "online": r.status_code < 500 and r.status_code not in (401, 403),
+                "http": r.status_code,
+            }
+    except Exception:
+        return {"success": False, "online": False, "message": "Cannot reach"}
+
+
+async def register_webhook_with_credentials(
+    url: str,
+    *,
+    base_url: str,
+    username: str,
+    password: str,
+    events=None,
+) -> dict:
+    """Register inbound/status webhooks on an individual connected SMS-Gate phone."""
+    u = (username or "").strip()
+    p = (password or "").strip()
+    if not u or not p:
+        return {"success": False, "error": "No credentials"}
+    if not url:
+        return {"success": False, "error": "No webhook URL"}
+    root = (base_url or DEFAULT_BASE).strip().rstrip("/")
+    events = tuple(events or DEFAULT_EVENTS)
+    auth = base64.b64encode(f"{u}:{p}".encode()).decode()
+    headers = {"Content-Type": "application/json", "Authorization": f"Basic {auth}"}
+    created, kept, errors = [], [], []
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(20)) as c:
+            existing = []
+            try:
+                r = await c.get(f"{root}/webhooks", headers=headers)
+                if r.status_code < 400 and r.text:
+                    data = r.json()
+                    existing = data if isinstance(data, list) else data.get("webhooks", [])
+            except Exception:
+                pass
+            by_pair = {(w.get("url"), w.get("event")): w for w in existing if isinstance(w, dict)}
+            for ev in events:
+                if (url, ev) in by_pair:
+                    kept.append(ev)
+                    continue
+                pr = await c.post(f"{root}/webhooks", headers=headers, json={"url": url, "event": ev})
+                if pr.status_code < 400:
+                    created.append(ev)
+                else:
+                    errors.append(f"{ev}: HTTP {pr.status_code}")
+        registered = set(created) | set(kept)
+        missing_req = [e for e in REQUIRED_EVENTS if e not in registered]
+        return {
+            "success": not missing_req,
+            "url": url,
+            "created": created,
+            "kept": kept,
+            "missing_required": missing_req,
+            "errors": errors,
+        }
+    except Exception as exc:
+        return {"success": False, "error": str(exc)[:300]}
+
+
 async def send_sms_direct(phone,body,sim=1):
     u,p=_creds()
     if not u or not p: return {"success":False,"error":"No credentials"}

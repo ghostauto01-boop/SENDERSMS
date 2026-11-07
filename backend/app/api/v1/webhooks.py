@@ -79,21 +79,25 @@ def _redact_sensitive_payload(body: dict, reason: str) -> dict:
     return safe
 
 
-def _verify_signature(request: Request, raw_body: bytes) -> None:
-    """Reject webhook deliveries that are not signed by our SMS gateway.
+def _verify_signature(
+    request: Request,
+    raw_body: bytes,
+    extra_secrets: list[str] | None = None,
+) -> None:
+    """Reject unsigned or forged SMS-Gate webhook deliveries.
 
-    Without this any anonymous caller can inject fake inbound messages,
-    poison lead statuses and trigger push notifications.
-
-    Rejections carry a ``webhook_reject_reason`` marker so the route can record
-    *that a delivery arrived and why it was refused*. Without that, a
-    deployment whose SMSGATE_WEBHOOK_SECRET is unset answers 503 to every
-    delivery and the inbox simply stays empty with nothing in the app to
-    explain it.
+    Accepts either the primary Render ``SMSGATE_WEBHOOK_SECRET`` or any
+    per-phone encrypted signing secret configured in Settings -> SMS Gateway.
     """
-    secret = settings.SMSGATE_WEBHOOK_SECRET
+    candidates: list[str] = []
+    if extra_secrets:
+        for s in extra_secrets:
+            if s and s not in candidates:
+                candidates.append(s)
+    if settings.SMSGATE_WEBHOOK_SECRET and settings.SMSGATE_WEBHOOK_SECRET not in candidates:
+        candidates.append(settings.SMSGATE_WEBHOOK_SECRET)
 
-    if not secret:
+    if not candidates:
         if settings.SMSGATE_WEBHOOK_ALLOW_UNSIGNED and not settings.is_production:
             logger.warning(
                 "Webhook signature check SKIPPED (SMSGATE_WEBHOOK_ALLOW_UNSIGNED=1). "
@@ -113,8 +117,9 @@ def _verify_signature(request: Request, raw_body: bytes) -> None:
     signature = request.headers.get("x-signature", "")
     timestamp = request.headers.get("x-timestamp", "")
 
-    if not SMSGateProvider.validate_webhook_signature(
-        raw_body, signature, timestamp, secret
+    if not any(
+        SMSGateProvider.validate_webhook_signature(raw_body, signature, timestamp, sec)
+        for sec in candidates
     ):
         logger.warning(
             "Webhook rejected: invalid signature from %s",
@@ -208,44 +213,26 @@ async def _parse(req: Request) -> dict:
     if not body: body = dict(req.query_params)
     return body
 
+@router.post("/smsgateway/phone/{phone_id}")
+async def smsgateway_phone_webhook(
+    phone_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Per-phone webhook endpoint verifying against that phone's signing key (or Render fallback)."""
+    request.state.gateway_phone_id = phone_id
+    return await smsgateway_webhook(request=request, db=db)
+
+
 @router.post("/smsgateway")
 async def smsgateway_webhook(request: Request, db: AsyncSession = Depends(get_db)):
-    """
-    Receive SMS events from SMS-Gate.app.
-    
-    SMS-Gate.app sends webhooks in this format:
-    {
-      "deviceId": "...",
-      "event": "sms:received",
-      "id": "webhook-event-id",
-      "payload": {
-        "messageId": "abc123",
-        "message": "Hello!",        <-- SMS content
-        "sender": "+1234567890",    <-- who sent it
-        "recipient": "+0987654321", <-- device's number
-        "simNumber": 1,
-        "receivedAt": "2024-06-22T15:46:11.000+07:00"
-      },
-      "webhookId": "..."
-    }
-    
-    For sms:sent/delivered/failed events:
-    {
-      "event": "sms:delivered",
-      "payload": {
-        "messageId": "msg-789",
-        "sender": "+123...",     <-- device's number
-        "recipient": "+999...",  <-- who received it
-        "deliveredAt": "..."
-      }
-    }
-    """
-    # Read the raw bytes first: the signature is computed over the body
-    # exactly as sent, before any JSON parsing. Starlette caches this so
-    # the later _parse() call still works.
+    from app.services import gateway_service
+
     raw_body = await request.body()
+    phone_id = getattr(request.state, "gateway_phone_id", None)
+    valid_secrets = await gateway_service.list_valid_webhook_secrets(db, phone_id=phone_id)
     try:
-        _verify_signature(request, raw_body)
+        _verify_signature(request, raw_body, extra_secrets=valid_secrets)
     except HTTPException as exc:
         reason = getattr(exc, "webhook_reject_reason", None)
         if reason:

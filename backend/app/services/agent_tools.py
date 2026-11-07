@@ -1517,6 +1517,24 @@ async def start_campaign(db, args, ctx):
 
 
 @tool(
+    "reconcile_campaign_state",
+    "campaigns",
+    "Reconcile remote campaign statuses, follow-up rules, and pending scheduled messages before retrying any campaign or follow-up mutation after a connection interruption.",
+    _obj(campaign_ids=S("Optional comma-separated campaign IDs (e.g. '25,26')")),
+)
+async def reconcile_campaign_state(db, args, ctx):
+    from app.mcp.execution_guard import reconcile_campaigns_and_followups
+
+    raw_ids = str(args.get("campaign_ids") or "").strip()
+    parsed_ids = [int(tok.strip()) for tok in raw_ids.split(",") if tok.strip().isdigit()] if raw_ids else None
+    return await reconcile_campaigns_and_followups(
+        db,
+        campaign_ids=parsed_ids,
+        include_scheduled_messages=True,
+    )
+
+
+@tool(
     "pause_campaign",
     "campaigns",
     "Pause a running or scheduled campaign.",
