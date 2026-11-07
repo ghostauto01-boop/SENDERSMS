@@ -326,8 +326,12 @@ async def test_gmail_reply_in_spam_is_rescued_and_imported(db, monkeypatch):
         moves.append({"uid": uid, "folder": folder})
         return {"success": True}
 
+    async def fake_mirror(_db, _mailbox, **_kwargs):
+        return {"success": True, "seen": 0, "stored": 0, "errors": []}
+
     monkeypatch.setattr(gmail_provider, "imap_sync", fake_imap_sync)
     monkeypatch.setattr(gmail_provider, "imap_rescue_from_spam", fake_rescue)
+    monkeypatch.setattr("app.services.mailbox_message_service.mirror_mailbox", fake_mirror)
 
     summary = await mailbox_service.sync_mailbox(db, mailbox)
 

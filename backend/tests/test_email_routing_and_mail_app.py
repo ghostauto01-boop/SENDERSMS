@@ -1,13 +1,13 @@
 """Email routing: the four rules the operator set, each one pinned by a test.
 
 1. Email leaves only through Brevo or a connected Gmail — nothing else.
-2. Every Brevo send (campaign *and* one-off) carries a Reply-To, and the Brevo
-   sender address is always in it.
+2. Brevo receives one valid Reply-To in its dedicated `replyTo` object; the
+   unsupported standard header is never put in the custom headers map.
 3. A reply leaves from the Gmail address that received it — never from a Brevo
    sender, never from "a Gmail that happens to be connected".
-4. A reply into a connected mailbox is imported, and imported fast: the Gmail
-   path uses ``users.messages.batchGet`` (100 messages per request) rather than
-   one request per message.
+4. A reply into a connected mailbox is imported through the documented
+   `users.messages.get` method with bounded concurrency, not a nonexistent
+   batchGet endpoint.
 
 The Mail-page mirror (Sent/Spam/Drafts, not just recognised replies) is covered
 here too, because it is the same sync pass.
@@ -210,8 +210,8 @@ class _CaptureBrevo:
         return False
 
 
-async def test_campaign_send_puts_the_brevo_sender_in_reply_to(db, monkeypatch):
-    """The rule applies to campaigns, not just one-off sends."""
+async def test_campaign_send_uses_dedicated_reply_to_without_custom_header(db, monkeypatch):
+    """Brevo gets one address in its dedicated field, never a Reply-To header."""
     account = await _account(db, from_email="hello@100.brevosend.com",
                              reply_to="hello@100.brevosend.com")
     await _mailbox(db, address="me@gmail.com")
@@ -228,7 +228,7 @@ async def test_campaign_send_puts_the_brevo_sender_in_reply_to(db, monkeypatch):
     assert result["success"] is True, result
     sent = fake.calls[0]
     assert sent["reply_to"] == "me@gmail.com"
-    assert sent["headers"]["Reply-To"] == "me@gmail.com, hello@100.brevosend.com"
+    assert "Reply-To" not in sent["headers"]
 
 
 async def _never_called():
@@ -280,13 +280,8 @@ async def test_mailbox_reply_to_names_the_mailbox_then_the_brevo_sender(db):
 # ===========================================================================
 
 
-async def test_gmail_reply_sync_uses_one_batch_request_not_one_per_message(db, monkeypatch):
-    """250 replies must not cost 250 sequential HTTPS calls.
-
-    The sync used to ``GET /users/me/messages/{id}`` in a loop. Now it lists ids
-    and fetches them with ``batchGet``, which is what makes "import as fast as
-    it can" true rather than aspirational.
-    """
+async def test_gmail_reply_sync_uses_bounded_message_fetch_for_new_ids(db, monkeypatch):
+    """A reply sync lists IDs, then delegates body fetches to the provider helper."""
     account = await _account(db, from_email="hello@100.brevosend.com")
     contact = await _contact(db)
     sent, _ = await _outgoing(db, contact, account, rfc_id="<root-1@brevosend.com>")
@@ -328,7 +323,11 @@ async def test_gmail_reply_sync_uses_one_batch_request_not_one_per_message(db, m
             })
         return {"success": True, "items": items, "errors": []}
 
-    monkeypatch.setattr(gmail_provider, "gmail_list_ids", fake_list_ids)
+    async def fake_profile(token):
+        return {"success": True, "history_id": "history-1"}
+
+    monkeypatch.setattr(gmail_provider, "gmail_profile", fake_profile)
+    monkeypatch.setattr(gmail_provider, "gmail_list_all_ids", fake_list_ids)
     monkeypatch.setattr(gmail_provider, "gmail_get_message", fake_get_message)
     monkeypatch.setattr(gmail_provider, "gmail_batch_get", fake_batch)
     monkeypatch.setattr(mailbox_service, "access_token_for",
@@ -338,70 +337,584 @@ async def test_gmail_reply_sync_uses_one_batch_request_not_one_per_message(db, m
     summary = await mailbox_service.sync_mailbox(db, mailbox)
     assert summary["seen"] == 250
     assert summary["replies"] == 250
-    # The sync asks for bodies in ONE batch call and never fetches one at a
-    # time. The chunking below 100 ids happens inside the provider, and is
-    # pinned by the next test.
+    # The service hands the complete ID set to the provider's bounded-fetch
+    # helper once; that helper issues documented messages.get calls internally.
     assert calls["single_get"] == 0
     assert calls["batch"] == 1
     assert summary["errors"] == []
 
 
 @pytest.mark.asyncio
-async def test_batch_get_splits_more_than_one_hundred_ids_into_chunks(monkeypatch):
-    """``users.messages.batchGet`` accepts 100 ids; 250 must become 3 requests.
+async def test_gmail_reply_fetch_does_not_advance_cursor_after_partial_failure(db, monkeypatch):
+    mailbox = await _mailbox(db, address="me@gmail.com")
+    old_state = {"reply_history_id": "history-old", "since": "2026-11-01T00:00:00+00:00"}
+    mailbox.cursor_state = json.dumps(old_state)
 
-    Faked at the HTTP boundary (``_api``), so this exercises the real chunking
-    and the real concurrency limiter rather than a copy of them.
-    """
-    posted: list[list[str]] = []
+    async def fake_access_token(db, mailbox):
+        return "access-token", None
 
-    async def fake_api(token, method, path, *, params=None, json_body=None):
-        posted.append(list((json_body or {}).get("ids") or []))
-        return {"success": True, "data": {"messages": [
-            {"id": mid, "payload": {"mimeType": "text/plain",
-                                    "body": {"data": "SGk=", "size": 2},
-                                    "headers": [{"name": "From", "value": "a@b.com"},
-                                                {"name": "To", "value": "me@gmail.com"},
-                                                {"name": "Subject", "value": "Hi"},
-                                                {"name": "Message-ID", "value": f"<{mid}@b.com>"}]},
-             "labelIds": ["INBOX"], "internalDate": "1700000000000",
-             "threadId": "t1", "snippet": "Hi"}
-            for mid in (json_body or {}).get("ids") or []
-        ]}}
+    async def fake_history(token, history_id):
+        return {"success": True, "data": {
+            "history": [{"messagesAdded": [{"message": {"id": "new-message"}}]}],
+            "historyId": "history-new",
+        }}
+
+    async def fake_batch(token, ids, **kwargs):
+        assert ids == ["new-message"]
+        return {"success": False, "items": [], "errors": ["new-message: temporary error"]}
+
+    monkeypatch.setattr(mailbox_service, "access_token_for", fake_access_token)
+    monkeypatch.setattr(gmail_provider, "gmail_history_changes", fake_history)
+    monkeypatch.setattr(gmail_provider, "gmail_batch_get", fake_batch)
+    _items, next_state, errors = await mailbox_service._fetch_gmail_api(db, mailbox)
+    assert next_state == old_state
+    assert errors == ["new-message: temporary error"]
+
+
+@pytest.mark.asyncio
+async def test_gmail_message_fetch_uses_documented_get_with_bounded_concurrency(monkeypatch):
+    """Gmail has no batchGet endpoint; 250 IDs become concurrent messages.get calls."""
+    import asyncio
+
+    requests: list[tuple[str, str]] = []
+    active = 0
+    max_active = 0
+
+    async def fake_api(token, method, path, *, params=None, json_body=None, _client=None):
+        nonlocal active, max_active
+        requests.append((method, path))
+        active += 1
+        max_active = max(max_active, active)
+        await asyncio.sleep(0.001)
+        active -= 1
+        message_id = path.rsplit("/", 1)[-1]
+        return {"success": True, "data": {
+            "id": message_id,
+            "payload": {"mimeType": "text/plain", "body": {"data": "SGk=", "size": 2},
+                        "headers": [{"name": "From", "value": "a@b.com"},
+                                    {"name": "To", "value": "me@gmail.com"},
+                                    {"name": "Subject", "value": "Hi"},
+                                    {"name": "Message-ID", "value": f"<{message_id}@b.com>"}]},
+            "labelIds": ["INBOX"], "internalDate": "1700000000000",
+            "threadId": "t1", "snippet": "Hi",
+        }}
 
     monkeypatch.setattr(gmail_provider, "_api", fake_api)
     ids = [f"m{i}" for i in range(250)]
     result = await gmail_provider.gmail_batch_get("token", ids)
     assert result["success"] is True
-    assert len(posted) == 3
-    assert all(len(chunk) <= gmail_provider.BATCH_GET_LIMIT for chunk in posted)
+    assert len(requests) == 250
+    assert all(method == "GET" for method, _path in requests)
+    assert all("/users/me/messages/" in path and "batchGet" not in path
+               for _method, path in requests)
+    assert max_active == gmail_provider.BATCH_CONCURRENCY
     assert len(result["items"]) == 250
-    # Every message came back normalised with the folder the mail app shows.
     assert all(item["_folder"] == "INBOX" for item in result["items"])
 
 
 @pytest.mark.asyncio
-async def test_batch_get_deduplicates_ids_and_skips_blanks(monkeypatch):
-    async def fake_api(token, method, path, *, params=None, json_body=None):
-        return {"success": True, "data": {"messages": []}}
+async def test_gmail_message_get_deduplicates_ids_and_skips_blanks(monkeypatch):
+    requested = []
+
+    async def fake_api(token, method, path, *, params=None, json_body=None, _client=None):
+        requested.append(path)
+        message_id = path.rsplit("/", 1)[-1]
+        return {"success": True, "data": {
+            "id": message_id,
+            "payload": {"headers": [], "body": {"data": "SGk="}},
+            "labelIds": [],
+        }}
 
     monkeypatch.setattr(gmail_provider, "_api", fake_api)
     result = await gmail_provider.gmail_batch_get("token", ["a", "a", "", "  ", "b"])
     assert result["success"] is True
-    assert result["items"] == []
+    assert len(result["items"]) == 2
+    assert len(requested) == 2
+
+
+@pytest.mark.asyncio
+async def test_gmail_list_all_ids_follows_pages_and_deduplicates(monkeypatch):
+    calls = []
+
+    async def fake_api(token, method, path, *, params=None, json_body=None, _client=None):
+        calls.append((method, params or {}))
+        if (params or {}).get("pageToken") == "page-2":
+            return {"success": True, "data": {
+                "messages": [{"id": "b"}, {"id": "c"}],
+            }}
+        return {"success": True, "data": {
+            "messages": [{"id": "a"}, {"id": "b"}],
+            "nextPageToken": "page-2",
+        }}
+
+    monkeypatch.setattr(gmail_provider, "_api", fake_api)
+    listed = await gmail_provider.gmail_list_all_ids(
+        "token", label_ids=["INBOX"], query="after:2026/11/01",
+    )
+    assert listed["success"] is True
+    assert [item["id"] for item in listed["data"]["messages"]] == ["a", "b", "c"]
+    assert len(calls) == 2
+    assert calls[1][1]["pageToken"] == "page-2"
+
+
+@pytest.mark.asyncio
+async def test_gmail_list_after_uses_search_query_not_history_parameter(monkeypatch):
+    seen = {}
+
+    async def fake_api(token, method, path, *, params=None, json_body=None, _client=None):
+        seen.update(params or {})
+        return {"success": True, "data": {"messages": []}}
+
+    monkeypatch.setattr(gmail_provider, "_api", fake_api)
+    result = await gmail_provider.gmail_list(
+        "token", query="in:inbox", after="2026-11-05", max_results=50,
+    )
+    assert result["success"] is True
+    assert seen["q"] == "in:inbox after:2026/11/05"
+    assert "startHistoryId" not in seen
+
+
+@pytest.mark.asyncio
+async def test_gmail_history_uses_real_plural_fields_and_pages_all_changes(monkeypatch):
+    calls = []
+
+    async def fake_api(token, method, path, *, params=None, json_body=None, _client=None):
+        calls.append(params or {})
+        if (params or {}).get("pageToken") == "history-2":
+            return {"success": True, "data": {
+                "history": [{"id": "22", "messagesDeleted": [
+                    {"message": {"id": "deleted"}},
+                ]}],
+                "historyId": "22",
+            }}
+        return {"success": True, "data": {
+            "history": [{"id": "21", "messagesAdded": [
+                {"message": {"id": "added"}},
+            ], "labelsAdded": [{"message": {"id": "labelled"}, "labelIds": ["INBOX"]}]}],
+            "nextPageToken": "history-2",
+            "historyId": "21",
+        }}
+
+    monkeypatch.setattr(gmail_provider, "_api", fake_api)
+    result = await gmail_provider.gmail_history_changes("token", "20")
+    assert result["success"] is True
+    assert result["data"]["historyId"] == "22"
+    assert len(result["data"]["history"]) == 2
+    assert calls[0]["historyTypes"] == [
+        "messageAdded", "messageDeleted", "labelAdded", "labelRemoved",
+    ]
+    assert "messagesAdded" in calls[0]["fields"]
+    assert "labelsAdded" in calls[0]["fields"]
+    assert "messageAdded/message/id" not in calls[0]["fields"]
+
+
+@pytest.mark.asyncio
+async def test_gmail_get_downloads_attachment_id_body_and_small_file(monkeypatch):
+    import base64
+
+    message = {
+        "id": "m1", "threadId": "t1", "labelIds": ["INBOX"],
+        "payload": {
+            "mimeType": "multipart/mixed",
+            "headers": [{"name": "From", "value": "ada@example.com"},
+                       {"name": "To", "value": "me@gmail.com"}],
+            "parts": [
+                {"mimeType": "text/plain", "body": {"attachmentId": "body-1", "size": 5}},
+                {"mimeType": "application/pdf", "filename": "note.pdf",
+                 "body": {"attachmentId": "file-1", "size": 3}},
+            ],
+        },
+    }
+
+    requested = []
+
+    async def fake_api(token, method, path, *, params=None, json_body=None, _client=None):
+        requested.append(path)
+        if path.endswith("/messages/m1"):
+            return {"success": True, "data": message}
+        if path.endswith("/attachments/body-1"):
+            return {"success": True, "data": {"data": gmail_provider._b64url_encode(b"Hello")}}
+        if path.endswith("/attachments/file-1"):
+            return {"success": True, "data": {"data": gmail_provider._b64url_encode(b"PDF")}}
+        raise AssertionError(f"Unexpected Gmail API path: {path}")
+
+    monkeypatch.setattr(gmail_provider, "_api", fake_api)
+    result = await gmail_provider.gmail_get_message("token", "m1", include_attachments=True)
+    assert result["success"] is True
+    assert result["item"]["RawTextBody"] == "Hello"
+    attachment = result["item"]["Attachments"][0]
+    assert attachment["name"] == "note.pdf"
+    assert base64.b64decode(attachment["content"]) == b"PDF"
+
+    requested.clear()
+    mirror_item = await gmail_provider.gmail_get_message("token", "m1", include_attachments=False)
+    assert mirror_item["success"] is True
+    assert mirror_item["item"]["RawTextBody"] == "Hello"
+    assert "content" not in mirror_item["item"]["Attachments"][0]
+    assert not any(path.endswith("/attachments/file-1") for path in requested)
+
+
+def test_gmail_payload_caps_inline_attachment_decoding_before_collecting(monkeypatch):
+    import base64
+
+    monkeypatch.setattr(gmail_provider, "MAX_IMPORT_ATTACHMENT_BYTES", 4)
+    monkeypatch.setattr(gmail_provider, "MAX_IMPORT_ATTACHMENTS_TOTAL_BYTES", 5)
+    encoded = [gmail_provider._b64url_encode(raw) for raw in (b"abc", b"def", b"z")]
+    decoded_calls = []
+    original_decode = gmail_provider._b64url_decode
+
+    def track_decode(value):
+        decoded_calls.append(value)
+        return original_decode(value)
+
+    monkeypatch.setattr(gmail_provider, "_b64url_decode", track_decode)
+    _text, _html, attachments, _headers, _refs, _errors = gmail_provider._walk_payload({
+        "mimeType": "multipart/mixed",
+        "parts": [
+            {"mimeType": "application/octet-stream", "filename": "one.bin",
+             "body": {"data": encoded[0]}},
+            {"mimeType": "application/octet-stream", "filename": "two.bin",
+             "body": {"data": encoded[1]}},
+            {"mimeType": "application/octet-stream", "filename": "three.bin",
+             "body": {"data": encoded[2]}},
+        ],
+    })
+
+    assert decoded_calls == [encoded[0], encoded[2]]
+    assert [record["name"] for record in attachments] == ["one.bin", "two.bin", "three.bin"]
+    assert base64.b64decode(attachments[0]["content"]) == b"abc"
+    assert "content" not in attachments[1]
+    assert base64.b64decode(attachments[2]["content"]) == b"z"
+
+
+@pytest.mark.asyncio
+async def test_gmail_attachment_response_size_is_checked_before_decoding(monkeypatch):
+    monkeypatch.setattr(gmail_provider, "MAX_IMPORT_ATTACHMENT_BYTES", 3)
+    decoded_calls = []
+    original_decode = gmail_provider._b64url_decode
+
+    def track_decode(value):
+        decoded_calls.append(value)
+        return original_decode(value)
+
+    message = {
+        "id": "m1", "labelIds": ["INBOX"],
+        "payload": {"mimeType": "multipart/mixed", "parts": [
+            {"mimeType": "application/pdf", "filename": "large.pdf",
+             "body": {"attachmentId": "file-1", "size": 3}},
+        ]},
+    }
+
+    async def fake_api(token, method, path, *, params=None, json_body=None, _client=None):
+        if path.endswith("/messages/m1"):
+            return {"success": True, "data": message}
+        if path.endswith("/attachments/file-1"):
+            return {"success": True, "data": {
+                "data": gmail_provider._b64url_encode(b"four"),
+            }}
+        raise AssertionError(f"Unexpected Gmail API path: {path}")
+
+    monkeypatch.setattr(gmail_provider, "_api", fake_api)
+    monkeypatch.setattr(gmail_provider, "_b64url_decode", track_decode)
+    result = await gmail_provider.gmail_get_message("token", "m1", include_attachments=True)
+
+    assert result["success"] is True
+    assert result["item"]["Attachments"] == []
+    assert decoded_calls == []
+
+
+def test_gmail_payload_decodes_rfc2047_headers_and_quoted_address_lists():
+    item = gmail_provider._normalize_api_message({
+        "id": "m1", "threadId": "t1", "internalDate": "1700000000000",
+        "labelIds": ["INBOX"],
+        "payload": {
+            "mimeType": "text/plain", "body": {"data": "SGVsbG8="},
+            "headers": [
+                {"name": "from", "value": "=?UTF-8?Q?Ada_Lovelace?= <ada@example.com>"},
+                {"name": "to", "value": '"Doe, Jane" <jane@example.com>, Other <other@example.com>'},
+                {"name": "subject", "value": "=?UTF-8?Q?R=C3=A9ponse?="},
+                {"name": "message-id", "value": "<m1@example.com>"},
+                {"name": "in-reply-to", "value": "<root@example.com>"},
+            ],
+        },
+    })
+    assert item["From"] == {"Address": "ada@example.com", "Name": "Ada Lovelace"}
+    assert item["To"] == [
+        {"Address": "jane@example.com"}, {"Address": "other@example.com"},
+    ]
+    assert item["Subject"] == "Réponse"
+    assert item["InReplyTo"] == "<root@example.com>"
+    assert item["Headers"]["Message-ID"] == "<m1@example.com>"
+
+
+def test_imap_mirror_cursor_tracks_backlog_and_stops_before_failed_message(monkeypatch):
+    class FakeIMAP:
+        def __init__(self, fail_at=None):
+            self.fail_at = fail_at
+            self.fetches = []
+
+        def select(self, _folder, readonly=False):
+            return "OK", [b"1"]
+
+        def status(self, _folder, _items):
+            return "OK", [b'"INBOX" (UIDNEXT 20 EXISTS 19 UNSEEN 1)']
+
+        def uid(self, command, *args):
+            if command == "SEARCH":
+                return "OK", [b"5 6 7 8"]
+            if command == "FETCH":
+                uid = args[0]
+                self.fetches.append(uid)
+                if uid == self.fail_at:
+                    return "NO", []
+                return "OK", [(b"(FLAGS (\\Seen))", b"raw-message")]
+            raise AssertionError(f"Unexpected IMAP command: {command}")
+
+        def logout(self):
+            return "BYE", [b"logout"]
+
+    monkeypatch.setattr(
+        gmail_provider, "parse_mime",
+        lambda _raw, **_kwargs: {"RawTextBody": "Body", "Attachments": []},
+    )
+    views = {"INBOX": ("INBOX",)}
+
+    capped_connection = FakeIMAP()
+    monkeypatch.setattr(gmail_provider, "_imap_login", lambda *_args: capped_connection)
+    capped = gmail_provider._imap_mirror_blocking(
+        "me@gmail.com", "app-password", views,
+        cursors={"mirror:INBOX": 5}, lookback_days=14, max_per_folder=2,
+    )
+    assert capped["success"] is True
+    assert capped_connection.fetches == ["5", "6"]
+    assert capped["cursor_updates"] == {"mirror:INBOX": 7}
+
+    failed_connection = FakeIMAP(fail_at="6")
+    monkeypatch.setattr(gmail_provider, "_imap_login", lambda *_args: failed_connection)
+    partial = gmail_provider._imap_mirror_blocking(
+        "me@gmail.com", "app-password", views,
+        cursors={"mirror:INBOX": 5}, lookback_days=14, max_per_folder=10,
+    )
+    assert partial["success"] is False
+    assert failed_connection.fetches == ["5", "6"]
+    assert partial["cursor_updates"] == {"mirror:INBOX": 6}
+    assert any("fetch failed" in error for error in partial["errors"])
+
+
+def test_imap_reply_sync_resumes_capped_backlog_and_failed_uid(monkeypatch):
+    class FakeIMAP:
+        def __init__(self, fail_at=None):
+            self.fail_at = fail_at
+            self.fetches = []
+
+        def select(self, _folder, readonly=False):
+            return "OK", [b"1"]
+
+        def status(self, _folder, _items):
+            return "OK", [b'"INBOX" (UIDNEXT 20 EXISTS 19 UNSEEN 1)']
+
+        def uid(self, command, *args):
+            if command == "SEARCH":
+                return "OK", [b"5 6 7 8"]
+            if command == "FETCH":
+                uid = args[0]
+                self.fetches.append(uid)
+                if uid == self.fail_at:
+                    return "NO", []
+                return "OK", [(b"(RFC822 {4})", b"raw!")]
+            raise AssertionError(f"Unexpected IMAP command: {command}")
+
+        def logout(self):
+            return "BYE", [b"logout"]
+
+    monkeypatch.setattr(gmail_provider, "MAX_PER_SYNC", 2)
+    monkeypatch.setattr(
+        gmail_provider, "parse_mime",
+        lambda _raw, **_kwargs: {"RawTextBody": "Body", "Attachments": []},
+    )
+
+    capped_connection = FakeIMAP()
+    monkeypatch.setattr(gmail_provider, "_imap_login", lambda *_args: capped_connection)
+    capped = gmail_provider._imap_sync_blocking(
+        "me@gmail.com", "app-password", ["INBOX"], {"INBOX": 5},
+        import_all=False, lookback_days=7,
+    )
+    assert capped["success"] is True
+    assert capped_connection.fetches == ["5", "6"]
+    assert capped["cursor_updates"] == {"INBOX": 7}
+
+    failed_connection = FakeIMAP(fail_at="6")
+    monkeypatch.setattr(gmail_provider, "_imap_login", lambda *_args: failed_connection)
+    partial = gmail_provider._imap_sync_blocking(
+        "me@gmail.com", "app-password", ["INBOX"], {"INBOX": 5},
+        import_all=False, lookback_days=7,
+    )
+    assert partial["success"] is False
+    assert failed_connection.fetches == ["5", "6"]
+    assert partial["cursor_updates"] == {"INBOX": 6}
+
+
+@pytest.mark.asyncio
+async def test_imap_reply_sync_merges_only_safe_folder_cursor_updates(db, monkeypatch):
+    old_state = {"folders": {"INBOX": 10, "[Gmail]/Spam": 20}, "since": "before"}
+    mailbox = await _mailbox(
+        db, address="me@gmail.com", provider="imap", credential="app-password",
+        cursor_state=json.dumps(old_state),
+    )
+    seen = {}
+
+    async def fake_imap_sync(_address, _password, folders, cursors, **_kwargs):
+        seen.update(folders=folders, cursors=cursors)
+        return {
+            "success": False,
+            "items": [],
+            "cursors": {"INBOX": 999, "[Gmail]/Spam": 25},
+            "cursor_updates": {"[Gmail]/Spam": 25},
+            "errors": ["INBOX/11: fetch failed (NO)"],
+        }
+
+    monkeypatch.setattr(gmail_provider, "imap_sync", fake_imap_sync)
+    items, state, errors = await mailbox_service._fetch_imap(db, mailbox)
+
+    assert items == []
+    assert seen["cursors"] == old_state["folders"]
+    assert state["folders"] == {"INBOX": 10, "[Gmail]/Spam": 25}
+    assert state["since"] == "before"
+    assert errors == ["INBOX/11: fetch failed (NO)"]
 
 
 async def _token():
     return "token", None
 
 
+@pytest.mark.asyncio
+async def test_imap_mirror_preserves_failed_cursors_and_reports_partial_errors(db, monkeypatch):
+    old_time = "2026-11-01T00:00:00+00:00"
+    old_state = {
+        "mirror": {"mirror:INBOX": 10, "mirror:SENT": 20},
+        "mirrored_at": old_time,
+    }
+    mailbox = await _mailbox(db, address="me@gmail.com", provider="imap",
+                             cursor_state=json.dumps(old_state))
+    seen_request = {}
+
+    async def fake_mirror(_address, _password, *, cursors, first_sync):
+        seen_request.update(cursors=cursors, first_sync=first_sync)
+        return {
+            "success": False,
+            "items": [],
+            # Aggregate state includes a bad cursor; only cursor_updates is safe.
+            "cursors": {"mirror:INBOX": 999, "mirror:SENT": 25},
+            "cursor_updates": {"mirror:SENT": 25},
+            "errors": ["INBOX/11: fetch failed (NO)"],
+        }
+
+    monkeypatch.setattr(gmail_provider, "imap_mirror_folders", fake_mirror)
+    result = await mailbox_message_service._mirror_imap(db, mailbox)
+
+    assert seen_request == {
+        "cursors": {"mirror:INBOX": 10, "mirror:SENT": 20},
+        "first_sync": False,
+    }
+    assert result["success"] is False
+    assert result["errors"] == ["INBOX/11: fetch failed (NO)"]
+    saved = json.loads(mailbox.cursor_state)
+    assert saved["mirror"] == {"mirror:INBOX": 10, "mirror:SENT": 25}
+    assert saved["mirrored_at"] == old_time
+
+
+@pytest.mark.asyncio
+async def test_imap_mirror_does_not_trust_aggregate_cursors_without_safe_updates(db, monkeypatch):
+    old_state = {"mirror": {"mirror:INBOX": 10}, "mirrored_at": "before"}
+    mailbox = await _mailbox(db, address="me@gmail.com", provider="imap",
+                             cursor_state=json.dumps(old_state))
+
+    async def fake_mirror(_address, _password, **_kwargs):
+        return {
+            "success": False,
+            "items": [],
+            "cursors": {"mirror:INBOX": 999},
+            "errors": ["INBOX: search failed (NO)"],
+        }
+
+    monkeypatch.setattr(gmail_provider, "imap_mirror_folders", fake_mirror)
+    result = await mailbox_message_service._mirror_imap(db, mailbox)
+
+    assert result["success"] is False
+    assert json.loads(mailbox.cursor_state) == old_state
+
+
 async def _no_mirror(db, mailbox, **kwargs):
     return {"success": True, "seen": 0, "stored": 0}
 
 
-def test_batch_get_caps_each_request_at_one_hundred_ids():
-    """Gmail's documented limit; exceeding it is a 400, not a silent truncation."""
-    assert gmail_provider.BATCH_GET_LIMIT == 100
+@pytest.mark.asyncio
+async def test_gmail_mirror_keeps_history_cursor_on_api_failure(db, monkeypatch):
+    mailbox = await _mailbox(db, address="me@gmail.com")
+    old_state = {"mirror_history_id": "history-old", "mirrored_at": "2026-11-01T00:00:00+00:00"}
+    mailbox.cursor_state = json.dumps(old_state)
+
+    async def fake_access_token(db, mailbox):
+        return "access-token", None
+
+    async def fake_history(token, history_id):
+        return {"success": False, "status_code": 429, "error": "rate limited"}
+
+    monkeypatch.setattr(mailbox_service, "access_token_for", fake_access_token)
+    monkeypatch.setattr(gmail_provider, "gmail_history_changes", fake_history)
+    result = await mailbox_message_service._mirror_gmail_api(db, mailbox)
+    assert result["success"] is False
+    assert mailbox.cursor_state == json.dumps(old_state)
+    assert "rate limited" in " ".join(result["errors"])
+
+
+@pytest.mark.asyncio
+async def test_gmail_api_retries_safe_gets_but_never_retries_side_effects(monkeypatch):
+    class Response:
+        def __init__(self, status_code):
+            self.status_code = status_code
+            self.headers = {}
+            self.text = "temporary error"
+
+        def json(self):
+            return {"error": {"message": "temporary error"}} if self.status_code >= 400 else {"ok": True}
+
+    calls = []
+
+    class Client:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc):
+            return False
+
+        async def request(self, method, url, **kwargs):
+            calls.append(method)
+            return Response(503 if len(calls) == 1 else 200)
+
+    async def no_sleep(_delay):
+        return None
+
+    monkeypatch.setattr(gmail_provider.httpx, "AsyncClient", Client)
+    monkeypatch.setattr(gmail_provider.asyncio, "sleep", no_sleep)
+
+    get_result = await gmail_provider._api("token", "GET", "/users/me/profile")
+    assert get_result["success"] is True
+    assert calls == ["GET", "GET"]
+
+    calls.clear()
+    post_result = await gmail_provider._api("token", "POST", "/users/me/messages/send", json_body={})
+    assert post_result["success"] is False
+    assert calls == ["POST"]
+
+
+def test_gmail_message_fetch_has_a_small_concurrency_budget():
+    """Every message is fetched individually, with no unbounded task burst."""
+    assert gmail_provider.BATCH_CONCURRENCY == 3
+    assert gmail_provider.BATCH_GET_LIMIT >= gmail_provider.BATCH_CONCURRENCY
     assert gmail_provider.MAX_PER_SYNC >= 250
 
 

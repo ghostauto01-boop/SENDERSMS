@@ -14,29 +14,8 @@ const api = vi.hoisted(() => ({
 
 vi.mock("../../api/aiAgent", () => ({ agentApi: api }));
 vi.mock("react-hot-toast", () => ({
-  default: { success: vi.fn(), error: vi.fn(), default: vi.fn() },
+  default: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }),
 }));
-
-const MODELS = [
-  {
-    id: "openai/gpt-oss-20b",
-    label: "OpenAI: GPT-OSS 20B",
-    tools: true,
-    context: 131072,
-    recommended: true,
-    vendor: "OpenAI",
-    input_modalities: ["text", "image"],
-  },
-  {
-    id: "anthropic/claude-sonnet-4.5",
-    label: "Anthropic: Claude Sonnet 4.5",
-    tools: true,
-    context: 200000,
-    recommended: false,
-    vendor: "Anthropic",
-    input_modalities: ["text"],
-  },
-];
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -45,78 +24,52 @@ beforeEach(() => {
     openrouter_hint: "sk-or-v***wxyz",
     console_url: "https://openrouter.ai/settings/keys",
     preset_console_url: "https://openrouter.ai/settings/presets",
-    vendor: "",
     preset: "",
-    models: { openrouter: "openai/gpt-oss-20b" },
-    default_provider: "openrouter",
     auto_fallback: true,
     auto_approve: false,
+    voice: { auto_send: false, language: "", read_aloud: false },
   });
-  api.models.mockResolvedValue({
-    provider: "openrouter",
-    models: MODELS,
-    vendors: [
-      { vendor: "OpenAI", count: 1 },
-      { vendor: "Anthropic", count: 1 },
+  api.presets.mockResolvedValue({
+    available: true,
+    items: [
+      { name: "sales-voice", label: "Sales voice", description: "Warm and concise" },
+      { name: "support-agent", label: "Support agent" },
     ],
-    selected: "openai/gpt-oss-20b",
-    selected_vendor: "",
-    preset: "",
-    total: 2,
-    error: null,
+    saved: "",
   });
-  api.presets.mockResolvedValue({ available: false, items: [], saved: "" });
   api.saveSettings.mockResolvedValue({ success: true });
-  api.savePresets.mockResolvedValue({ success: true, preset: "", vendor: "", warnings: [] });
+  api.savePresets.mockResolvedValue({ success: true, preset: "sales-voice", warnings: [] });
 });
 
-describe("AgentModelSettings compact mode", () => {
-  it("keeps the live model selector available without spending another health request", async () => {
+describe("AgentModelSettings preset-only settings", () => {
+  it("offers preset selection only and does not load the model catalogue", async () => {
     render(<AgentModelSettings compact />);
 
-    // The catalogue is read live, grouped by the lab behind each model.
-    const selector = await screen.findByRole("button", { name: /openai\/gpt-oss-20b/ });
-    expect(api.models).toHaveBeenCalledWith("openrouter", false);
+    const preset = await screen.findByRole("combobox", { name: "OpenRouter preset" });
+    expect(screen.getByText(/there are no separate model or provider choices/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText("Provider")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Model")).not.toBeInTheDocument();
+    expect(api.models).not.toHaveBeenCalled();
     expect(api.health).not.toHaveBeenCalled();
-    fireEvent.click(selector);
+    expect(api.presets).toHaveBeenCalledTimes(1);
 
-    const model = await screen.findByRole("button", { name: /anthropic\/claude-sonnet-4\.5/ });
-    fireEvent.click(model);
+    fireEvent.change(preset, { target: { value: "sales-voice" } });
+    fireEvent.click(screen.getByRole("button", { name: "Select preset" }));
 
-    await waitFor(() => expect(api.saveSettings).toHaveBeenCalledWith({
-      provider: "openrouter",
-      model: "anthropic/claude-sonnet-4.5",
+    await waitFor(() => expect(api.savePresets).toHaveBeenCalledWith({
+      preset: "sales-voice",
+      check: true,
     }));
-    expect(api.health).not.toHaveBeenCalled();
   });
 
-  it("groups the catalogue by vendor and filters it", async () => {
+  it("allows a preset slug when OpenRouter does not list presets", async () => {
+    api.presets.mockResolvedValue({ available: false, items: [], saved: "" });
     render(<AgentModelSettings compact />);
-    await screen.findByRole("button", { name: /openai\/gpt-oss-20b/ });
-    fireEvent.click(screen.getByRole("button", { name: /openai\/gpt-oss-20b/ }));
 
-    // The vendor headings come from the live catalogue, not a hard-coded list.
-    const headings = await screen.findAllByText(/^(OpenAI|Anthropic)$/);
-    expect(headings.map((h) => h.textContent)).toEqual(expect.arrayContaining(["OpenAI", "Anthropic"]));
-
-    fireEvent.change(screen.getByLabelText("Provider"), { target: { value: "Anthropic" } });
-    // The picker narrows to one lab. The saved model stays named on the closed
-    // selector either way — filtering must not appear to change the model.
-    await waitFor(() =>
-      expect(screen.getAllByRole("button", { name: /openai\/gpt-oss-20b/ }).length).toBe(1),
-    );
-    // One in the picker; the closed selector still names the saved model.
-    expect(screen.getAllByRole("button", { name: /anthropic\/claude-sonnet-4\.5/ }).length).toBe(1);
-  });
-
-  it("attaches an OpenRouter preset by name after OpenRouter accepts it", async () => {
-    render(<AgentModelSettings compact />);
-    await screen.findByRole("button", { name: /openai\/gpt-oss-20b/ });
-
-    fireEvent.change(screen.getByPlaceholderText("my-sales-preset"), {
+    fireEvent.change(await screen.findByLabelText("OpenRouter preset slug"), {
       target: { value: "warm-outreach" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Save the preset" }));
+    fireEvent.click(screen.getByRole("button", { name: "Select preset" }));
 
     await waitFor(() => expect(api.savePresets).toHaveBeenCalledWith({
       preset: "warm-outreach",
@@ -124,48 +77,54 @@ describe("AgentModelSettings compact mode", () => {
     }));
   });
 
-  it("pins routing to one vendor", async () => {
-    render(<AgentModelSettings compact />);
-    await screen.findByRole("button", { name: /openai\/gpt-oss-20b/ });
-
-    fireEvent.change(screen.getByLabelText(/Pin the lab/), { target: { value: "Anthropic" } });
-    await waitFor(() => expect(api.savePresets).toHaveBeenCalledWith({ vendor: "Anthropic" }));
-  });
-
-  it("refuses a preset name OpenRouter rejects", async () => {
+  it("does not attach a preset OpenRouter rejects", async () => {
     api.savePresets.mockResolvedValue({
       success: false,
-      preset: "nope",
-      vendor: "",
+      preset: "",
       warnings: [],
       error: "OpenRouter does not know a preset called nope.",
     });
-
     render(<AgentModelSettings compact />);
-    await screen.findByRole("button", { name: /openai\/gpt-oss-20b/ });
 
-    fireEvent.change(screen.getByPlaceholderText("my-sales-preset"), { target: { value: "nope" } });
-    fireEvent.click(screen.getByRole("button", { name: "Save the preset" }));
+    fireEvent.change(await screen.findByRole("combobox", { name: "OpenRouter preset" }), {
+      target: { value: "support-agent" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Select preset" }));
 
     await waitFor(() => expect(api.savePresets).toHaveBeenCalled());
-    // The saved value is never written locally when OpenRouter refused it.
-    await waitFor(() => expect(api.presets).toHaveBeenCalledTimes(1));
+    expect(screen.queryByText("Currently selected: support-agent")).not.toBeInTheDocument();
   });
 
-  it("does not read the catalogue before a key exists", async () => {
+  it("saves an API key without presenting provider or model selectors", async () => {
+    render(<AgentModelSettings compact />);
+
+    await screen.findByRole("button", { name: "Save key" });
+    fireEvent.change(screen.getAllByLabelText("OpenRouter API key")[1], {
+      target: { value: "sk-or-v1-new-test-key" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save key" }));
+
+    await waitFor(() => expect(api.saveSettings).toHaveBeenCalledWith({
+      api_key: "sk-or-v1-new-test-key",
+    }));
+    expect(api.models).not.toHaveBeenCalled();
+  });
+
+  it("does not request presets until a key exists", async () => {
     api.settings.mockResolvedValue({
       openrouter_configured: false,
       openrouter_hint: null,
-      models: { openrouter: null },
-      default_provider: "openrouter",
+      preset: "",
       auto_fallback: true,
       auto_approve: false,
+      voice: { auto_send: false, language: "", read_aloud: false },
     });
 
     render(<AgentModelSettings compact />);
     await screen.findByText("Not set");
 
+    expect(api.presets).not.toHaveBeenCalled();
     expect(api.models).not.toHaveBeenCalled();
-    expect(screen.getByText(/Save a key to see the live catalogue\./)).toBeInTheDocument();
+    expect(screen.getByLabelText("OpenRouter preset slug")).toBeDisabled();
   });
 });

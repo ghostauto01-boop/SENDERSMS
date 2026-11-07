@@ -15,11 +15,10 @@ This module keeps that copy. It is deliberately a cache over Gmail:
   id and thread id, so a flag change, a move or a delete is applied to Gmail
   first and the row only reflects what Gmail reports back. Nothing here can
   delete mail.
-* **Syncs are incremental.** The first pass mirrors a week; later passes ask for
-  ids newer than the folder's watermark (IMAP ``UIDNEXT``, or the Gmail
-  ``historyId``) and fetch bodies with ``users.messages.batchGet`` — 100
-  messages per request — so "import as fast as it can" is a property of the
-  sync, not a hope.
+* **Syncs are incremental.** The first pass mirrors a recent window; later
+  passes ask Gmail for changes since ``historyId`` (or use IMAP ``UIDNEXT``).
+  Gmail messages are fetched through the documented ``users.messages.get``
+  method with bounded concurrency; there is no ``messages.batchGet`` endpoint.
 * **Bodies are truncated.** A newsletter is not worth megabytes per row;
   ``is_truncated`` says so and the reading pane pulls the full copy from Gmail
   on demand (:func:`full_body`).
@@ -36,7 +35,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from sqlalchemy import Select, func, or_, select
+from sqlalchemy import Select, delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.email_inbox import EmailMailbox
@@ -56,11 +55,9 @@ FOLDER_KEYS = FOLDERS + ("ALL", "STARRED", "UNREAD")
 #: the reading pane fetches the rest from Gmail.
 TEXT_LIMIT = 60_000
 HTML_LIMIT = 200_000
-#: How far back the first mirror goes. A whole Gmail history in one pass would
-#: take minutes and mostly fill the database with newsletters.
+#: How far back a fresh mirror or expired-history recovery goes. A whole Gmail
+#: history in one pass would take minutes and mostly fill the database with newsletters.
 FIRST_MIRROR_DAYS = 14
-#: Per-folder cap on a normal (incremental) mirror pass.
-MIRROR_BATCH = gmail_provider.MAX_PER_SYNC
 
 
 def _now() -> datetime:
@@ -194,66 +191,85 @@ async def link_conversation(db: AsyncSession, row: MailboxMessage, item: dict) -
 
 async def _mirror_gmail_api(db: AsyncSession, mailbox: EmailMailbox, *,
                             force_full: bool = False) -> dict:
-    """Mirror one Gmail-API mailbox using historyId, then batchGet.
+    """Mirror Gmail with paginated history and the documented messages.get API.
 
-    The order of operations is what makes this fast *and* correct:
-
-    1. ask ``users.history`` for every message id touched since the watermark —
-       one request covering all five folders;
-    2. if there is no watermark (first mirror, or Gmail expired the history),
-       fall back to listing ids per folder with a date window;
-    3. download the unknown ids with ``batchGet``, 100 at a time, 3 in flight;
-    4. store, and only then advance the watermark.
+    A fresh profile watermark is captured before a full list, so mail arriving
+    during the list is included by the next history request. Failed pages or
+    message fetches never advance the watermark; successful rows remain safe to
+    revisit because the Gmail message id is the mirror's unique key.
     """
     from app.services.mailbox_service import access_token_for
 
     token, error = await access_token_for(db, mailbox)
     if not token:
         return {"success": False, "error": error or "Could not refresh the Gmail API token",
-                "seen": 0, "stored": 0}
+                "seen": 0, "stored": 0, "errors": [error or "Gmail token unavailable"]}
 
     state = _cursor_state(mailbox)
     history_id = "" if force_full else str(state.get("mirror_history_id") or "")
+    next_history = history_id
+    needs_full_list = not bool(history_id)
     ids: list[str] = []
+    deleted_ids: list[str] = []
     errors: list[str] = []
 
     if history_id:
         changes = await gmail_provider.gmail_history_changes(token, history_id)
         if changes.get("success"):
-            for entry in changes["data"].get("history") or []:
-                for kind in ("messageAdded", "labelAdded", "labelRemoved"):
-                    record = (entry or {}).get(kind) or {}
-                    message = record.get("message") or {}
+            data = changes.get("data") or {}
+            for entry in data.get("history") or []:
+                for field in ("messagesAdded", "labelsAdded", "labelsRemoved"):
+                    for record in (entry or {}).get(field) or []:
+                        message = (record or {}).get("message") or {}
+                        if message.get("id"):
+                            ids.append(str(message["id"]))
+                for record in (entry or {}).get("messagesDeleted") or []:
+                    message = (record or {}).get("message") or {}
                     if message.get("id"):
-                        ids.append(str(message["id"]))
-            history_id = str(changes["data"].get("historyId") or history_id)
+                        deleted_ids.append(str(message["id"]))
+            next_history = str(data.get("historyId") or history_id)
+        elif int(changes.get("status_code") or 0) == 404:
+            # Gmail says an invalid/expired startHistoryId requires a full sync.
+            needs_full_list = True
         else:
-            # An expired historyId is normal after ~7 idle days. Fall through to
-            # a folder listing rather than reporting a failure.
-            history_id = ""
+            detail = str(changes.get("error") or "Gmail history request failed")[:200]
+            return {"success": False, "error": detail, "errors": [detail],
+                    "seen": 0, "stored": 0}
 
-    if not history_id:
-        window = FIRST_MIRROR_DAYS if not state.get("mirrored_at") else 3
-        after = (_now() - timedelta(days=window)).strftime("%Y/%m/%d")
+    if needs_full_list:
+        profile = await gmail_provider.gmail_profile(token)
+        if profile.get("success") and profile.get("history_id"):
+            next_history = str(profile["history_id"])
+        else:
+            errors.append(
+                f"profile: {str(profile.get('error') or 'Gmail profile returned no historyId')[:200]}"
+            )
+
+        # Re-list the whole recovery window on an expired history cursor. The
+        # natural-key upsert makes this safe and catches mail missed while idle.
+        after = (_now() - timedelta(days=FIRST_MIRROR_DAYS)).strftime("%Y/%m/%d")
         for view in FOLDERS:
             label = gmail_provider.FOLDER_LABELS[view]
-            listed = await gmail_provider.gmail_list_ids(
-                token, label_ids=[label], query=f"after:{after}", max_results=MIRROR_BATCH,
+            listed = await gmail_provider.gmail_list_all_ids(
+                token, label_ids=[label], query=f"after:{after}", page_size=500,
             )
             if not listed.get("success"):
-                errors.append(f"{view}: {listed.get('error')}")
-                continue
-            ids.extend(str(m.get("id")) for m in listed["data"].get("messages") or [] if m.get("id"))
-        profile = await gmail_provider.gmail_profile(token)
-        history_id = str((profile or {}).get("history_id") or "")
+                errors.append(f"{view}: {str(listed.get('error') or 'Gmail list failed')[:200]}")
+            ids.extend(
+                str(row.get("id")) for row in (listed.get("data") or {}).get("messages") or []
+                if isinstance(row, dict) and row.get("id")
+            )
 
     ids = list(dict.fromkeys(ids))
+    deleted_ids = list(dict.fromkeys(deleted_ids))
     already = await _existing_ids(db, mailbox.id, ids)
-    fresh = [i for i in ids if i not in already]
+    fresh = [message_id for message_id in ids if message_id not in already]
 
     stored = 0
     if fresh:
-        fetched = await gmail_provider.gmail_batch_get(token, fresh, strip_quotes=False)
+        fetched = await gmail_provider.gmail_batch_get(
+            token, fresh, strip_quotes=False, include_attachments=False,
+        )
         errors.extend(fetched.get("errors") or [])
         for item in fetched.get("items") or []:
             pid = str(item.get("_provider_message_id") or "")
@@ -270,33 +286,53 @@ async def _mirror_gmail_api(db: AsyncSession, mailbox: EmailMailbox, *,
             db.add(row)
             stored += 1
 
-    # Refresh the folders/labels of rows Gmail moved since we last looked: a
-    # message that was in the Inbox and is now in Spam must move here too.
-    if ids:
-        await _refresh_known(db, mailbox, token, [i for i in ids if i in already])
+    # Refresh every known message Gmail says changed, not only the first page.
+    existing_changed = [message_id for message_id in ids if message_id in already]
+    refresh_errors, missing_ids = await _refresh_known(
+        db, mailbox, token, existing_changed,
+    )
+    errors.extend(refresh_errors)
+    deleted_ids.extend(missing_ids)
 
-    new_state = {**state, "mirror_history_id": history_id, "mirrored_at": _now().isoformat()}
-    mailbox.cursor_state = json.dumps(new_state)[:8000]
+    deleted_ids = list(dict.fromkeys(deleted_ids))
+    if deleted_ids:
+        for start in range(0, len(deleted_ids), 400):
+            chunk = deleted_ids[start:start + 400]
+            await db.execute(
+                delete(MailboxMessage).where(
+                    MailboxMessage.mailbox_id == mailbox.id,
+                    MailboxMessage.provider_message_id.in_(chunk),
+                )
+            )
+
+    if not errors and next_history:
+        new_state = {
+            **state,
+            "mirror_history_id": next_history,
+            "mirrored_at": _now().isoformat(),
+        }
+        mailbox.cursor_state = json.dumps(new_state)[:8000]
     await db.flush()
-    return {"success": True, "seen": len(ids), "new": len(fresh), "stored": stored,
-            "errors": errors[:5]}
+    return {"success": not errors, "seen": len(ids), "new": len(fresh),
+            "stored": stored, "errors": errors[:10]}
 
 
 async def _refresh_known(db: AsyncSession, mailbox: EmailMailbox, token: str,
-                         pids: list[str]) -> None:
-    """Re-read the labels of messages we already have, so folders stay true."""
+                         pids: list[str]) -> tuple[list[str], list[str]]:
+    """Refresh folders/flags for all changed rows and remove deleted messages."""
     if not pids:
-        return
-    fetched = await gmail_provider.gmail_batch_get(token, pids[:MIRROR_BATCH], strip_quotes=False)
-    if not fetched.get("success"):
-        return
+        return [], []
+    pids = list(dict.fromkeys(str(pid) for pid in pids if pid))
+    fetched = await gmail_provider.gmail_batch_get(
+        token, pids, strip_quotes=False, include_attachments=False,
+    )
     rows = {
         row.provider_message_id: row
         for row in (
             await db.execute(
                 select(MailboxMessage).where(
                     MailboxMessage.mailbox_id == mailbox.id,
-                    MailboxMessage.provider_message_id.in_(pids[:MIRROR_BATCH]),
+                    MailboxMessage.provider_message_id.in_(pids),
                 )
             )
         ).scalars().all()
@@ -311,22 +347,36 @@ async def _refresh_known(db: AsyncSession, mailbox: EmailMailbox, token: str,
         if labels:
             row.is_read = "UNREAD" not in labels
             row.is_starred = "STARRED" in labels
+    missing_ids = list(fetched.get("missing_ids") or [])
+    if missing_ids:
+        await db.execute(
+            delete(MailboxMessage).where(
+                MailboxMessage.mailbox_id == mailbox.id,
+                MailboxMessage.provider_message_id.in_(missing_ids),
+            )
+        )
+    return list(fetched.get("errors") or []), missing_ids
 
 
 async def _mirror_imap(db: AsyncSession, mailbox: EmailMailbox, *,
                        force_full: bool = False) -> dict:
-    """Mirror an app-password mailbox over IMAP."""
+    """Mirror an app-password mailbox over IMAP without skipping failed mail."""
     password = decrypt_value(mailbox.credential_encrypted or "")
     if not password:
         return {"success": False, "error": "This mailbox has no stored app password",
-                "seen": 0, "stored": 0}
+                "seen": 0, "stored": 0, "errors": ["This mailbox has no stored app password"]}
     state = _cursor_state(mailbox)
+    saved_cursors = state.get("mirror") if isinstance(state.get("mirror"), dict) else {}
+    request_cursors = {} if force_full else dict(saved_cursors)
     result = await gmail_provider.imap_mirror_folders(
         mailbox.email_address, password,
-        cursors={} if force_full else (state.get("mirror") or {}),
+        cursors=request_cursors,
         first_sync=force_full or not state.get("mirrored_at"),
     )
     items = result.get("items") or []
+    errors = [str(error)[:300] for error in (result.get("errors") or []) if error]
+    if result.get("error"):
+        errors.append(str(result["error"])[:300])
     stored = 0
     already = await _existing_ids(
         db, mailbox.id, [str(i.get("_provider_message_id") or "") for i in items]
@@ -353,11 +403,29 @@ async def _mirror_imap(db: AsyncSession, mailbox: EmailMailbox, *,
         await link_conversation(db, row, item)
         db.add(row)
         stored += 1
-    new_state = {**state, "mirror": result.get("cursors") or {}, "mirrored_at": _now().isoformat()}
+
+    # The provider returns updates only for folders whose messages were fully
+    # fetched. On a partial pass, ignore its aggregate cursor map and merge only
+    # those safe per-folder updates over the saved state. Older providers/mocks
+    # without cursor_updates are trusted only when the whole pass succeeded.
+    cursor_updates = result.get("cursor_updates")
+    if cursor_updates is None:
+        cursor_updates = result.get("cursors") or {} if not errors else {}
+    cursor_updates = dict(cursor_updates or {})
+    completed = result.get("success") is not False and not errors
+    if completed and force_full:
+        cursors = dict(result.get("cursors") or cursor_updates)
+    elif completed:
+        cursors = {**saved_cursors, **dict(result.get("cursors") or cursor_updates)}
+    else:
+        cursors = {**saved_cursors, **cursor_updates}
+    new_state = {**state, "mirror": cursors}
+    if completed:
+        new_state["mirrored_at"] = _now().isoformat()
     mailbox.cursor_state = json.dumps(new_state)[:8000]
     await db.flush()
-    return {"success": True, "seen": len(items), "new": len(items), "stored": stored,
-            "errors": (result.get("errors") or [])[:5]}
+    return {"success": completed, "seen": len(items), "new": len(items),
+            "stored": stored, "errors": errors[:10]}
 
 
 async def mirror_mailbox(db: AsyncSession, mailbox: EmailMailbox, *,

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import {
-  Activity, AlertTriangle, Brain, Cpu, History, Loader2, Lock, Menu, MessageSquarePlus,
+  Activity, AlertTriangle, Brain, Cpu, History, Menu, MessageSquarePlus,
   Paperclip, Pencil, Plug, Settings2,
   Sparkles, Trash2, X,
 } from "lucide-react";
@@ -74,7 +74,6 @@ export default function AIAgentPage() {
   const [sending, setSending] = useState(false);
   const [streamError, setStreamError] = useState<{ message: string; hint?: string; retryable?: boolean } | null>(null);
   const [busyCard, setBusyCard] = useState<{ id: number; state: "approve" | "cancel" } | null>(null);
-  const [switchingProvider, setSwitchingProvider] = useState<Provider | null>(null);
   const [attached, setAttached] = useState<AgentFile | null>(null);
 
   const [drawer, setDrawer] = useState(false);
@@ -96,6 +95,12 @@ export default function AIAgentPage() {
   const activeProvider: Provider = "openrouter";
   const activeProviderHealth = health?.providers.find((check) => check.provider === activeProvider);
   const providerConfigured = () => Boolean(settings?.openrouter_configured);
+  const handleAgentConfigured = useCallback((ready: boolean) => {
+    agentApi.settings().then(setSettings).catch(() => {});
+    // Re-check only when a key is added or removed; a preset update should not
+    // trigger another live health request.
+    if (ready !== configured) agentApi.health().then(setHealth).catch(() => {});
+  }, [configured]);
 
   // ---------------------------------------------------------------------
   // load
@@ -234,12 +239,8 @@ export default function AIAgentPage() {
     }
   };
 
-  /**
-   * There is one provider now, so this is not a switch — it is the door to the
-   * settings panel where the *model* is chosen. Kept as a named action so the
-   * keyboard affordance and the "add a key" nudge both stay where they were.
-   */
-  const openModelSettings = () => {
+  /** Open the key and preset settings; there is no provider/model picker. */
+  const openPresetSettings = () => {
     if (!providerConfigured()) {
       setPanel("settings");
       return;
@@ -265,7 +266,7 @@ export default function AIAgentPage() {
       streaming: true,
       step: { current: 0, max: 15 },
       statusText: "Routing via OpenRouter…",
-      activeModel: settings?.models?.openrouter || null,
+      activeRoute: settings?.preset ? `Preset · ${settings.preset}` : null,
     };
     streamBuffer.current = { text: "", blocks: [] };
     setTurns((current) => [...current, userTurn, assistantTurn]);
@@ -300,14 +301,14 @@ export default function AIAgentPage() {
               patchAssistant((turn) => ({
                 ...turn,
                 statusText: event.text,
-                activeModel: event.model || turn.activeModel,
+                activeRoute: settings?.preset ? `Preset · ${settings.preset}` : event.model || turn.activeRoute,
               }));
               break;
             case "step":
               patchAssistant((turn) => ({
                 ...turn,
                 step: { current: event.step, max: event.max },
-                activeModel: event.model || turn.activeModel,
+                activeRoute: settings?.preset ? `Preset · ${settings.preset}` : event.model || turn.activeRoute,
               }));
               break;
             case "thinking": {
@@ -341,7 +342,7 @@ export default function AIAgentPage() {
               if (event.model) {
                 patchAssistant((turn) => ({
                   ...turn,
-                  activeModel: event.model || turn.activeModel,
+                  activeRoute: settings?.preset ? `Preset · ${settings.preset}` : event.model || turn.activeRoute,
                   statusText: `Switched to ${event.model}…`,
                 }));
               }
@@ -415,7 +416,7 @@ export default function AIAgentPage() {
                 streaming: false,
                 step: null,
                 statusText: null,
-                activeModel: event.model || turn.activeModel,
+                activeRoute: settings?.preset ? `Preset · ${settings.preset}` : event.model || turn.activeRoute,
               }));
               break;
             default:
@@ -607,35 +608,23 @@ export default function AIAgentPage() {
               type="button"
               onClick={() => setPanel("settings")}
               className="truncate text-left hover:text-primary-700 dark:hover:text-primary-300"
-              title="Choose a live AI model"
+              title="Choose an OpenRouter preset"
             >
-              OpenRouter
-              {settings?.models?.[activeProvider] ? ` · ${settings.models[activeProvider]}` : " · automatic model"}
-              {settings?.preset ? ` · ${settings.preset}` : ""}
+              OpenRouter · {settings?.preset ? `preset ${settings.preset}` : "choose a preset"}
             </button>
-            {settings?.preset_locked && (settings?.preset_models?.length || 0) > 0 && (
-              <span
-                className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary-100 px-2 py-0.5 text-[10px] font-semibold text-primary-800 dark:bg-primary-950/70 dark:text-primary-200"
-                title="Permanent Preset Lock active — only your selected models run, with automatic fallback"
-              >
-                <Lock size={10} /> Preset Locked ({settings.preset_models!.length})
-              </span>
-            )}
             {activeProviderHealth?.latency_ms != null && (
               <span className="shrink-0 text-gray-400">{activeProviderHealth.latency_ms} ms</span>
             )}
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1">
-          {/* One provider, so this is the model chip rather than a toggle.
-              Pressing it opens the settings panel where the live catalogue —
-              grouped by the lab behind each model — is picked. */}
+          {/* Open the single-provider preset settings; no model/provider picker. */}
           <button
             type="button"
-            onClick={openModelSettings}
-            aria-label="Change the AI model"
+            onClick={openPresetSettings}
+            aria-label="Open OpenRouter preset settings"
             title={providerConfigured()
-              ? "Change the model — the list is read live from OpenRouter"
+              ? "Choose an OpenRouter preset"
               : "Add an OpenRouter key in settings to use the agent"}
             className={`inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-gray-50 px-2 py-1.5 text-[10.5px] font-semibold transition-colors hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700 ${
               providerConfigured() ? "text-primary-800 dark:text-primary-200" : "text-gray-400"
@@ -888,18 +877,7 @@ export default function AIAgentPage() {
                   </button>
                 </div>
                 <div className="flex-1 overflow-y-auto p-2.5">
-                  <AgentModelSettings
-                    compact
-                    onConfigured={(ready) => {
-                      agentApi.settings().then(setSettings).catch(() => {});
-                      // Do not duplicate the shell's initial health request just
-                      // because the settings drawer mounted. Re-check when a key
-                      // is added or removed and readiness actually changes.
-                      if (ready !== configured) {
-                        agentApi.health().then(setHealth).catch(() => {});
-                      }
-                    }}
-                  />
+                  <AgentModelSettings compact onConfigured={handleAgentConfigured} />
                   <div className="mt-3 grid grid-cols-2 gap-2 sm:hidden">
                     <button type="button" onClick={() => setPanel("files")} className="btn-secondary btn-sm">
                       <Paperclip size={12} /> Files

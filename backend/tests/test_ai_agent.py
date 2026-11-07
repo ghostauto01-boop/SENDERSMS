@@ -200,20 +200,21 @@ def fake(monkeypatch):
 # ---------------------------------------------------------------------------
 async def test_models_come_from_the_live_list(client, db, fake):
     await save_key(db, "openrouter", OPENROUTER_KEY)
-    response = await client.get("/api/v1/ai-agent/models?provider=openrouter")
+    response = await client.get("/api/v1/ai-agent/models")
     assert response.status_code == 200
     payload = response.json()
     ids = [m["id"] for m in payload["models"]]
-    # Embedding and transcription models cannot answer a chat turn, so they must
-    # never reach the dropdown.
+    # Embedding and transcription models cannot answer a chat turn, so they are
+    # excluded from the automatic chat catalogue.
     assert "openai/text-embedding-3-large" not in ids
     assert "openai/whisper-1" not in ids
     assert "anthropic/claude-3.5-haiku" in ids
-    # A current default is chosen from the live list and stored.
-    assert payload["selected"] in ids
-    assert payload["selected"] == "anthropic/claude-3.5-haiku"
-    # "Pick the provider" reads off the live catalogue, not a table in the code.
-    assert {v["vendor"] for v in payload["vendors"]} == {"Anthropic", "OpenAI", "Google", "Meta"}
+    # The model catalogue is diagnostic only; it exposes no selectable default.
+    assert "selected" not in payload
+    assert all("recommended" not in model for model in payload["models"])
+    # The settings UI is preset-only; no vendor/provider picker is returned.
+    assert "vendors" not in payload
+    assert "selected_vendor" not in payload
 
 
 async def test_no_hard_coded_model_names_in_code():
@@ -250,7 +251,7 @@ async def test_no_hard_coded_model_names_in_code():
 async def test_models_reports_a_bad_key_clearly(client, db, fake):
     await save_key(db, "openrouter", OPENROUTER_KEY)
     fake["provider"].fail["openrouter"] = True
-    response = await client.get("/api/v1/ai-agent/models?provider=openrouter")
+    response = await client.get("/api/v1/ai-agent/models")
     payload = response.json()
     assert payload["models"] == []
     assert payload["error"]["code"] == "key_invalid"
@@ -302,7 +303,7 @@ async def test_no_key_ever_leaves_the_server(client, db, fake):
     for path in (
         "/api/v1/ai-agent/settings",
         "/api/v1/ai-agent/health",
-        "/api/v1/ai-agent/models?provider=openrouter",
+        "/api/v1/ai-agent/models",
         "/api/v1/ai-agent/presets",
     ):
         response = await client.get(path)
@@ -316,12 +317,13 @@ async def test_no_key_ever_leaves_the_server(client, db, fake):
 async def test_test_button_uses_the_saved_key(client, db, fake):
     await save_key(db, "openrouter", OPENROUTER_KEY)
     # No api_key in the body — the old endpoint 422'd on this.
-    response = await client.post("/api/v1/ai-agent/settings/test", json={"provider": "openrouter"})
+    response = await client.post("/api/v1/ai-agent/settings/test", json={})
     assert response.status_code == 200
     payload = response.json()
     assert payload["success"] is True
     assert payload["using_saved_key"] is True
-    assert payload["suggested_model"] == "anthropic/claude-3.5-haiku"
+    assert payload["models"] > 0
+    assert "suggested_model" not in payload
     assert OPENROUTER_KEY not in response.text
 
 
@@ -329,24 +331,28 @@ async def test_test_button_prefers_a_typed_key(client, db, fake):
     await save_key(db, "openrouter", OPENROUTER_KEY)
     response = await client.post(
         "/api/v1/ai-agent/settings/test",
-        json={"provider": "openrouter", "api_key": "sk-or-v1-typed-key-value-123456"},
+        json={"api_key": "sk-or-v1-typed-key-value-123456"},
     )
     assert response.status_code == 200
     assert response.json()["using_saved_key"] is False
 
 
-async def test_settings_persist_model_and_toggles(client, db, fake):
+async def test_settings_persist_behavior_toggles_without_model_or_vendor_controls(client, db, fake):
     response = await client.put(
         "/api/v1/ai-agent/settings",
         json={"provider": "openrouter", "model": "anthropic/claude-3.5-haiku",
-              "default_provider": "openrouter", "auto_approve": True, "auto_fallback": False},
+              "vendor": "Anthropic", "auto_approve": True, "auto_fallback": False},
     )
     assert response.status_code == 200
     settings = (await client.get("/api/v1/ai-agent/settings")).json()
-    assert settings["models"]["openrouter"] == "anthropic/claude-3.5-haiku"
-    assert settings["default_provider"] == "openrouter"
     assert settings["auto_approve"] is True
     assert settings["auto_fallback"] is False
+    assert "models" not in settings
+    assert "vendor" not in settings
+    assert "default_provider" not in settings
+    from app.services import ai_providers
+    assert await ai_providers.get_model(db, "openrouter") is None
+    assert await ai_providers.get_vendor(db, "openrouter") == ""
 
 
 # ---------------------------------------------------------------------------
@@ -355,6 +361,18 @@ async def test_settings_persist_model_and_toggles(client, db, fake):
 async def _new_session(client) -> str:
     response = await client.post("/api/v1/ai-agent/sessions", json={"name": "Test"})
     return response.json()["session"]["id"]
+
+
+async def test_session_create_ignores_legacy_provider_and_model_fields(client, db):
+    response = await client.post(
+        "/api/v1/ai-agent/sessions",
+        json={"name": "Preset-only session", "provider": "groq", "model": "legacy/model"},
+    )
+    assert response.status_code == 200
+    payload = response.json()["session"]
+    assert "model" not in payload
+    session = await db.get(AIAgentSession, payload["id"])
+    assert session.model == "openrouter"
 
 
 async def test_chat_streams_a_reply(client, db, fake):
@@ -375,6 +393,37 @@ async def test_chat_streams_a_reply(client, db, fake):
     detail = (await client.get(f"/api/v1/ai-agent/sessions/{session_id}")).json()
     roles = [m["role"] for m in detail["messages"]]
     assert roles == ["user", "assistant"]
+
+
+async def test_chat_ignores_legacy_provider_and_model_overrides(client, db, fake):
+    """The public chat API always uses the preset or internal automatic route."""
+    await save_key(db, "openrouter", OPENROUTER_KEY)
+    from app.services import ai_providers
+
+    automatic_model = "anthropic/claude-3.5-haiku"
+    await ai_providers.set_model(db, "openrouter", automatic_model)
+    await db.commit()
+
+    def answer(body):
+        assert body["model"] == automatic_model
+        return httpx.Response(
+            200, text='data: {"choices":[{"delta":{"content":"Automatic route"}}]}\n\ndata: [DONE]'
+        )
+
+    fake["provider"].chat = [answer]
+    session_id = await _new_session(client)
+    response = await client.post(
+        f"/api/v1/ai-agent/sessions/{session_id}/chat",
+        json={
+            "message": "hello",
+            "stream": False,
+            "provider": "openrouter",
+            "model": "openai/gpt-4o-mini",
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["error"] is None
+    assert "Automatic route" in response.json()["response"]
 
 
 async def test_chat_never_returns_a_bare_500(client, db, fake):
@@ -514,6 +563,33 @@ async def test_a_rate_limit_recovers_on_another_model_and_says_so(client, db, fa
     notices = [e for e in payload["events"] if e["type"] == "notice"]
     assert any("hit a limit" in n["text"] for n in notices)
     assert payload["events"][-1]["provider"] == "openrouter"
+
+
+async def test_automatic_recovery_can_be_disabled_without_a_preset(client, db, fake):
+    await save_key(db, "openrouter", OPENROUTER_KEY)
+    from app.services import ai_providers
+
+    model = "openai/gpt-4o-mini"
+    await ai_providers.set_model(db, "openrouter", model)
+    await ai_providers.set_flag(db, ai_providers.AUTO_FALLBACK_SETTING, False)
+    await db.commit()
+    calls = []
+
+    def limited(body):
+        calls.append(body["model"])
+        return httpx.Response(429, json={"error": {"message": "rate limit reached"}})
+
+    fake["provider"].chat = [limited]
+    session_id = await _new_session(client)
+    response = await client.post(
+        f"/api/v1/ai-agent/sessions/{session_id}/chat",
+        json={"message": "hello", "stream": False},
+    )
+    payload = response.json()
+
+    assert payload["error"]["code"] == "rate_limited"
+    assert calls == [model]
+    assert not any(event["type"] == "notice" for event in payload["events"])
 
 
 async def test_a_model_scoped_429_persists_the_working_route(client, db, fake):
@@ -879,7 +955,7 @@ async def test_an_image_turn_uses_a_vision_model_and_keeps_the_session_on_openro
     assert response.json()["error"] is None
     assert any("chat/completions" in url for _, url in fake["provider"].calls)
     session = await client.get(f"/api/v1/ai-agent/sessions/{session_id}")
-    assert session.json()["session"]["model"] == "openrouter"
+    assert "model" not in session.json()["session"]
 
 
 async def test_the_vision_model_comes_from_the_live_catalogue(client, db, fake):
@@ -1039,6 +1115,29 @@ async def test_transcribe_returns_text(client, db, fake):
     payload = response.json()
     assert payload["text"] == "import this into a new list"
     assert payload["provider"] == "openrouter"
+
+
+async def test_transcription_uses_the_selected_preset_without_model_selection(client, db, fake):
+    await save_key(db, "openrouter", OPENROUTER_KEY)
+    from app.services import ai_providers
+
+    await ai_providers.set_preset(db, "voice-workflow")
+    await db.commit()
+
+    def transcribe(body):
+        assert body["model"] == "@preset/voice-workflow"
+        assert "input_audio" in json.dumps(body["messages"])
+        return httpx.Response(200, json={"choices": [{"message": {
+            "role": "assistant", "content": "use the selected voice preset"}}]})
+
+    fake["provider"].chat = [transcribe]
+    response = await client.post(
+        "/api/v1/ai-agent/transcribe",
+        files={"audio": ("voice.webm", b"fake-audio-bytes", "audio/webm")},
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["text"] == "use the selected voice preset"
 
 
 async def test_global_memory_round_trip(client, db, fake):

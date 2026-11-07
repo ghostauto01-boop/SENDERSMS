@@ -1933,12 +1933,10 @@ async def reply_to_chain(
 
     The rule the operator asked for, stated precisely:
 
-    **the Brevo sender is attached to Reply-To on every send and every
-    campaign, always** — so a reply can always come back to Brevo's inbound
-    parser, which is one of the two doors that import it. But it is attached
-    *last*, because a real mailbox in front of it is what makes a reply show up
-    inside this app in seconds instead of waiting on a webhook, and it is what
-    lets the outgoing reply leave from the address that actually received it.
+    This is the internal candidate chain. Brevo's API accepts only one address
+    in its dedicated ``replyTo`` field, so the head is the address placed on the
+    wire; the rest is retained for routing and diagnostics, not encoded as a
+    comma-separated custom header.
 
     Order: connected mailboxes (Gmail API first) → the sender's configured
     Reply-To / personal From → the Brevo sender address. Deduplicated, never
@@ -1950,10 +1948,8 @@ async def reply_to_chain(
     chain: list[str] = []
 
     def add(value: str | None) -> None:
-        clean = (value or "").strip()
-        if not clean or "@" not in clean:
-            return
-        if any(existing.lower() == clean.lower() for existing in chain):
+        clean = normalize_email(value)
+        if not clean or any(existing == clean for existing in chain):
             return
         chain.append(clean)
 
@@ -1990,8 +1986,9 @@ async def brevo_envelope(
     Otherwise it stays the stored From. The stored ``from_email`` is never
     rewritten — the relay address is cached on ``brevo_from_email`` instead.
 
-    Reply-To is never blank when the account has a From address: it is the head
-    of :func:`reply_to_chain`. ``reply_to_header`` supplies the rest.
+    Reply-To is the first address in :func:`reply_to_chain`. Brevo exposes only
+    one valid address in its dedicated ``replyTo`` object; the remaining chain
+    cannot be sent as a standard custom header, which Brevo rejects.
     """
     from app.providers.brevo import is_brevo_relay_address, pick_verified_from
 
@@ -2011,12 +2008,11 @@ async def brevo_envelope(
 async def reply_to_header(
     db: AsyncSession, account: EmailAccount, from_email: str | None
 ) -> str | None:
-    """The full ``Reply-To`` header value, or None when one address suffices.
+    """Return a legacy, display-only rendering of the full reply chain.
 
-    Brevo's ``replyTo`` field carries exactly one address, so the remaining
-    addresses of the chain travel as a MIME header. Mail clients read the
-    header, so "Reply" goes to the first address and "Reply all" reaches every
-    address in the chain — Brevo's inbound parser included.
+    Brevo's API accepts a single address through its dedicated ``replyTo``
+    object and rejects ``Reply-To`` as a custom header, so this value must never
+    be added to a Brevo request. Gmail sends may use their own native header.
     """
     chain = await reply_to_chain(db, account, from_email)
     if len(chain) < 2:
@@ -2027,17 +2023,18 @@ async def reply_to_header(
 async def mailbox_reply_to(
     db: AsyncSession, account: EmailAccount | None, mailbox
 ) -> str:
-    """``Reply-To`` for mail that leaves through a connected Gmail.
+    """Native Gmail ``Reply-To`` addresses for a message sent through a mailbox.
 
-    The mailbox that sent it comes first — that is the address the next answer
-    must land in — with the Brevo sender attached behind it, because the Brevo
-    sender is attached to Reply-To on *every* send. Never blank.
+    The mailbox that sent it comes first so the next answer lands where this
+    app reads it. Gmail's RFC 5322 send path supports a mailbox list, so the
+    remaining configured addresses can follow; this differs from Brevo's API,
+    which allows only one dedicated ``replyTo`` address.
     """
     chain: list[str] = []
 
     def add(value: str | None) -> None:
-        clean = (value or "").strip()
-        if clean and "@" in clean and not any(c.lower() == clean.lower() for c in chain):
+        clean = normalize_email(value)
+        if clean and clean not in chain:
             chain.append(clean)
 
     add(getattr(mailbox, "email_address", None))
@@ -2304,13 +2301,8 @@ async def _send_via_account(db: AsyncSession, account: EmailAccount, message: Me
 
     headers = await build_headers(db, message, account, bulk=bool(message.bulk_send))
     from_email, reply_to = await brevo_envelope(db, account)
-    # The whole reply chain rides in the header: Brevo's `replyTo` field takes
-    # one address, and every address in the chain has to be reachable for a
-    # reply — the mailbox this app reads *and* the Brevo sender that parses
-    # inbound mail. Applied to campaigns and one-off sends alike.
-    chain_header = await reply_to_header(db, account, from_email)
-    if chain_header:
-        headers["Reply-To"] = chain_header
+    # Reply-To is a dedicated Brevo API field, not a custom header. Brevo rejects
+    # standard headers in `headers` with `invalid_parameter`.
     # "Plain personal email" mode means exactly that: no tracking pixel and no
     # link wrapping, so Brevo must not inject them.
     plain = await campaign_plain_mode(db, message.campaign_id, message.ads_campaign_id)

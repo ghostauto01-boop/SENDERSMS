@@ -2,15 +2,15 @@
 
 Everything the browser needs and nothing it must not have:
 
-  * POST   /models                         live model list per provider
-  * GET    /health                         real 1-token ping per provider
-  * GET    /settings                       keys (masked), models, toggles
-  * PUT    /settings                       save a key / model / toggle
+  * GET    /models                         diagnostic catalogue; never a selector
+  * GET    /health                         real 1-token OpenRouter ping
+  * GET    /settings                       masked key, selected preset, toggles
+  * PUT    /settings                       save a key / toggle
   * POST   /settings/test                  test the *saved* key (or a typed one)
   * GET    /sessions                       list chats
   * POST   /sessions                       new chat
   * GET    /sessions/{id}                  one chat + messages + files + pending cards
-  * PATCH  /sessions/{id}                  rename, switch model, set skills
+  * PATCH  /sessions/{id}                  rename, set skills, prompt or memory
   * DELETE /sessions/{id}
   * POST   /sessions/{id}/chat             SSE stream (application/x-ndjson fallback)
   * POST   /actions/{id}/approve|cancel    the confirmation card's two buttons
@@ -32,7 +32,7 @@ from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, Response, UploadFile
 from fastapi.responses import JSONResponse, StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -84,74 +84,46 @@ def _serialise_message(message: AIAgentMessage) -> dict:
 # ---------------------------------------------------------------------------
 # models
 # ---------------------------------------------------------------------------
-def _model_option(model, recommended_id: Optional[str]) -> dict:
+def _model_option(model) -> dict:
+    """Diagnostic metadata only; the API never exposes a selectable model."""
     return {
         "id": model.id,
         "label": model.label,
         "tools": model.tools,
         "context": model.context,
-        "vendor": model.vendor,
         "input_modalities": list(model.input_modalities),
         "prompt_price": model.prompt_price,
         "completion_price": model.completion_price,
-        # The UI marks this so nobody wonders why it was chosen.
-        "recommended": model.id == recommended_id,
     }
 
 
 @router.get("/models")
 async def list_models(
-    provider: str = Query("openrouter", pattern="^openrouter$"),
     refresh: bool = Query(True, description="Ask OpenRouter now instead of using the cache"),
-    vendor: Optional[str] = Query(None, description="Filter to one vendor from the live list"),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """The models OpenRouter currently serves, plus the one selected here.
+    """Live OpenRouter model catalogue for automatic recovery and diagnostics.
 
-    This is the only place a model name can come from — there is no default
-    model constant anywhere in the codebase, which is what stopped the
-    hard-coded ``llama-3.3-70b-versatile`` / ``gemini-1.5-flash`` 404s.
-
-    ``vendors`` is the same live list grouped by the provider behind each model
-    (every OpenRouter id is ``vendor/model``), which is what makes "pick the
-    provider" possible without a hard-coded vendor table.
+    The settings UI does not expose this as a picker: users select presets,
+    which own their models and routing. Automatic recovery remains internal to
+    the runtime and is used only when no preset is configured.
     """
     try:
-        models = await ai_providers.list_models(db, provider, refresh=refresh)
+        models = await ai_providers.list_models(db, ai_providers.PROVIDER, refresh=refresh)
     except ai_providers.ProviderError as error:
         return JSONResponse(
             status_code=200,
             content={
-                "provider": provider,
+                "provider": ai_providers.PROVIDER,
                 "models": [],
-                "vendors": [],
-                "selected": await ai_providers.get_model(db, provider),
                 "error": error.to_dict(),
             },
         )
-    selected = await ai_providers.get_model(db, provider)
-    ids = {m.id for m in models}
-    if not selected or selected not in ids:
-        selected = ai_providers.pick_default(provider, models) or (models[0].id if models else None)
-        if selected:
-            await ai_providers.set_model(db, provider, selected)
-            await db.commit()
-    recommended = ai_providers.pick_default(provider, models)
-    shown = models
-    wanted_vendor = (vendor or "").strip()
-    if wanted_vendor:
-        shown = [m for m in models if m.vendor.lower() == wanted_vendor.lower()] or models
     return {
-        "provider": provider,
-        "models": [_model_option(m, recommended) for m in shown],
-        "vendors": [
-            {"vendor": group["vendor"], "count": group["count"]}
-            for group in ai_providers.group_models_by_vendor(models)
-        ],
-        "selected": selected,
-        "selected_vendor": await ai_providers.get_vendor(db, provider),
-        "preset": await ai_providers.get_preset(db, provider),
+        "provider": ai_providers.PROVIDER,
+        "models": [_model_option(model) for model in models],
+        "preset": await ai_providers.get_preset(db),
         "total": len(models),
         "error": None,
     }
@@ -174,11 +146,6 @@ async def list_presets(
 
 class PresetUpdate(BaseModel):
     preset: Optional[str] = None
-    vendor: Optional[str] = None
-    preset_locked: Optional[bool] = None
-    preset_models: Optional[list[str]] = None
-    saved_presets: Optional[list[dict[str, Any]]] = None
-    active_saved_preset: Optional[str] = None
     check: bool = False
 
 
@@ -188,20 +155,10 @@ async def put_preset(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """Pin routing to a vendor, attach an OpenRouter preset, and/or lock an ordered fallback chain."""
+    """Select or clear one OpenRouter preset; it owns model/provider routing."""
     warnings: list[str] = []
-    if body.vendor is not None:
-        await ai_providers.set_vendor(db, body.vendor)
-    if body.preset_locked is not None:
-        await ai_providers.set_preset_locked(db, body.preset_locked)
-    if body.preset_models is not None:
-        await ai_providers.set_preset_models(db, body.preset_models)
-    if body.saved_presets is not None:
-        await ai_providers.set_saved_presets(db, body.saved_presets)
-    if body.active_saved_preset is not None:
-        await ai_providers.set_active_saved_preset(db, body.active_saved_preset)
     if body.preset is not None:
-        name = body.preset.strip()
+        name = ai_providers._preset_slug(body.preset)
         if name and body.check:
             check = await ai_providers.validate_preset(db, name)
             if not check.get("success") and not check.get("preset_accepted"):
@@ -215,11 +172,6 @@ async def put_preset(
     return {
         "success": True,
         "preset": await ai_providers.get_preset(db),
-        "vendor": await ai_providers.get_vendor(db),
-        "preset_locked": await ai_providers.get_preset_locked(db),
-        "preset_models": await ai_providers.get_preset_models(db),
-        "saved_presets": await ai_providers.get_saved_presets(db),
-        "active_saved_preset": await ai_providers.get_active_saved_preset(db),
         "warnings": warnings,
     }
 
@@ -233,7 +185,7 @@ async def agent_health(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """Live status for both providers.
+    """Live status for OpenRouter.
 
     The old version reported "configured" because a row existed in the settings
     table — while every chat failed on a dead model. This one asks the provider
@@ -266,17 +218,10 @@ async def agent_health(
 # settings
 # ---------------------------------------------------------------------------
 class SettingsUpdate(BaseModel):
-    provider: Optional[str] = Field(None, pattern="^openrouter$")
     api_key: Optional[str] = None
     clear_key: bool = False
-    model: Optional[str] = None
-    default_provider: Optional[str] = None
     auto_fallback: Optional[bool] = None
     auto_approve: Optional[bool] = None
-    preset_locked: Optional[bool] = None
-    preset_models: Optional[list[str]] = None
-    saved_presets: Optional[list[dict[str, Any]]] = None
-    active_saved_preset: Optional[str] = None
 
 
 @router.get("/settings")
@@ -284,14 +229,6 @@ async def get_settings(db: AsyncSession = Depends(get_db), user: User = Depends(
     summary = await ai_providers.keys_summary(db)
     return {
         **summary,
-        "models": {p: await ai_providers.get_model(db, p) for p in ai_providers.PROVIDERS},
-        "default_provider": await ai_providers.get_default_provider(db),
-        "vendor": await ai_providers.get_vendor(db),
-        "preset": await ai_providers.get_preset(db),
-        "preset_locked": await ai_providers.get_preset_locked(db),
-        "preset_models": await ai_providers.get_preset_models(db),
-        "saved_presets": await ai_providers.get_saved_presets(db),
-        "active_saved_preset": await ai_providers.get_active_saved_preset(db),
         "auto_fallback": await ai_providers.get_flag(db, ai_providers.AUTO_FALLBACK_SETTING, True),
         "auto_approve": await ai_providers.get_flag(db, ai_providers.AUTO_APPROVE_SETTING, False),
         "voice": await _voice_settings(db),
@@ -323,40 +260,23 @@ async def put_settings(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    prov = body.provider or "openrouter"
+    prov = ai_providers.PROVIDER
     if body.api_key is not None or body.clear_key:
         if body.clear_key:
             await ai_providers.set_api_key(db, prov, "")
         elif body.api_key and body.api_key.strip():
             await ai_providers.set_api_key(db, prov, body.api_key)
-    if body.model:
-        await ai_providers.set_model(db, prov, body.model)
-    if body.default_provider in ai_providers.PROVIDERS:
-        await ai_providers._set_value(db, ai_providers.DEFAULT_PROVIDER_SETTING, body.default_provider)
     if body.auto_fallback is not None:
         await ai_providers.set_flag(db, ai_providers.AUTO_FALLBACK_SETTING, body.auto_fallback)
     if body.auto_approve is not None:
         await ai_providers.set_flag(db, ai_providers.AUTO_APPROVE_SETTING, body.auto_approve)
-    if body.preset_locked is not None:
-        await ai_providers.set_preset_locked(db, body.preset_locked)
-    if body.preset_models is not None:
-        cleaned_models = await ai_providers.set_preset_models(db, body.preset_models)
-        if cleaned_models and not body.model and (body.preset_locked or await ai_providers.get_preset_locked(db)):
-            await ai_providers.set_model(db, "openrouter", cleaned_models[0])
-    if body.saved_presets is not None:
-        await ai_providers.set_saved_presets(db, body.saved_presets)
-    if body.active_saved_preset is not None:
-        await ai_providers.set_active_saved_preset(db, body.active_saved_preset)
     await db.commit()
     return {
         "success": True,
         "provider": "openrouter",
         **(await ai_providers.keys_summary(db)),
-        "models": {p: await ai_providers.get_model(db, p) for p in ai_providers.PROVIDERS},
-        "preset_locked": await ai_providers.get_preset_locked(db),
-        "preset_models": await ai_providers.get_preset_models(db),
-        "saved_presets": await ai_providers.get_saved_presets(db),
-        "active_saved_preset": await ai_providers.get_active_saved_preset(db),
+        "auto_fallback": await ai_providers.get_flag(db, ai_providers.AUTO_FALLBACK_SETTING, True),
+        "auto_approve": await ai_providers.get_flag(db, ai_providers.AUTO_APPROVE_SETTING, False),
     }
 
 
@@ -380,7 +300,6 @@ async def put_voice_settings(
 
 
 class TestKeyRequest(BaseModel):
-    provider: Optional[str] = Field(None, pattern="^openrouter$")
     api_key: Optional[str] = None
 
 
@@ -395,7 +314,7 @@ async def test_key(
     The old version demanded ``api_key`` in the body, so the only key the
     operator actually had (the saved, masked one) could never be tested.
     """
-    providers = [body.provider] if body.provider else list(ai_providers.PROVIDERS)
+    providers = list(ai_providers.PROVIDERS)
     results = []
     for provider in providers:
         typed = (body.api_key or "").strip()
@@ -421,14 +340,12 @@ async def test_key(
                 "using_saved_key": not typed,
             })
             continue
-        chosen = ai_providers.pick_default(provider, models)
         results.append({
             "provider": provider,
             "success": True,
             "state": "ok",
             "message": f"{ai_providers.label(provider)} OK — {len(models)} models available.",
             "models": len(models),
-            "suggested_model": chosen,
             "using_saved_key": not typed,
             "key_hint": ai_providers.mask(key),
         })
@@ -442,7 +359,6 @@ async def test_key(
 # ---------------------------------------------------------------------------
 class SessionCreate(BaseModel):
     name: Optional[str] = "New chat"
-    model: Optional[str] = None
     system_prompt: Optional[str] = None
 
 
@@ -469,7 +385,6 @@ async def list_sessions(db: AsyncSession = Depends(get_db), user: User = Depends
         out.append({
             "id": session.id,
             "name": session.name,
-            "model": session.model,
             "skills": session.skills or [],
             "message_count": count,
             "last_message": (last.content or "")[:160] if last else "",
@@ -487,14 +402,13 @@ async def create_session(
 ):
     session = await agent_runtime.create_session(
         db, user_id=user.id, name=body.name or "New chat",
-        model=body.model, system_prompt=body.system_prompt,
+        system_prompt=body.system_prompt,
     )
     await db.commit()
     return {
         "session": {
             "id": session.id,
             "name": session.name,
-            "model": session.model,
             "created_at": session.created_at.isoformat() if session.created_at else None,
         }
     }
@@ -541,7 +455,6 @@ async def get_session(
         "session": {
             "id": session.id,
             "name": session.name,
-            "model": session.model,
             "memory": session.memory,
             "skills": session.skills or [],
             "system_prompt": session.system_prompt,
@@ -565,7 +478,6 @@ async def get_session(
 
 class SessionUpdate(BaseModel):
     name: Optional[str] = None
-    model: Optional[str] = None
     skills: Optional[list[str]] = None
     system_prompt: Optional[str] = None
     memory: Optional[str] = None
@@ -581,8 +493,6 @@ async def update_session(
     session = await _session_or_404(db, session_id)
     if body.name:
         session.name = body.name.strip()[:200]
-    if body.model in ai_providers.PROVIDERS:
-        session.model = body.model
     if body.skills is not None:
         session.skills = body.skills
     if body.system_prompt is not None:
@@ -590,7 +500,7 @@ async def update_session(
     if body.memory is not None:
         session.memory = body.memory[:20000]
     await db.commit()
-    return {"success": True, "session": {"id": session.id, "name": session.name, "model": session.model}}
+    return {"success": True, "session": {"id": session.id, "name": session.name}}
 
 
 @router.delete("/sessions/{session_id}")
@@ -611,8 +521,6 @@ async def delete_session(
 class ChatRequest(BaseModel):
     message: str
     file_ids: Optional[list[int]] = None
-    model: Optional[str] = None
-    provider: Optional[str] = None
     #: Ask for the full JSON response instead of the stream (used by tests and
     #: by any client that cannot read a stream).
     stream: bool = True
@@ -634,18 +542,11 @@ async def chat(
     if not text:
         raise HTTPException(400, "message is required")
 
-    if body.model:
-        await ai_providers.set_model(db, body.provider or session.model, body.model)
-    if body.provider and body.provider != session.model:
-        session.model = body.provider
-        await db.flush()
-
     if not body.stream:
         events: list[dict] = []
         error_payload = None
         async for event in agent_runtime.run_turn(
             db, session, text, user=user, file_ids=body.file_ids,
-            provider_override=body.provider, model_override=body.model,
         ):
             events.append(event)
             if event.get("type") == "error":
@@ -667,7 +568,6 @@ async def chat(
         try:
             async for event in agent_runtime.run_turn(
                 db, session, text, user=user, file_ids=body.file_ids,
-                provider_override=body.provider, model_override=body.model,
             ):
                 yield json.dumps(event, default=str) + "\n"
         except Exception as exc:  # pragma: no cover - last-resort guard
@@ -678,7 +578,7 @@ async def chat(
                 "error": {
                     "code": "upstream_error", "provider": session.model,
                     "status": 500, "message": str(exc)[:300],
-                    "hint": "Retry. If it keeps failing, switch provider.",
+                    "hint": "Retry. If it keeps failing, check your OpenRouter key and selected preset.",
                     "retryable": True,
                 },
             }) + "\n"

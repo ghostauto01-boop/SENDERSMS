@@ -692,8 +692,6 @@ async def run_turn(
     *,
     user,
     file_ids: Optional[list[int]] = None,
-    provider_override: Optional[str] = None,
-    model_override: Optional[str] = None,
 ) -> AsyncIterator[dict]:
     """Execute one turn, yielding SSE-shaped events.
 
@@ -736,24 +734,20 @@ async def run_turn(
         }
         return
 
-    # One provider now. A session created before the switch stores "groq" or
-    # "gemini" in ``session.model``; neither exists any more, so anything that
-    # is not in PROVIDERS resolves to OpenRouter rather than to a dead key.
-    provider = provider_override or session.model or await ai_providers.get_default_provider(db)
+    # A session created before the OpenRouter switch may store a retired
+    # provider name in ``session.model``. Normalize it internally; routing is
+    # now controlled by the selected preset or automatic OpenRouter recovery.
+    provider = session.model or await ai_providers.get_default_provider(db)
     if provider not in ai_providers.PROVIDERS:
         provider = ai_providers.PROVIDER
-    requested_provider = provider
 
-    # 2. Key + model, from OpenRouter's live list.
+    # 2. Key + route. Models are automatic unless a preset owns routing.
     keys = await ai_providers.get_keys(db)
     auto_approve = await ai_providers.get_flag(db, AUTO_APPROVE_SETTING, False)
     allow_fallback = await ai_providers.get_flag(db, AUTO_FALLBACK_SETTING, True)
     api_key = keys.get(provider)
     images = await _file_images(db, session.id, file_ids)
-    #: An image on a text-only model used to mean a second provider. Now it means
-    #: one extra step on the same provider: resolve a vision-capable model from
-    #: the live catalogue and use it for this turn.
-    temporary_image_route = False
+    #: Without a preset, resolve a capable image model internally for this turn.
 
     if not api_key:
         error = ProviderError(
@@ -767,19 +761,11 @@ async def run_turn(
         yield {"type": "done", "turn_id": turn_id}
         return
 
-    effective_model_override = model_override if provider == requested_provider else None
     try:
-        if images and not (
-            effective_model_override
-            and ai_providers.is_vision_model(provider, effective_model_override)
-        ):
-            temporary_image_route = True
+        if images:
             model = await ai_providers.resolve_vision_model(db, provider, api_key=api_key)
-            effective_model_override = None
         else:
-            model = effective_model_override or await ai_providers.resolve_model(
-                db, provider, api_key=api_key
-            )
+            model = await ai_providers.resolve_model(db, provider, api_key=api_key)
     except ProviderError as error:
         # No model could be resolved — most often "this picture needs a
         # vision-capable model and the catalogue has none for this key". Report
@@ -790,9 +776,7 @@ async def run_turn(
         yield {"type": "done", "turn_id": turn_id}
         return
 
-    if effective_model_override:
-        await ai_providers.set_model(db, provider, effective_model_override)
-    if provider != session.model and not temporary_image_route:
+    if provider != session.model:
         session.model = provider
         await db.flush()
 
@@ -819,20 +803,17 @@ async def run_turn(
     skills = await _active_skills(db, session, user_text)
     summaries = await _file_summaries(db, session.id, file_ids)
     global_memory = await get_global_memory(db)
-    preset_locked = await ai_providers.get_preset_locked(db)
-    preset_models = await ai_providers.get_preset_models(db)
+    selected_preset = await ai_providers.get_preset(db)
+    route_description = (
+        f"OpenRouter preset “{selected_preset}”"
+        if selected_preset else f"automatic OpenRouter routing ({model})"
+    )
     yield {
         "type": "status",
         "phase": "context_ready",
         "model": model,
-        "preset_locked": preset_locked,
-        "preset_count": len(preset_models),
         "tools_count": len(tools_in_use),
-        "text": (
-            f"Prepared {len(tools_in_use)} workspace tool(s) · Locked preset chain ({len(preset_models)} model(s), starting with {model})"
-            if preset_locked and preset_models
-            else f"Prepared {len(tools_in_use)} workspace tool(s) · Connecting to OpenRouter ({model})"
-        ),
+        "text": f"Prepared {len(tools_in_use)} workspace tool(s) · Using {route_description}",
     }
     system_text = build_system_prompt(
         memory=session.memory or "",
@@ -948,7 +929,7 @@ async def run_turn(
                         api_key = keys.get(used_provider) or api_key
                     if event.get("model"):
                         used_model = event["model"]
-                    if used_provider != session.model and not temporary_image_route:
+                    if used_provider != session.model:
                         session.model = used_provider
                         await db.flush()
         except ProviderError as error:
@@ -980,7 +961,7 @@ async def run_turn(
                 code="upstream_error",
                 provider=used_provider,
                 model=used_model,
-                message=f"{used_provider.title()} returned an empty answer. Retry or switch provider.",
+                message=f"{used_provider.title()} returned an empty answer. Retry or check your selected preset.",
                 detail="The provider returned neither text nor a tool call.",
             )
             await _save_error(db, session, error, turn_id)
