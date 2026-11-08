@@ -1,0 +1,135 @@
+{
+  "phone_number": [
+    "phone",
+    "phone_number",
+    "phonenumber",
+    "phone number",
+    "phone no",
+    "phone_no",
+    "mobile",
+    "mobile number",
+    "mobile_number",
+    "mobile no",
+    "mobile_no",
+    "tel",
+    "telephone",
+    "telephone number",
+    "contact",
+    "contact number",
+    "number",
+    "cell",
+    "cell phone",
+    "sms number"
+  ],
+  "first_name": [
+    "first_name",
+    "firstname",
+    "first name",
+    "fname",
+    "given name",
+    "given_name",
+    "name",
+    "full name",
+    "fullname",
+    "customer name",
+    "customer_name",
+    "contact name",
+    "contact_name",
+    "contact person",
+    "contact_person",
+    "client name",
+    "client_name"
+  ],
+  "last_name": [
+    "last_name",
+    "lastname",
+    "last name",
+    "lname",
+    "surname",
+    "family name",
+    "family_name"
+  ],
+  "business_name": [
+    "business_name",
+    "businessname",
+    "business name",
+    "business",
+    "company",
+    "company name",
+    "brand",
+    "brand name",
+    "brand_name",
+    "organization",
+    "organisation",
+    "restaurant",
+    "restaurant name",
+    "shop",
+    "store"
+  ],
+  "email": [
+    "email",
+    "e-mail",
+    "mail",
+    "email address",
+    "email_address",
+    "email id",
+    "emailid",
+    "email 1",
+    "primary email",
+    "contact email",
+    "business email",
+    "work email",
+    "e mail address",
+    "mail id"
+  ],
+  "city": [
+    "city",
+    "town"
+  ],
+  "state": [
+    "state",
+    "region",
+    "province"
+  ],
+  "country": [
+    "country",
+    "nation"
+  ],
+  "website": [
+    "website",
+    "web",
+    "url",
+    "site",
+    "web site"
+  ],
+  "industry": [
+    "industry",
+    "sector",
+    "category"
+  ],
+  "source": [
+    "source",
+    "channel",
+    "origin"
+  ],
+  "lead_status": [
+    "lead status",
+    "lead_status",
+    "status",
+    "pipeline status"
+  ],
+  "notes": [
+    "notes",
+    "note",
+    "comments",
+    "comment"
+  ],
+  "tags": [
+    "tags",
+    "tag",
+    "label",
+    "labels",
+    "groups",
+    "group"
+  ]
+}

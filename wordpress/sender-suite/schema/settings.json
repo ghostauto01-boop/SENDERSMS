@@ -1,0 +1,641 @@
+[
+  {
+    "name": "APP_NAME",
+    "type": "str",
+    "source": "backend/app/config.py:35",
+    "secret": false,
+    "default": "Sendify",
+    "requires_operator_value": false,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "APP_ENV",
+    "type": "str",
+    "source": "backend/app/config.py:36",
+    "secret": false,
+    "default": "development",
+    "requires_operator_value": false,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "LOG_LEVEL",
+    "type": "str",
+    "source": "backend/app/config.py:37",
+    "secret": false,
+    "default": "INFO",
+    "requires_operator_value": false,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "DEFAULT_TIMEZONE",
+    "type": "str",
+    "source": "backend/app/config.py:38",
+    "secret": false,
+    "default": "Africa/Lagos",
+    "requires_operator_value": false,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "SECRET_KEY",
+    "type": "str",
+    "source": "backend/app/config.py:41",
+    "secret": true,
+    "default": null,
+    "requires_operator_value": true,
+    "expression_kind": "Name"
+  },
+  {
+    "name": "CREDENTIAL_ENCRYPTION_KEY",
+    "type": "str",
+    "source": "backend/app/config.py:42",
+    "secret": true,
+    "default": null,
+    "requires_operator_value": true,
+    "expression_kind": "Name"
+  },
+  {
+    "name": "ACCESS_TOKEN_EXPIRE_MINUTES",
+    "type": "int",
+    "source": "backend/app/config.py:43",
+    "secret": true,
+    "default": null,
+    "requires_operator_value": true,
+    "expression_kind": "BinOp"
+  },
+  {
+    "name": "DATABASE_URL",
+    "type": "str",
+    "source": "backend/app/config.py:46",
+    "secret": false,
+    "default": null,
+    "requires_operator_value": false,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "REDIS_URL",
+    "type": "str",
+    "source": "backend/app/config.py:49",
+    "secret": false,
+    "default": null,
+    "requires_operator_value": false,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "CORS_ORIGINS",
+    "type": "str",
+    "source": "backend/app/config.py:52",
+    "secret": false,
+    "default": "http://localhost:5173,http://localhost:3000",
+    "requires_operator_value": false,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "MCP_CORS_ORIGINS",
+    "type": "str",
+    "source": "backend/app/config.py:56",
+    "secret": false,
+    "default": "https://chatgpt.com,https://chat.openai.com,https://claude.ai",
+    "requires_operator_value": false,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "PUBLIC_BASE_URL",
+    "type": "Optional[str]",
+    "source": "backend/app/config.py:70",
+    "secret": false,
+    "default": null,
+    "requires_operator_value": false,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "ADMIN_USERNAME",
+    "type": "str",
+    "source": "backend/app/config.py:73",
+    "secret": false,
+    "default": "admin",
+    "requires_operator_value": false,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "ADMIN_PASSWORD",
+    "type": "str",
+    "source": "backend/app/config.py:74",
+    "secret": true,
+    "default": null,
+    "requires_operator_value": true,
+    "expression_kind": "Name"
+  },
+  {
+    "name": "LOGIN_PASSWORD",
+    "type": "str",
+    "source": "backend/app/config.py:77",
+    "secret": true,
+    "default": null,
+    "requires_operator_value": true,
+    "expression_kind": "Name"
+  },
+  {
+    "name": "SMSGATE_BASE_URL",
+    "type": "Optional[str]",
+    "source": "backend/app/config.py:81",
+    "secret": false,
+    "default": "https://api.sms-gate.app/3rdparty/v1",
+    "requires_operator_value": false,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "SMSGATE_USERNAME",
+    "type": "Optional[str]",
+    "source": "backend/app/config.py:82",
+    "secret": false,
+    "default": null,
+    "requires_operator_value": false,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "SMSGATE_PASSWORD",
+    "type": "Optional[str]",
+    "source": "backend/app/config.py:83",
+    "secret": true,
+    "default": null,
+    "requires_operator_value": true,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "SMSGATE_WEBHOOK_SECRET",
+    "type": "Optional[str]",
+    "source": "backend/app/config.py:84",
+    "secret": true,
+    "default": null,
+    "requires_operator_value": true,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "SMSGATE_WEBHOOK_ALLOW_UNSIGNED",
+    "type": "bool",
+    "source": "backend/app/config.py:87",
+    "secret": false,
+    "default": false,
+    "requires_operator_value": false,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "ENABLE_INLINE_POLLER",
+    "type": "bool",
+    "source": "backend/app/config.py:91",
+    "secret": false,
+    "default": true,
+    "requires_operator_value": false,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "INLINE_POLL_INTERVAL",
+    "type": "int",
+    "source": "backend/app/config.py:92",
+    "secret": false,
+    "default": 30,
+    "requires_operator_value": false,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "INLINE_IDLE_POLL_INTERVAL",
+    "type": "int",
+    "source": "backend/app/config.py:98",
+    "secret": false,
+    "default": null,
+    "requires_operator_value": false,
+    "expression_kind": "BinOp"
+  },
+  {
+    "name": "INLINE_POLL_ACTIVE_WINDOW",
+    "type": "int",
+    "source": "backend/app/config.py:99",
+    "secret": false,
+    "default": null,
+    "requires_operator_value": false,
+    "expression_kind": "BinOp"
+  },
+  {
+    "name": "SMSGATE_TIMEOUT",
+    "type": "int",
+    "source": "backend/app/config.py:100",
+    "secret": false,
+    "default": 30,
+    "requires_operator_value": false,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "SMSGATE_RETRY_COUNT",
+    "type": "int",
+    "source": "backend/app/config.py:101",
+    "secret": false,
+    "default": 3,
+    "requires_operator_value": false,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "SMSGATE_POLL_INTERVAL",
+    "type": "int",
+    "source": "backend/app/config.py:102",
+    "secret": false,
+    "default": 60,
+    "requires_operator_value": false,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "CALLGATE_BASE_URL",
+    "type": "Optional[str]",
+    "source": "backend/app/config.py:108",
+    "secret": false,
+    "default": null,
+    "requires_operator_value": false,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "CALLGATE_USERNAME",
+    "type": "Optional[str]",
+    "source": "backend/app/config.py:109",
+    "secret": false,
+    "default": null,
+    "requires_operator_value": false,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "CALLGATE_PASSWORD",
+    "type": "Optional[str]",
+    "source": "backend/app/config.py:110",
+    "secret": true,
+    "default": null,
+    "requires_operator_value": true,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "CALLGATE_WEBHOOK_SECRET",
+    "type": "Optional[str]",
+    "source": "backend/app/config.py:111",
+    "secret": true,
+    "default": null,
+    "requires_operator_value": true,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "CALLGATE_TIMEOUT",
+    "type": "int",
+    "source": "backend/app/config.py:112",
+    "secret": false,
+    "default": 15,
+    "requires_operator_value": false,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "CALLGATE_ALLOW_DIRECT_DIAL_FALLBACK",
+    "type": "bool",
+    "source": "backend/app/config.py:115",
+    "secret": false,
+    "default": true,
+    "requires_operator_value": false,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "PAYSTACK_PUBLIC_KEY",
+    "type": "Optional[str]",
+    "source": "backend/app/config.py:120",
+    "secret": false,
+    "default": null,
+    "requires_operator_value": false,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "PAYSTACK_SECRET_KEY",
+    "type": "Optional[str]",
+    "source": "backend/app/config.py:121",
+    "secret": true,
+    "default": null,
+    "requires_operator_value": true,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "ONESIGNAL_APP_ID",
+    "type": "Optional[str]",
+    "source": "backend/app/config.py:124",
+    "secret": false,
+    "default": null,
+    "requires_operator_value": false,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "ONESIGNAL_REST_API_KEY",
+    "type": "Optional[str]",
+    "source": "backend/app/config.py:125",
+    "secret": true,
+    "default": null,
+    "requires_operator_value": true,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "PUSHOVER_APP_TOKEN",
+    "type": "Optional[str]",
+    "source": "backend/app/config.py:128",
+    "secret": true,
+    "default": null,
+    "requires_operator_value": true,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "PUSHOVER_USER_KEY",
+    "type": "Optional[str]",
+    "source": "backend/app/config.py:129",
+    "secret": false,
+    "default": null,
+    "requires_operator_value": false,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "VAPID_PUBLIC_KEY",
+    "type": "Optional[str]",
+    "source": "backend/app/config.py:135",
+    "secret": true,
+    "default": null,
+    "requires_operator_value": true,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "VAPID_PRIVATE_KEY",
+    "type": "Optional[str]",
+    "source": "backend/app/config.py:136",
+    "secret": true,
+    "default": null,
+    "requires_operator_value": true,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "VAPID_CLAIM_EMAIL",
+    "type": "str",
+    "source": "backend/app/config.py:137",
+    "secret": true,
+    "default": null,
+    "requires_operator_value": true,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "MCP_OAUTH_ENABLED",
+    "type": "bool",
+    "source": "backend/app/config.py:143",
+    "secret": false,
+    "default": true,
+    "requires_operator_value": false,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "MCP_OAUTH_REQUIRE_LOGIN",
+    "type": "bool",
+    "source": "backend/app/config.py:150",
+    "secret": false,
+    "default": true,
+    "requires_operator_value": false,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "MCP_OAUTH_ACCESS_TOKEN_TTL_MINUTES",
+    "type": "int",
+    "source": "backend/app/config.py:151",
+    "secret": true,
+    "default": null,
+    "requires_operator_value": true,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "MCP_OAUTH_REFRESH_TOKEN_TTL_DAYS",
+    "type": "int",
+    "source": "backend/app/config.py:152",
+    "secret": true,
+    "default": null,
+    "requires_operator_value": true,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "GOOGLE_CLIENT_ID",
+    "type": "Optional[str]",
+    "source": "backend/app/config.py:158",
+    "secret": false,
+    "default": null,
+    "requires_operator_value": false,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "GOOGLE_CLIENT_SECRET",
+    "type": "Optional[str]",
+    "source": "backend/app/config.py:159",
+    "secret": true,
+    "default": null,
+    "requires_operator_value": true,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "GMAIL_POLL_INTERVAL",
+    "type": "int",
+    "source": "backend/app/config.py:164",
+    "secret": false,
+    "default": 30,
+    "requires_operator_value": false,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "GMAIL_RESCUE_FROM_SPAM",
+    "type": "bool",
+    "source": "backend/app/config.py:168",
+    "secret": false,
+    "default": true,
+    "requires_operator_value": false,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "GMAIL_SEND_REPLIES",
+    "type": "bool",
+    "source": "backend/app/config.py:171",
+    "secret": false,
+    "default": true,
+    "requires_operator_value": false,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "EMAIL_ENRICHMENT_ENABLED",
+    "type": "bool",
+    "source": "backend/app/config.py:184",
+    "secret": false,
+    "default": true,
+    "requires_operator_value": false,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "EMAIL_ENRICHMENT_USE_PROVIDERS",
+    "type": "bool",
+    "source": "backend/app/config.py:187",
+    "secret": false,
+    "default": true,
+    "requires_operator_value": false,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "EMAIL_ENRICHMENT_ALLOW_INFERRED",
+    "type": "bool",
+    "source": "backend/app/config.py:190",
+    "secret": false,
+    "default": false,
+    "requires_operator_value": false,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "EMAIL_ENRICHMENT_KEEP_PRIMARY",
+    "type": "bool",
+    "source": "backend/app/config.py:193",
+    "secret": false,
+    "default": true,
+    "requires_operator_value": false,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "EMAIL_SEND_INFERRED",
+    "type": "bool",
+    "source": "backend/app/config.py:196",
+    "secret": false,
+    "default": true,
+    "requires_operator_value": false,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "EMAIL_REQUIRE_VERIFIED",
+    "type": "bool",
+    "source": "backend/app/config.py:197",
+    "secret": false,
+    "default": false,
+    "requires_operator_value": false,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "EMAIL_DEFAULT_DAILY_LIMIT",
+    "type": "int",
+    "source": "backend/app/config.py:201",
+    "secret": false,
+    "default": 0,
+    "requires_operator_value": false,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "EMAIL_ENRICHMENT_DNS_TTL",
+    "type": "int",
+    "source": "backend/app/config.py:204",
+    "secret": false,
+    "default": 3600,
+    "requires_operator_value": false,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "EMAIL_ENRICHMENT_TIMEOUT",
+    "type": "int",
+    "source": "backend/app/config.py:205",
+    "secret": false,
+    "default": 8,
+    "requires_operator_value": false,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "HUNTER_API_KEY",
+    "type": "Optional[str]",
+    "source": "backend/app/config.py:208",
+    "secret": true,
+    "default": null,
+    "requires_operator_value": true,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "ZEROBOUNCE_API_KEY",
+    "type": "Optional[str]",
+    "source": "backend/app/config.py:210",
+    "secret": true,
+    "default": null,
+    "requires_operator_value": true,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "NEVERBOUNCE_API_KEY",
+    "type": "Optional[str]",
+    "source": "backend/app/config.py:212",
+    "secret": true,
+    "default": null,
+    "requires_operator_value": true,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "REACHER_API_URL",
+    "type": "Optional[str]",
+    "source": "backend/app/config.py:222",
+    "secret": false,
+    "default": null,
+    "requires_operator_value": false,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "REACHER_API_KEY",
+    "type": "Optional[str]",
+    "source": "backend/app/config.py:223",
+    "secret": true,
+    "default": null,
+    "requires_operator_value": true,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "EMAIL_VALIDATOR_SMTP",
+    "type": "bool",
+    "source": "backend/app/config.py:226",
+    "secret": false,
+    "default": true,
+    "requires_operator_value": false,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "OPENROUTER_API_KEY",
+    "type": "Optional[str]",
+    "source": "backend/app/config.py:239",
+    "secret": true,
+    "default": null,
+    "requires_operator_value": true,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "RATE_LIMIT_AI_AGENT",
+    "type": "str",
+    "source": "backend/app/config.py:242",
+    "secret": false,
+    "default": "60/minute",
+    "requires_operator_value": false,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "RATE_LIMIT_AI_TRANSCRIBE",
+    "type": "str",
+    "source": "backend/app/config.py:243",
+    "secret": false,
+    "default": "20/minute",
+    "requires_operator_value": false,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "RATE_LIMIT_LOGIN",
+    "type": "str",
+    "source": "backend/app/config.py:245",
+    "secret": false,
+    "default": "10/minute",
+    "requires_operator_value": false,
+    "expression_kind": "Constant"
+  },
+  {
+    "name": "RATE_LIMIT_API",
+    "type": "str",
+    "source": "backend/app/config.py:251",
+    "secret": false,
+    "default": "600/minute",
+    "requires_operator_value": false,
+    "expression_kind": "Constant"
+  }
+]

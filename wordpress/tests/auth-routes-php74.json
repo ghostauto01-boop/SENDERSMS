@@ -1,0 +1,11 @@
+{
+  "ok": true,
+  "assertions": 57,
+  "diffs": [],
+  "php": "7.4.34-dev",
+  "scope": "Offline own-app dispatch with fake WP requests/responses, synthetic password codec, SQLite accounts, simulated non-expiring MySQL rate counter; not actual HTTP, browser, WordPress, Argon2, expiry or concurrent MySQL verification",
+  "native_wordpress_verified": false,
+  "native_mysql_verified": false,
+  "native_argon2_login_verified": false,
+  "suite": "auth-routes"
+}

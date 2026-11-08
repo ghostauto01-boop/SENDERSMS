@@ -1,0 +1,4577 @@
+[
+  {
+    "method": "DELETE",
+    "path": "/api/v1/ads/audiences/{audience_id}",
+    "sources": [
+      "backend/app/api/v1/ads.py:1719"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/ads/calendar/{event_id}",
+    "sources": [
+      "backend/app/api/v1/ads.py:2545"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/ads/campaigns/{campaign_id}",
+    "sources": [
+      "backend/app/api/v1/ads.py:514"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/audience/{assignment_id}",
+    "sources": [
+      "backend/app/api/v1/ads.py:1053"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/followup-steps/{step_id}",
+    "sources": [
+      "backend/app/api/v1/ads.py:2123"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/ads/creatives/{creative_id}",
+    "sources": [
+      "backend/app/api/v1/ads.py:1499"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/ads/followup-steps/{step_id}",
+    "sources": [
+      "backend/app/api/v1/ads.py:2140"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/ads/followup-templates/{template_id}",
+    "sources": [
+      "backend/app/api/v1/ads.py:2284"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/ads/sets/{set_id}",
+    "sources": [
+      "backend/app/api/v1/ads.py:1285"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/ads/suppression/{entry_id}",
+    "sources": [
+      "backend/app/api/v1/ads.py:2626"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/ai-agent/files/{file_id}",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:835"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/ai-agent/memory/global",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:914"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/ai-agent/memory/{session_id}",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:944"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/ai-agent/sessions/{session_id}",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:507"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/ai-agent/skills/{skill_id}",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:1043"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/automations/{automation_id}",
+    "sources": [
+      "backend/app/api/v1/automations.py:130"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/autoreply/{rule_id}",
+    "sources": [
+      "backend/app/api/v1/autoreply.py:134"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/calendar/{meeting_id}",
+    "sources": [
+      "backend/app/api/v1/calendar.py:535"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/calls/webhooks/{webhook_id}",
+    "sources": [
+      "backend/app/api/v1/calls.py:160"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/campaign-followups/{followup_id}",
+    "sources": [
+      "backend/app/api/v1/campaign_followups.py:247"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/campaigns/{campaign_id}",
+    "sources": [
+      "backend/app/api/v1/campaigns.py:596"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/contacts/{contact_id}",
+    "sources": [
+      "backend/app/api/v1/contacts.py:963"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/email/accounts/{account_id}",
+    "sources": [
+      "backend/app/api/v1/email.py:295"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/email/domains/{domain_id}",
+    "sources": [
+      "backend/app/api/v1/email.py:412"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/email/suppression/{entry_id}",
+    "sources": [
+      "backend/app/api/v1/email.py:1669"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/followups/{followup_id}",
+    "sources": [
+      "backend/app/api/v1/followups.py:213"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/invoices/{invoice_id}",
+    "sources": [
+      "backend/app/api/v1/invoices.py:1203"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/lists/{list_id}",
+    "sources": [
+      "backend/app/api/v1/lists.py:213"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/mailbox/{mailbox_id}",
+    "sources": [
+      "backend/app/api/v1/mailbox.py:559"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/mcp/clients/{client_pk}",
+    "sources": [
+      "backend/app/api/v1/mcp.py:1188"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/mcp/tokens/{token_id}",
+    "sources": [
+      "backend/app/api/v1/mcp.py:1000"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/sequences/{sequence_id}",
+    "sources": [
+      "backend/app/api/v1/sequences.py:243"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/settings/callgate/webhooks/{webhook_id}",
+    "sources": [
+      "backend/app/api/v1/settings.py:287"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/settings/gateway/phones/{phone_id}",
+    "sources": [
+      "backend/app/api/v1/settings.py:501"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/settings/gateway/webhooks/{webhook_id}",
+    "sources": [
+      "backend/app/api/v1/settings.py:142"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/templates/{template_id}",
+    "sources": [
+      "backend/app/api/v1/templates.py:306"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/variables/{variable_id}",
+    "sources": [
+      "backend/app/api/v1/variables.py:163"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/connectors/{key}/mcp",
+    "sources": [
+      "backend/app/api/v1/mcp.py:353"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/mcp",
+    "sources": [
+      "backend/app/api/v1/mcp.py:313"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/mcp/",
+    "sources": [
+      "backend/app/api/v1/mcp.py:313"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/.well-known/oauth-authorization-server",
+    "sources": [
+      "backend/app/api/v1/mcp.py:403"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/.well-known/oauth-authorization-server/{path:path}",
+    "sources": [
+      "backend/app/api/v1/mcp.py:403"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/.well-known/oauth-protected-resource",
+    "sources": [
+      "backend/app/api/v1/mcp.py:378"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/.well-known/oauth-protected-resource/{path:path}",
+    "sources": [
+      "backend/app/api/v1/mcp.py:378"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/.well-known/openid-configuration",
+    "sources": [
+      "backend/app/api/v1/mcp.py:403"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/.well-known/openid-configuration/{path:path}",
+    "sources": [
+      "backend/app/api/v1/mcp.py:403"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/activity",
+    "sources": [
+      "backend/app/api/v1/ads.py:3100"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/audiences",
+    "sources": [
+      "backend/app/api/v1/ads.py:1651"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/audiences/{audience_id}",
+    "sources": [
+      "backend/app/api/v1/ads.py:1691"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/audiences/{audience_id}/preview",
+    "sources": [
+      "backend/app/api/v1/ads.py:1732"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/calendar",
+    "sources": [
+      "backend/app/api/v1/ads.py:2451"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/campaigns",
+    "sources": [
+      "backend/app/api/v1/ads.py:275"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/campaigns/{campaign_id}",
+    "sources": [
+      "backend/app/api/v1/ads.py:352"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/activity",
+    "sources": [
+      "backend/app/api/v1/ads.py:1139"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/analytics",
+    "sources": [
+      "backend/app/api/v1/ads.py:1046"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/audience",
+    "sources": [
+      "backend/app/api/v1/ads.py:812"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/followup-steps",
+    "sources": [
+      "backend/app/api/v1/ads.py:1938"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/jobs",
+    "sources": [
+      "backend/app/api/v1/ads.py:893"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/optimization",
+    "sources": [
+      "backend/app/api/v1/ads.py:1110"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/send-logs",
+    "sources": [
+      "backend/app/api/v1/ads.py:936"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/sets",
+    "sources": [
+      "backend/app/api/v1/ads.py:1177"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/contacts/{contact_id}/timeline",
+    "sources": [
+      "backend/app/api/v1/ads.py:2718"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/creatives/{creative_id}/analytics",
+    "sources": [
+      "backend/app/api/v1/ads.py:1568"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/creatives/{creative_id}/versions",
+    "sources": [
+      "backend/app/api/v1/ads.py:1441"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/export/{kind}",
+    "sources": [
+      "backend/app/api/v1/ads.py:2943"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/followup-steps/{step_id}",
+    "sources": [
+      "backend/app/api/v1/ads.py:2009"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/followup-templates",
+    "sources": [
+      "backend/app/api/v1/ads.py:2213"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/followup-templates/{template_id}",
+    "sources": [
+      "backend/app/api/v1/ads.py:2249"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/followups",
+    "sources": [
+      "backend/app/api/v1/ads.py:2301"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/overview",
+    "sources": [
+      "backend/app/api/v1/ads.py:187"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/r/{assignment_id}",
+    "sources": [
+      "backend/app/api/v1/ads.py:1831"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/reference",
+    "sources": [
+      "backend/app/api/v1/ads.py:3039"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/search",
+    "sources": [
+      "backend/app/api/v1/ads.py:2805"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/sets/{set_id}/creatives",
+    "sources": [
+      "backend/app/api/v1/ads.py:1338"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/sets/{set_id}/preview",
+    "sources": [
+      "backend/app/api/v1/ads.py:1306"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/suppression",
+    "sources": [
+      "backend/app/api/v1/ads.py:2563"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ai-agent/activity",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:643"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ai-agent/files",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:802"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ai-agent/files/{file_id}",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:815"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ai-agent/health",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:183"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ai-agent/memory/global",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:898"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ai-agent/memory/{session_id}",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:921"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ai-agent/models",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:101"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ai-agent/presets",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:133"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ai-agent/sessions",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:366"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ai-agent/sessions/{session_id}",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:418"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ai-agent/settings",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:228"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ai-agent/skills",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:959"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ai-agent/skills/{skill_id}",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:1030"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ai-agent/tools",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:1057"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/analytics/by-campaign",
+    "sources": [
+      "backend/app/api/v1/analytics.py:205"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/analytics/calls",
+    "sources": [
+      "backend/app/api/v1/analytics.py:251"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/analytics/funnel",
+    "sources": [
+      "backend/app/api/v1/analytics.py:148"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/analytics/overview",
+    "sources": [
+      "backend/app/api/v1/analytics.py:24"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/analytics/timeseries",
+    "sources": [
+      "backend/app/api/v1/analytics.py:101"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/auth/access",
+    "sources": [
+      "backend/app/api/v1/auth.py:243"
+    ],
+    "state": "partial handler; native WordPress/HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/auth/me",
+    "sources": [
+      "backend/app/api/v1/auth.py:276"
+    ],
+    "state": "partial handler; native WordPress/HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/automations",
+    "sources": [
+      "backend/app/api/v1/automations.py:43"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/automations/",
+    "sources": [
+      "backend/app/api/v1/automations.py:43"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/automations/{automation_id}",
+    "sources": [
+      "backend/app/api/v1/automations.py:88"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/autoreply",
+    "sources": [
+      "backend/app/api/v1/autoreply.py:44"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/autoreply/",
+    "sources": [
+      "backend/app/api/v1/autoreply.py:44"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/autoreply/{rule_id}",
+    "sources": [
+      "backend/app/api/v1/autoreply.py:87"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/calendar",
+    "sources": [
+      "backend/app/api/v1/calendar.py:164"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/calendar/",
+    "sources": [
+      "backend/app/api/v1/calendar.py:164"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/calendar/day",
+    "sources": [
+      "backend/app/api/v1/calendar.py:251"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/calendar/tags",
+    "sources": [
+      "backend/app/api/v1/calendar.py:273"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/calendar/tags/all",
+    "sources": [
+      "backend/app/api/v1/calendar.py:634"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/calendar/upcoming",
+    "sources": [
+      "backend/app/api/v1/calendar.py:237"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/calendar/{meeting_id}",
+    "sources": [
+      "backend/app/api/v1/calendar.py:301"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/calendar/{meeting_id}/preview",
+    "sources": [
+      "backend/app/api/v1/calendar.py:315"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/calls/active",
+    "sources": [
+      "backend/app/api/v1/calls.py:328"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/calls/config",
+    "sources": [
+      "backend/app/api/v1/calls.py:59"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/calls/logs",
+    "sources": [
+      "backend/app/api/v1/calls.py:287"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/calls/webhooks",
+    "sources": [
+      "backend/app/api/v1/calls.py:113"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/campaign-followups/campaigns",
+    "sources": [
+      "backend/app/api/v1/campaign_followups.py:45"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/campaign-followups/campaigns/{campaign_id}",
+    "sources": [
+      "backend/app/api/v1/campaign_followups.py:100"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/campaign-followups/{followup_id}/log",
+    "sources": [
+      "backend/app/api/v1/campaign_followups.py:405"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/campaign-followups/{followup_id}/preview",
+    "sources": [
+      "backend/app/api/v1/campaign_followups.py:323"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/campaigns",
+    "sources": [
+      "backend/app/api/v1/campaigns.py:53"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/campaigns/",
+    "sources": [
+      "backend/app/api/v1/campaigns.py:53"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/campaigns/reconcile",
+    "sources": [
+      "backend/app/api/v1/campaigns.py:106"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/campaigns/{campaign_id}",
+    "sources": [
+      "backend/app/api/v1/campaigns.py:131"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/campaigns/{campaign_id}/analytics",
+    "sources": [
+      "backend/app/api/v1/campaigns.py:610"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/campaigns/{campaign_id}/conversations",
+    "sources": [
+      "backend/app/api/v1/campaigns.py:634"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/campaigns/{campaign_id}/performance",
+    "sources": [
+      "backend/app/api/v1/campaigns.py:763"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/contacts",
+    "sources": [
+      "backend/app/api/v1/contacts.py:186"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/contacts/",
+    "sources": [
+      "backend/app/api/v1/contacts.py:186"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/contacts/enrich/status",
+    "sources": [
+      "backend/app/api/v1/contacts.py:1496"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/contacts/export",
+    "sources": [
+      "backend/app/api/v1/contacts.py:349"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/contacts/export/csv",
+    "sources": [
+      "backend/app/api/v1/contacts.py:1663"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/contacts/import/jobs/{job_id}",
+    "sources": [
+      "backend/app/api/v1/contacts.py:1334"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/contacts/import/jobs/{job_id}/errors.csv",
+    "sources": [
+      "backend/app/api/v1/contacts.py:1367"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/contacts/tags/",
+    "sources": [
+      "backend/app/api/v1/contacts.py:546"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/contacts/{contact_id}",
+    "sources": [
+      "backend/app/api/v1/contacts.py:588"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/contacts/{contact_id}/activity",
+    "sources": [
+      "backend/app/api/v1/contacts.py:1803"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/dashboard/charts",
+    "sources": [
+      "backend/app/api/v1/dashboard.py:205"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/dashboard/stats",
+    "sources": [
+      "backend/app/api/v1/dashboard.py:38"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/accounts",
+    "sources": [
+      "backend/app/api/v1/email.py:154"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/accounts/{account_id}/deliverability",
+    "sources": [
+      "backend/app/api/v1/email.py:1842"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/accounts/{account_id}/senders",
+    "sources": [
+      "backend/app/api/v1/email.py:669"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/contacts/{contact_id}/engagement",
+    "sources": [
+      "backend/app/api/v1/email.py:2071"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/domains",
+    "sources": [
+      "backend/app/api/v1/email.py:361"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/domains/{domain_id}",
+    "sources": [
+      "backend/app/api/v1/email.py:382"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/events",
+    "sources": [
+      "backend/app/api/v1/email.py:1689"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/health",
+    "sources": [
+      "backend/app/api/v1/email.py:182"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/history",
+    "sources": [
+      "backend/app/api/v1/email.py:1062"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/inbox/conversations",
+    "sources": [
+      "backend/app/api/v1/email.py:1167"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/inbox/conversations/{conversation_id}",
+    "sources": [
+      "backend/app/api/v1/email.py:1321"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/inbox/unread-count",
+    "sources": [
+      "backend/app/api/v1/email.py:1579"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/messages/{message_id}/events",
+    "sources": [
+      "backend/app/api/v1/email.py:2016"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/overview",
+    "sources": [
+      "backend/app/api/v1/email.py:694"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/reference",
+    "sources": [
+      "backend/app/api/v1/email.py:796"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/senders",
+    "sources": [
+      "backend/app/api/v1/email.py:172"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/stats",
+    "sources": [
+      "backend/app/api/v1/email.py:786"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/suppression",
+    "sources": [
+      "backend/app/api/v1/email.py:1607"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/unsubscribe",
+    "sources": [
+      "backend/app/api/v1/email.py:1769"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/followups",
+    "sources": [
+      "backend/app/api/v1/followups.py:79"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/followups/",
+    "sources": [
+      "backend/app/api/v1/followups.py:79"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/guide",
+    "sources": [
+      "backend/app/api/v1/guide.py:27",
+      "backend/app/api/v1/guide.py:27"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/guide/",
+    "sources": [
+      "backend/app/api/v1/guide.py:27"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/guide/summary",
+    "sources": [
+      "backend/app/api/v1/guide.py:36"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/health",
+    "sources": [
+      "backend/app/main.py:1402"
+    ],
+    "state": "partial handler; native WordPress/HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/health/db",
+    "sources": [
+      "backend/app/main.py:1413"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/inbox/campaign-filters",
+    "sources": [
+      "backend/app/api/v1/inbox.py:182"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/inbox/conversations",
+    "sources": [
+      "backend/app/api/v1/inbox.py:34"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/inbox/conversations/{conversation_id}",
+    "sources": [
+      "backend/app/api/v1/inbox.py:237"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/inbox/conversations/{conversation_id}/templates/{template_id}/preview",
+    "sources": [
+      "backend/app/api/v1/inbox.py:262"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/inbox/device-info",
+    "sources": [
+      "backend/app/api/v1/inbox.py:503"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/invoices",
+    "sources": [
+      "backend/app/api/v1/invoices.py:779"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/invoices/analytics",
+    "sources": [
+      "backend/app/api/v1/invoices.py:351"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/invoices/currencies",
+    "sources": [
+      "backend/app/api/v1/invoices.py:333"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/invoices/links",
+    "sources": [
+      "backend/app/api/v1/invoices.py:1015"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/invoices/payments",
+    "sources": [
+      "backend/app/api/v1/invoices.py:464"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/invoices/public/{token}",
+    "sources": [
+      "backend/app/api/v1/invoices.py:644"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/invoices/public/{token}/verify",
+    "sources": [
+      "backend/app/api/v1/invoices.py:725"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/invoices/settings",
+    "sources": [
+      "backend/app/api/v1/invoices.py:292"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/invoices/{invoice_id}",
+    "sources": [
+      "backend/app/api/v1/invoices.py:1086"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/invoices/{invoice_id}/events",
+    "sources": [
+      "backend/app/api/v1/invoices.py:1470"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/invoices/{invoice_id}/payments",
+    "sources": [
+      "backend/app/api/v1/invoices.py:1460"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/lists",
+    "sources": [
+      "backend/app/api/v1/lists.py:77"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/lists/",
+    "sources": [
+      "backend/app/api/v1/lists.py:77"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/lists/{list_id}/contacts",
+    "sources": [
+      "backend/app/api/v1/lists.py:263"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/lists/{list_id}/stats",
+    "sources": [
+      "backend/app/api/v1/lists.py:619"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/mail/messages",
+    "sources": [
+      "backend/app/api/v1/mail.py:80"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/mail/messages/{mailbox_id}/{provider_message_id}",
+    "sources": [
+      "backend/app/api/v1/mail.py:99"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/mail/overview",
+    "sources": [
+      "backend/app/api/v1/mail.py:67"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/mailbox",
+    "sources": [
+      "backend/app/api/v1/mailbox.py:282",
+      "backend/app/api/v1/mailbox.py:282"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/mailbox/",
+    "sources": [
+      "backend/app/api/v1/mailbox.py:282"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/mailbox/google/callback",
+    "sources": [
+      "backend/app/api/v1/mailbox.py:343"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/mailbox/google/start",
+    "sources": [
+      "backend/app/api/v1/mailbox.py:304"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/mailbox/report",
+    "sources": [
+      "backend/app/api/v1/mailbox.py:271"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/mailbox/{mailbox_id}",
+    "sources": [
+      "backend/app/api/v1/mailbox.py:526"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/mcp/activity",
+    "sources": [
+      "backend/app/api/v1/mcp.py:1013"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/mcp/bridge",
+    "sources": [
+      "backend/app/api/v1/mcp.py:1113"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/mcp/clients",
+    "sources": [
+      "backend/app/api/v1/mcp.py:1153"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/mcp/connectors",
+    "sources": [
+      "backend/app/api/v1/mcp.py:1041"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/mcp/endpoints",
+    "sources": [
+      "backend/app/api/v1/mcp.py:1248"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/mcp/execution-health",
+    "sources": [
+      "backend/app/api/v1/mcp.py:1271"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/mcp/tokens",
+    "sources": [
+      "backend/app/api/v1/mcp.py:964"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/notifications",
+    "sources": [
+      "backend/app/api/v1/notifications.py:33"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/notifications/",
+    "sources": [
+      "backend/app/api/v1/notifications.py:33"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/notifications/push/subscriptions",
+    "sources": [
+      "backend/app/api/v1/notifications.py:156"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/notifications/push/vapid-key",
+    "sources": [
+      "backend/app/api/v1/notifications.py:105"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/notifications/unread-count",
+    "sources": [
+      "backend/app/api/v1/notifications.py:55"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/overview/campaigns",
+    "sources": [
+      "backend/app/api/v1/overview.py:358"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/overview/campaigns/{campaign_id}",
+    "sources": [
+      "backend/app/api/v1/overview.py:478"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/overview/metrics",
+    "sources": [
+      "backend/app/api/v1/overview.py:574"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/send/history",
+    "sources": [
+      "backend/app/api/v1/send.py:374"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/send/scheduled",
+    "sources": [
+      "backend/app/api/v1/send.py:319"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/sequences",
+    "sources": [
+      "backend/app/api/v1/sequences.py:69"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/sequences/",
+    "sources": [
+      "backend/app/api/v1/sequences.py:69"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/sequences/{sequence_id}",
+    "sources": [
+      "backend/app/api/v1/sequences.py:104"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/settings/access",
+    "sources": [
+      "backend/app/api/v1/settings.py:22"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/settings/appearance",
+    "sources": [
+      "backend/app/api/v1/settings.py:606"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/settings/callgate",
+    "sources": [
+      "backend/app/api/v1/settings.py:213"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/settings/callgate/webhooks",
+    "sources": [
+      "backend/app/api/v1/settings.py:248"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/settings/compliance",
+    "sources": [
+      "backend/app/api/v1/settings.py:196"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/settings/gateway",
+    "sources": [
+      "backend/app/api/v1/settings.py:45"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/settings/gateway/phones",
+    "sources": [
+      "backend/app/api/v1/settings.py:451"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/settings/gateway/webhooks",
+    "sources": [
+      "backend/app/api/v1/settings.py:111"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/settings/google-oauth",
+    "sources": [
+      "backend/app/api/v1/settings.py:314"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/settings/notifications",
+    "sources": [
+      "backend/app/api/v1/settings.py:151"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/settings/notifications/muted-senders",
+    "sources": [
+      "backend/app/api/v1/settings.py:158"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/system/errors",
+    "sources": [
+      "backend/app/api/v1/system.py:291"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/system/health",
+    "sources": [
+      "backend/app/api/v1/system.py:47"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/templates",
+    "sources": [
+      "backend/app/api/v1/templates.py:95"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/templates/",
+    "sources": [
+      "backend/app/api/v1/templates.py:95"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/templates/categories",
+    "sources": [
+      "backend/app/api/v1/templates.py:126"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/templates/{template_id}",
+    "sources": [
+      "backend/app/api/v1/templates.py:201"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/validator/jobs",
+    "sources": [
+      "backend/app/api/v1/validator.py:186"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/validator/jobs/{job_id}",
+    "sources": [
+      "backend/app/api/v1/validator.py:199"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/validator/status",
+    "sources": [
+      "backend/app/api/v1/validator.py:83"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/variables",
+    "sources": [
+      "backend/app/api/v1/variables.py:33"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/variables/",
+    "sources": [
+      "backend/app/api/v1/variables.py:33"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/variables/contact/{contact_id}/profile",
+    "sources": [
+      "backend/app/api/v1/variables.py:204"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/webhooks/callgate",
+    "sources": [
+      "backend/app/api/v1/webhooks.py:566"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/webhooks/logs",
+    "sources": [
+      "backend/app/api/v1/webhooks.py:708"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/webhooks/smsgateway",
+    "sources": [
+      "backend/app/api/v1/webhooks.py:404"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/apple-touch-icon.png",
+    "sources": [
+      "backend/app/main.py:1548"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/connectors/{key}/mcp",
+    "sources": [
+      "backend/app/api/v1/mcp.py:348"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/connectors/{key}/oauth/authorize",
+    "sources": [
+      "backend/app/api/v1/mcp.py:660"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/connectors/{key}/oauth/register/{client_id}",
+    "sources": [
+      "backend/app/api/v1/mcp.py:453"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/favicon.svg",
+    "sources": [
+      "backend/app/main.py:1550"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/icon-192.png",
+    "sources": [
+      "backend/app/main.py:1540"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/icon-512.png",
+    "sources": [
+      "backend/app/main.py:1542"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/icon-maskable-192.png",
+    "sources": [
+      "backend/app/main.py:1544"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/icon-maskable-512.png",
+    "sources": [
+      "backend/app/main.py:1546"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/manifest.json",
+    "sources": [
+      "backend/app/main.py:1520"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/mcp",
+    "sources": [
+      "backend/app/api/v1/mcp.py:307"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/mcp/",
+    "sources": [
+      "backend/app/api/v1/mcp.py:307"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/mcp/health",
+    "sources": [
+      "backend/app/api/v1/mcp.py:319"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/oauth/approved",
+    "sources": [
+      "backend/app/api/v1/mcp.py:673"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/oauth/authorize",
+    "sources": [
+      "backend/app/api/v1/mcp.py:660"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/oauth/register/{client_id}",
+    "sources": [
+      "backend/app/api/v1/mcp.py:453"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/sw.js",
+    "sources": [
+      "backend/app/main.py:1538"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/{fp:path}",
+    "sources": [
+      "backend/app/main.py:1557",
+      "backend/app/main.py:1563"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/ads/audiences/{audience_id}",
+    "sources": [
+      "backend/app/api/v1/ads.py:1700"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/ads/calendar/{event_id}",
+    "sources": [
+      "backend/app/api/v1/ads.py:2527"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/ads/campaigns/{campaign_id}",
+    "sources": [
+      "backend/app/api/v1/ads.py:394"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/followup-steps/{step_id}",
+    "sources": [
+      "backend/app/api/v1/ads.py:2045"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/ads/creatives/{creative_id}",
+    "sources": [
+      "backend/app/api/v1/ads.py:1387"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/ads/followup-steps/{step_id}",
+    "sources": [
+      "backend/app/api/v1/ads.py:2058"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/ads/followup-templates/{template_id}",
+    "sources": [
+      "backend/app/api/v1/ads.py:2263"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/ads/sets/{set_id}",
+    "sources": [
+      "backend/app/api/v1/ads.py:1220"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/ai-agent/sessions/{session_id}",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:487"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/campaigns/{campaign_id}",
+    "sources": [
+      "backend/app/api/v1/campaigns.py:221"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/email/accounts/{account_id}",
+    "sources": [
+      "backend/app/api/v1/email.py:256"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/invoices/{invoice_id}",
+    "sources": [
+      "backend/app/api/v1/invoices.py:1096"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/mailbox/{mailbox_id}",
+    "sources": [
+      "backend/app/api/v1/mailbox.py:536"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/audiences",
+    "sources": [
+      "backend/app/api/v1/ads.py:1675"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/audiences/{audience_id}/attach",
+    "sources": [
+      "backend/app/api/v1/ads.py:1772"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/audiences/{audience_id}/duplicate",
+    "sources": [
+      "backend/app/api/v1/ads.py:1739"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/calendar",
+    "sources": [
+      "backend/app/api/v1/ads.py:2511"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns",
+    "sources": [
+      "backend/app/api/v1/ads.py:321"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns/bulk",
+    "sources": [
+      "backend/app/api/v1/ads.py:2859"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/archive",
+    "sources": [
+      "backend/app/api/v1/ads.py:681"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/audience/bulk-remove",
+    "sources": [
+      "backend/app/api/v1/ads.py:1083"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/complete",
+    "sources": [
+      "backend/app/api/v1/ads.py:665"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/contacts",
+    "sources": [
+      "backend/app/api/v1/ads.py:733"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/dispatch",
+    "sources": [
+      "backend/app/api/v1/ads.py:711"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/duplicate",
+    "sources": [
+      "backend/app/api/v1/ads.py:697"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/followup-steps",
+    "sources": [
+      "backend/app/api/v1/ads.py:1964"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/jobs/retry",
+    "sources": [
+      "backend/app/api/v1/ads.py:907"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/launch",
+    "sources": [
+      "backend/app/api/v1/ads.py:576"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/optimize",
+    "sources": [
+      "backend/app/api/v1/ads.py:1118"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/pause",
+    "sources": [
+      "backend/app/api/v1/ads.py:610"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/rebuild-audience",
+    "sources": [
+      "backend/app/api/v1/ads.py:802"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/resume",
+    "sources": [
+      "backend/app/api/v1/ads.py:630"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/sets",
+    "sources": [
+      "backend/app/api/v1/ads.py:1197"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/simulate",
+    "sources": [
+      "backend/app/api/v1/ads.py:569"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/validate",
+    "sources": [
+      "backend/app/api/v1/ads.py:523"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/contacts/bulk",
+    "sources": [
+      "backend/app/api/v1/ads.py:2919"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/contacts/{contact_id}/action",
+    "sources": [
+      "backend/app/api/v1/ads.py:2650"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/creatives/bulk",
+    "sources": [
+      "backend/app/api/v1/ads.py:2895"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/creatives/{creative_id}/duplicate",
+    "sources": [
+      "backend/app/api/v1/ads.py:1471"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/creatives/{creative_id}/promote",
+    "sources": [
+      "backend/app/api/v1/ads.py:1519"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/followup-templates",
+    "sources": [
+      "backend/app/api/v1/ads.py:2235"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/followups",
+    "sources": [
+      "backend/app/api/v1/ads.py:2382"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/followups/process",
+    "sources": [
+      "backend/app/api/v1/ads.py:2439"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/followups/{task_id}/{action}",
+    "sources": [
+      "backend/app/api/v1/ads.py:2401"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/sets/preview",
+    "sources": [
+      "backend/app/api/v1/ads.py:1274"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/sets/{set_id}/creatives",
+    "sources": [
+      "backend/app/api/v1/ads.py:1364"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/sets/{set_id}/duplicate",
+    "sources": [
+      "backend/app/api/v1/ads.py:1239"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/sets/{set_id}/pause-losers",
+    "sources": [
+      "backend/app/api/v1/ads.py:1252"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/suppression",
+    "sources": [
+      "backend/app/api/v1/ads.py:2598"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/track/click",
+    "sources": [
+      "backend/app/api/v1/ads.py:1813"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ai-agent/actions/{action_id}/approve",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:602"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ai-agent/actions/{action_id}/cancel",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:624"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ai-agent/activity/{action_id}/undo",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:674"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ai-agent/files",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:790"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ai-agent/sessions",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:398"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ai-agent/sessions/{session_id}/chat",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:531"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ai-agent/sessions/{session_id}/files",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:777"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ai-agent/settings/test",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:307"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ai-agent/skills",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:977"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ai-agent/skills/json",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:999"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ai-agent/transcribe",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:853"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ai/classify",
+    "sources": [
+      "backend/app/api/v1/ai.py:24"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/auth/admin",
+    "sources": [
+      "backend/app/api/v1/auth.py:187"
+    ],
+    "state": "partial handler; native WordPress/HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/auth/login",
+    "sources": [
+      "backend/app/api/v1/auth.py:212"
+    ],
+    "state": "partial handler; native WordPress/HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/auth/logout",
+    "sources": [
+      "backend/app/api/v1/auth.py:229"
+    ],
+    "state": "partial handler; native WordPress/HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/automations/",
+    "sources": [
+      "backend/app/api/v1/automations.py:60"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/automations/test",
+    "sources": [
+      "backend/app/api/v1/automations.py:144"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/autoreply/",
+    "sources": [
+      "backend/app/api/v1/autoreply.py:67"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/autoreply/test",
+    "sources": [
+      "backend/app/api/v1/autoreply.py:148"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/calendar/",
+    "sources": [
+      "backend/app/api/v1/calendar.py:361"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/calendar/{meeting_id}/cancel",
+    "sources": [
+      "backend/app/api/v1/calendar.py:587"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/calendar/{meeting_id}/complete",
+    "sources": [
+      "backend/app/api/v1/calendar.py:577"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/calendar/{meeting_id}/confirm",
+    "sources": [
+      "backend/app/api/v1/calendar.py:568"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/calendar/{meeting_id}/no-show",
+    "sources": [
+      "backend/app/api/v1/calendar.py:597"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/calendar/{meeting_id}/send-invite",
+    "sources": [
+      "backend/app/api/v1/calendar.py:606"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/calendar/{meeting_id}/send-reminder",
+    "sources": [
+      "backend/app/api/v1/calendar.py:620"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/calls/end",
+    "sources": [
+      "backend/app/api/v1/calls.py:240"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/calls/log-direct",
+    "sources": [
+      "backend/app/api/v1/calls.py:263"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/calls/register-webhook",
+    "sources": [
+      "backend/app/api/v1/calls.py:125"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/calls/start",
+    "sources": [
+      "backend/app/api/v1/calls.py:184"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/calls/test",
+    "sources": [
+      "backend/app/api/v1/calls.py:102"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/campaign-followups/campaigns/{campaign_id}",
+    "sources": [
+      "backend/app/api/v1/campaign_followups.py:144"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/campaign-followups/campaigns/{campaign_id}/process-now",
+    "sources": [
+      "backend/app/api/v1/campaign_followups.py:287"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/campaign-followups/{followup_id}/run",
+    "sources": [
+      "backend/app/api/v1/campaign_followups.py:264"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/campaigns/",
+    "sources": [
+      "backend/app/api/v1/campaigns.py:160"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/campaigns/{campaign_id}/duplicate",
+    "sources": [
+      "backend/app/api/v1/campaigns.py:917"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/campaigns/{campaign_id}/pause",
+    "sources": [
+      "backend/app/api/v1/campaigns.py:481"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/campaigns/{campaign_id}/resume",
+    "sources": [
+      "backend/app/api/v1/campaigns.py:507"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/campaigns/{campaign_id}/schedule",
+    "sources": [
+      "backend/app/api/v1/campaigns.py:340"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/campaigns/{campaign_id}/start",
+    "sources": [
+      "backend/app/api/v1/campaigns.py:394"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/campaigns/{campaign_id}/stop",
+    "sources": [
+      "backend/app/api/v1/campaigns.py:576"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/campaigns/{campaign_id}/validate",
+    "sources": [
+      "backend/app/api/v1/campaigns.py:321"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/contacts/",
+    "sources": [
+      "backend/app/api/v1/contacts.py:602"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/contacts/bulk",
+    "sources": [
+      "backend/app/api/v1/contacts.py:978"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/contacts/clean",
+    "sources": [
+      "backend/app/api/v1/contacts.py:477"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/contacts/enrich",
+    "sources": [
+      "backend/app/api/v1/contacts.py:1558"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/contacts/import/csv",
+    "sources": [
+      "backend/app/api/v1/contacts.py:1393"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/contacts/import/jobs",
+    "sources": [
+      "backend/app/api/v1/contacts.py:1241"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/contacts/import/preview",
+    "sources": [
+      "backend/app/api/v1/contacts.py:1227"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/contacts/import/url",
+    "sources": [
+      "backend/app/api/v1/contacts.py:1274"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/contacts/quarantine/generated",
+    "sources": [
+      "backend/app/api/v1/contacts.py:569"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/contacts/validate-emails",
+    "sources": [
+      "backend/app/api/v1/contacts.py:495"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/contacts/{contact_id}/email-opt-in",
+    "sources": [
+      "backend/app/api/v1/contacts.py:1749"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/contacts/{contact_id}/email-opt-out",
+    "sources": [
+      "backend/app/api/v1/contacts.py:1725"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/contacts/{contact_id}/sms-opt-in",
+    "sources": [
+      "backend/app/api/v1/contacts.py:1773"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/accounts",
+    "sources": [
+      "backend/app/api/v1/email.py:226"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/accounts/{account_id}/default",
+    "sources": [
+      "backend/app/api/v1/email.py:507"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/accounts/{account_id}/test",
+    "sources": [
+      "backend/app/api/v1/email.py:522"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/accounts/{account_id}/test-send",
+    "sources": [
+      "backend/app/api/v1/email.py:541"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/accounts/{account_id}/webhook/reveal",
+    "sources": [
+      "backend/app/api/v1/email.py:443"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/accounts/{account_id}/webhook/rotate",
+    "sources": [
+      "backend/app/api/v1/email.py:471"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/domains",
+    "sources": [
+      "backend/app/api/v1/email.py:339"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/domains/{domain_id}/verify",
+    "sources": [
+      "backend/app/api/v1/email.py:393"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/inbox/conversations/{conversation_id}/read",
+    "sources": [
+      "backend/app/api/v1/email.py:1528"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/inbox/conversations/{conversation_id}/reply",
+    "sources": [
+      "backend/app/api/v1/email.py:1405"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/inbox/conversations/{conversation_id}/status",
+    "sources": [
+      "backend/app/api/v1/email.py:1551"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/messages/{message_id}/retry",
+    "sources": [
+      "backend/app/api/v1/email.py:1122"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/preview",
+    "sources": [
+      "backend/app/api/v1/email.py:839"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/send",
+    "sources": [
+      "backend/app/api/v1/email.py:895"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/senders-preview",
+    "sources": [
+      "backend/app/api/v1/email.py:557"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/suppression",
+    "sources": [
+      "backend/app/api/v1/email.py:1646"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/test-send",
+    "sources": [
+      "backend/app/api/v1/email.py:623"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/unsubscribe",
+    "sources": [
+      "backend/app/api/v1/email.py:1796"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/followups/",
+    "sources": [
+      "backend/app/api/v1/followups.py:154"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/followups/{followup_id}/reschedule",
+    "sources": [
+      "backend/app/api/v1/followups.py:305"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/followups/{followup_id}/send-now",
+    "sources": [
+      "backend/app/api/v1/followups.py:248"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/followups/{followup_id}/skip",
+    "sources": [
+      "backend/app/api/v1/followups.py:273"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/inbox/conversations/{conversation_id}/mark-close",
+    "sources": [
+      "backend/app/api/v1/inbox.py:401"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/inbox/conversations/{conversation_id}/mark-interested",
+    "sources": [
+      "backend/app/api/v1/inbox.py:393"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/inbox/conversations/{conversation_id}/mark-not-interested",
+    "sources": [
+      "backend/app/api/v1/inbox.py:397"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/inbox/conversations/{conversation_id}/mark-opportunity",
+    "sources": [
+      "backend/app/api/v1/inbox.py:405"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/inbox/conversations/{conversation_id}/mark-unread",
+    "sources": [
+      "backend/app/api/v1/inbox.py:426"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/inbox/conversations/{conversation_id}/reply",
+    "sources": [
+      "backend/app/api/v1/inbox.py:298"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/inbox/conversations/{conversation_id}/resume-sequence",
+    "sources": [
+      "backend/app/api/v1/inbox.py:444"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/inbox/conversations/{conversation_id}/status",
+    "sources": [
+      "backend/app/api/v1/inbox.py:414"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/inbox/conversations/{conversation_id}/stop-sequence",
+    "sources": [
+      "backend/app/api/v1/inbox.py:435"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/inbox/conversations/{conversation_id}/{mark}",
+    "sources": [
+      "backend/app/api/v1/inbox.py:851"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/inbox/messages/{message_id}/feedback",
+    "sources": [
+      "backend/app/api/v1/inbox.py:786"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/inbox/poll-debug",
+    "sources": [
+      "backend/app/api/v1/inbox.py:700"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/inbox/poll-now",
+    "sources": [
+      "backend/app/api/v1/inbox.py:768"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/inbox/register-webhook",
+    "sources": [
+      "backend/app/api/v1/inbox.py:527"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/inbox/sync-full",
+    "sources": [
+      "backend/app/api/v1/inbox.py:544"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/invoices",
+    "sources": [
+      "backend/app/api/v1/invoices.py:851"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/invoices/links",
+    "sources": [
+      "backend/app/api/v1/invoices.py:946"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/invoices/paystack/webhook",
+    "sources": [
+      "backend/app/api/v1/invoices.py:537"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/invoices/public/{token}/pay",
+    "sources": [
+      "backend/app/api/v1/invoices.py:658"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/invoices/settings/test",
+    "sources": [
+      "backend/app/api/v1/invoices.py:308"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/invoices/{invoice_id}/duplicate",
+    "sources": [
+      "backend/app/api/v1/invoices.py:1216"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/invoices/{invoice_id}/pay",
+    "sources": [
+      "backend/app/api/v1/invoices.py:1338"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/invoices/{invoice_id}/payments",
+    "sources": [
+      "backend/app/api/v1/invoices.py:1409"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/invoices/{invoice_id}/remind",
+    "sources": [
+      "backend/app/api/v1/invoices.py:1288"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/invoices/{invoice_id}/rotate-link",
+    "sources": [
+      "backend/app/api/v1/invoices.py:1489"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/invoices/{invoice_id}/send",
+    "sources": [
+      "backend/app/api/v1/invoices.py:1275"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/invoices/{invoice_id}/void",
+    "sources": [
+      "backend/app/api/v1/invoices.py:1323"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/lists/",
+    "sources": [
+      "backend/app/api/v1/lists.py:172"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/lists/{list_id}/clean",
+    "sources": [
+      "backend/app/api/v1/lists.py:521"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/lists/{list_id}/contacts",
+    "sources": [
+      "backend/app/api/v1/lists.py:315"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/lists/{list_id}/contacts/add-all",
+    "sources": [
+      "backend/app/api/v1/lists.py:387"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/lists/{list_id}/contacts/delete",
+    "sources": [
+      "backend/app/api/v1/lists.py:464"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/lists/{list_id}/contacts/remove",
+    "sources": [
+      "backend/app/api/v1/lists.py:417"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/lists/{list_id}/validate-emails",
+    "sources": [
+      "backend/app/api/v1/lists.py:547"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/mail/messages/{mailbox_id}/{provider_message_id}/delete",
+    "sources": [
+      "backend/app/api/v1/mail.py:155"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/mail/messages/{mailbox_id}/{provider_message_id}/flags",
+    "sources": [
+      "backend/app/api/v1/mail.py:117"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/mail/messages/{mailbox_id}/{provider_message_id}/move",
+    "sources": [
+      "backend/app/api/v1/mail.py:137"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/mail/messages/{mailbox_id}/{provider_message_id}/reply",
+    "sources": [
+      "backend/app/api/v1/mail.py:170"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/mail/refresh",
+    "sources": [
+      "backend/app/api/v1/mail.py:194"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/mailbox",
+    "sources": [
+      "backend/app/api/v1/mailbox.py:463"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/mailbox/",
+    "sources": [
+      "backend/app/api/v1/mailbox.py:463"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/mailbox/{mailbox_id}/check",
+    "sources": [
+      "backend/app/api/v1/mailbox.py:581"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/mailbox/{mailbox_id}/filters",
+    "sources": [
+      "backend/app/api/v1/mailbox.py:607"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/mailbox/{mailbox_id}/sync",
+    "sources": [
+      "backend/app/api/v1/mailbox.py:594"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/mailbox/{mailbox_id}/test-send",
+    "sources": [
+      "backend/app/api/v1/mailbox.py:641"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/mcp/connectors/{key}",
+    "sources": [
+      "backend/app/api/v1/mcp.py:1134"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/mcp/connectors/{key}/revoke",
+    "sources": [
+      "backend/app/api/v1/mcp.py:1202"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/mcp/connectors/{key}/test",
+    "sources": [
+      "backend/app/api/v1/mcp.py:1223"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/mcp/tokens",
+    "sources": [
+      "backend/app/api/v1/mcp.py:971"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/notifications/push/subscribe",
+    "sources": [
+      "backend/app/api/v1/notifications.py:116"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/notifications/push/test",
+    "sources": [
+      "backend/app/api/v1/notifications.py:168"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/notifications/push/unsubscribe",
+    "sources": [
+      "backend/app/api/v1/notifications.py:144"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/notifications/read-all",
+    "sources": [
+      "backend/app/api/v1/notifications.py:80"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/notifications/{event_id}/read",
+    "sources": [
+      "backend/app/api/v1/notifications.py:67"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/send/",
+    "sources": [
+      "backend/app/api/v1/send.py:37"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/send/messages/{mid}/retry",
+    "sources": [
+      "backend/app/api/v1/send.py:468"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/send/scheduled/{sid}/cancel",
+    "sources": [
+      "backend/app/api/v1/send.py:440"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/send/scheduled/{sid}/retry",
+    "sources": [
+      "backend/app/api/v1/send.py:452"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/send/validate",
+    "sources": [
+      "backend/app/api/v1/send.py:264"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/sequences/",
+    "sources": [
+      "backend/app/api/v1/sequences.py:119"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/settings/callgate/register-webhook",
+    "sources": [
+      "backend/app/api/v1/settings.py:258"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/settings/callgate/test",
+    "sources": [
+      "backend/app/api/v1/settings.py:240"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/settings/gateway/phones",
+    "sources": [
+      "backend/app/api/v1/settings.py:466"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/settings/gateway/phones/{phone_id}/register-webhook",
+    "sources": [
+      "backend/app/api/v1/settings.py:538"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/settings/gateway/phones/{phone_id}/test",
+    "sources": [
+      "backend/app/api/v1/settings.py:518"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/settings/gateway/register-webhook",
+    "sources": [
+      "backend/app/api/v1/settings.py:78"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/settings/gateway/test",
+    "sources": [
+      "backend/app/api/v1/settings.py:72"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/settings/notifications/{provider}/test",
+    "sources": [
+      "backend/app/api/v1/settings.py:184"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/templates/",
+    "sources": [
+      "backend/app/api/v1/templates.py:215"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/templates/preview",
+    "sources": [
+      "backend/app/api/v1/templates.py:141"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/templates/{template_id}/duplicate",
+    "sources": [
+      "backend/app/api/v1/templates.py:321"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/templates/{template_id}/to-email",
+    "sources": [
+      "backend/app/api/v1/templates.py:353"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/validator/batch",
+    "sources": [
+      "backend/app/api/v1/validator.py:281"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/validator/jobs",
+    "sources": [
+      "backend/app/api/v1/validator.py:159"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/validator/jobs/{job_id}/cancel",
+    "sources": [
+      "backend/app/api/v1/validator.py:211"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/validator/selection",
+    "sources": [
+      "backend/app/api/v1/validator.py:143"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/validator/self-test",
+    "sources": [
+      "backend/app/api/v1/validator.py:105"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/variables/",
+    "sources": [
+      "backend/app/api/v1/variables.py:85"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/variables/preview",
+    "sources": [
+      "backend/app/api/v1/variables.py:186"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/variables/sync",
+    "sources": [
+      "backend/app/api/v1/variables.py:76"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/webhooks/brevo",
+    "sources": [
+      "backend/app/api/v1/webhooks.py:628"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/webhooks/brevo/{account_id}",
+    "sources": [
+      "backend/app/api/v1/webhooks.py:628"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/webhooks/callgate",
+    "sources": [
+      "backend/app/api/v1/webhooks.py:431"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/webhooks/smsgate/inbound",
+    "sources": [
+      "backend/app/api/v1/webhooks.py:570"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/webhooks/smsgateway",
+    "sources": [
+      "backend/app/api/v1/webhooks.py:228"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/webhooks/smsgateway/phone/{phone_id}",
+    "sources": [
+      "backend/app/api/v1/webhooks.py:217"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/connectors/{key}/mcp",
+    "sources": [
+      "backend/app/api/v1/mcp.py:338"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/connectors/{key}/oauth/authorize",
+    "sources": [
+      "backend/app/api/v1/mcp.py:667"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/connectors/{key}/oauth/register",
+    "sources": [
+      "backend/app/api/v1/mcp.py:429"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/connectors/{key}/oauth/revoke",
+    "sources": [
+      "backend/app/api/v1/mcp.py:931"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/connectors/{key}/oauth/token",
+    "sources": [
+      "backend/app/api/v1/mcp.py:921"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/mcp",
+    "sources": [
+      "backend/app/api/v1/mcp.py:300"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/mcp/",
+    "sources": [
+      "backend/app/api/v1/mcp.py:300"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/oauth/authorize",
+    "sources": [
+      "backend/app/api/v1/mcp.py:667"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/oauth/register",
+    "sources": [
+      "backend/app/api/v1/mcp.py:429"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/oauth/revoke",
+    "sources": [
+      "backend/app/api/v1/mcp.py:931"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/oauth/token",
+    "sources": [
+      "backend/app/api/v1/mcp.py:921"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/ai-agent/memory/global",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:903"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/ai-agent/memory/{session_id}",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:931"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/ai-agent/presets",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:153"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/ai-agent/settings",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:258"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/ai-agent/settings/voice",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:284"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/automations/{automation_id}",
+    "sources": [
+      "backend/app/api/v1/automations.py:100"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/autoreply/{rule_id}",
+    "sources": [
+      "backend/app/api/v1/autoreply.py:99"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/calendar/{meeting_id}",
+    "sources": [
+      "backend/app/api/v1/calendar.py:457"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/calls/config",
+    "sources": [
+      "backend/app/api/v1/calls.py:78"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/campaign-followups/{followup_id}",
+    "sources": [
+      "backend/app/api/v1/campaign_followups.py:212"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/campaigns/{campaign_id}",
+    "sources": [
+      "backend/app/api/v1/campaigns.py:221"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/contacts/{contact_id}",
+    "sources": [
+      "backend/app/api/v1/contacts.py:663"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/invoices/settings",
+    "sources": [
+      "backend/app/api/v1/invoices.py:298"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/lists/{list_id}",
+    "sources": [
+      "backend/app/api/v1/lists.py:194"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/sequences/{sequence_id}",
+    "sources": [
+      "backend/app/api/v1/sequences.py:163"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/settings/access",
+    "sources": [
+      "backend/app/api/v1/settings.py:28"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/settings/appearance",
+    "sources": [
+      "backend/app/api/v1/settings.py:633"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/settings/callgate",
+    "sources": [
+      "backend/app/api/v1/settings.py:226"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/settings/compliance",
+    "sources": [
+      "backend/app/api/v1/settings.py:200"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/settings/gateway/phones/{phone_id}",
+    "sources": [
+      "backend/app/api/v1/settings.py:481"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/settings/gateway/routing",
+    "sources": [
+      "backend/app/api/v1/settings.py:558"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/settings/gateway/sim",
+    "sources": [
+      "backend/app/api/v1/settings.py:67"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/settings/google-oauth",
+    "sources": [
+      "backend/app/api/v1/settings.py:357"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/settings/notifications/muted-senders",
+    "sources": [
+      "backend/app/api/v1/settings.py:165"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/settings/notifications/{provider}",
+    "sources": [
+      "backend/app/api/v1/settings.py:172"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/templates/{template_id}",
+    "sources": [
+      "backend/app/api/v1/templates.py:262"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/variables/{variable_id}",
+    "sources": [
+      "backend/app/api/v1/variables.py:123"
+    ],
+    "state": "missing original application handler",
+    "certified": false
+  }
+]

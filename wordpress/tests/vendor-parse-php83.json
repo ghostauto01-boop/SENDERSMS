@@ -1,0 +1,7 @@
+{
+  "ok": true,
+  "assertions": 1538,
+  "php": "8.3.36",
+  "scope": "Vendor syntax TOKEN_PARSE only, not runtime/library functional coverage",
+  "suite": "vendor-parse"
+}

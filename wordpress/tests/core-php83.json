@@ -1,0 +1,9 @@
+{
+  "ok": true,
+  "assertions": 4017,
+  "php": "8.3.36",
+  "scope": "schema plan, crypto utilities and SQL mocks only",
+  "native_mysql_verified": false,
+  "native_wordpress_install_verified": false,
+  "suite": "core"
+}
