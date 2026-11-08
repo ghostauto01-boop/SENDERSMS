@@ -69,7 +69,7 @@ The source oracle extracts selected **actual original** DTOs, functions, models 
 - **333 actual Python rounding cases**, including half ties, nextafter neighbours, fractional quantities and tax rates.
 - **34 source DTO acceptance cases**.
 - **866 invoice assertions per PHP runtime**, including item/audit/delete failure rollback, number/invoice conflicts, first-counter failures, imported-number recovery, distinct tokens, no advertised checkout, unsupported-send refusal, overflow/nonfinite/NUL guards, protected attempted-payment records and private provider JSON.
-- **578 shared dispatcher assertions per runtime**, including invoice authentication/origin/path boundaries, monetary recomputation, audit persistence, rollback, duplication, voiding and guarded deletion.
+- **614 shared dispatcher assertions per runtime**, including invoice authentication/origin/path boundaries, monetary recomputation, audit persistence, rollback, duplication, voiding and guarded deletion.
 
 Known comparison boundaries are explicit: nondeterministic tokens, disabled checkout URLs and monotonic `updated_at` differ intentionally; event collections normalize to latest-first. No actual provider requests or payments occurred. Seeded payment history in the safety test is synthetic, not a settlement test.
 

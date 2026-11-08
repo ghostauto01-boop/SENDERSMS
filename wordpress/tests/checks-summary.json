@@ -1,7 +1,7 @@
 {
   "ok": true,
-  "php_lint_checks": 80,
-  "php_assertions": 40924,
+  "php_lint_checks": 82,
+  "php_assertions": 41190,
   "vendor_parser_checks": 3075,
   "vendor_hash_checks": 1547,
   "unchanged_frontend_files": 165,
@@ -69,7 +69,7 @@
     },
     {
       "ok": true,
-      "assertions": 578,
+      "assertions": 614,
       "diffs": [],
       "php": "7.4.34-dev",
       "scope": "Offline requests/responses with synthetic password codec, seventy-three synthetic SQLite application tables, fault-injected transaction failure; not real WP/HTTP/Argon2/native MySQL/concurrency proof",
@@ -253,6 +253,19 @@
       "provider_requests": 0,
       "payments_recorded": 0,
       "suite": "invoices"
+    },
+    {
+      "ok": true,
+      "assertions": 97,
+      "diffs": [],
+      "php": "7.4.34-dev",
+      "source_operations": 38,
+      "scope": "Actual selected source inbox/attribution functions and original stop SQL; fixed clock, synthetic SQLite, omitted FKs/relationships. Known UTC timestamp and error-redaction normalization. Injected transaction/conflict/admission tests, not native WP/MySQL/HTTP/concurrency/sending/ingestion/sequence-execution proof.",
+      "native_wordpress_verified": false,
+      "native_mysql_verified": false,
+      "provider_requests": 0,
+      "messages_sent": 0,
+      "suite": "inbox"
     },
     {
       "ok": true,
@@ -324,7 +337,7 @@
     },
     {
       "ok": true,
-      "assertions": 578,
+      "assertions": 614,
       "diffs": [],
       "php": "8.3.36",
       "scope": "Offline requests/responses with synthetic password codec, seventy-three synthetic SQLite application tables, fault-injected transaction failure; not real WP/HTTP/Argon2/native MySQL/concurrency proof",
@@ -508,6 +521,19 @@
       "provider_requests": 0,
       "payments_recorded": 0,
       "suite": "invoices"
+    },
+    {
+      "ok": true,
+      "assertions": 97,
+      "diffs": [],
+      "php": "8.3.36",
+      "source_operations": 38,
+      "scope": "Actual selected source inbox/attribution functions and original stop SQL; fixed clock, synthetic SQLite, omitted FKs/relationships. Known UTC timestamp and error-redaction normalization. Injected transaction/conflict/admission tests, not native WP/MySQL/HTTP/concurrency/sending/ingestion/sequence-execution proof.",
+      "native_wordpress_verified": false,
+      "native_mysql_verified": false,
+      "provider_requests": 0,
+      "messages_sent": 0,
+      "suite": "inbox"
     },
     {
       "ok": true,

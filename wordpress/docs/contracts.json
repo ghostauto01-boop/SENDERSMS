@@ -1482,7 +1482,7 @@
     "sources": [
       "backend/app/api/v1/inbox.py:182"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -1491,7 +1491,7 @@
     "sources": [
       "backend/app/api/v1/inbox.py:34"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -1500,7 +1500,7 @@
     "sources": [
       "backend/app/api/v1/inbox.py:237"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -1509,7 +1509,7 @@
     "sources": [
       "backend/app/api/v1/inbox.py:262"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -3464,7 +3464,7 @@
     "sources": [
       "backend/app/api/v1/inbox.py:401"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -3473,7 +3473,7 @@
     "sources": [
       "backend/app/api/v1/inbox.py:393"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -3482,7 +3482,7 @@
     "sources": [
       "backend/app/api/v1/inbox.py:397"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -3491,7 +3491,7 @@
     "sources": [
       "backend/app/api/v1/inbox.py:405"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -3500,7 +3500,7 @@
     "sources": [
       "backend/app/api/v1/inbox.py:426"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -3518,7 +3518,7 @@
     "sources": [
       "backend/app/api/v1/inbox.py:444"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -3527,7 +3527,7 @@
     "sources": [
       "backend/app/api/v1/inbox.py:414"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -3536,7 +3536,7 @@
     "sources": [
       "backend/app/api/v1/inbox.py:435"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {

@@ -1,6 +1,6 @@
 # Remaining WordPress recreation work
 
-388 missing source handlers,120 partial health/auth/contact/list/variable/template/reply/classification/notification/import/analytics/sequence/settings/calendar/invoice handlers,0 fully certified contracts. The administrator CSV diagnostic is not the original source import API.
+376 missing source handlers,132 partial health/auth/contact/list/variable/template/reply/classification/notification/import/analytics/sequence/settings/calendar/invoice/inbox handlers,0 fully certified contracts. The administrator CSV diagnostic is not the original source import API.
 
 Every row is outstanding, including all partial handlers until native HTTP certification. See README.md for actual implemented utilities and fresh test boundaries.
 
@@ -170,10 +170,10 @@ Every row is outstanding, including all partial handlers until native HTTP certi
 | GET | /api/v1/guide/summary | backend/app/api/v1/guide.py:36 | missing original application handler |
 | GET | /api/v1/health | backend/app/main.py:1402 | partial handler; native WordPress/HTTP unverified |
 | GET | /api/v1/health/db | backend/app/main.py:1413 | missing original application handler |
-| GET | /api/v1/inbox/campaign-filters | backend/app/api/v1/inbox.py:182 | missing original application handler |
-| GET | /api/v1/inbox/conversations | backend/app/api/v1/inbox.py:34 | missing original application handler |
-| GET | /api/v1/inbox/conversations/{conversation_id} | backend/app/api/v1/inbox.py:237 | missing original application handler |
-| GET | /api/v1/inbox/conversations/{conversation_id}/templates/{template_id}/preview | backend/app/api/v1/inbox.py:262 | missing original application handler |
+| GET | /api/v1/inbox/campaign-filters | backend/app/api/v1/inbox.py:182 | partial handler; native WordPress/HTTP unverified |
+| GET | /api/v1/inbox/conversations | backend/app/api/v1/inbox.py:34 | partial handler; native WordPress/HTTP unverified |
+| GET | /api/v1/inbox/conversations/{conversation_id} | backend/app/api/v1/inbox.py:237 | partial handler; native WordPress/HTTP unverified |
+| GET | /api/v1/inbox/conversations/{conversation_id}/templates/{template_id}/preview | backend/app/api/v1/inbox.py:262 | partial handler; native WordPress/HTTP unverified |
 | GET | /api/v1/inbox/device-info | backend/app/api/v1/inbox.py:503 | missing original application handler |
 | GET | /api/v1/invoices | backend/app/api/v1/invoices.py:779 | partial handler; native WordPress/HTTP unverified |
 | GET | /api/v1/invoices/analytics | backend/app/api/v1/invoices.py:351 | missing original application handler |
@@ -390,15 +390,15 @@ Every row is outstanding, including all partial handlers until native HTTP certi
 | POST | /api/v1/followups/{followup_id}/reschedule | backend/app/api/v1/followups.py:305 | missing original application handler |
 | POST | /api/v1/followups/{followup_id}/send-now | backend/app/api/v1/followups.py:248 | missing original application handler |
 | POST | /api/v1/followups/{followup_id}/skip | backend/app/api/v1/followups.py:273 | missing original application handler |
-| POST | /api/v1/inbox/conversations/{conversation_id}/mark-close | backend/app/api/v1/inbox.py:401 | missing original application handler |
-| POST | /api/v1/inbox/conversations/{conversation_id}/mark-interested | backend/app/api/v1/inbox.py:393 | missing original application handler |
-| POST | /api/v1/inbox/conversations/{conversation_id}/mark-not-interested | backend/app/api/v1/inbox.py:397 | missing original application handler |
-| POST | /api/v1/inbox/conversations/{conversation_id}/mark-opportunity | backend/app/api/v1/inbox.py:405 | missing original application handler |
-| POST | /api/v1/inbox/conversations/{conversation_id}/mark-unread | backend/app/api/v1/inbox.py:426 | missing original application handler |
+| POST | /api/v1/inbox/conversations/{conversation_id}/mark-close | backend/app/api/v1/inbox.py:401 | partial handler; native WordPress/HTTP unverified |
+| POST | /api/v1/inbox/conversations/{conversation_id}/mark-interested | backend/app/api/v1/inbox.py:393 | partial handler; native WordPress/HTTP unverified |
+| POST | /api/v1/inbox/conversations/{conversation_id}/mark-not-interested | backend/app/api/v1/inbox.py:397 | partial handler; native WordPress/HTTP unverified |
+| POST | /api/v1/inbox/conversations/{conversation_id}/mark-opportunity | backend/app/api/v1/inbox.py:405 | partial handler; native WordPress/HTTP unverified |
+| POST | /api/v1/inbox/conversations/{conversation_id}/mark-unread | backend/app/api/v1/inbox.py:426 | partial handler; native WordPress/HTTP unverified |
 | POST | /api/v1/inbox/conversations/{conversation_id}/reply | backend/app/api/v1/inbox.py:298 | missing original application handler |
-| POST | /api/v1/inbox/conversations/{conversation_id}/resume-sequence | backend/app/api/v1/inbox.py:444 | missing original application handler |
-| POST | /api/v1/inbox/conversations/{conversation_id}/status | backend/app/api/v1/inbox.py:414 | missing original application handler |
-| POST | /api/v1/inbox/conversations/{conversation_id}/stop-sequence | backend/app/api/v1/inbox.py:435 | missing original application handler |
+| POST | /api/v1/inbox/conversations/{conversation_id}/resume-sequence | backend/app/api/v1/inbox.py:444 | partial handler; native WordPress/HTTP unverified |
+| POST | /api/v1/inbox/conversations/{conversation_id}/status | backend/app/api/v1/inbox.py:414 | partial handler; native WordPress/HTTP unverified |
+| POST | /api/v1/inbox/conversations/{conversation_id}/stop-sequence | backend/app/api/v1/inbox.py:435 | partial handler; native WordPress/HTTP unverified |
 | POST | /api/v1/inbox/conversations/{conversation_id}/{mark} | backend/app/api/v1/inbox.py:851 | missing original application handler |
 | POST | /api/v1/inbox/messages/{message_id}/feedback | backend/app/api/v1/inbox.py:786 | missing original application handler |
 | POST | /api/v1/inbox/poll-debug | backend/app/api/v1/inbox.py:700 | missing original application handler |

@@ -1,0 +1,6463 @@
+{
+  "seeds": [
+    {
+      "table": "contacts",
+      "values": {
+        "id": 1,
+        "first_name": "Ada",
+        "last_name": "Obi",
+        "business_name": null,
+        "phone_number": "+2348031112222",
+        "email": null,
+        "city": null,
+        "state": null,
+        "country": null,
+        "website": null,
+        "industry": null,
+        "source": null,
+        "lead_status": "new",
+        "consent_status": "unknown",
+        "has_consented": false,
+        "is_opted_out": false,
+        "opted_out_at": null,
+        "opt_out_reason": null,
+        "is_undeliverable": false,
+        "undeliverable_reason": null,
+        "delivery_fail_count": 0,
+        "is_email_opted_out": false,
+        "email_opted_out_at": null,
+        "email_opt_out_reason": null,
+        "email_status": "active",
+        "is_email_undeliverable": false,
+        "email_fail_count": 0,
+        "email_last_error": null,
+        "email_source": null,
+        "email_verified": false,
+        "email_verified_at": null,
+        "email_confidence": null,
+        "email_verdict": null,
+        "email_enriched_at": null,
+        "email_enrichment_note": null,
+        "email_lower": null,
+        "notes": null,
+        "custom_fields": "{\"project\":\"Native\"}",
+        "messages_sent": 0,
+        "messages_received": 0,
+        "emails_sent": 0,
+        "emails_received": 0,
+        "last_emailed_at": null,
+        "last_email_reply_at": null,
+        "last_contacted_at": null,
+        "last_reply_at": null,
+        "created_at": "2026-01-02T12:00:00.123456+00:00",
+        "updated_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "contacts",
+      "values": {
+        "id": 2,
+        "first_name": null,
+        "last_name": null,
+        "business_name": "Bola Ltd",
+        "phone_number": null,
+        "email": "bola@business.ng",
+        "city": null,
+        "state": null,
+        "country": null,
+        "website": null,
+        "industry": null,
+        "source": null,
+        "lead_status": "new",
+        "consent_status": "unknown",
+        "has_consented": false,
+        "is_opted_out": false,
+        "opted_out_at": null,
+        "opt_out_reason": null,
+        "is_undeliverable": false,
+        "undeliverable_reason": null,
+        "delivery_fail_count": 0,
+        "is_email_opted_out": false,
+        "email_opted_out_at": null,
+        "email_opt_out_reason": null,
+        "email_status": "active",
+        "is_email_undeliverable": false,
+        "email_fail_count": 0,
+        "email_last_error": null,
+        "email_source": null,
+        "email_verified": false,
+        "email_verified_at": null,
+        "email_confidence": null,
+        "email_verdict": null,
+        "email_enriched_at": null,
+        "email_enrichment_note": null,
+        "email_lower": null,
+        "notes": null,
+        "custom_fields": "malformed",
+        "messages_sent": 0,
+        "messages_received": 0,
+        "emails_sent": 0,
+        "emails_received": 0,
+        "last_emailed_at": null,
+        "last_email_reply_at": null,
+        "last_contacted_at": null,
+        "last_reply_at": null,
+        "created_at": "2026-01-02T12:00:00.123456+00:00",
+        "updated_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "contacts",
+      "values": {
+        "id": 3,
+        "first_name": "Chidi",
+        "last_name": null,
+        "business_name": null,
+        "phone_number": null,
+        "email": "chidi@business.ng",
+        "city": null,
+        "state": null,
+        "country": null,
+        "website": null,
+        "industry": null,
+        "source": null,
+        "lead_status": "customer",
+        "consent_status": "unknown",
+        "has_consented": false,
+        "is_opted_out": false,
+        "opted_out_at": null,
+        "opt_out_reason": null,
+        "is_undeliverable": false,
+        "undeliverable_reason": null,
+        "delivery_fail_count": 0,
+        "is_email_opted_out": false,
+        "email_opted_out_at": null,
+        "email_opt_out_reason": null,
+        "email_status": "active",
+        "is_email_undeliverable": false,
+        "email_fail_count": 0,
+        "email_last_error": null,
+        "email_source": null,
+        "email_verified": false,
+        "email_verified_at": null,
+        "email_confidence": null,
+        "email_verdict": null,
+        "email_enriched_at": null,
+        "email_enrichment_note": null,
+        "email_lower": null,
+        "notes": null,
+        "custom_fields": null,
+        "messages_sent": 0,
+        "messages_received": 0,
+        "emails_sent": 0,
+        "emails_received": 0,
+        "last_emailed_at": null,
+        "last_email_reply_at": null,
+        "last_contacted_at": null,
+        "last_reply_at": null,
+        "created_at": "2026-01-02T12:00:00.123456+00:00",
+        "updated_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "campaigns",
+      "values": {
+        "id": 1,
+        "name": "First",
+        "description": null,
+        "status": "draft",
+        "paused_from": null,
+        "paused_at": null,
+        "paused_reason": null,
+        "channel": "sms",
+        "list_id": null,
+        "template_id": null,
+        "sequence_id": null,
+        "message_body": null,
+        "sequence_version_id": null,
+        "gateway_setting_id": null,
+        "email_account_id": null,
+        "fallback_email_account_id": null,
+        "email_account_ids": null,
+        "sender_distribution": "round_robin",
+        "email_sender_weights": null,
+        "subject": null,
+        "html_body": null,
+        "track_opens": true,
+        "track_clicks": true,
+        "plain_personal_email": false,
+        "sender_daily_limits": null,
+        "timezone_name": null,
+        "allowed_weekdays": null,
+        "attachments": null,
+        "daily_limit": null,
+        "hourly_limit": null,
+        "per_minute_limit": null,
+        "min_delay": null,
+        "max_delay": null,
+        "send_start_hour": null,
+        "send_end_hour": null,
+        "allow_weekends": true,
+        "total_contacts": 0,
+        "messages_sent": 0,
+        "messages_delivered": 0,
+        "messages_failed": 0,
+        "replies": 0,
+        "interested": 0,
+        "scheduled_at": null,
+        "scheduled_start_at": null,
+        "started_at": null,
+        "completed_at": null,
+        "created_at": "2026-01-02T12:00:00.123456+00:00",
+        "updated_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "campaigns",
+      "values": {
+        "id": 2,
+        "name": "Second",
+        "description": null,
+        "status": "running",
+        "paused_from": null,
+        "paused_at": null,
+        "paused_reason": null,
+        "channel": "sms",
+        "list_id": null,
+        "template_id": null,
+        "sequence_id": null,
+        "message_body": null,
+        "sequence_version_id": null,
+        "gateway_setting_id": null,
+        "email_account_id": null,
+        "fallback_email_account_id": null,
+        "email_account_ids": null,
+        "sender_distribution": "round_robin",
+        "email_sender_weights": null,
+        "subject": null,
+        "html_body": null,
+        "track_opens": true,
+        "track_clicks": true,
+        "plain_personal_email": false,
+        "sender_daily_limits": null,
+        "timezone_name": null,
+        "allowed_weekdays": null,
+        "attachments": null,
+        "daily_limit": null,
+        "hourly_limit": null,
+        "per_minute_limit": null,
+        "min_delay": null,
+        "max_delay": null,
+        "send_start_hour": null,
+        "send_end_hour": null,
+        "allow_weekends": true,
+        "total_contacts": 0,
+        "messages_sent": 0,
+        "messages_delivered": 0,
+        "messages_failed": 0,
+        "replies": 0,
+        "interested": 0,
+        "scheduled_at": null,
+        "scheduled_start_at": null,
+        "started_at": null,
+        "completed_at": null,
+        "created_at": "2026-01-02T12:00:00.123456+00:00",
+        "updated_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "ads_campaigns",
+      "values": {
+        "id": 1,
+        "name": "Ads first",
+        "description": null,
+        "objective": "replies",
+        "status": "draft",
+        "channel": "sms",
+        "email_account_id": null,
+        "fallback_email_account_id": null,
+        "email_account_ids": null,
+        "sender_distribution": "round_robin",
+        "email_sender_weights": null,
+        "subject": null,
+        "track_opens": true,
+        "track_clicks": true,
+        "plain_personal_email": true,
+        "sender_daily_limits": null,
+        "owner_id": null,
+        "daily_limit": null,
+        "total_limit": null,
+        "start_date": null,
+        "end_date": null,
+        "send_start_hour": null,
+        "send_end_hour": null,
+        "send_days": null,
+        "timezone_name": null,
+        "drip_mode": "off",
+        "drip_batch_size": 1,
+        "drip_interval_minutes": 0,
+        "pacing": "even",
+        "continuous": true,
+        "always_on": false,
+        "max_per_contact_per_day": null,
+        "max_per_contact_per_week": null,
+        "optimization_mode": "manual",
+        "auto_optimize": false,
+        "optimize_metric": "score",
+        "optimize_min_sends": 30,
+        "optimize_min_gap_pct": 25.0,
+        "optimize_action": "shift",
+        "optimize_last_run_at": null,
+        "test_mode": false,
+        "queued_edit_policy": "keep",
+        "priority": "normal",
+        "paused_reason": null,
+        "paused_at": null,
+        "sent_count": 0,
+        "last_state": null,
+        "last_state_at": null,
+        "last_activity_at": null,
+        "last_error": null,
+        "state_changed_at": null,
+        "created_at": "2026-01-02T12:00:00.123456+00:00",
+        "updated_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "conversations",
+      "values": {
+        "id": 1,
+        "contact_id": 1,
+        "channel": "sms",
+        "email_account_id": null,
+        "subject": null,
+        "campaign_id": null,
+        "ads_campaign_id": null,
+        "last_campaign_id": null,
+        "last_ads_campaign_id": null,
+        "status": "unread",
+        "message_count": 3,
+        "unread_count": 3,
+        "sequence_paused": false,
+        "last_message_preview": "Preview 1",
+        "last_message_at": "2026-01-02T11:00:00.123456+00:00",
+        "created_at": "2026-01-02T12:00:00.123456+00:00",
+        "updated_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "conversations",
+      "values": {
+        "id": 2,
+        "contact_id": 2,
+        "channel": "email",
+        "email_account_id": null,
+        "subject": null,
+        "campaign_id": null,
+        "ads_campaign_id": null,
+        "last_campaign_id": null,
+        "last_ads_campaign_id": null,
+        "status": "opportunity",
+        "message_count": 3,
+        "unread_count": 1,
+        "sequence_paused": false,
+        "last_message_preview": "Preview 2",
+        "last_message_at": "2026-01-02T10:00:00.123456+00:00",
+        "created_at": "2026-01-02T12:00:00.123456+00:00",
+        "updated_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "conversations",
+      "values": {
+        "id": 3,
+        "contact_id": 3,
+        "channel": "sms",
+        "email_account_id": null,
+        "subject": null,
+        "campaign_id": null,
+        "ads_campaign_id": null,
+        "last_campaign_id": null,
+        "last_ads_campaign_id": null,
+        "status": "active",
+        "message_count": 3,
+        "unread_count": 0,
+        "sequence_paused": false,
+        "last_message_preview": "Preview 3",
+        "last_message_at": "2026-01-02T09:00:00.123456+00:00",
+        "created_at": "2026-01-02T12:00:00.123456+00:00",
+        "updated_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "messages",
+      "values": {
+        "id": 1,
+        "conversation_id": 1,
+        "contact_id": 1,
+        "campaign_id": 1,
+        "ads_campaign_id": null,
+        "direction": "outgoing",
+        "channel": "sms",
+        "body": "Synthetic 0",
+        "segment_count": 1,
+        "char_count": 0,
+        "subject": null,
+        "html_body": null,
+        "from_address": null,
+        "to_address": null,
+        "email_account_id": null,
+        "rfc_message_id": null,
+        "in_reply_to": null,
+        "attachments": null,
+        "bulk_send": false,
+        "cc_addresses": null,
+        "bcc_addresses": null,
+        "opened_at": null,
+        "clicked_at": null,
+        "open_count": 0,
+        "click_count": 0,
+        "bounced_at": null,
+        "bounced_hard": false,
+        "status": "sent",
+        "provider": null,
+        "provider_message_id": null,
+        "idempotency_key": "synthetic-inbox-0",
+        "provider_response": null,
+        "is_auto_reply": false,
+        "send_from_mailbox": false,
+        "ai_sentiment": null,
+        "ai_intent": null,
+        "ai_confidence": null,
+        "retry_count": 0,
+        "last_error": null,
+        "retry_at": null,
+        "sent_at": null,
+        "delivered_at": null,
+        "failed_at": null,
+        "status_polled_at": null,
+        "created_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "messages",
+      "values": {
+        "id": 2,
+        "conversation_id": 1,
+        "contact_id": 1,
+        "campaign_id": 2,
+        "ads_campaign_id": null,
+        "direction": "outgoing",
+        "channel": "sms",
+        "body": "Synthetic 1",
+        "segment_count": 1,
+        "char_count": 0,
+        "subject": null,
+        "html_body": null,
+        "from_address": null,
+        "to_address": null,
+        "email_account_id": null,
+        "rfc_message_id": null,
+        "in_reply_to": null,
+        "attachments": null,
+        "bulk_send": false,
+        "cc_addresses": null,
+        "bcc_addresses": null,
+        "opened_at": null,
+        "clicked_at": null,
+        "open_count": 0,
+        "click_count": 0,
+        "bounced_at": null,
+        "bounced_hard": false,
+        "status": "sent",
+        "provider": null,
+        "provider_message_id": null,
+        "idempotency_key": "synthetic-inbox-1",
+        "provider_response": null,
+        "is_auto_reply": false,
+        "send_from_mailbox": false,
+        "ai_sentiment": null,
+        "ai_intent": null,
+        "ai_confidence": null,
+        "retry_count": 0,
+        "last_error": "provider secret-looking error",
+        "retry_at": null,
+        "sent_at": null,
+        "delivered_at": null,
+        "failed_at": null,
+        "status_polled_at": null,
+        "created_at": "2026-01-02T12:01:00.123456+00:00"
+      }
+    },
+    {
+      "table": "messages",
+      "values": {
+        "id": 3,
+        "conversation_id": 1,
+        "contact_id": 1,
+        "campaign_id": null,
+        "ads_campaign_id": null,
+        "direction": "incoming",
+        "channel": "sms",
+        "body": "Synthetic 2",
+        "segment_count": 1,
+        "char_count": 0,
+        "subject": null,
+        "html_body": null,
+        "from_address": null,
+        "to_address": null,
+        "email_account_id": null,
+        "rfc_message_id": null,
+        "in_reply_to": null,
+        "attachments": null,
+        "bulk_send": false,
+        "cc_addresses": null,
+        "bcc_addresses": null,
+        "opened_at": null,
+        "clicked_at": null,
+        "open_count": 0,
+        "click_count": 0,
+        "bounced_at": null,
+        "bounced_hard": false,
+        "status": "received",
+        "provider": null,
+        "provider_message_id": null,
+        "idempotency_key": "synthetic-inbox-2",
+        "provider_response": null,
+        "is_auto_reply": false,
+        "send_from_mailbox": false,
+        "ai_sentiment": null,
+        "ai_intent": null,
+        "ai_confidence": null,
+        "retry_count": 0,
+        "last_error": null,
+        "retry_at": null,
+        "sent_at": null,
+        "delivered_at": null,
+        "failed_at": null,
+        "status_polled_at": null,
+        "created_at": "2026-01-02T12:02:00.123456+00:00"
+      }
+    },
+    {
+      "table": "messages",
+      "values": {
+        "id": 4,
+        "conversation_id": 2,
+        "contact_id": 2,
+        "campaign_id": null,
+        "ads_campaign_id": 1,
+        "direction": "outgoing",
+        "channel": "email",
+        "body": "Synthetic 3",
+        "segment_count": 1,
+        "char_count": 0,
+        "subject": null,
+        "html_body": null,
+        "from_address": null,
+        "to_address": null,
+        "email_account_id": null,
+        "rfc_message_id": null,
+        "in_reply_to": null,
+        "attachments": null,
+        "bulk_send": false,
+        "cc_addresses": null,
+        "bcc_addresses": null,
+        "opened_at": null,
+        "clicked_at": null,
+        "open_count": 0,
+        "click_count": 0,
+        "bounced_at": null,
+        "bounced_hard": false,
+        "status": "sent",
+        "provider": null,
+        "provider_message_id": null,
+        "idempotency_key": "synthetic-inbox-3",
+        "provider_response": null,
+        "is_auto_reply": false,
+        "send_from_mailbox": false,
+        "ai_sentiment": null,
+        "ai_intent": null,
+        "ai_confidence": null,
+        "retry_count": 0,
+        "last_error": null,
+        "retry_at": null,
+        "sent_at": null,
+        "delivered_at": null,
+        "failed_at": null,
+        "status_polled_at": null,
+        "created_at": "2026-01-02T12:03:00.123456+00:00"
+      }
+    },
+    {
+      "table": "messages",
+      "values": {
+        "id": 5,
+        "conversation_id": 2,
+        "contact_id": 2,
+        "campaign_id": null,
+        "ads_campaign_id": null,
+        "direction": "incoming",
+        "channel": "email",
+        "body": "Synthetic 4",
+        "segment_count": 1,
+        "char_count": 0,
+        "subject": null,
+        "html_body": null,
+        "from_address": null,
+        "to_address": null,
+        "email_account_id": null,
+        "rfc_message_id": null,
+        "in_reply_to": null,
+        "attachments": null,
+        "bulk_send": false,
+        "cc_addresses": null,
+        "bcc_addresses": null,
+        "opened_at": null,
+        "clicked_at": null,
+        "open_count": 0,
+        "click_count": 0,
+        "bounced_at": null,
+        "bounced_hard": false,
+        "status": "received",
+        "provider": null,
+        "provider_message_id": null,
+        "idempotency_key": "synthetic-inbox-4",
+        "provider_response": null,
+        "is_auto_reply": false,
+        "send_from_mailbox": false,
+        "ai_sentiment": null,
+        "ai_intent": null,
+        "ai_confidence": null,
+        "retry_count": 0,
+        "last_error": null,
+        "retry_at": null,
+        "sent_at": null,
+        "delivered_at": null,
+        "failed_at": null,
+        "status_polled_at": null,
+        "created_at": "2026-01-02T12:04:00.123456+00:00"
+      }
+    },
+    {
+      "table": "messages",
+      "values": {
+        "id": 6,
+        "conversation_id": 3,
+        "contact_id": 3,
+        "campaign_id": null,
+        "ads_campaign_id": null,
+        "direction": "outgoing",
+        "channel": "sms",
+        "body": "Synthetic 5",
+        "segment_count": 1,
+        "char_count": 0,
+        "subject": null,
+        "html_body": null,
+        "from_address": null,
+        "to_address": null,
+        "email_account_id": null,
+        "rfc_message_id": null,
+        "in_reply_to": null,
+        "attachments": null,
+        "bulk_send": false,
+        "cc_addresses": null,
+        "bcc_addresses": null,
+        "opened_at": null,
+        "clicked_at": null,
+        "open_count": 0,
+        "click_count": 0,
+        "bounced_at": null,
+        "bounced_hard": false,
+        "status": "sent",
+        "provider": null,
+        "provider_message_id": null,
+        "idempotency_key": "synthetic-inbox-5",
+        "provider_response": null,
+        "is_auto_reply": false,
+        "send_from_mailbox": false,
+        "ai_sentiment": null,
+        "ai_intent": null,
+        "ai_confidence": null,
+        "retry_count": 0,
+        "last_error": null,
+        "retry_at": null,
+        "sent_at": null,
+        "delivered_at": null,
+        "failed_at": null,
+        "status_polled_at": null,
+        "created_at": "2026-01-02T12:05:00.123456+00:00"
+      }
+    },
+    {
+      "table": "followups",
+      "values": {
+        "id": 1,
+        "contact_id": 1,
+        "campaign_id": null,
+        "campaign_contact_id": null,
+        "sequence_id": null,
+        "sequence_step_order": null,
+        "channel": "sms",
+        "subject": null,
+        "email_account_id": null,
+        "status": "pending",
+        "scheduled_at": "2026-01-02T12:00:00.123456+00:00",
+        "executed_at": null,
+        "message_id": null,
+        "template_id": null,
+        "message_text": null,
+        "attempt_count": 0,
+        "max_attempts": 3,
+        "last_error": null,
+        "notify_on_due": false,
+        "is_overdue": false,
+        "created_at": "2026-01-02T12:00:00.123456+00:00",
+        "updated_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "followups",
+      "values": {
+        "id": 2,
+        "contact_id": 1,
+        "campaign_id": null,
+        "campaign_contact_id": null,
+        "sequence_id": null,
+        "sequence_step_order": null,
+        "channel": "email",
+        "subject": null,
+        "email_account_id": null,
+        "status": "sending",
+        "scheduled_at": "2026-01-02T12:00:00.123456+00:00",
+        "executed_at": null,
+        "message_id": null,
+        "template_id": null,
+        "message_text": null,
+        "attempt_count": 0,
+        "max_attempts": 3,
+        "last_error": null,
+        "notify_on_due": false,
+        "is_overdue": false,
+        "created_at": "2026-01-02T12:00:00.123456+00:00",
+        "updated_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "followups",
+      "values": {
+        "id": 3,
+        "contact_id": 1,
+        "campaign_id": null,
+        "campaign_contact_id": null,
+        "sequence_id": null,
+        "sequence_step_order": null,
+        "channel": "sms",
+        "subject": null,
+        "email_account_id": null,
+        "status": "sent",
+        "scheduled_at": "2026-01-02T12:00:00.123456+00:00",
+        "executed_at": null,
+        "message_id": null,
+        "template_id": null,
+        "message_text": null,
+        "attempt_count": 0,
+        "max_attempts": 3,
+        "last_error": null,
+        "notify_on_due": false,
+        "is_overdue": false,
+        "created_at": "2026-01-02T12:00:00.123456+00:00",
+        "updated_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "followups",
+      "values": {
+        "id": 4,
+        "contact_id": 2,
+        "campaign_id": null,
+        "campaign_contact_id": null,
+        "sequence_id": null,
+        "sequence_step_order": null,
+        "channel": "sms",
+        "subject": null,
+        "email_account_id": null,
+        "status": "pending",
+        "scheduled_at": "2026-01-02T12:00:00.123456+00:00",
+        "executed_at": null,
+        "message_id": null,
+        "template_id": null,
+        "message_text": null,
+        "attempt_count": 0,
+        "max_attempts": 3,
+        "last_error": null,
+        "notify_on_due": false,
+        "is_overdue": false,
+        "created_at": "2026-01-02T12:00:00.123456+00:00",
+        "updated_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "campaign_contacts",
+      "values": {
+        "id": 1,
+        "campaign_id": 1,
+        "contact_id": 1,
+        "status": "pending",
+        "sequence_step": 0,
+        "email_account_id": null,
+        "next_action_at": "2026-01-02T12:00:00.123456+00:00",
+        "messages_sent": 0,
+        "last_error": null,
+        "last_message_id": null,
+        "last_message_at": null,
+        "last_reply_at": null,
+        "created_at": "2026-01-02T12:00:00.123456+00:00",
+        "updated_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "campaign_contacts",
+      "values": {
+        "id": 2,
+        "campaign_id": 1,
+        "contact_id": 1,
+        "status": "queued",
+        "sequence_step": 0,
+        "email_account_id": null,
+        "next_action_at": "2026-01-02T12:00:00.123456+00:00",
+        "messages_sent": 0,
+        "last_error": null,
+        "last_message_id": null,
+        "last_message_at": null,
+        "last_reply_at": null,
+        "created_at": "2026-01-02T12:00:00.123456+00:00",
+        "updated_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "campaign_contacts",
+      "values": {
+        "id": 3,
+        "campaign_id": 1,
+        "contact_id": 1,
+        "status": "sent",
+        "sequence_step": 0,
+        "email_account_id": null,
+        "next_action_at": "2026-01-02T12:00:00.123456+00:00",
+        "messages_sent": 0,
+        "last_error": null,
+        "last_message_id": null,
+        "last_message_at": null,
+        "last_reply_at": null,
+        "created_at": "2026-01-02T12:00:00.123456+00:00",
+        "updated_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "campaign_contacts",
+      "values": {
+        "id": 4,
+        "campaign_id": 1,
+        "contact_id": 1,
+        "status": "failed",
+        "sequence_step": 0,
+        "email_account_id": null,
+        "next_action_at": "2026-01-02T12:00:00.123456+00:00",
+        "messages_sent": 0,
+        "last_error": null,
+        "last_message_id": null,
+        "last_message_at": null,
+        "last_reply_at": null,
+        "created_at": "2026-01-02T12:00:00.123456+00:00",
+        "updated_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "campaign_contacts",
+      "values": {
+        "id": 5,
+        "campaign_id": 1,
+        "contact_id": 2,
+        "status": "pending",
+        "sequence_step": 0,
+        "email_account_id": null,
+        "next_action_at": "2026-01-02T12:00:00.123456+00:00",
+        "messages_sent": 0,
+        "last_error": null,
+        "last_message_id": null,
+        "last_message_at": null,
+        "last_reply_at": null,
+        "created_at": "2026-01-02T12:00:00.123456+00:00",
+        "updated_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    }
+  ],
+  "operations": [
+    {
+      "kind": "filters",
+      "expected": {
+        "status": 200,
+        "body": {
+          "items": [],
+          "unattributed": {
+            "leads": 2,
+            "replies": 1,
+            "unread": 1
+          },
+          "total_conversations": 2
+        }
+      },
+      "snapshot": {
+        "conversations": [
+          {
+            "id": 1,
+            "status": "unread",
+            "unread_count": 3,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": null,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": null
+          },
+          {
+            "id": 2,
+            "status": "opportunity",
+            "unread_count": 1,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": null,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": null
+          },
+          {
+            "id": 3,
+            "status": "active",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": null,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": null
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "new"
+          },
+          {
+            "id": 2,
+            "lead_status": "new"
+          },
+          {
+            "id": 3,
+            "lead_status": "customer"
+          }
+        ],
+        "followups": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "pending"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "sending"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent"
+          },
+          {
+            "id": 4,
+            "contact_id": 2,
+            "status": "pending"
+          }
+        ],
+        "campaign_contacts": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "queued",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 4,
+            "contact_id": 1,
+            "status": "failed",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 5,
+            "contact_id": 2,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "list",
+      "expected": {
+        "status": 200,
+        "body": {
+          "total": 2,
+          "items": [
+            {
+              "id": 1,
+              "channel": "sms",
+              "contact_id": 1,
+              "contact_name": "Ada Obi",
+              "contact_phone": "+2348031112222",
+              "contact_lead_status": "new",
+              "status": "unread",
+              "message_count": 3,
+              "unread_count": 3,
+              "last_message_preview": "Preview 1",
+              "last_message_at": "2026-01-02T11:00:00.123456",
+              "created_at": "2026-01-02T12:00:00.123456",
+              "campaign": {
+                "id": 1,
+                "kind": "campaign",
+                "name": "First",
+                "status": "draft"
+              },
+              "last_campaign": {
+                "id": 2,
+                "kind": "campaign",
+                "name": "Second",
+                "status": "running"
+              },
+              "contact": {
+                "phone_number": "+2348031112222",
+                "lead_status": "new",
+                "business_name": null,
+                "first_name": "Ada",
+                "last_name": "Obi",
+                "city": null,
+                "state": null,
+                "custom_fields": {
+                  "project": "Native"
+                }
+              }
+            },
+            {
+              "id": 3,
+              "channel": "sms",
+              "contact_id": 3,
+              "contact_name": "Chidi",
+              "contact_phone": null,
+              "contact_lead_status": "customer",
+              "status": "active",
+              "message_count": 3,
+              "unread_count": 0,
+              "last_message_preview": "Preview 3",
+              "last_message_at": "2026-01-02T09:00:00.123456",
+              "created_at": "2026-01-02T12:00:00.123456",
+              "campaign": null,
+              "last_campaign": null,
+              "contact": {
+                "phone_number": null,
+                "lead_status": "customer",
+                "business_name": null,
+                "first_name": "Chidi",
+                "last_name": null,
+                "city": null,
+                "state": null,
+                "custom_fields": {}
+              }
+            }
+          ],
+          "counts": {
+            "active": 1,
+            "unread": 1,
+            "all": 2
+          }
+        }
+      },
+      "snapshot": {
+        "conversations": [
+          {
+            "id": 1,
+            "status": "unread",
+            "unread_count": 3,
+            "sequence_paused": false,
+            "campaign_id": 1,
+            "ads_campaign_id": null,
+            "last_campaign_id": 2,
+            "last_ads_campaign_id": null
+          },
+          {
+            "id": 2,
+            "status": "opportunity",
+            "unread_count": 1,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": null,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": null
+          },
+          {
+            "id": 3,
+            "status": "active",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": null,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": null
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "new"
+          },
+          {
+            "id": 2,
+            "lead_status": "new"
+          },
+          {
+            "id": 3,
+            "lead_status": "customer"
+          }
+        ],
+        "followups": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "pending"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "sending"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent"
+          },
+          {
+            "id": 4,
+            "contact_id": 2,
+            "status": "pending"
+          }
+        ],
+        "campaign_contacts": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "queued",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 4,
+            "contact_id": 1,
+            "status": "failed",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 5,
+            "contact_id": 2,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "list",
+      "q": {
+        "search": "+234803",
+        "channel": "all"
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "total": 1,
+          "items": [
+            {
+              "id": 1,
+              "channel": "sms",
+              "contact_id": 1,
+              "contact_name": "Ada Obi",
+              "contact_phone": "+2348031112222",
+              "contact_lead_status": "new",
+              "status": "unread",
+              "message_count": 3,
+              "unread_count": 3,
+              "last_message_preview": "Preview 1",
+              "last_message_at": "2026-01-02T11:00:00.123456",
+              "created_at": "2026-01-02T12:00:00.123456",
+              "campaign": {
+                "id": 1,
+                "kind": "campaign",
+                "name": "First",
+                "status": "draft"
+              },
+              "last_campaign": {
+                "id": 2,
+                "kind": "campaign",
+                "name": "Second",
+                "status": "running"
+              },
+              "contact": {
+                "phone_number": "+2348031112222",
+                "lead_status": "new",
+                "business_name": null,
+                "first_name": "Ada",
+                "last_name": "Obi",
+                "city": null,
+                "state": null,
+                "custom_fields": {
+                  "project": "Native"
+                }
+              }
+            }
+          ],
+          "counts": {
+            "active": 1,
+            "opportunity": 1,
+            "unread": 2,
+            "all": 3
+          }
+        }
+      },
+      "snapshot": {
+        "conversations": [
+          {
+            "id": 1,
+            "status": "unread",
+            "unread_count": 3,
+            "sequence_paused": false,
+            "campaign_id": 1,
+            "ads_campaign_id": null,
+            "last_campaign_id": 2,
+            "last_ads_campaign_id": null
+          },
+          {
+            "id": 2,
+            "status": "opportunity",
+            "unread_count": 1,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": null,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": null
+          },
+          {
+            "id": 3,
+            "status": "active",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": null,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": null
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "new"
+          },
+          {
+            "id": 2,
+            "lead_status": "new"
+          },
+          {
+            "id": 3,
+            "lead_status": "customer"
+          }
+        ],
+        "followups": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "pending"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "sending"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent"
+          },
+          {
+            "id": 4,
+            "contact_id": 2,
+            "status": "pending"
+          }
+        ],
+        "campaign_contacts": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "queued",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 4,
+            "contact_id": 1,
+            "status": "failed",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 5,
+            "contact_id": 2,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "list",
+      "q": {
+        "search": "803111",
+        "channel": "all"
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "total": 1,
+          "items": [
+            {
+              "id": 1,
+              "channel": "sms",
+              "contact_id": 1,
+              "contact_name": "Ada Obi",
+              "contact_phone": "+2348031112222",
+              "contact_lead_status": "new",
+              "status": "unread",
+              "message_count": 3,
+              "unread_count": 3,
+              "last_message_preview": "Preview 1",
+              "last_message_at": "2026-01-02T11:00:00.123456",
+              "created_at": "2026-01-02T12:00:00.123456",
+              "campaign": {
+                "id": 1,
+                "kind": "campaign",
+                "name": "First",
+                "status": "draft"
+              },
+              "last_campaign": {
+                "id": 2,
+                "kind": "campaign",
+                "name": "Second",
+                "status": "running"
+              },
+              "contact": {
+                "phone_number": "+2348031112222",
+                "lead_status": "new",
+                "business_name": null,
+                "first_name": "Ada",
+                "last_name": "Obi",
+                "city": null,
+                "state": null,
+                "custom_fields": {
+                  "project": "Native"
+                }
+              }
+            }
+          ],
+          "counts": {
+            "active": 1,
+            "opportunity": 1,
+            "unread": 2,
+            "all": 3
+          }
+        }
+      },
+      "snapshot": {
+        "conversations": [
+          {
+            "id": 1,
+            "status": "unread",
+            "unread_count": 3,
+            "sequence_paused": false,
+            "campaign_id": 1,
+            "ads_campaign_id": null,
+            "last_campaign_id": 2,
+            "last_ads_campaign_id": null
+          },
+          {
+            "id": 2,
+            "status": "opportunity",
+            "unread_count": 1,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": null,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": null
+          },
+          {
+            "id": 3,
+            "status": "active",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": null,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": null
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "new"
+          },
+          {
+            "id": 2,
+            "lead_status": "new"
+          },
+          {
+            "id": 3,
+            "lead_status": "customer"
+          }
+        ],
+        "followups": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "pending"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "sending"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent"
+          },
+          {
+            "id": 4,
+            "contact_id": 2,
+            "status": "pending"
+          }
+        ],
+        "campaign_contacts": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "queued",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 4,
+            "contact_id": 1,
+            "status": "failed",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 5,
+            "contact_id": 2,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "list",
+      "q": {
+        "search": "Ada",
+        "channel": "all"
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "total": 1,
+          "items": [
+            {
+              "id": 1,
+              "channel": "sms",
+              "contact_id": 1,
+              "contact_name": "Ada Obi",
+              "contact_phone": "+2348031112222",
+              "contact_lead_status": "new",
+              "status": "unread",
+              "message_count": 3,
+              "unread_count": 3,
+              "last_message_preview": "Preview 1",
+              "last_message_at": "2026-01-02T11:00:00.123456",
+              "created_at": "2026-01-02T12:00:00.123456",
+              "campaign": {
+                "id": 1,
+                "kind": "campaign",
+                "name": "First",
+                "status": "draft"
+              },
+              "last_campaign": {
+                "id": 2,
+                "kind": "campaign",
+                "name": "Second",
+                "status": "running"
+              },
+              "contact": {
+                "phone_number": "+2348031112222",
+                "lead_status": "new",
+                "business_name": null,
+                "first_name": "Ada",
+                "last_name": "Obi",
+                "city": null,
+                "state": null,
+                "custom_fields": {
+                  "project": "Native"
+                }
+              }
+            }
+          ],
+          "counts": {
+            "active": 1,
+            "opportunity": 1,
+            "unread": 2,
+            "all": 3
+          }
+        }
+      },
+      "snapshot": {
+        "conversations": [
+          {
+            "id": 1,
+            "status": "unread",
+            "unread_count": 3,
+            "sequence_paused": false,
+            "campaign_id": 1,
+            "ads_campaign_id": null,
+            "last_campaign_id": 2,
+            "last_ads_campaign_id": null
+          },
+          {
+            "id": 2,
+            "status": "opportunity",
+            "unread_count": 1,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": null,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": null
+          },
+          {
+            "id": 3,
+            "status": "active",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": null,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": null
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "new"
+          },
+          {
+            "id": 2,
+            "lead_status": "new"
+          },
+          {
+            "id": 3,
+            "lead_status": "customer"
+          }
+        ],
+        "followups": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "pending"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "sending"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent"
+          },
+          {
+            "id": 4,
+            "contact_id": 2,
+            "status": "pending"
+          }
+        ],
+        "campaign_contacts": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "queued",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 4,
+            "contact_id": 1,
+            "status": "failed",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 5,
+            "contact_id": 2,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "list",
+      "q": {
+        "search": "Bola",
+        "channel": "all"
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "total": 1,
+          "items": [
+            {
+              "id": 2,
+              "channel": "email",
+              "contact_id": 2,
+              "contact_name": "Bola Ltd",
+              "contact_phone": null,
+              "contact_lead_status": "new",
+              "status": "opportunity",
+              "message_count": 3,
+              "unread_count": 1,
+              "last_message_preview": "Preview 2",
+              "last_message_at": "2026-01-02T10:00:00.123456",
+              "created_at": "2026-01-02T12:00:00.123456",
+              "campaign": {
+                "id": 1,
+                "kind": "ads",
+                "name": "Ads first",
+                "status": "draft"
+              },
+              "last_campaign": {
+                "id": 1,
+                "kind": "ads",
+                "name": "Ads first",
+                "status": "draft"
+              },
+              "contact": {
+                "phone_number": null,
+                "lead_status": "new",
+                "business_name": "Bola Ltd",
+                "first_name": null,
+                "last_name": null,
+                "city": null,
+                "state": null,
+                "custom_fields": {}
+              }
+            }
+          ],
+          "counts": {
+            "active": 1,
+            "opportunity": 1,
+            "unread": 2,
+            "all": 3
+          }
+        }
+      },
+      "snapshot": {
+        "conversations": [
+          {
+            "id": 1,
+            "status": "unread",
+            "unread_count": 3,
+            "sequence_paused": false,
+            "campaign_id": 1,
+            "ads_campaign_id": null,
+            "last_campaign_id": 2,
+            "last_ads_campaign_id": null
+          },
+          {
+            "id": 2,
+            "status": "opportunity",
+            "unread_count": 1,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": 1,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": 1
+          },
+          {
+            "id": 3,
+            "status": "active",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": null,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": null
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "new"
+          },
+          {
+            "id": 2,
+            "lead_status": "new"
+          },
+          {
+            "id": 3,
+            "lead_status": "customer"
+          }
+        ],
+        "followups": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "pending"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "sending"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent"
+          },
+          {
+            "id": 4,
+            "contact_id": 2,
+            "status": "pending"
+          }
+        ],
+        "campaign_contacts": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "queued",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 4,
+            "contact_id": 1,
+            "status": "failed",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 5,
+            "contact_id": 2,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "list",
+      "q": {
+        "search": "%",
+        "channel": "all"
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "total": 3,
+          "items": [
+            {
+              "id": 1,
+              "channel": "sms",
+              "contact_id": 1,
+              "contact_name": "Ada Obi",
+              "contact_phone": "+2348031112222",
+              "contact_lead_status": "new",
+              "status": "unread",
+              "message_count": 3,
+              "unread_count": 3,
+              "last_message_preview": "Preview 1",
+              "last_message_at": "2026-01-02T11:00:00.123456",
+              "created_at": "2026-01-02T12:00:00.123456",
+              "campaign": {
+                "id": 1,
+                "kind": "campaign",
+                "name": "First",
+                "status": "draft"
+              },
+              "last_campaign": {
+                "id": 2,
+                "kind": "campaign",
+                "name": "Second",
+                "status": "running"
+              },
+              "contact": {
+                "phone_number": "+2348031112222",
+                "lead_status": "new",
+                "business_name": null,
+                "first_name": "Ada",
+                "last_name": "Obi",
+                "city": null,
+                "state": null,
+                "custom_fields": {
+                  "project": "Native"
+                }
+              }
+            },
+            {
+              "id": 2,
+              "channel": "email",
+              "contact_id": 2,
+              "contact_name": "Bola Ltd",
+              "contact_phone": null,
+              "contact_lead_status": "new",
+              "status": "opportunity",
+              "message_count": 3,
+              "unread_count": 1,
+              "last_message_preview": "Preview 2",
+              "last_message_at": "2026-01-02T10:00:00.123456",
+              "created_at": "2026-01-02T12:00:00.123456",
+              "campaign": {
+                "id": 1,
+                "kind": "ads",
+                "name": "Ads first",
+                "status": "draft"
+              },
+              "last_campaign": {
+                "id": 1,
+                "kind": "ads",
+                "name": "Ads first",
+                "status": "draft"
+              },
+              "contact": {
+                "phone_number": null,
+                "lead_status": "new",
+                "business_name": "Bola Ltd",
+                "first_name": null,
+                "last_name": null,
+                "city": null,
+                "state": null,
+                "custom_fields": {}
+              }
+            },
+            {
+              "id": 3,
+              "channel": "sms",
+              "contact_id": 3,
+              "contact_name": "Chidi",
+              "contact_phone": null,
+              "contact_lead_status": "customer",
+              "status": "active",
+              "message_count": 3,
+              "unread_count": 0,
+              "last_message_preview": "Preview 3",
+              "last_message_at": "2026-01-02T09:00:00.123456",
+              "created_at": "2026-01-02T12:00:00.123456",
+              "campaign": null,
+              "last_campaign": null,
+              "contact": {
+                "phone_number": null,
+                "lead_status": "customer",
+                "business_name": null,
+                "first_name": "Chidi",
+                "last_name": null,
+                "city": null,
+                "state": null,
+                "custom_fields": {}
+              }
+            }
+          ],
+          "counts": {
+            "active": 1,
+            "opportunity": 1,
+            "unread": 2,
+            "all": 3
+          }
+        }
+      },
+      "snapshot": {
+        "conversations": [
+          {
+            "id": 1,
+            "status": "unread",
+            "unread_count": 3,
+            "sequence_paused": false,
+            "campaign_id": 1,
+            "ads_campaign_id": null,
+            "last_campaign_id": 2,
+            "last_ads_campaign_id": null
+          },
+          {
+            "id": 2,
+            "status": "opportunity",
+            "unread_count": 1,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": 1,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": 1
+          },
+          {
+            "id": 3,
+            "status": "active",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": null,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": null
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "new"
+          },
+          {
+            "id": 2,
+            "lead_status": "new"
+          },
+          {
+            "id": 3,
+            "lead_status": "customer"
+          }
+        ],
+        "followups": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "pending"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "sending"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent"
+          },
+          {
+            "id": 4,
+            "contact_id": 2,
+            "status": "pending"
+          }
+        ],
+        "campaign_contacts": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "queued",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 4,
+            "contact_id": 1,
+            "status": "failed",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 5,
+            "contact_id": 2,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "list",
+      "q": {
+        "search": "٠٨٠٣",
+        "channel": "all"
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "total": 0,
+          "items": [],
+          "counts": {
+            "active": 1,
+            "opportunity": 1,
+            "unread": 2,
+            "all": 3
+          }
+        }
+      },
+      "snapshot": {
+        "conversations": [
+          {
+            "id": 1,
+            "status": "unread",
+            "unread_count": 3,
+            "sequence_paused": false,
+            "campaign_id": 1,
+            "ads_campaign_id": null,
+            "last_campaign_id": 2,
+            "last_ads_campaign_id": null
+          },
+          {
+            "id": 2,
+            "status": "opportunity",
+            "unread_count": 1,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": 1,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": 1
+          },
+          {
+            "id": 3,
+            "status": "active",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": null,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": null
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "new"
+          },
+          {
+            "id": 2,
+            "lead_status": "new"
+          },
+          {
+            "id": 3,
+            "lead_status": "customer"
+          }
+        ],
+        "followups": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "pending"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "sending"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent"
+          },
+          {
+            "id": 4,
+            "contact_id": 2,
+            "status": "pending"
+          }
+        ],
+        "campaign_contacts": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "queued",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 4,
+            "contact_id": 1,
+            "status": "failed",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 5,
+            "contact_id": 2,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "list",
+      "q": {
+        "search": "not a name 0803111",
+        "channel": "all"
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "total": 1,
+          "items": [
+            {
+              "id": 1,
+              "channel": "sms",
+              "contact_id": 1,
+              "contact_name": "Ada Obi",
+              "contact_phone": "+2348031112222",
+              "contact_lead_status": "new",
+              "status": "unread",
+              "message_count": 3,
+              "unread_count": 3,
+              "last_message_preview": "Preview 1",
+              "last_message_at": "2026-01-02T11:00:00.123456",
+              "created_at": "2026-01-02T12:00:00.123456",
+              "campaign": {
+                "id": 1,
+                "kind": "campaign",
+                "name": "First",
+                "status": "draft"
+              },
+              "last_campaign": {
+                "id": 2,
+                "kind": "campaign",
+                "name": "Second",
+                "status": "running"
+              },
+              "contact": {
+                "phone_number": "+2348031112222",
+                "lead_status": "new",
+                "business_name": null,
+                "first_name": "Ada",
+                "last_name": "Obi",
+                "city": null,
+                "state": null,
+                "custom_fields": {
+                  "project": "Native"
+                }
+              }
+            }
+          ],
+          "counts": {
+            "active": 1,
+            "opportunity": 1,
+            "unread": 2,
+            "all": 3
+          }
+        }
+      },
+      "snapshot": {
+        "conversations": [
+          {
+            "id": 1,
+            "status": "unread",
+            "unread_count": 3,
+            "sequence_paused": false,
+            "campaign_id": 1,
+            "ads_campaign_id": null,
+            "last_campaign_id": 2,
+            "last_ads_campaign_id": null
+          },
+          {
+            "id": 2,
+            "status": "opportunity",
+            "unread_count": 1,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": 1,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": 1
+          },
+          {
+            "id": 3,
+            "status": "active",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": null,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": null
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "new"
+          },
+          {
+            "id": 2,
+            "lead_status": "new"
+          },
+          {
+            "id": 3,
+            "lead_status": "customer"
+          }
+        ],
+        "followups": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "pending"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "sending"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent"
+          },
+          {
+            "id": 4,
+            "contact_id": 2,
+            "status": "pending"
+          }
+        ],
+        "campaign_contacts": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "queued",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 4,
+            "contact_id": 1,
+            "status": "failed",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 5,
+            "contact_id": 2,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "list",
+      "q": {
+        "channel": "email"
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "total": 1,
+          "items": [
+            {
+              "id": 2,
+              "channel": "email",
+              "contact_id": 2,
+              "contact_name": "Bola Ltd",
+              "contact_phone": null,
+              "contact_lead_status": "new",
+              "status": "opportunity",
+              "message_count": 3,
+              "unread_count": 1,
+              "last_message_preview": "Preview 2",
+              "last_message_at": "2026-01-02T10:00:00.123456",
+              "created_at": "2026-01-02T12:00:00.123456",
+              "campaign": {
+                "id": 1,
+                "kind": "ads",
+                "name": "Ads first",
+                "status": "draft"
+              },
+              "last_campaign": {
+                "id": 1,
+                "kind": "ads",
+                "name": "Ads first",
+                "status": "draft"
+              },
+              "contact": {
+                "phone_number": null,
+                "lead_status": "new",
+                "business_name": "Bola Ltd",
+                "first_name": null,
+                "last_name": null,
+                "city": null,
+                "state": null,
+                "custom_fields": {}
+              }
+            }
+          ],
+          "counts": {
+            "opportunity": 1,
+            "all": 1,
+            "unread": 1
+          }
+        }
+      },
+      "snapshot": {
+        "conversations": [
+          {
+            "id": 1,
+            "status": "unread",
+            "unread_count": 3,
+            "sequence_paused": false,
+            "campaign_id": 1,
+            "ads_campaign_id": null,
+            "last_campaign_id": 2,
+            "last_ads_campaign_id": null
+          },
+          {
+            "id": 2,
+            "status": "opportunity",
+            "unread_count": 1,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": 1,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": 1
+          },
+          {
+            "id": 3,
+            "status": "active",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": null,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": null
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "new"
+          },
+          {
+            "id": 2,
+            "lead_status": "new"
+          },
+          {
+            "id": 3,
+            "lead_status": "customer"
+          }
+        ],
+        "followups": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "pending"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "sending"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent"
+          },
+          {
+            "id": 4,
+            "contact_id": 2,
+            "status": "pending"
+          }
+        ],
+        "campaign_contacts": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "queued",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 4,
+            "contact_id": 1,
+            "status": "failed",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 5,
+            "contact_id": 2,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "list",
+      "q": {
+        "channel": "all",
+        "per_page": 2
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "total": 3,
+          "items": [
+            {
+              "id": 1,
+              "channel": "sms",
+              "contact_id": 1,
+              "contact_name": "Ada Obi",
+              "contact_phone": "+2348031112222",
+              "contact_lead_status": "new",
+              "status": "unread",
+              "message_count": 3,
+              "unread_count": 3,
+              "last_message_preview": "Preview 1",
+              "last_message_at": "2026-01-02T11:00:00.123456",
+              "created_at": "2026-01-02T12:00:00.123456",
+              "campaign": {
+                "id": 1,
+                "kind": "campaign",
+                "name": "First",
+                "status": "draft"
+              },
+              "last_campaign": {
+                "id": 2,
+                "kind": "campaign",
+                "name": "Second",
+                "status": "running"
+              },
+              "contact": {
+                "phone_number": "+2348031112222",
+                "lead_status": "new",
+                "business_name": null,
+                "first_name": "Ada",
+                "last_name": "Obi",
+                "city": null,
+                "state": null,
+                "custom_fields": {
+                  "project": "Native"
+                }
+              }
+            },
+            {
+              "id": 2,
+              "channel": "email",
+              "contact_id": 2,
+              "contact_name": "Bola Ltd",
+              "contact_phone": null,
+              "contact_lead_status": "new",
+              "status": "opportunity",
+              "message_count": 3,
+              "unread_count": 1,
+              "last_message_preview": "Preview 2",
+              "last_message_at": "2026-01-02T10:00:00.123456",
+              "created_at": "2026-01-02T12:00:00.123456",
+              "campaign": {
+                "id": 1,
+                "kind": "ads",
+                "name": "Ads first",
+                "status": "draft"
+              },
+              "last_campaign": {
+                "id": 1,
+                "kind": "ads",
+                "name": "Ads first",
+                "status": "draft"
+              },
+              "contact": {
+                "phone_number": null,
+                "lead_status": "new",
+                "business_name": "Bola Ltd",
+                "first_name": null,
+                "last_name": null,
+                "city": null,
+                "state": null,
+                "custom_fields": {}
+              }
+            }
+          ],
+          "counts": {
+            "active": 1,
+            "opportunity": 1,
+            "unread": 2,
+            "all": 3
+          }
+        }
+      },
+      "snapshot": {
+        "conversations": [
+          {
+            "id": 1,
+            "status": "unread",
+            "unread_count": 3,
+            "sequence_paused": false,
+            "campaign_id": 1,
+            "ads_campaign_id": null,
+            "last_campaign_id": 2,
+            "last_ads_campaign_id": null
+          },
+          {
+            "id": 2,
+            "status": "opportunity",
+            "unread_count": 1,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": 1,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": 1
+          },
+          {
+            "id": 3,
+            "status": "active",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": null,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": null
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "new"
+          },
+          {
+            "id": 2,
+            "lead_status": "new"
+          },
+          {
+            "id": 3,
+            "lead_status": "customer"
+          }
+        ],
+        "followups": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "pending"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "sending"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent"
+          },
+          {
+            "id": 4,
+            "contact_id": 2,
+            "status": "pending"
+          }
+        ],
+        "campaign_contacts": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "queued",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 4,
+            "contact_id": 1,
+            "status": "failed",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 5,
+            "contact_id": 2,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "list",
+      "q": {
+        "channel": "all",
+        "page": 2,
+        "per_page": 2
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "total": 3,
+          "items": [
+            {
+              "id": 3,
+              "channel": "sms",
+              "contact_id": 3,
+              "contact_name": "Chidi",
+              "contact_phone": null,
+              "contact_lead_status": "customer",
+              "status": "active",
+              "message_count": 3,
+              "unread_count": 0,
+              "last_message_preview": "Preview 3",
+              "last_message_at": "2026-01-02T09:00:00.123456",
+              "created_at": "2026-01-02T12:00:00.123456",
+              "campaign": null,
+              "last_campaign": null,
+              "contact": {
+                "phone_number": null,
+                "lead_status": "customer",
+                "business_name": null,
+                "first_name": "Chidi",
+                "last_name": null,
+                "city": null,
+                "state": null,
+                "custom_fields": {}
+              }
+            }
+          ],
+          "counts": {
+            "active": 1,
+            "opportunity": 1,
+            "unread": 2,
+            "all": 3
+          }
+        }
+      },
+      "snapshot": {
+        "conversations": [
+          {
+            "id": 1,
+            "status": "unread",
+            "unread_count": 3,
+            "sequence_paused": false,
+            "campaign_id": 1,
+            "ads_campaign_id": null,
+            "last_campaign_id": 2,
+            "last_ads_campaign_id": null
+          },
+          {
+            "id": 2,
+            "status": "opportunity",
+            "unread_count": 1,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": 1,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": 1
+          },
+          {
+            "id": 3,
+            "status": "active",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": null,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": null
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "new"
+          },
+          {
+            "id": 2,
+            "lead_status": "new"
+          },
+          {
+            "id": 3,
+            "lead_status": "customer"
+          }
+        ],
+        "followups": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "pending"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "sending"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent"
+          },
+          {
+            "id": 4,
+            "contact_id": 2,
+            "status": "pending"
+          }
+        ],
+        "campaign_contacts": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "queued",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 4,
+            "contact_id": 1,
+            "status": "failed",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 5,
+            "contact_id": 2,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "list",
+      "q": {
+        "search": "0803111"
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "total": 1,
+          "items": [
+            {
+              "id": 1,
+              "channel": "sms",
+              "contact_id": 1,
+              "contact_name": "Ada Obi",
+              "contact_phone": "+2348031112222",
+              "contact_lead_status": "new",
+              "status": "unread",
+              "message_count": 3,
+              "unread_count": 3,
+              "last_message_preview": "Preview 1",
+              "last_message_at": "2026-01-02T11:00:00.123456",
+              "created_at": "2026-01-02T12:00:00.123456",
+              "campaign": {
+                "id": 1,
+                "kind": "campaign",
+                "name": "First",
+                "status": "draft"
+              },
+              "last_campaign": {
+                "id": 2,
+                "kind": "campaign",
+                "name": "Second",
+                "status": "running"
+              },
+              "contact": {
+                "phone_number": "+2348031112222",
+                "lead_status": "new",
+                "business_name": null,
+                "first_name": "Ada",
+                "last_name": "Obi",
+                "city": null,
+                "state": null,
+                "custom_fields": {
+                  "project": "Native"
+                }
+              }
+            }
+          ],
+          "counts": {
+            "active": 1,
+            "unread": 1,
+            "all": 2
+          }
+        }
+      },
+      "snapshot": {
+        "conversations": [
+          {
+            "id": 1,
+            "status": "unread",
+            "unread_count": 3,
+            "sequence_paused": false,
+            "campaign_id": 1,
+            "ads_campaign_id": null,
+            "last_campaign_id": 2,
+            "last_ads_campaign_id": null
+          },
+          {
+            "id": 2,
+            "status": "opportunity",
+            "unread_count": 1,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": 1,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": 1
+          },
+          {
+            "id": 3,
+            "status": "active",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": null,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": null
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "new"
+          },
+          {
+            "id": 2,
+            "lead_status": "new"
+          },
+          {
+            "id": 3,
+            "lead_status": "customer"
+          }
+        ],
+        "followups": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "pending"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "sending"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent"
+          },
+          {
+            "id": 4,
+            "contact_id": 2,
+            "status": "pending"
+          }
+        ],
+        "campaign_contacts": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "queued",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 4,
+            "contact_id": 1,
+            "status": "failed",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 5,
+            "contact_id": 2,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "list",
+      "q": {
+        "status": "unread"
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "total": 1,
+          "items": [
+            {
+              "id": 1,
+              "channel": "sms",
+              "contact_id": 1,
+              "contact_name": "Ada Obi",
+              "contact_phone": "+2348031112222",
+              "contact_lead_status": "new",
+              "status": "unread",
+              "message_count": 3,
+              "unread_count": 3,
+              "last_message_preview": "Preview 1",
+              "last_message_at": "2026-01-02T11:00:00.123456",
+              "created_at": "2026-01-02T12:00:00.123456",
+              "campaign": {
+                "id": 1,
+                "kind": "campaign",
+                "name": "First",
+                "status": "draft"
+              },
+              "last_campaign": {
+                "id": 2,
+                "kind": "campaign",
+                "name": "Second",
+                "status": "running"
+              },
+              "contact": {
+                "phone_number": "+2348031112222",
+                "lead_status": "new",
+                "business_name": null,
+                "first_name": "Ada",
+                "last_name": "Obi",
+                "city": null,
+                "state": null,
+                "custom_fields": {
+                  "project": "Native"
+                }
+              }
+            }
+          ],
+          "counts": {
+            "active": 1,
+            "unread": 1,
+            "all": 2
+          }
+        }
+      },
+      "snapshot": {
+        "conversations": [
+          {
+            "id": 1,
+            "status": "unread",
+            "unread_count": 3,
+            "sequence_paused": false,
+            "campaign_id": 1,
+            "ads_campaign_id": null,
+            "last_campaign_id": 2,
+            "last_ads_campaign_id": null
+          },
+          {
+            "id": 2,
+            "status": "opportunity",
+            "unread_count": 1,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": 1,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": 1
+          },
+          {
+            "id": 3,
+            "status": "active",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": null,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": null
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "new"
+          },
+          {
+            "id": 2,
+            "lead_status": "new"
+          },
+          {
+            "id": 3,
+            "lead_status": "customer"
+          }
+        ],
+        "followups": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "pending"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "sending"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent"
+          },
+          {
+            "id": 4,
+            "contact_id": 2,
+            "status": "pending"
+          }
+        ],
+        "campaign_contacts": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "queued",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 4,
+            "contact_id": 1,
+            "status": "failed",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 5,
+            "contact_id": 2,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "list",
+      "q": {
+        "campaign_id": 2
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "total": 1,
+          "items": [
+            {
+              "id": 1,
+              "channel": "sms",
+              "contact_id": 1,
+              "contact_name": "Ada Obi",
+              "contact_phone": "+2348031112222",
+              "contact_lead_status": "new",
+              "status": "unread",
+              "message_count": 3,
+              "unread_count": 3,
+              "last_message_preview": "Preview 1",
+              "last_message_at": "2026-01-02T11:00:00.123456",
+              "created_at": "2026-01-02T12:00:00.123456",
+              "campaign": {
+                "id": 1,
+                "kind": "campaign",
+                "name": "First",
+                "status": "draft"
+              },
+              "last_campaign": {
+                "id": 2,
+                "kind": "campaign",
+                "name": "Second",
+                "status": "running"
+              },
+              "contact": {
+                "phone_number": "+2348031112222",
+                "lead_status": "new",
+                "business_name": null,
+                "first_name": "Ada",
+                "last_name": "Obi",
+                "city": null,
+                "state": null,
+                "custom_fields": {
+                  "project": "Native"
+                }
+              }
+            }
+          ],
+          "counts": {
+            "active": 1,
+            "unread": 1,
+            "all": 2
+          }
+        }
+      },
+      "snapshot": {
+        "conversations": [
+          {
+            "id": 1,
+            "status": "unread",
+            "unread_count": 3,
+            "sequence_paused": false,
+            "campaign_id": 1,
+            "ads_campaign_id": null,
+            "last_campaign_id": 2,
+            "last_ads_campaign_id": null
+          },
+          {
+            "id": 2,
+            "status": "opportunity",
+            "unread_count": 1,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": 1,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": 1
+          },
+          {
+            "id": 3,
+            "status": "active",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": null,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": null
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "new"
+          },
+          {
+            "id": 2,
+            "lead_status": "new"
+          },
+          {
+            "id": 3,
+            "lead_status": "customer"
+          }
+        ],
+        "followups": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "pending"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "sending"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent"
+          },
+          {
+            "id": 4,
+            "contact_id": 2,
+            "status": "pending"
+          }
+        ],
+        "campaign_contacts": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "queued",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 4,
+            "contact_id": 1,
+            "status": "failed",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 5,
+            "contact_id": 2,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "list",
+      "q": {
+        "ads_campaign_id": 1
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "total": 0,
+          "items": [],
+          "counts": {
+            "active": 1,
+            "unread": 1,
+            "all": 2
+          }
+        }
+      },
+      "snapshot": {
+        "conversations": [
+          {
+            "id": 1,
+            "status": "unread",
+            "unread_count": 3,
+            "sequence_paused": false,
+            "campaign_id": 1,
+            "ads_campaign_id": null,
+            "last_campaign_id": 2,
+            "last_ads_campaign_id": null
+          },
+          {
+            "id": 2,
+            "status": "opportunity",
+            "unread_count": 1,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": 1,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": 1
+          },
+          {
+            "id": 3,
+            "status": "active",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": null,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": null
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "new"
+          },
+          {
+            "id": 2,
+            "lead_status": "new"
+          },
+          {
+            "id": 3,
+            "lead_status": "customer"
+          }
+        ],
+        "followups": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "pending"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "sending"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent"
+          },
+          {
+            "id": 4,
+            "contact_id": 2,
+            "status": "pending"
+          }
+        ],
+        "campaign_contacts": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "queued",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 4,
+            "contact_id": 1,
+            "status": "failed",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 5,
+            "contact_id": 2,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "list",
+      "q": {
+        "replied_only": true
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "total": 1,
+          "items": [
+            {
+              "id": 1,
+              "channel": "sms",
+              "contact_id": 1,
+              "contact_name": "Ada Obi",
+              "contact_phone": "+2348031112222",
+              "contact_lead_status": "new",
+              "status": "unread",
+              "message_count": 3,
+              "unread_count": 3,
+              "last_message_preview": "Preview 1",
+              "last_message_at": "2026-01-02T11:00:00.123456",
+              "created_at": "2026-01-02T12:00:00.123456",
+              "campaign": {
+                "id": 1,
+                "kind": "campaign",
+                "name": "First",
+                "status": "draft"
+              },
+              "last_campaign": {
+                "id": 2,
+                "kind": "campaign",
+                "name": "Second",
+                "status": "running"
+              },
+              "contact": {
+                "phone_number": "+2348031112222",
+                "lead_status": "new",
+                "business_name": null,
+                "first_name": "Ada",
+                "last_name": "Obi",
+                "city": null,
+                "state": null,
+                "custom_fields": {
+                  "project": "Native"
+                }
+              }
+            }
+          ],
+          "counts": {
+            "active": 1,
+            "unread": 1,
+            "all": 2
+          }
+        }
+      },
+      "snapshot": {
+        "conversations": [
+          {
+            "id": 1,
+            "status": "unread",
+            "unread_count": 3,
+            "sequence_paused": false,
+            "campaign_id": 1,
+            "ads_campaign_id": null,
+            "last_campaign_id": 2,
+            "last_ads_campaign_id": null
+          },
+          {
+            "id": 2,
+            "status": "opportunity",
+            "unread_count": 1,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": 1,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": 1
+          },
+          {
+            "id": 3,
+            "status": "active",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": null,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": null
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "new"
+          },
+          {
+            "id": 2,
+            "lead_status": "new"
+          },
+          {
+            "id": 3,
+            "lead_status": "customer"
+          }
+        ],
+        "followups": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "pending"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "sending"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent"
+          },
+          {
+            "id": 4,
+            "contact_id": 2,
+            "status": "pending"
+          }
+        ],
+        "campaign_contacts": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "queued",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 4,
+            "contact_id": 1,
+            "status": "failed",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 5,
+            "contact_id": 2,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "filters",
+      "q": {
+        "channel": "all"
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "items": [
+            {
+              "id": 1,
+              "kind": "ads",
+              "name": "Ads first",
+              "status": "draft",
+              "leads": 1,
+              "replies": 1,
+              "unread": 1
+            },
+            {
+              "id": 1,
+              "kind": "campaign",
+              "name": "First",
+              "status": "draft",
+              "leads": 1,
+              "replies": 1,
+              "unread": 1
+            }
+          ],
+          "unattributed": {
+            "leads": 1,
+            "replies": 0,
+            "unread": 0
+          },
+          "total_conversations": 3
+        }
+      },
+      "snapshot": {
+        "conversations": [
+          {
+            "id": 1,
+            "status": "unread",
+            "unread_count": 3,
+            "sequence_paused": false,
+            "campaign_id": 1,
+            "ads_campaign_id": null,
+            "last_campaign_id": 2,
+            "last_ads_campaign_id": null
+          },
+          {
+            "id": 2,
+            "status": "opportunity",
+            "unread_count": 1,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": 1,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": 1
+          },
+          {
+            "id": 3,
+            "status": "active",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": null,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": null
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "new"
+          },
+          {
+            "id": 2,
+            "lead_status": "new"
+          },
+          {
+            "id": 3,
+            "lead_status": "customer"
+          }
+        ],
+        "followups": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "pending"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "sending"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent"
+          },
+          {
+            "id": 4,
+            "contact_id": 2,
+            "status": "pending"
+          }
+        ],
+        "campaign_contacts": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "queued",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 4,
+            "contact_id": 1,
+            "status": "failed",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 5,
+            "contact_id": 2,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "get",
+      "id": 1,
+      "expected": {
+        "status": 200,
+        "body": {
+          "id": 1,
+          "campaign": {
+            "id": 1,
+            "kind": "campaign",
+            "name": "First",
+            "status": "draft"
+          },
+          "last_campaign": {
+            "id": 2,
+            "kind": "campaign",
+            "name": "Second",
+            "status": "running"
+          },
+          "contact": {
+            "id": 1,
+            "phone_number": "+2348031112222",
+            "first_name": "Ada",
+            "last_name": "Obi",
+            "business_name": null,
+            "lead_status": "new",
+            "city": null,
+            "state": null,
+            "email": null,
+            "website": null,
+            "notes": null,
+            "custom_fields": {
+              "project": "Native"
+            }
+          },
+          "status": "read",
+          "sequence_paused": false,
+          "messages": [
+            {
+              "id": 1,
+              "direction": "outgoing",
+              "body": "Synthetic 0",
+              "status": "sent",
+              "created_at": "2026-01-02T12:00:00.123456",
+              "sent_at": null,
+              "delivered_at": null,
+              "failed_at": null,
+              "last_error": null,
+              "segment_count": 1,
+              "provider_message_id": null,
+              "ai_sentiment": null,
+              "ai_intent": null,
+              "ai_confidence": null
+            },
+            {
+              "id": 2,
+              "direction": "outgoing",
+              "body": "Synthetic 1",
+              "status": "sent",
+              "created_at": "2026-01-02T12:01:00.123456",
+              "sent_at": null,
+              "delivered_at": null,
+              "failed_at": null,
+              "last_error": "provider secret-looking error",
+              "segment_count": 1,
+              "provider_message_id": null,
+              "ai_sentiment": null,
+              "ai_intent": null,
+              "ai_confidence": null
+            },
+            {
+              "id": 3,
+              "direction": "incoming",
+              "body": "Synthetic 2",
+              "status": "received",
+              "created_at": "2026-01-02T12:02:00.123456",
+              "sent_at": null,
+              "delivered_at": null,
+              "failed_at": null,
+              "last_error": null,
+              "segment_count": 1,
+              "provider_message_id": null,
+              "ai_sentiment": null,
+              "ai_intent": null,
+              "ai_confidence": null
+            }
+          ]
+        }
+      },
+      "snapshot": {
+        "conversations": [
+          {
+            "id": 1,
+            "status": "read",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": 1,
+            "ads_campaign_id": null,
+            "last_campaign_id": 2,
+            "last_ads_campaign_id": null
+          },
+          {
+            "id": 2,
+            "status": "opportunity",
+            "unread_count": 1,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": 1,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": 1
+          },
+          {
+            "id": 3,
+            "status": "active",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": null,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": null
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "new"
+          },
+          {
+            "id": 2,
+            "lead_status": "new"
+          },
+          {
+            "id": 3,
+            "lead_status": "customer"
+          }
+        ],
+        "followups": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "pending"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "sending"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent"
+          },
+          {
+            "id": 4,
+            "contact_id": 2,
+            "status": "pending"
+          }
+        ],
+        "campaign_contacts": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "queued",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 4,
+            "contact_id": 1,
+            "status": "failed",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 5,
+            "contact_id": 2,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "action",
+      "id": 1,
+      "action": "mark-interested",
+      "expected": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "status": "interested"
+        }
+      },
+      "snapshot": {
+        "conversations": [
+          {
+            "id": 1,
+            "status": "interested",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": 1,
+            "ads_campaign_id": null,
+            "last_campaign_id": 2,
+            "last_ads_campaign_id": null
+          },
+          {
+            "id": 2,
+            "status": "opportunity",
+            "unread_count": 1,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": 1,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": 1
+          },
+          {
+            "id": 3,
+            "status": "active",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": null,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": null
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "interested"
+          },
+          {
+            "id": 2,
+            "lead_status": "new"
+          },
+          {
+            "id": 3,
+            "lead_status": "customer"
+          }
+        ],
+        "followups": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "pending"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "sending"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent"
+          },
+          {
+            "id": 4,
+            "contact_id": 2,
+            "status": "pending"
+          }
+        ],
+        "campaign_contacts": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "queued",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 4,
+            "contact_id": 1,
+            "status": "failed",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 5,
+            "contact_id": 2,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "get",
+      "id": 1,
+      "expected": {
+        "status": 200,
+        "body": {
+          "id": 1,
+          "campaign": {
+            "id": 1,
+            "kind": "campaign",
+            "name": "First",
+            "status": "draft"
+          },
+          "last_campaign": {
+            "id": 2,
+            "kind": "campaign",
+            "name": "Second",
+            "status": "running"
+          },
+          "contact": {
+            "id": 1,
+            "phone_number": "+2348031112222",
+            "first_name": "Ada",
+            "last_name": "Obi",
+            "business_name": null,
+            "lead_status": "interested",
+            "city": null,
+            "state": null,
+            "email": null,
+            "website": null,
+            "notes": null,
+            "custom_fields": {
+              "project": "Native"
+            }
+          },
+          "status": "interested",
+          "sequence_paused": false,
+          "messages": [
+            {
+              "id": 1,
+              "direction": "outgoing",
+              "body": "Synthetic 0",
+              "status": "sent",
+              "created_at": "2026-01-02T12:00:00.123456",
+              "sent_at": null,
+              "delivered_at": null,
+              "failed_at": null,
+              "last_error": null,
+              "segment_count": 1,
+              "provider_message_id": null,
+              "ai_sentiment": null,
+              "ai_intent": null,
+              "ai_confidence": null
+            },
+            {
+              "id": 2,
+              "direction": "outgoing",
+              "body": "Synthetic 1",
+              "status": "sent",
+              "created_at": "2026-01-02T12:01:00.123456",
+              "sent_at": null,
+              "delivered_at": null,
+              "failed_at": null,
+              "last_error": "provider secret-looking error",
+              "segment_count": 1,
+              "provider_message_id": null,
+              "ai_sentiment": null,
+              "ai_intent": null,
+              "ai_confidence": null
+            },
+            {
+              "id": 3,
+              "direction": "incoming",
+              "body": "Synthetic 2",
+              "status": "received",
+              "created_at": "2026-01-02T12:02:00.123456",
+              "sent_at": null,
+              "delivered_at": null,
+              "failed_at": null,
+              "last_error": null,
+              "segment_count": 1,
+              "provider_message_id": null,
+              "ai_sentiment": null,
+              "ai_intent": null,
+              "ai_confidence": null
+            }
+          ]
+        }
+      },
+      "snapshot": {
+        "conversations": [
+          {
+            "id": 1,
+            "status": "interested",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": 1,
+            "ads_campaign_id": null,
+            "last_campaign_id": 2,
+            "last_ads_campaign_id": null
+          },
+          {
+            "id": 2,
+            "status": "opportunity",
+            "unread_count": 1,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": 1,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": 1
+          },
+          {
+            "id": 3,
+            "status": "active",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": null,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": null
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "interested"
+          },
+          {
+            "id": 2,
+            "lead_status": "new"
+          },
+          {
+            "id": 3,
+            "lead_status": "customer"
+          }
+        ],
+        "followups": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "pending"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "sending"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent"
+          },
+          {
+            "id": 4,
+            "contact_id": 2,
+            "status": "pending"
+          }
+        ],
+        "campaign_contacts": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "queued",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 4,
+            "contact_id": 1,
+            "status": "failed",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 5,
+            "contact_id": 2,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "action",
+      "id": 1,
+      "action": "mark-unread",
+      "expected": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "status": "unread"
+        }
+      },
+      "snapshot": {
+        "conversations": [
+          {
+            "id": 1,
+            "status": "unread",
+            "unread_count": 1,
+            "sequence_paused": false,
+            "campaign_id": 1,
+            "ads_campaign_id": null,
+            "last_campaign_id": 2,
+            "last_ads_campaign_id": null
+          },
+          {
+            "id": 2,
+            "status": "opportunity",
+            "unread_count": 1,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": 1,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": 1
+          },
+          {
+            "id": 3,
+            "status": "active",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": null,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": null
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "interested"
+          },
+          {
+            "id": 2,
+            "lead_status": "new"
+          },
+          {
+            "id": 3,
+            "lead_status": "customer"
+          }
+        ],
+        "followups": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "pending"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "sending"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent"
+          },
+          {
+            "id": 4,
+            "contact_id": 2,
+            "status": "pending"
+          }
+        ],
+        "campaign_contacts": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "queued",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 4,
+            "contact_id": 1,
+            "status": "failed",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 5,
+            "contact_id": 2,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "action",
+      "id": 1,
+      "action": "status",
+      "body": {
+        "status": " active "
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "status": "unread"
+        }
+      },
+      "snapshot": {
+        "conversations": [
+          {
+            "id": 1,
+            "status": "unread",
+            "unread_count": 1,
+            "sequence_paused": false,
+            "campaign_id": 1,
+            "ads_campaign_id": null,
+            "last_campaign_id": 2,
+            "last_ads_campaign_id": null
+          },
+          {
+            "id": 2,
+            "status": "opportunity",
+            "unread_count": 1,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": 1,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": 1
+          },
+          {
+            "id": 3,
+            "status": "active",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": null,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": null
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "interested"
+          },
+          {
+            "id": 2,
+            "lead_status": "new"
+          },
+          {
+            "id": 3,
+            "lead_status": "customer"
+          }
+        ],
+        "followups": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "pending"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "sending"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent"
+          },
+          {
+            "id": 4,
+            "contact_id": 2,
+            "status": "pending"
+          }
+        ],
+        "campaign_contacts": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "queued",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 4,
+            "contact_id": 1,
+            "status": "failed",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 5,
+            "contact_id": 2,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "action",
+      "id": 1,
+      "action": "mark-opportunity",
+      "expected": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "status": "opportunity"
+        }
+      },
+      "snapshot": {
+        "conversations": [
+          {
+            "id": 1,
+            "status": "opportunity",
+            "unread_count": 1,
+            "sequence_paused": false,
+            "campaign_id": 1,
+            "ads_campaign_id": null,
+            "last_campaign_id": 2,
+            "last_ads_campaign_id": null
+          },
+          {
+            "id": 2,
+            "status": "opportunity",
+            "unread_count": 1,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": 1,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": 1
+          },
+          {
+            "id": 3,
+            "status": "active",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": null,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": null
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "interested"
+          },
+          {
+            "id": 2,
+            "lead_status": "new"
+          },
+          {
+            "id": 3,
+            "lead_status": "customer"
+          }
+        ],
+        "followups": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "pending"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "sending"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent"
+          },
+          {
+            "id": 4,
+            "contact_id": 2,
+            "status": "pending"
+          }
+        ],
+        "campaign_contacts": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "queued",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 4,
+            "contact_id": 1,
+            "status": "failed",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 5,
+            "contact_id": 2,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "action",
+      "id": 1,
+      "action": "stop-sequence",
+      "expected": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "sequence_paused": true
+        }
+      },
+      "snapshot": {
+        "conversations": [
+          {
+            "id": 1,
+            "status": "opportunity",
+            "unread_count": 1,
+            "sequence_paused": true,
+            "campaign_id": 1,
+            "ads_campaign_id": null,
+            "last_campaign_id": 2,
+            "last_ads_campaign_id": null
+          },
+          {
+            "id": 2,
+            "status": "opportunity",
+            "unread_count": 1,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": 1,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": 1
+          },
+          {
+            "id": 3,
+            "status": "active",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": null,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": null
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "interested"
+          },
+          {
+            "id": 2,
+            "lead_status": "new"
+          },
+          {
+            "id": 3,
+            "lead_status": "customer"
+          }
+        ],
+        "followups": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "cancelled"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "cancelled"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent"
+          },
+          {
+            "id": 4,
+            "contact_id": 2,
+            "status": "pending"
+          }
+        ],
+        "campaign_contacts": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "replied",
+            "next_action_at": null
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "replied",
+            "next_action_at": null
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "replied",
+            "next_action_at": null
+          },
+          {
+            "id": 4,
+            "contact_id": 1,
+            "status": "failed",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 5,
+            "contact_id": 2,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "get",
+      "id": 1,
+      "expected": {
+        "status": 200,
+        "body": {
+          "id": 1,
+          "campaign": {
+            "id": 1,
+            "kind": "campaign",
+            "name": "First",
+            "status": "draft"
+          },
+          "last_campaign": {
+            "id": 2,
+            "kind": "campaign",
+            "name": "Second",
+            "status": "running"
+          },
+          "contact": {
+            "id": 1,
+            "phone_number": "+2348031112222",
+            "first_name": "Ada",
+            "last_name": "Obi",
+            "business_name": null,
+            "lead_status": "interested",
+            "city": null,
+            "state": null,
+            "email": null,
+            "website": null,
+            "notes": null,
+            "custom_fields": {
+              "project": "Native"
+            }
+          },
+          "status": "opportunity",
+          "sequence_paused": true,
+          "messages": [
+            {
+              "id": 1,
+              "direction": "outgoing",
+              "body": "Synthetic 0",
+              "status": "sent",
+              "created_at": "2026-01-02T12:00:00.123456",
+              "sent_at": null,
+              "delivered_at": null,
+              "failed_at": null,
+              "last_error": null,
+              "segment_count": 1,
+              "provider_message_id": null,
+              "ai_sentiment": null,
+              "ai_intent": null,
+              "ai_confidence": null
+            },
+            {
+              "id": 2,
+              "direction": "outgoing",
+              "body": "Synthetic 1",
+              "status": "sent",
+              "created_at": "2026-01-02T12:01:00.123456",
+              "sent_at": null,
+              "delivered_at": null,
+              "failed_at": null,
+              "last_error": "provider secret-looking error",
+              "segment_count": 1,
+              "provider_message_id": null,
+              "ai_sentiment": null,
+              "ai_intent": null,
+              "ai_confidence": null
+            },
+            {
+              "id": 3,
+              "direction": "incoming",
+              "body": "Synthetic 2",
+              "status": "received",
+              "created_at": "2026-01-02T12:02:00.123456",
+              "sent_at": null,
+              "delivered_at": null,
+              "failed_at": null,
+              "last_error": null,
+              "segment_count": 1,
+              "provider_message_id": null,
+              "ai_sentiment": null,
+              "ai_intent": null,
+              "ai_confidence": null
+            }
+          ]
+        }
+      },
+      "snapshot": {
+        "conversations": [
+          {
+            "id": 1,
+            "status": "opportunity",
+            "unread_count": 0,
+            "sequence_paused": true,
+            "campaign_id": 1,
+            "ads_campaign_id": null,
+            "last_campaign_id": 2,
+            "last_ads_campaign_id": null
+          },
+          {
+            "id": 2,
+            "status": "opportunity",
+            "unread_count": 1,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": 1,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": 1
+          },
+          {
+            "id": 3,
+            "status": "active",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": null,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": null
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "interested"
+          },
+          {
+            "id": 2,
+            "lead_status": "new"
+          },
+          {
+            "id": 3,
+            "lead_status": "customer"
+          }
+        ],
+        "followups": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "cancelled"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "cancelled"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent"
+          },
+          {
+            "id": 4,
+            "contact_id": 2,
+            "status": "pending"
+          }
+        ],
+        "campaign_contacts": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "replied",
+            "next_action_at": null
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "replied",
+            "next_action_at": null
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "replied",
+            "next_action_at": null
+          },
+          {
+            "id": 4,
+            "contact_id": 1,
+            "status": "failed",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 5,
+            "contact_id": 2,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "action",
+      "id": 1,
+      "action": "resume-sequence",
+      "expected": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "sequence_paused": false
+        }
+      },
+      "snapshot": {
+        "conversations": [
+          {
+            "id": 1,
+            "status": "opportunity",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": 1,
+            "ads_campaign_id": null,
+            "last_campaign_id": 2,
+            "last_ads_campaign_id": null
+          },
+          {
+            "id": 2,
+            "status": "opportunity",
+            "unread_count": 1,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": 1,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": 1
+          },
+          {
+            "id": 3,
+            "status": "active",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": null,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": null
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "interested"
+          },
+          {
+            "id": 2,
+            "lead_status": "new"
+          },
+          {
+            "id": 3,
+            "lead_status": "customer"
+          }
+        ],
+        "followups": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "cancelled"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "cancelled"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent"
+          },
+          {
+            "id": 4,
+            "contact_id": 2,
+            "status": "pending"
+          }
+        ],
+        "campaign_contacts": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "replied",
+            "next_action_at": null
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "replied",
+            "next_action_at": null
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "replied",
+            "next_action_at": null
+          },
+          {
+            "id": 4,
+            "contact_id": 1,
+            "status": "failed",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 5,
+            "contact_id": 2,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "action",
+      "id": 1,
+      "action": "mark-not-interested",
+      "expected": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "status": "not_interested"
+        }
+      },
+      "snapshot": {
+        "conversations": [
+          {
+            "id": 1,
+            "status": "not_interested",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": 1,
+            "ads_campaign_id": null,
+            "last_campaign_id": 2,
+            "last_ads_campaign_id": null
+          },
+          {
+            "id": 2,
+            "status": "opportunity",
+            "unread_count": 1,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": 1,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": 1
+          },
+          {
+            "id": 3,
+            "status": "active",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": null,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": null
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "not_interested"
+          },
+          {
+            "id": 2,
+            "lead_status": "new"
+          },
+          {
+            "id": 3,
+            "lead_status": "customer"
+          }
+        ],
+        "followups": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "cancelled"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "cancelled"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent"
+          },
+          {
+            "id": 4,
+            "contact_id": 2,
+            "status": "pending"
+          }
+        ],
+        "campaign_contacts": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "replied",
+            "next_action_at": null
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "replied",
+            "next_action_at": null
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "replied",
+            "next_action_at": null
+          },
+          {
+            "id": 4,
+            "contact_id": 1,
+            "status": "failed",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 5,
+            "contact_id": 2,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "action",
+      "id": 1,
+      "action": "mark-close",
+      "expected": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "status": "closed"
+        }
+      },
+      "snapshot": {
+        "conversations": [
+          {
+            "id": 1,
+            "status": "closed",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": 1,
+            "ads_campaign_id": null,
+            "last_campaign_id": 2,
+            "last_ads_campaign_id": null
+          },
+          {
+            "id": 2,
+            "status": "opportunity",
+            "unread_count": 1,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": 1,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": 1
+          },
+          {
+            "id": 3,
+            "status": "active",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": null,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": null
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "closed"
+          },
+          {
+            "id": 2,
+            "lead_status": "new"
+          },
+          {
+            "id": 3,
+            "lead_status": "customer"
+          }
+        ],
+        "followups": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "cancelled"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "cancelled"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent"
+          },
+          {
+            "id": 4,
+            "contact_id": 2,
+            "status": "pending"
+          }
+        ],
+        "campaign_contacts": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "replied",
+            "next_action_at": null
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "replied",
+            "next_action_at": null
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "replied",
+            "next_action_at": null
+          },
+          {
+            "id": 4,
+            "contact_id": 1,
+            "status": "failed",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 5,
+            "contact_id": 2,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "get",
+      "id": 1,
+      "expected": {
+        "status": 200,
+        "body": {
+          "id": 1,
+          "campaign": {
+            "id": 1,
+            "kind": "campaign",
+            "name": "First",
+            "status": "draft"
+          },
+          "last_campaign": {
+            "id": 2,
+            "kind": "campaign",
+            "name": "Second",
+            "status": "running"
+          },
+          "contact": {
+            "id": 1,
+            "phone_number": "+2348031112222",
+            "first_name": "Ada",
+            "last_name": "Obi",
+            "business_name": null,
+            "lead_status": "closed",
+            "city": null,
+            "state": null,
+            "email": null,
+            "website": null,
+            "notes": null,
+            "custom_fields": {
+              "project": "Native"
+            }
+          },
+          "status": "closed",
+          "sequence_paused": false,
+          "messages": [
+            {
+              "id": 1,
+              "direction": "outgoing",
+              "body": "Synthetic 0",
+              "status": "sent",
+              "created_at": "2026-01-02T12:00:00.123456",
+              "sent_at": null,
+              "delivered_at": null,
+              "failed_at": null,
+              "last_error": null,
+              "segment_count": 1,
+              "provider_message_id": null,
+              "ai_sentiment": null,
+              "ai_intent": null,
+              "ai_confidence": null
+            },
+            {
+              "id": 2,
+              "direction": "outgoing",
+              "body": "Synthetic 1",
+              "status": "sent",
+              "created_at": "2026-01-02T12:01:00.123456",
+              "sent_at": null,
+              "delivered_at": null,
+              "failed_at": null,
+              "last_error": "provider secret-looking error",
+              "segment_count": 1,
+              "provider_message_id": null,
+              "ai_sentiment": null,
+              "ai_intent": null,
+              "ai_confidence": null
+            },
+            {
+              "id": 3,
+              "direction": "incoming",
+              "body": "Synthetic 2",
+              "status": "received",
+              "created_at": "2026-01-02T12:02:00.123456",
+              "sent_at": null,
+              "delivered_at": null,
+              "failed_at": null,
+              "last_error": null,
+              "segment_count": 1,
+              "provider_message_id": null,
+              "ai_sentiment": null,
+              "ai_intent": null,
+              "ai_confidence": null
+            }
+          ]
+        }
+      },
+      "snapshot": {
+        "conversations": [
+          {
+            "id": 1,
+            "status": "closed",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": 1,
+            "ads_campaign_id": null,
+            "last_campaign_id": 2,
+            "last_ads_campaign_id": null
+          },
+          {
+            "id": 2,
+            "status": "opportunity",
+            "unread_count": 1,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": 1,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": 1
+          },
+          {
+            "id": 3,
+            "status": "active",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": null,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": null
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "closed"
+          },
+          {
+            "id": 2,
+            "lead_status": "new"
+          },
+          {
+            "id": 3,
+            "lead_status": "customer"
+          }
+        ],
+        "followups": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "cancelled"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "cancelled"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent"
+          },
+          {
+            "id": 4,
+            "contact_id": 2,
+            "status": "pending"
+          }
+        ],
+        "campaign_contacts": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "replied",
+            "next_action_at": null
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "replied",
+            "next_action_at": null
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "replied",
+            "next_action_at": null
+          },
+          {
+            "id": 4,
+            "contact_id": 1,
+            "status": "failed",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 5,
+            "contact_id": 2,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "action",
+      "id": 2,
+      "action": "status",
+      "body": {
+        "status": "active"
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "status": "unread"
+        }
+      },
+      "snapshot": {
+        "conversations": [
+          {
+            "id": 1,
+            "status": "closed",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": 1,
+            "ads_campaign_id": null,
+            "last_campaign_id": 2,
+            "last_ads_campaign_id": null
+          },
+          {
+            "id": 2,
+            "status": "unread",
+            "unread_count": 1,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": 1,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": 1
+          },
+          {
+            "id": 3,
+            "status": "active",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": null,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": null
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "closed"
+          },
+          {
+            "id": 2,
+            "lead_status": "new"
+          },
+          {
+            "id": 3,
+            "lead_status": "customer"
+          }
+        ],
+        "followups": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "cancelled"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "cancelled"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent"
+          },
+          {
+            "id": 4,
+            "contact_id": 2,
+            "status": "pending"
+          }
+        ],
+        "campaign_contacts": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "replied",
+            "next_action_at": null
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "replied",
+            "next_action_at": null
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "replied",
+            "next_action_at": null
+          },
+          {
+            "id": 4,
+            "contact_id": 1,
+            "status": "failed",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 5,
+            "contact_id": 2,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "action",
+      "id": 2,
+      "action": "status",
+      "body": {
+        "status": "read"
+      },
+      "expected": {
+        "status": 422,
+        "message": "status must be one of ['active', 'unread', 'interested', 'not_interested', 'closed', 'opportunity']"
+      },
+      "snapshot": {
+        "conversations": [
+          {
+            "id": 1,
+            "status": "closed",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": 1,
+            "ads_campaign_id": null,
+            "last_campaign_id": 2,
+            "last_ads_campaign_id": null
+          },
+          {
+            "id": 2,
+            "status": "unread",
+            "unread_count": 1,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": 1,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": 1
+          },
+          {
+            "id": 3,
+            "status": "active",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": null,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": null
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "closed"
+          },
+          {
+            "id": 2,
+            "lead_status": "new"
+          },
+          {
+            "id": 3,
+            "lead_status": "customer"
+          }
+        ],
+        "followups": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "cancelled"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "cancelled"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent"
+          },
+          {
+            "id": 4,
+            "contact_id": 2,
+            "status": "pending"
+          }
+        ],
+        "campaign_contacts": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "replied",
+            "next_action_at": null
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "replied",
+            "next_action_at": null
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "replied",
+            "next_action_at": null
+          },
+          {
+            "id": 4,
+            "contact_id": 1,
+            "status": "failed",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 5,
+            "contact_id": 2,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "list",
+      "q": {
+        "channel": "invalid"
+      },
+      "expected": {
+        "status": 422,
+        "message": "channel must be 'sms', 'email' or 'all' — got 'invalid'."
+      },
+      "snapshot": {
+        "conversations": [
+          {
+            "id": 1,
+            "status": "closed",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": 1,
+            "ads_campaign_id": null,
+            "last_campaign_id": 2,
+            "last_ads_campaign_id": null
+          },
+          {
+            "id": 2,
+            "status": "unread",
+            "unread_count": 1,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": 1,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": 1
+          },
+          {
+            "id": 3,
+            "status": "active",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": null,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": null
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "closed"
+          },
+          {
+            "id": 2,
+            "lead_status": "new"
+          },
+          {
+            "id": 3,
+            "lead_status": "customer"
+          }
+        ],
+        "followups": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "cancelled"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "cancelled"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent"
+          },
+          {
+            "id": 4,
+            "contact_id": 2,
+            "status": "pending"
+          }
+        ],
+        "campaign_contacts": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "replied",
+            "next_action_at": null
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "replied",
+            "next_action_at": null
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "replied",
+            "next_action_at": null
+          },
+          {
+            "id": 4,
+            "contact_id": 1,
+            "status": "failed",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 5,
+            "contact_id": 2,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "list",
+      "q": {
+        "search": "Missing"
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "total": 0,
+          "items": [],
+          "counts": {
+            "active": 1,
+            "closed": 1,
+            "all": 2,
+            "unread": 0
+          }
+        }
+      },
+      "snapshot": {
+        "conversations": [
+          {
+            "id": 1,
+            "status": "closed",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": 1,
+            "ads_campaign_id": null,
+            "last_campaign_id": 2,
+            "last_ads_campaign_id": null
+          },
+          {
+            "id": 2,
+            "status": "unread",
+            "unread_count": 1,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": 1,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": 1
+          },
+          {
+            "id": 3,
+            "status": "active",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": null,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": null
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "closed"
+          },
+          {
+            "id": 2,
+            "lead_status": "new"
+          },
+          {
+            "id": 3,
+            "lead_status": "customer"
+          }
+        ],
+        "followups": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "cancelled"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "cancelled"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent"
+          },
+          {
+            "id": 4,
+            "contact_id": 2,
+            "status": "pending"
+          }
+        ],
+        "campaign_contacts": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "replied",
+            "next_action_at": null
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "replied",
+            "next_action_at": null
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "replied",
+            "next_action_at": null
+          },
+          {
+            "id": 4,
+            "contact_id": 1,
+            "status": "failed",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 5,
+            "contact_id": 2,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "list",
+      "q": {
+        "channel": "all",
+        "status": "all"
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "total": 3,
+          "items": [
+            {
+              "id": 1,
+              "channel": "sms",
+              "contact_id": 1,
+              "contact_name": "Ada Obi",
+              "contact_phone": "+2348031112222",
+              "contact_lead_status": "closed",
+              "status": "closed",
+              "message_count": 3,
+              "unread_count": 0,
+              "last_message_preview": "Preview 1",
+              "last_message_at": "2026-01-02T11:00:00.123456",
+              "created_at": "2026-01-02T12:00:00.123456",
+              "campaign": {
+                "id": 1,
+                "kind": "campaign",
+                "name": "First",
+                "status": "draft"
+              },
+              "last_campaign": {
+                "id": 2,
+                "kind": "campaign",
+                "name": "Second",
+                "status": "running"
+              },
+              "contact": {
+                "phone_number": "+2348031112222",
+                "lead_status": "closed",
+                "business_name": null,
+                "first_name": "Ada",
+                "last_name": "Obi",
+                "city": null,
+                "state": null,
+                "custom_fields": {
+                  "project": "Native"
+                }
+              }
+            },
+            {
+              "id": 2,
+              "channel": "email",
+              "contact_id": 2,
+              "contact_name": "Bola Ltd",
+              "contact_phone": null,
+              "contact_lead_status": "new",
+              "status": "unread",
+              "message_count": 3,
+              "unread_count": 1,
+              "last_message_preview": "Preview 2",
+              "last_message_at": "2026-01-02T10:00:00.123456",
+              "created_at": "2026-01-02T12:00:00.123456",
+              "campaign": {
+                "id": 1,
+                "kind": "ads",
+                "name": "Ads first",
+                "status": "draft"
+              },
+              "last_campaign": {
+                "id": 1,
+                "kind": "ads",
+                "name": "Ads first",
+                "status": "draft"
+              },
+              "contact": {
+                "phone_number": null,
+                "lead_status": "new",
+                "business_name": "Bola Ltd",
+                "first_name": null,
+                "last_name": null,
+                "city": null,
+                "state": null,
+                "custom_fields": {}
+              }
+            },
+            {
+              "id": 3,
+              "channel": "sms",
+              "contact_id": 3,
+              "contact_name": "Chidi",
+              "contact_phone": null,
+              "contact_lead_status": "customer",
+              "status": "active",
+              "message_count": 3,
+              "unread_count": 0,
+              "last_message_preview": "Preview 3",
+              "last_message_at": "2026-01-02T09:00:00.123456",
+              "created_at": "2026-01-02T12:00:00.123456",
+              "campaign": null,
+              "last_campaign": null,
+              "contact": {
+                "phone_number": null,
+                "lead_status": "customer",
+                "business_name": null,
+                "first_name": "Chidi",
+                "last_name": null,
+                "city": null,
+                "state": null,
+                "custom_fields": {}
+              }
+            }
+          ],
+          "counts": {
+            "active": 1,
+            "closed": 1,
+            "unread": 1,
+            "all": 3
+          }
+        }
+      },
+      "snapshot": {
+        "conversations": [
+          {
+            "id": 1,
+            "status": "closed",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": 1,
+            "ads_campaign_id": null,
+            "last_campaign_id": 2,
+            "last_ads_campaign_id": null
+          },
+          {
+            "id": 2,
+            "status": "unread",
+            "unread_count": 1,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": 1,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": 1
+          },
+          {
+            "id": 3,
+            "status": "active",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": null,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": null
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "closed"
+          },
+          {
+            "id": 2,
+            "lead_status": "new"
+          },
+          {
+            "id": 3,
+            "lead_status": "customer"
+          }
+        ],
+        "followups": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "cancelled"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "cancelled"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent"
+          },
+          {
+            "id": 4,
+            "contact_id": 2,
+            "status": "pending"
+          }
+        ],
+        "campaign_contacts": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "replied",
+            "next_action_at": null
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "replied",
+            "next_action_at": null
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "replied",
+            "next_action_at": null
+          },
+          {
+            "id": 4,
+            "contact_id": 1,
+            "status": "failed",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 5,
+            "contact_id": 2,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "filters",
+      "expected": {
+        "status": 200,
+        "body": {
+          "items": [
+            {
+              "id": 1,
+              "kind": "campaign",
+              "name": "First",
+              "status": "draft",
+              "leads": 1,
+              "replies": 1,
+              "unread": 0
+            }
+          ],
+          "unattributed": {
+            "leads": 1,
+            "replies": 0,
+            "unread": 0
+          },
+          "total_conversations": 2
+        }
+      },
+      "snapshot": {
+        "conversations": [
+          {
+            "id": 1,
+            "status": "closed",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": 1,
+            "ads_campaign_id": null,
+            "last_campaign_id": 2,
+            "last_ads_campaign_id": null
+          },
+          {
+            "id": 2,
+            "status": "unread",
+            "unread_count": 1,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": 1,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": 1
+          },
+          {
+            "id": 3,
+            "status": "active",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": null,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": null
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "closed"
+          },
+          {
+            "id": 2,
+            "lead_status": "new"
+          },
+          {
+            "id": 3,
+            "lead_status": "customer"
+          }
+        ],
+        "followups": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "cancelled"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "cancelled"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent"
+          },
+          {
+            "id": 4,
+            "contact_id": 2,
+            "status": "pending"
+          }
+        ],
+        "campaign_contacts": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "replied",
+            "next_action_at": null
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "replied",
+            "next_action_at": null
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "replied",
+            "next_action_at": null
+          },
+          {
+            "id": 4,
+            "contact_id": 1,
+            "status": "failed",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 5,
+            "contact_id": 2,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "get",
+      "id": 404,
+      "expected": {
+        "status": 404,
+        "message": "Not Found"
+      },
+      "snapshot": {
+        "conversations": [
+          {
+            "id": 1,
+            "status": "closed",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": 1,
+            "ads_campaign_id": null,
+            "last_campaign_id": 2,
+            "last_ads_campaign_id": null
+          },
+          {
+            "id": 2,
+            "status": "unread",
+            "unread_count": 1,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": 1,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": 1
+          },
+          {
+            "id": 3,
+            "status": "active",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": null,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": null
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "closed"
+          },
+          {
+            "id": 2,
+            "lead_status": "new"
+          },
+          {
+            "id": 3,
+            "lead_status": "customer"
+          }
+        ],
+        "followups": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "cancelled"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "cancelled"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent"
+          },
+          {
+            "id": 4,
+            "contact_id": 2,
+            "status": "pending"
+          }
+        ],
+        "campaign_contacts": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "replied",
+            "next_action_at": null
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "replied",
+            "next_action_at": null
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "replied",
+            "next_action_at": null
+          },
+          {
+            "id": 4,
+            "contact_id": 1,
+            "status": "failed",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 5,
+            "contact_id": 2,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "action",
+      "id": 404,
+      "action": "mark-unread",
+      "expected": {
+        "status": 404,
+        "message": "Conversation not found"
+      },
+      "snapshot": {
+        "conversations": [
+          {
+            "id": 1,
+            "status": "closed",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": 1,
+            "ads_campaign_id": null,
+            "last_campaign_id": 2,
+            "last_ads_campaign_id": null
+          },
+          {
+            "id": 2,
+            "status": "unread",
+            "unread_count": 1,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": 1,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": 1
+          },
+          {
+            "id": 3,
+            "status": "active",
+            "unread_count": 0,
+            "sequence_paused": false,
+            "campaign_id": null,
+            "ads_campaign_id": null,
+            "last_campaign_id": null,
+            "last_ads_campaign_id": null
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "closed"
+          },
+          {
+            "id": 2,
+            "lead_status": "new"
+          },
+          {
+            "id": 3,
+            "lead_status": "customer"
+          }
+        ],
+        "followups": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "cancelled"
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "cancelled"
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "sent"
+          },
+          {
+            "id": 4,
+            "contact_id": 2,
+            "status": "pending"
+          }
+        ],
+        "campaign_contacts": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "status": "replied",
+            "next_action_at": null
+          },
+          {
+            "id": 2,
+            "contact_id": 1,
+            "status": "replied",
+            "next_action_at": null
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "status": "replied",
+            "next_action_at": null
+          },
+          {
+            "id": 4,
+            "contact_id": 1,
+            "status": "failed",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          },
+          {
+            "id": 5,
+            "contact_id": 2,
+            "status": "pending",
+            "next_action_at": "2026-01-02T12:00:00.123456"
+          }
+        ]
+      }
+    }
+  ],
+  "scope": "Actual selected inbox/attribution AST and two original stop-sequence statements. Synthetic SQLite/fixed UTC clock; omitted FKs/relationships, no original app/provider imports. No native WordPress/MySQL/HTTP/concurrency/receive/reply proof."
+}
