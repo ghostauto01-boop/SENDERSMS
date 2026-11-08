@@ -10,7 +10,7 @@ The complete current task list, module counts and every outstanding method/path 
 
 - Source AST inventory:73 tables,1,120 columns,235 indexes,61 foreign keys,511 HTTP declarations/508 distinct contracts,71 settings declarations,165 unchanged frontend file hashes.
 - A source-derived MySQL/MariaDB schema planner, explicit SQL alternatives, checked/prepared database adapter with nested transactions, guarded installer and data-retaining lifecycle.
-- Site/field-bound AES-256-GCM encrypted-value utility with tamper checks and key serialization/debug protections. **Eight initial auth settings now persist encrypted in a custom table**, with a capability/nonce-protected operator setup screen. This is not a claim that all 71 source settings or provider credentials are wired.
+- Site/field-bound AES-256-GCM encrypted-value utility with tamper checks and key serialization/debug protections. **Nine active auth/scheduling settings now persist encrypted in a custom table (including the follow-up day-view timezone)**, with a capability/nonce-protected operator setup screen. This is not a claim that all 71 source settings or provider credentials are wired.
 - Pinned/scoped phone8.13.52, Locale2.7.0 and mbstring1.31.0, upstream licenses, modified-file hashes and Unicode15 lower/upper/decimal/NFKD data.
 - Original-source-compatible UTF-8 replacement and CSV parsing, header mapping, phone/email classification and read-only preview service.
 - Own-app-authenticated multipart CSV preview and synchronous import APIs: real contact persistence, additive phone/email/name/alias merges, custom fields/variables, global/row/conditional tags, destination lists, duplicate/company suggestions and error reporting. Imports never grant consent or clear existing opt-outs. Durable background jobs, batch progress polling and private CSV error downloads are also implemented. Public URL imports also feed the same job queue through a bounded pinned-address fetcher; full frontend/native-host integration is still missing.
@@ -19,6 +19,7 @@ The complete current task list, module counts and every outstanding method/path 
 - Calendar-only booking CRUD, attendees, SMS conversation links, protected pipeline transitions, date/filter/tag/upcoming/day reads and personalized previews now persist natively. Sending/reminder flags must be disabled: requests for unimplemented delivery fail instead of claiming success. Immediate attendee responses and non-multiplying contact filters deliberately fix source inconsistencies; see `docs/CALENDAR.md`. Complete calendar UI/delivery/native qualification remains outstanding.
 - Private draft invoice creation/read/edit/delete, line items, server totals, numbering, audit history, duplication, draft voiding, filtered listing/currency summaries and read-only existing payment metadata are implemented. Money/payment-attempt records are protected from edits/deletion. Checkout URLs are explicitly unavailable; no invoice email/Paystack/settlement calls or PDF/browser workflows are implemented. See `docs/INVOICES.md` for storage/rounding bounds, deliberate source differences and native qualification gaps.
 - Status-only SMS-Gate callbacks now authenticate raw-body HMAC, deduplicate receipts and transactionally reconcile stored SMS/message/campaign/contact state, with encrypted admin-only signing-key configuration. No provider connection, sends, registration, inbound ingestion or native qualification is implied. See `docs/SMS_RECEIPTS.md`.
+- Standalone follow-up preparation, local-timezone/DST day views, live overdue flags and transactional skip/delete/reschedule controls are implemented, with attempt/history/pause/consent/link guards. This does not execute follow-ups, resolve configured email senders, notify due events or queue sends. See `docs/FOLLOWUPS.md`.
 - Stored inbox conversations/messages, channel/status/campaign/replied/search filters, first/last campaign attribution repair, campaign filter counts, transactional read/unread/lead labels, active-template preview and source-scoped sequence-pause/cancellation controls are implemented. These are data/control APIs, not replies, ingestion, provider sync or sequence execution; raw provider errors are redacted and large threads fail without silently clearing unread state. See `docs/INBOX.md`.
 - A separately labeled WordPress-administrator-only CSV diagnostic with capability/nonce/upload/size checks. This is **not** the original own-app-authenticated import API, and performs no contact writes.
 - One public REST health handler and five initial own-application auth handlers (access/admin/login/logout/me), at `/wp-json/sender-suite/v1/`. These are not yet mapped to the original `/api/v1/` URLs or certified against real WordPress HTTP. Other application APIs are deliberately not registered as fake successful placeholders.
@@ -39,8 +40,8 @@ The complete current task list, module counts and every outstanding method/path 
 
 See `tests/checks-summary.json` and `tests/frontend-evidence.json`.
 
--41,630 functional assertions across PHP WASM7.4.34-dev and8.3.36, including offline account/DTO and auth-dispatch tests.
--84 first-party PHP syntax checks.
+-42,122 functional assertions across PHP WASM7.4.34-dev and8.3.36, including offline account/DTO and auth-dispatch tests.
+-86 first-party PHP syntax checks.
 -3,075 vendor parser checks, **reported separately from functional coverage**. The PHP8-only guarded mbstring bootstrap is intentionally not parsed with PHP7.4. Parser memory is raised to512M only inside that test.
 -1,547 vendor file hashes and165 unchanged frontend source hashes verified.
 -Recorded unchanged frontend run (not rerun in this iteration):269 tests/43 files pass; production build passes and generates132 assets. A jsdom navigation warning is not native browser workflow proof.
@@ -99,6 +100,7 @@ python3 wordpress/tools/generate_calendar_fixtures.py
 python3 wordpress/tools/generate_invoice_fixtures.py
 python3 wordpress/tools/generate_inbox_fixtures.py
 python3 wordpress/tools/generate_sms_receipts_fixtures.py
+python3 wordpress/tools/generate_followup_fixtures.py
 python3 wordpress/tools/run_checks.py
 python3 wordpress/tools/checkpoint.py
 python3 wordpress/tools/write_remaining_checklist.py
@@ -145,7 +147,7 @@ These handlers have actual persistence logic, not placeholder successes. They re
 
 ## Remaining work
 
-`docs/contracts.json` and `docs/REMAINING_WORK.md` retain every source method/path. Current status: **375 missing handlers,133 partial health/auth/contact/list/variable/template/reply/classification/notification/import/analytics/sequence/settings/calendar/invoice/inbox/status-webhook handlers,0 fully certified contracts**. The six actual preview/import/URL/job/status/error-report API handlers are included in the partial count; the separate administrator preview diagnostic is not counted.
+`docs/contracts.json` and `docs/REMAINING_WORK.md` retain every source method/path. Current status: **369 missing handlers,139 partial health/auth/contact/list/variable/template/reply/classification/notification/import/analytics/sequence/settings/calendar/invoice/inbox/status-webhook/follow-up-control handlers,0 fully certified contracts**. The six actual preview/import/URL/job/status/error-report API handlers are included in the partial count; the separate administrator preview diagnostic is not counted.
 
 Native auth/account/session/rate-limit certification and concurrency recovery, full settings/provider wiring, contact/list deletion and related-record cleanup, remaining bulk actions, native URL transport and queue/lock certification, email accounts/verification, campaigns/follow-ups, inbox/SMS/calls, scheduler, webhooks, invoices/calendar, remaining profile workflows, AI/MCP, analytics/notifications, complete migration, unchanged frontend integration and native release tests still need recreation/implementation. Do not expose the unchanged frontend as a working application until those routes and permissions exist.
 

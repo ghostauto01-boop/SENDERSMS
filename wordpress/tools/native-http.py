@@ -2,6 +2,7 @@
 """Real HTTP against an isolated CI site. No provider messages or external requests."""
 import hashlib,hmac,http.cookiejar,json,os,subprocess,time,urllib.error,urllib.parse,urllib.request
 from pathlib import Path
+from datetime import datetime,timedelta,timezone
 E=Path(os.environ['NATIVE_WP_EVIDENCE']);BASE='http://127.0.0.1:8080';checks=0;failures=[]
 cookie_roundtrip=False
 jar=http.cookiejar.CookieJar();client=urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar));anonymous=urllib.request.build_opener();private=json.loads((E/'private-test-cookie.json').read_text())
@@ -138,10 +139,18 @@ try:
   s,b,h=request('POST','webhooks/smsgateway',receipt,headers={'X-Timestamp':ts,'X-Signature':sig},authenticated=False);check('native unsupported/unmatched receipt is retryable '+event,s,503);check('native receipt no-store '+event,h.get('Cache-Control'),'no-store')
  s,b,h=request('POST','webhooks/smsgateway',receipt,authenticated=False);check('native unsigned callback refused',s,401)
  s,b,h=request('PUT','settings/gateway/webhook-signing',{'secret':''});check('native signer explicitly disabled',b.get('configured'),False)
+ # Follow-up persistence/control only: deliberately no send or execution worker.
+ future=(datetime.now(timezone.utc)+timedelta(days=2)).isoformat()
+ s,b,h=request('POST','followups/',{'contact_id':contact,'scheduled_at':future,'message_text':'Native stored continuation','notify_on_due':True});check('native follow-up preparation',s,201);followup=b.get('id');check('native follow-up is pending',b.get('status'),'pending')
+ s,b,h=request('GET','followups',query={'view':'pending','channel':'all'});check('native follow-up pending list',s,200);check('native follow-up present',any(i.get('id')==followup for i in b.get('items',[])))
+ s,b,h=request('POST',f'followups/{followup}/send-now');check('native send-now explicitly unavailable',s,503)
+ s,b,h=request('POST',f'followups/{followup}/skip');check('native follow-up skip',b.get('success'),True)
+ s,b,h=request('POST',f'followups/{followup}/reschedule',query={'new_time':future});check('native follow-up reschedule',s,200)
+ s,b,h=request('DELETE',f'followups/{followup}');check('native unsent follow-up deletion',s,204)
  s,b,h=request('POST','auth/logout');check('native logout',s,200)
  s,b,h=request('GET','contacts');check('native logout clears browser cookie',s,401)
 except Exception as e:failures.append({'exception':type(e).__name__,'message':str(e)})
 finally:
- result=dict(ok=not failures,assertions=checks,failures=failures,native_wordpress_http=True,native_mysql=True,actual_http_cookie_roundtrip=cookie_roundtrip,provider_messages_sent=0,complete_application=False,production_ready=False,scope='Actual HTTP/WordPress/MySQL smoke checks for implemented auth/contact/list/variable/template/synchronous import/job/CSV report/analytics/sequence-builder/lifecycle/export/settings/calendar/invoice/inbox paths and explicit native import worker (not actual WP cron dispatch); not full contract/SPA/browser/native concurrency/destructive FK/migration/provider certification')
+ result=dict(ok=not failures,assertions=checks,failures=failures,native_wordpress_http=True,native_mysql=True,actual_http_cookie_roundtrip=cookie_roundtrip,provider_messages_sent=0,complete_application=False,production_ready=False,scope='Actual HTTP/WordPress/MySQL smoke checks for implemented auth/contact/list/variable/template/synchronous import/job/CSV report/analytics/sequence-builder/lifecycle/export/settings/calendar/invoice/inbox/follow-up-control paths and explicit native import worker (not actual WP cron dispatch); not full contract/SPA/browser/native concurrency/destructive FK/migration/provider certification')
  (E/'native-http.json').write_text(json.dumps(result,indent=2)+'\n');print(json.dumps(result));(E/'private-test-cookie.json').unlink(missing_ok=True)
 raise SystemExit(bool(failures))

@@ -1,7 +1,7 @@
 {
   "ok": true,
-  "php_lint_checks": 84,
-  "php_assertions": 41630,
+  "php_lint_checks": 86,
+  "php_assertions": 42122,
   "vendor_parser_checks": 3075,
   "vendor_hash_checks": 1547,
   "unchanged_frontend_files": 165,
@@ -69,7 +69,7 @@
     },
     {
       "ok": true,
-      "assertions": 634,
+      "assertions": 668,
       "diffs": [],
       "php": "7.4.34-dev",
       "scope": "Offline requests/responses with synthetic password codec, seventy-three synthetic SQLite application tables, fault-injected transaction failure; not real WP/HTTP/Argon2/native MySQL/concurrency proof",
@@ -279,6 +279,20 @@
       "gateway_connectivity_verified": false,
       "scope": "Selected original AST/SQLite synthetic HMAC and state parity, deliberate terminal/dedup safety hardening, fault rollback; no real HTTP/gateway/send/concurrency proof",
       "suite": "sms-receipts"
+    },
+    {
+      "ok": true,
+      "assertions": 212,
+      "diffs": [],
+      "php": "7.4.34-dev",
+      "source_operations": 47,
+      "source_dto_cases": 11,
+      "source_timezone_cases": 6,
+      "native_wordpress_verified": false,
+      "native_mysql_verified": false,
+      "workers_verified": false,
+      "scope": "Selected source/empty-sender/fixed-clock SQLite, deliberate history/pause/consent/link guards, fault rollback; no sends, actual worker, native HTTP/MySQL/concurrency or browser proof",
+      "suite": "followups"
     },
     {
       "ok": true,
@@ -350,7 +364,7 @@
     },
     {
       "ok": true,
-      "assertions": 634,
+      "assertions": 668,
       "diffs": [],
       "php": "8.3.36",
       "scope": "Offline requests/responses with synthetic password codec, seventy-three synthetic SQLite application tables, fault-injected transaction failure; not real WP/HTTP/Argon2/native MySQL/concurrency proof",
@@ -560,6 +574,20 @@
       "gateway_connectivity_verified": false,
       "scope": "Selected original AST/SQLite synthetic HMAC and state parity, deliberate terminal/dedup safety hardening, fault rollback; no real HTTP/gateway/send/concurrency proof",
       "suite": "sms-receipts"
+    },
+    {
+      "ok": true,
+      "assertions": 212,
+      "diffs": [],
+      "php": "8.3.36",
+      "source_operations": 47,
+      "source_dto_cases": 11,
+      "source_timezone_cases": 6,
+      "native_wordpress_verified": false,
+      "native_mysql_verified": false,
+      "workers_verified": false,
+      "scope": "Selected source/empty-sender/fixed-clock SQLite, deliberate history/pause/consent/link guards, fault rollback; no sends, actual worker, native HTTP/MySQL/concurrency or browser proof",
+      "suite": "followups"
     },
     {
       "ok": true,

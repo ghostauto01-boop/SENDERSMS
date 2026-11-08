@@ -38,4 +38,4 @@ Comparison and native safety/fault checks total **159 assertions per PHP runtime
 
 ## Still missing from the requested full migration
 
-Sequence execution, campaign enrollment/snapshot consumption, wait/condition evaluation, stop-on-reply/opt-out, actual sends, delivery reconciliation, follow-up scheduling, quiet hours, claims/leases, crash recovery and duplicate-send prevention remain outstanding. The sequence builder is not the full item 2 in the completion checklist. All other incomplete application areas and native release gates remain in `COMPLETION_CHECKLIST.md`.
+Sequence execution, campaign enrollment/snapshot consumption, wait/condition evaluation, stop-on-reply/opt-out, actual sends, complete delivery reconciliation, sequence-generated follow-up scheduling (standalone preparation/control APIs now exist; see `FOLLOWUPS.md`), quiet hours, claims/leases, crash recovery and duplicate-send prevention remain outstanding. The sequence builder is not the full item 2 in the completion checklist. All other incomplete application areas and native release gates remain in `COMPLETION_CHECKLIST.md`.

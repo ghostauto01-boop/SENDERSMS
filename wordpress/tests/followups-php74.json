@@ -1,0 +1,14 @@
+{
+  "ok": true,
+  "assertions": 212,
+  "diffs": [],
+  "php": "7.4.34-dev",
+  "source_operations": 47,
+  "source_dto_cases": 11,
+  "source_timezone_cases": 6,
+  "native_wordpress_verified": false,
+  "native_mysql_verified": false,
+  "workers_verified": false,
+  "scope": "Selected source/empty-sender/fixed-clock SQLite, deliberate history/pause/consent/link guards, fault rollback; no sends, actual worker, native HTTP/MySQL/concurrency or browser proof",
+  "suite": "followups"
+}

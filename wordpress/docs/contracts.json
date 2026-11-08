@@ -230,7 +230,7 @@
     "sources": [
       "backend/app/api/v1/followups.py:213"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -1418,7 +1418,7 @@
     "sources": [
       "backend/app/api/v1/followups.py:79"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -1427,7 +1427,7 @@
     "sources": [
       "backend/app/api/v1/followups.py:79"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -3428,7 +3428,7 @@
     "sources": [
       "backend/app/api/v1/followups.py:154"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -3437,7 +3437,7 @@
     "sources": [
       "backend/app/api/v1/followups.py:305"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -3455,7 +3455,7 @@
     "sources": [
       "backend/app/api/v1/followups.py:273"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {

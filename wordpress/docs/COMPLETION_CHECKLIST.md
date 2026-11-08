@@ -2,9 +2,9 @@
 
 Build: **0.11.0-dev**. WordPress is the native application backend; no original Python service is the proposed runtime. Original repository application files remain unchanged.
 
-**375 missing handlers, 133 partially implemented handlers, zero native-certified contracts, 508 source method/path contracts in total.** A partial handler has actual implementation, but does not mean its complete workflow, UI, dependencies and native behavior are certified. Every endpoint remains in the release backlog until those gates pass. Raw handler counts are not a percent-complete estimate.
+**369 missing handlers, 139 partially implemented handlers, zero native-certified contracts, 508 source method/path contracts in total.** A partial handler has actual implementation, but does not mean its complete workflow, UI, dependencies and native behavior are certified. Every endpoint remains in the release backlog until those gates pass. Raw handler counts are not a percent-complete estimate.
 
-Fresh offline evidence: 41,630 functional PHP-WASM assertions, 84 first-party syntax checks, 165 unchanged original frontend hashes. Offline evidence is **not** real WordPress/MySQL/HTTP/provider/browser certification. This checklist is the full current implementation/release backlog, not a claim that software can be guaranteed to run perfectly on every host.
+Fresh offline evidence: 42,122 functional PHP-WASM assertions, 86 first-party syntax checks, 165 unchanged original frontend hashes. Offline evidence is **not** real WordPress/MySQL/HTTP/provider/browser certification. This checklist is the full current implementation/release backlog, not a claim that software can be guaranteed to run perfectly on every host.
 
 ## Implementation order and acceptance gates
 
@@ -18,14 +18,14 @@ Fresh offline evidence: 41,630 functional PHP-WASM assertions, 84 first-party sy
 
 ### 2. Full native API/workflow implementation
 - [ ] Finish all exact methods/paths in the endpoint inventory below with source-compatible validation, responses, permissions and substantive behavior; never replace missing features with fake successful stubs.
-- [ ] Complete settings/provider wiring beyond the eight initial encrypted auth settings; all source configuration families, redacted outputs, secret storage, URL validation and rotation.
+- [ ] Complete settings/provider wiring beyond the nine active encrypted auth/scheduling settings; all source configuration families, redacted outputs, secret storage, URL validation and rotation.
 - [ ] Complete remaining profile/account/session workflows and roles/permissions.
 - [ ] Certify implemented contact/list deletion, dependency cleanup and bulk actions on native hosts; certify implemented JSON/CSV exports and complete enrichment, email verification, aliases/suppression and export/data-management workflows. Avoid deleting shared calendar attendees or unrelated records.
 - [ ] Validate upload preview, synchronous imports, background jobs/progress/error reports and URL imports on native hosts, including consent preservation, atomic batches, crashes, duplicate IDs/memberships, locks, public-address pinning/TLS, limits and retention. These APIs are implemented, not native-certified.
 - [ ] Implement actual SMS transports, provider/device/gateway configuration, one-to-one/bulk sends, scheduling, delivery/status reconciliation, bounded retries and error handling.
 - [ ] Implement complete email accounts/mailboxes/transports, domains/DNS verification, SMTP/provider/OAuth paths, sender selection, bulk/one-to-one mail, attachments, threading, suppression, unsubscribe/list headers, bounce/open/click tracking and inbox ingestion.
 - [ ] Implement both classic campaigns and Ads Manager: drafts, audiences/sets/creatives, assignment/targeting, transitions, budgets/throttles, queues, pause/resume/stop/delete, attribution, follow-up steps/templates/tasks and reconciliation.
-- [ ] Finish sequence execution (builder CRUD/validation/version snapshots now implemented), standalone/campaign follow-ups, due/overdue handling, quiet hours, timezone/DST behavior, retries and stop-on-reply/opt-out policies.
+- [ ] Qualify implemented standalone follow-up preparation, timezone-aware due/overdue views, skip/delete/reschedule controls and history/consent/link guards. Finish sequence execution (builder CRUD/validation/version snapshots now implemented), generated campaign follow-ups, sender resolution, due/overdue notifications, actual send-now/worker execution, quiet hours, timezone/DST delivery policy, retries and stop-on-reply/opt-out behavior.
 - [ ] Qualify implemented stored inbox/conversation reads, read/unread/labels, campaign attribution/filters, private template previews and sequence-pause controls on native hosts. Complete replies, attachments/HTML, large-thread pagination/export, receiving/polling/sync, inbound lifecycle, worker integration and the native inbox UI.
 - [ ] Implement calls/CallGate: configuration, handsets/devices, dial requests, call logs and authenticated event/webhook lifecycle. Call analytics alone is not calling.
 - [ ] Qualify implemented status-only SMS-Gate raw-body HMAC, encrypted signing-key configuration, receipt deduplication and transactional reconciliation on native hosts. Complete webhook registration, phone-specific keys, inbound/call/email events, rate limits, retry/recovery tooling, retention and redacted diagnostics; verify the documented first-terminal-wins policy against actual gateway behavior.
@@ -84,7 +84,7 @@ All counts below are derived from `docs/contracts.json`. Missing = no native han
 | contacts | 3 | 22 | 0 |
 | dashboard | 2 | 0 | 0 |
 | email | 41 | 0 | 0 |
-| followups | 7 | 0 | 0 |
+| followups | 1 | 6 | 0 |
 | guide | 3 | 0 | 0 |
 | inbox | 8 | 12 | 0 |
 | invoices | 17 | 9 | 0 |
@@ -135,7 +135,7 @@ This exhaustive list includes partially implemented routes because none is yet n
 | DELETE | `/api/v1/email/accounts/{account_id}` | Missing implementation |
 | DELETE | `/api/v1/email/domains/{domain_id}` | Missing implementation |
 | DELETE | `/api/v1/email/suppression/{entry_id}` | Missing implementation |
-| DELETE | `/api/v1/followups/{followup_id}` | Missing implementation |
+| DELETE | `/api/v1/followups/{followup_id}` | Implemented partially; native/full-workflow proof required |
 | DELETE | `/api/v1/invoices/{invoice_id}` | Implemented partially; native/full-workflow proof required |
 | DELETE | `/api/v1/lists/{list_id}` | Implemented partially; native/full-workflow proof required |
 | DELETE | `/api/v1/mailbox/{mailbox_id}` | Missing implementation |
@@ -267,8 +267,8 @@ This exhaustive list includes partially implemented routes because none is yet n
 | GET | `/api/v1/email/stats` | Missing implementation |
 | GET | `/api/v1/email/suppression` | Missing implementation |
 | GET | `/api/v1/email/unsubscribe` | Missing implementation |
-| GET | `/api/v1/followups` | Missing implementation |
-| GET | `/api/v1/followups/` | Missing implementation |
+| GET | `/api/v1/followups` | Implemented partially; native/full-workflow proof required |
+| GET | `/api/v1/followups/` | Implemented partially; native/full-workflow proof required |
 | GET | `/api/v1/guide` | Missing implementation |
 | GET | `/api/v1/guide/` | Missing implementation |
 | GET | `/api/v1/guide/summary` | Missing implementation |
@@ -490,10 +490,10 @@ This exhaustive list includes partially implemented routes because none is yet n
 | POST | `/api/v1/email/suppression` | Missing implementation |
 | POST | `/api/v1/email/test-send` | Missing implementation |
 | POST | `/api/v1/email/unsubscribe` | Missing implementation |
-| POST | `/api/v1/followups/` | Missing implementation |
-| POST | `/api/v1/followups/{followup_id}/reschedule` | Missing implementation |
+| POST | `/api/v1/followups/` | Implemented partially; native/full-workflow proof required |
+| POST | `/api/v1/followups/{followup_id}/reschedule` | Implemented partially; native/full-workflow proof required |
 | POST | `/api/v1/followups/{followup_id}/send-now` | Missing implementation |
-| POST | `/api/v1/followups/{followup_id}/skip` | Missing implementation |
+| POST | `/api/v1/followups/{followup_id}/skip` | Implemented partially; native/full-workflow proof required |
 | POST | `/api/v1/inbox/conversations/{conversation_id}/mark-close` | Implemented partially; native/full-workflow proof required |
 | POST | `/api/v1/inbox/conversations/{conversation_id}/mark-interested` | Implemented partially; native/full-workflow proof required |
 | POST | `/api/v1/inbox/conversations/{conversation_id}/mark-not-interested` | Implemented partially; native/full-workflow proof required |
