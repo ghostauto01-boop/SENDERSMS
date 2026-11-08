@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Real HTTP against an isolated CI site. No provider messages or external requests."""
-import http.cookiejar,json,os,time,urllib.error,urllib.parse,urllib.request
+import http.cookiejar,json,os,subprocess,time,urllib.error,urllib.parse,urllib.request
 from pathlib import Path
 E=Path(os.environ['NATIVE_WP_EVIDENCE']);BASE='http://127.0.0.1:8080';checks=0;failures=[]
 cookie_roundtrip=False
@@ -19,6 +19,22 @@ def request(method,path,body=None,query=None,headers=None,authenticated=True):
  except urllib.error.HTTPError as e:r=e
  raw=r.read();payload=json.loads(raw) if raw else None
  return r.status,payload,r.headers
+
+def upload(path,content,fields=None,authenticated=True):
+ boundary='SenderSuiteIsolatedMultipartBoundary'
+ parts=[]
+ for key,value in (fields or {}).items():parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="{key}"\r\n\r\n{value}\r\n'.encode())
+ parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="contacts.csv"\r\nContent-Type: text/csv\r\n\r\n'.encode()+content+f'\r\n--{boundary}--\r\n'.encode())
+ req=urllib.request.Request(BASE+'/?'+urllib.parse.urlencode({'rest_route':'/sender-suite/v1/'+path}),data=b''.join(parts),headers={'Content-Type':'multipart/form-data; boundary='+boundary},method='POST')
+ try:r=(client if authenticated else anonymous).open(req,timeout=30)
+ except urllib.error.HTTPError as e:r=e
+ return r.status,json.loads(r.read()),r.headers
+
+def raw_report(job):
+ req=urllib.request.Request(BASE+'/?'+urllib.parse.urlencode({'rest_route':f'/sender-suite/v1/contacts/import/jobs/{job}/errors.csv','_envelope':'1','_jsonp':'evil','_fields':'body'}))
+ try:r=client.open(req,timeout=30)
+ except urllib.error.HTTPError as e:r=e
+ return r.status,r.read(),r.headers
 
 try:
  # Bounded startup backoff in the CI test, not a sandbox dev-server poller.
@@ -57,10 +73,22 @@ try:
  s,b,h=request('GET','templates/'+str(email),query={'_fields':'name','_envelope':'1','_jsonp':'evil','_method':'DELETE'});check('WP reserved flags cannot change source method/shape',s,200);check('WP fields/envelope bypass disabled','id' in b and 'body' in b and 'attachments' in b);check('WP JSONP disabled','javascript' not in h.get('Content-Type',''))
  s,b,h=request('DELETE','templates/'+str(email));check('native template delete',s,204);check('native 204 empty body',b,None)
  s,b,h=request('GET','templates/'+str(email));check('native deleted template missing',s,404)
+ # Actual SAPI multipart uploads and actual MySQL worker execution, no synthetic reader.
+ s,b,h=upload('contacts/import/jobs',b'Email\nno-session@business.ng\n',authenticated=False);check('native anonymous upload denied',s,401)
+ s,b,h=upload('contacts/import/preview',b'Email,Import Note\npreview-only@business.ng,preview\n');check('native multipart preview',s,200);check('native multipart preview rows',b.get('total_rows'),1)
+ s,b,h=request('GET','contacts',query={'search':'preview-only'});check('native preview no contact writes',b.get('total'),0)
+ s,b,h=upload('contacts/import/csv',b'Email,Import Note\nsynchronous@business.ng,sync\n',{'new_list_name':'Native synchronous CSV'});check('native synchronous upload import',s,200);check('native synchronous contact persisted',b.get('imported'),1)
+ data='Email,Phone,Import Note\n'+''.join(f'native-job-{i}@business.ng,,value\n' for i in range(105))+',bad,invalid\n'
+ s,b,h=upload('contacts/import/jobs',data.encode(),{'new_list_name':'Native queued CSV','tags':'NativeJob'});check('native queued upload accepted',s,202);job=b.get('id');check('native job initially queued',b.get('status'),'queued');check('native job row total',b.get('total_rows'),106);check('native job never returns raw CSV','content' not in b)
+ s,b,h=request('GET',f'contacts/import/jobs/{job}');check('native job poll before worker',s,200);check('native no implicit processing on poll',b.get('processed_rows'),0)
+ worker=subprocess.run(['php',str(Path(__file__).with_name('native-import-worker.php'))],capture_output=True,text=True,timeout=90)
+ check('native worker exits successfully',worker.returncode,0);check('native worker structured success',json.loads(worker.stdout).get('ok'),True)
+ s,b,h=request('GET',f'contacts/import/jobs/{job}');check('native queued job completed',b.get('status'),'completed');check('native final job progress',b.get('progress_percent'),100);check('native final processed rows',b.get('processed_rows'),106);check('native job imported count',b.get('result',{}).get('imported'),105);check('native job invalid count',b.get('result',{}).get('invalid'),1);check('native job live list count',b.get('list',{}).get('contact_count'),105);check('native job omits imported IDs','imported_ids' not in b.get('result',{}))
+ s,raw,h=raw_report(job);check('native raw error report',s,200);check('native CSV not JSON wrapped',raw.startswith(b'row,level,error\r\n'));check('native report has phone warning',b'Phone number skipped' in raw);check('native report has invalid row',b'No phone number and no email' in raw);check('native error report content type',h.get('Content-Type'),'text/csv; charset=UTF-8');check('native error report cache private',h.get('Cache-Control'),'no-store');check('native error report attachment',h.get('Content-Disposition'),f'attachment; filename="import-errors-{job}.csv"')
  s,b,h=request('POST','auth/logout');check('native logout',s,200)
  s,b,h=request('GET','contacts');check('native logout clears browser cookie',s,401)
 except Exception as e:failures.append({'exception':type(e).__name__,'message':str(e)})
 finally:
- result=dict(ok=not failures,assertions=checks,failures=failures,native_wordpress_http=True,native_mysql=True,actual_http_cookie_roundtrip=cookie_roundtrip,provider_messages_sent=0,complete_application=False,production_ready=False,scope='Actual HTTP/WordPress/MySQL smoke checks for implemented auth/contact/list/variable/template paths only; not full contract/SPA/browser/native concurrency/destructive FK/migration/provider certification')
+ result=dict(ok=not failures,assertions=checks,failures=failures,native_wordpress_http=True,native_mysql=True,actual_http_cookie_roundtrip=cookie_roundtrip,provider_messages_sent=0,complete_application=False,production_ready=False,scope='Actual HTTP/WordPress/MySQL smoke checks for implemented auth/contact/list/variable/template/synchronous import/job/CSV report paths and explicit native import worker (not actual WP cron dispatch); not full contract/SPA/browser/native concurrency/destructive FK/migration/provider certification')
  (E/'native-http.json').write_text(json.dumps(result,indent=2)+'\n');print(json.dumps(result));(E/'private-test-cookie.json').unlink(missing_ok=True)
 raise SystemExit(bool(failures))

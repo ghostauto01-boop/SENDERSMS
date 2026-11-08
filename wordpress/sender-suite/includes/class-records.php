@@ -28,6 +28,7 @@ final class Records {
         }
         foreach ($data as $name => &$value) { if ($spec['columns'][$name]['type'] === 'Integer' && is_bool($value)) { $value = (int)$value; } } unset($value);
         $id = $this->db->insert($table, $data);
+        if (!$spec['columns']['id']['auto_increment']) { $id = $data['id']; }
         return $this->db->one($table, array('id' => $id));
     }
 

@@ -41,6 +41,7 @@ jobs:
           php wordpress/tools/native-wordpress.php
       - name: Actual HTTP requests with real cookies, WordPress and MySQL
         env:
+          NATIVE_DB_PASSWORD: isolated-wordpress-test-only
           NATIVE_WP_ROOT: ${{ runner.temp }}/wordpress
           NATIVE_WP_EVIDENCE: ${{ runner.temp }}/native-wordpress
         run: |

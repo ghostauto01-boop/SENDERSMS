@@ -61,9 +61,10 @@ final class DataRoutes {
             $user=$c['auth']->current(isset($_COOKIE['sendsms_session'])?wp_unslash($_COOKIE['sendsms_session']):null);
             if ($user===null) { throw new AuthFailure(401,'Not authenticated'); }
             $path=trim(substr($request->get_route(),strlen('/sender-suite/v1/')),'/'); $method=$request->get_method(); $q=$request->get_query_params();
+            if ($path==='contacts/import/jobs' && $method==='POST' && !ImportJobs::ensureSchedule()) { throw new AuthFailure(503,'WordPress could not schedule the import queue.'); }
             $contacts=new Contacts($c['db']); $lists=new ContactLists($c['db']); $status=200;
-            $data=$c['db']->transaction(function()use($path,$method,$q,$request,$contacts,$lists,$c,&$status){
-                if ($path==='contacts/import/preview'||$path==='contacts/import/csv') { return ImportRoutes::handle($request,$c); }
+            $data=$c['db']->transaction(function()use($path,$method,$q,$request,$contacts,$lists,$c,$user,&$status){
+                if (strpos($path,'contacts/import/')===0) { return ImportRoutes::handle($request,$c,$status,$user); }
                 if ($path==='notifications'||strpos($path,'notifications/')===0) { return NotificationCenter::handle($request,$c); }
                 if ($path==='ai/classify'||$path==='autoreply'||strpos($path,'autoreply/')===0||$path==='automations'||strpos($path,'automations/')===0) { return ReplyRoutes::handle($request,$c,$status); }
                 if ($path==='templates'||strpos($path,'templates/')===0) { return TemplateRoutes::handle($request,$c,$status); }
@@ -108,7 +109,9 @@ final class DataRoutes {
                 }
                 throw new AuthFailure(404,'Not Found');
             });
-            return AuthRoutes::response($data,$status,$id);
+            $response=AuthRoutes::response($data,$status,$id);
+            if ($data instanceof ImportErrorReport) { $response->header('Content-Type','text/csv; charset=UTF-8'); $response->header('Content-Disposition','attachment; filename="'.$data->filename.'"'); $response->header('X-Content-Type-Options','nosniff'); }
+            return $response;
         } catch (ValidationFailure $e) {
             return AuthRoutes::response(AuthRoutes::error(422,$e->getMessage(),$id,$e->field,true),422,$id);
         } catch (AuthFailure $e) {

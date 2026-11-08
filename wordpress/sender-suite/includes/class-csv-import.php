@@ -65,13 +65,14 @@ final class CsvImport {
         if ($target!==null) { $target=$this->db->one('contact_lists',array('id'=>$listId)); $result['list']=array_intersect_key($target,array_flip(array('id','name','contact_count'))); }
         return $result;
     }
-    public function run($bytes,$mapping,$listId=null,$skip=true,array $tags=array(),array $rules=array()) {
+    public function run($bytes,$mapping,$listId=null,$skip=true,array $tags=array(),array $rules=array(),callable $progress=null) {
         $r=array_fill_keys(array('imported','merged','merged_by_name','skipped','invalid','duplicates','total_rows','company_duplicates','with_phone','with_email','email_only','phone_only','both'),0); $r['company_duplicate_candidates']=array(); $r['errors']=array(); $r['imported_ids']=array();
         $reader=CsvReader::dictionaries($bytes); $reader->rewind(); if (!$reader->valid() || !$reader->current()['headers']) { $r['errors'][]=array('row'=>0,'error'=>'No headers found'); return $r; }
         $map=array(); foreach ($mapping as $key=>$v) { $map[Compat::lower(Compat::strip((string)$key))]=Compat::strip(self::text($v)); }
         $list=$listId!==null?$this->db->one('contact_lists',array('id'=>$listId)):null; $global=self::tags(implode(', ',$tags)); $cache=array(); foreach ($this->db->select('tags',array(),2147483647) as $t) { $cache[Compat::lower($t['name'])]=$t['id']; }
         $companies=array(); $free=self::data()['free_mail_domains']; foreach ($this->db->rows('SELECT id,email,website,business_name FROM '.$this->table('contacts')) as $c) { $c['id']=(int)$c['id']; $domain=self::domain($c['website']); $address=Compat::email($c['email']); if ($domain==='' && $address!==null) { $candidate=substr(strrchr($address,'@'),1); if (!in_array($candidate,$free,true)) { $domain=$candidate; } } if ($domain!=='') { $companies[Compat::lower($domain)][]=$c['id']; } if (self::truth($c['business_name'])) { $companies['name:'.Compat::lower(Compat::strip($c['business_name']))][]=$c['id']; } }
         $seen=array(); $added=0; $rowNum=0; $reader->next();
+        $advance=function()use($reader,&$r,$progress){if ($progress!==null && $r['total_rows']%100===0) { $progress($r['total_rows'],$r); }$reader->next();};
         while ($reader->valid()) {
             $rowNum++; $r['total_rows']++; $lower=array(); foreach ($reader->current()['row'] as $k=>$v) { $lower[Compat::lower(Compat::strip((string)$k))]=$v; } $d=array(); $custom=array(); $rowTags=array();
             foreach ($map as $key=>$target) { $v=$lower[$key]??''; if (!self::truth($v)) { $v=''; } if (!is_string($v)) { throw new \InvalidArgumentException('CSV cell is not scalar text'); } $v=Compat::strip($v); if ($v==='' || $target==='' || $target==='ignore') { continue; }
@@ -82,25 +83,26 @@ final class CsvImport {
             foreach ($rules as $rule) { if (!is_object($rule)) { continue; } $field=Compat::strip(self::text(self::truth($rule->field??null)?$rule->field:'')); $contains=Compat::strip(self::text(self::truth($rule->contains??null)?$rule->contains:'')); $name=self::cut(Compat::strip(self::text(self::truth($rule->tag??null)?$rule->tag:'')),100); $v=$d[$field]??null; if (!self::truth($v)) { $v=$custom[CsvPreview::customKey($field)]??null; } if (!self::truth($v)) { $v=$lower[Compat::lower($field)]??''; } if ($field!=='' && $contains!=='' && $name!=='' && strpos(Compat::lower(self::text($v)),Compat::lower($contains))!==false) { $rowTags[]=$name; } }
             $phone=Phone::clean($d['phone_number']??null); $email=Compat::email($d['email']??null); $raw=Compat::strip($d['phone_number']??'');
             if ($raw!=='' && $phone===null) { $r['errors'][]=array('row'=>$rowNum,'error'=>'Phone number skipped (not a valid Nigerian mobile): '.$raw,'level'=>'warning'); }
-            if ($phone===null && $email===null) { $r['invalid']++; $r['errors'][]=array('row'=>$rowNum,'error'=>'No phone number and no email address'.($raw!==''?" (phone '".$raw."' is not valid)":'')); $reader->next(); continue; }
+            if ($phone===null && $email===null) { $r['invalid']++; $r['errors'][]=array('row'=>$rowNum,'error'=>'No phone number and no email address'.($raw!==''?" (phone '".$raw."' is not valid)":'')); $advance(); continue; }
             $key=$phone!==null?'p:'.$phone:'e:'.$email; $companyKeys=array(); $domain=self::domain($d['website']??null); $emailDomain=$email!==null?substr(strrchr($email,'@'),1):''; if ($domain!=='') { $companyKeys[]=array(Compat::lower($domain),'domain'); } elseif ($emailDomain!=='' && !in_array($emailDomain,$free,true)) { $companyKeys[]=array(Compat::lower($emailDomain),'domain'); } $business=Compat::lower(Compat::strip($d['business_name']??'')); if ($business!=='') { $companyKeys[]=array('name:'.$business,'company_name'); }
             if ($skip) {
-                if (isset($seen[$key])) { $r['duplicates']++; $reader->next(); continue; }
+                if (isset($seen[$key])) { $r['duplicates']++; $advance(); continue; }
                 list($existing,$matchedBy)=$this->find($phone,$email,$d);
                 if ($existing!==null) {
                     $seen[$key]=true; if ($matchedBy==='name') { $r['merged_by_name']++; $r['errors'][]=array('row'=>$rowNum,'level'=>'info','error'=>'Merged into existing contact #'.$existing['id'].' by name match'); }
                     list($contact,$changed)=$this->merge($existing,$d,$custom,$phone,$email); $r[$changed?'merged':'duplicates']++; self::note($r,$contact);
                     if ($list!==null && !$this->db->one('contact_list_members',array('list_id'=>$listId,'contact_id'=>$contact['id']))) { $this->records->create('contact_list_members',array('list_id'=>$listId,'contact_id'=>$contact['id'])); $added++; }
                     foreach (array_merge($global,$rowTags) as $name) { $tag=$this->tag($name,$cache); if (!$this->db->one('contact_tags',array('contact_id'=>$contact['id'],'tag_id'=>$tag))) { $this->records->create('contact_tags',array('contact_id'=>$contact['id'],'tag_id'=>$tag)); } }
-                    $reader->next(); continue;
+                    $advance(); continue;
                 }
             }
             $pairs=array(); foreach ($companyKeys as $entry) { foreach ($companies[$entry[0]]??array() as $id) { $pairs[]=array('row'=>$rowNum,'contact_id'=>$id,'matched_by'=>$entry[1],'company_key'=>$entry[0]); } } if ($pairs) { $r['company_duplicates']++; foreach (array_slice($pairs,0,5) as $pair) { if (count($r['company_duplicate_candidates'])<1000) { $r['company_duplicate_candidates'][]=$pair; } } }
             $seen[$key]=true; if ($phone!==null) { $d['phone_number']=$phone; } else { unset($d['phone_number']); } if ($email!==null) { $d['email']=$email; } $d['country']=self::country($d['country']??null,$email,$d['website']??null); if (!array_key_exists('lead_status',$d)) { $d['lead_status']='new'; } if ($email!==null) { $d['email_lower']=$email; $d['email_source']='csv'; } if ($custom) { $d['custom_fields']=self::json((object)$custom); }
             $contact=$this->records->create('contacts',$d); $r['imported']++; $r['imported_ids'][]=$contact['id']; self::note($r,$contact); $applied=array(); foreach (array_merge($global,$rowTags) as $name) { $k=Compat::lower($name); if (isset($applied[$k])) { continue; } $applied[$k]=true; $this->records->create('contact_tags',array('contact_id'=>$contact['id'],'tag_id'=>$this->tag($name,$cache))); }
-            foreach ($companyKeys as $entry) { $companies[$entry[0]][]=$contact['id']; } if ($list!==null) { $this->records->create('contact_list_members',array('list_id'=>$listId,'contact_id'=>$contact['id'])); $added++; } $reader->next();
+            foreach ($companyKeys as $entry) { $companies[$entry[0]][]=$contact['id']; } if ($list!==null) { $this->records->create('contact_list_members',array('list_id'=>$listId,'contact_id'=>$contact['id'])); $added++; } $advance();
         }
         if ($list!==null && $added) { $this->db->update('contact_lists',array('contact_count'=>($list['contact_count']??0)+$added,'updated_at'=>$this->records->now()),array('id'=>$listId)); }
+        if ($progress!==null) { $progress($r['total_rows'],$r); }
         return $r;
     }
 }

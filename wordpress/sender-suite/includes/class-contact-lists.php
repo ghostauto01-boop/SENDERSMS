@@ -34,6 +34,12 @@ final class ContactLists {
             return array('id'=>$r['id'],'name'=>$r['name'],'description'=>$r['description'],'contact_count'=>$r['contact_count']);
         });
     }
+    /** Source queued-import naming: check the full normalized name, then truncate. */
+    public function importDestination($name) {
+        $name=$this->freeName($name);
+        $name=implode('',array_map(array(Compat::class,'chr'),array_slice(Compat::points($name),0,255)));
+        return $this->records->create('contact_lists',array('name'=>$name));
+    }
     public function update($id,$name=null,$description=null) {
         return $this->db->transaction(function()use($id,$name,$description){
             $r=$this->find($id); $data=array();

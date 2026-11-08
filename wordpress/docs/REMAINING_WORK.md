@@ -1,6 +1,6 @@
 # Remaining WordPress recreation work
 
-448 missing source handlers,60 partial health/auth/contact/list/variable/template/reply/classification/notification/import handlers,0 fully certified contracts. The administrator CSV diagnostic is not the original source import API.
+445 missing source handlers,63 partial health/auth/contact/list/variable/template/reply/classification/notification/import handlers,0 fully certified contracts. The administrator CSV diagnostic is not the original source import API.
 
 Every row is outstanding, including all partial handlers until native HTTP certification. See README.md for actual implemented utilities and fresh test boundaries.
 
@@ -137,8 +137,8 @@ Every row is outstanding, including all partial handlers until native HTTP certi
 | GET | /api/v1/contacts/enrich/status | backend/app/api/v1/contacts.py:1496 | missing original application handler |
 | GET | /api/v1/contacts/export | backend/app/api/v1/contacts.py:349 | missing original application handler |
 | GET | /api/v1/contacts/export/csv | backend/app/api/v1/contacts.py:1663 | missing original application handler |
-| GET | /api/v1/contacts/import/jobs/{job_id} | backend/app/api/v1/contacts.py:1334 | missing original application handler |
-| GET | /api/v1/contacts/import/jobs/{job_id}/errors.csv | backend/app/api/v1/contacts.py:1367 | missing original application handler |
+| GET | /api/v1/contacts/import/jobs/{job_id} | backend/app/api/v1/contacts.py:1334 | partial handler; native WordPress/HTTP unverified |
+| GET | /api/v1/contacts/import/jobs/{job_id}/errors.csv | backend/app/api/v1/contacts.py:1367 | partial handler; native WordPress/HTTP unverified |
 | GET | /api/v1/contacts/tags/ | backend/app/api/v1/contacts.py:546 | partial handler; native WordPress/HTTP unverified |
 | GET | /api/v1/contacts/{contact_id} | backend/app/api/v1/contacts.py:588 | partial handler; native WordPress/HTTP unverified |
 | GET | /api/v1/contacts/{contact_id}/activity | backend/app/api/v1/contacts.py:1803 | missing original application handler |
@@ -360,7 +360,7 @@ Every row is outstanding, including all partial handlers until native HTTP certi
 | POST | /api/v1/contacts/clean | backend/app/api/v1/contacts.py:477 | missing original application handler |
 | POST | /api/v1/contacts/enrich | backend/app/api/v1/contacts.py:1558 | missing original application handler |
 | POST | /api/v1/contacts/import/csv | backend/app/api/v1/contacts.py:1393 | partial handler; native WordPress/HTTP unverified |
-| POST | /api/v1/contacts/import/jobs | backend/app/api/v1/contacts.py:1241 | missing original application handler |
+| POST | /api/v1/contacts/import/jobs | backend/app/api/v1/contacts.py:1241 | partial handler; native WordPress/HTTP unverified |
 | POST | /api/v1/contacts/import/preview | backend/app/api/v1/contacts.py:1227 | partial handler; native WordPress/HTTP unverified |
 | POST | /api/v1/contacts/import/url | backend/app/api/v1/contacts.py:1274 | missing original application handler |
 | POST | /api/v1/contacts/quarantine/generated | backend/app/api/v1/contacts.py:569 | missing original application handler |
