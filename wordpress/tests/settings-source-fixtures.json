@@ -1,0 +1,1952 @@
+{
+  "operations": [
+    {
+      "kind": "appearance",
+      "expected": {
+        "status": 200,
+        "body": {
+          "mode": "system",
+          "palette": "emerald",
+          "density": "comfortable",
+          "radius": "rounded",
+          "font": "default"
+        }
+      },
+      "snapshot": {
+        "settings": [],
+        "providers": []
+      }
+    },
+    {
+      "kind": "appearance_put",
+      "body": {
+        "mode": "dark",
+        "palette": "sapphire",
+        "font": "mono"
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "mode": "dark",
+          "palette": "sapphire",
+          "density": "comfortable",
+          "radius": "rounded",
+          "font": "mono",
+          "appearance": {
+            "mode": "dark",
+            "palette": "sapphire",
+            "density": "comfortable",
+            "radius": "rounded",
+            "font": "mono"
+          }
+        }
+      },
+      "snapshot": {
+        "settings": [
+          {
+            "key": "appearance.preferences",
+            "value": {
+              "mode": "dark",
+              "palette": "sapphire",
+              "density": "comfortable",
+              "radius": "rounded",
+              "font": "mono"
+            },
+            "category": "appearance",
+            "description": "Workspace theme, color palette, density, radius, and typography"
+          }
+        ],
+        "providers": []
+      }
+    },
+    {
+      "kind": "appearance",
+      "expected": {
+        "status": 200,
+        "body": {
+          "mode": "dark",
+          "palette": "sapphire",
+          "density": "comfortable",
+          "radius": "rounded",
+          "font": "mono"
+        }
+      },
+      "snapshot": {
+        "settings": [
+          {
+            "key": "appearance.preferences",
+            "value": {
+              "mode": "dark",
+              "palette": "sapphire",
+              "density": "comfortable",
+              "radius": "rounded",
+              "font": "mono"
+            },
+            "category": "appearance",
+            "description": "Workspace theme, color palette, density, radius, and typography"
+          }
+        ],
+        "providers": []
+      }
+    },
+    {
+      "kind": "appearance_put",
+      "body": {
+        "density": "compact",
+        "radius": "sharp"
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "mode": "dark",
+          "palette": "sapphire",
+          "density": "compact",
+          "radius": "sharp",
+          "font": "mono",
+          "appearance": {
+            "mode": "dark",
+            "palette": "sapphire",
+            "density": "compact",
+            "radius": "sharp",
+            "font": "mono"
+          }
+        }
+      },
+      "snapshot": {
+        "settings": [
+          {
+            "key": "appearance.preferences",
+            "value": {
+              "mode": "dark",
+              "palette": "sapphire",
+              "density": "compact",
+              "radius": "sharp",
+              "font": "mono"
+            },
+            "category": "appearance",
+            "description": "Workspace theme, color palette, density, radius, and typography"
+          }
+        ],
+        "providers": []
+      }
+    },
+    {
+      "kind": "appearance_put",
+      "body": {
+        "mode": null,
+        "unknown": "ignored"
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "mode": "dark",
+          "palette": "sapphire",
+          "density": "compact",
+          "radius": "sharp",
+          "font": "mono",
+          "appearance": {
+            "mode": "dark",
+            "palette": "sapphire",
+            "density": "compact",
+            "radius": "sharp",
+            "font": "mono"
+          }
+        }
+      },
+      "snapshot": {
+        "settings": [
+          {
+            "key": "appearance.preferences",
+            "value": {
+              "mode": "dark",
+              "palette": "sapphire",
+              "density": "compact",
+              "radius": "sharp",
+              "font": "mono"
+            },
+            "category": "appearance",
+            "description": "Workspace theme, color palette, density, radius, and typography"
+          }
+        ],
+        "providers": []
+      }
+    },
+    {
+      "kind": "appearance_put",
+      "body": {
+        "palette": "unsupported"
+      },
+      "expected": {
+        "status": 400,
+        "message": "Unsupported palette 'unsupported'"
+      },
+      "snapshot": {
+        "settings": [
+          {
+            "key": "appearance.preferences",
+            "value": {
+              "mode": "dark",
+              "palette": "sapphire",
+              "density": "compact",
+              "radius": "sharp",
+              "font": "mono"
+            },
+            "category": "appearance",
+            "description": "Workspace theme, color palette, density, radius, and typography"
+          }
+        ],
+        "providers": []
+      }
+    },
+    {
+      "kind": "appearance_put",
+      "body": {
+        "mode": "DARK"
+      },
+      "expected": {
+        "status": 400,
+        "message": "Unsupported mode 'DARK'"
+      },
+      "snapshot": {
+        "settings": [
+          {
+            "key": "appearance.preferences",
+            "value": {
+              "mode": "dark",
+              "palette": "sapphire",
+              "density": "compact",
+              "radius": "sharp",
+              "font": "mono"
+            },
+            "category": "appearance",
+            "description": "Workspace theme, color palette, density, radius, and typography"
+          }
+        ],
+        "providers": []
+      }
+    },
+    {
+      "kind": "appearance_put",
+      "body": {
+        "font": "Comic Sans"
+      },
+      "expected": {
+        "status": 400,
+        "message": "Unsupported font 'Comic Sans'"
+      },
+      "snapshot": {
+        "settings": [
+          {
+            "key": "appearance.preferences",
+            "value": {
+              "mode": "dark",
+              "palette": "sapphire",
+              "density": "compact",
+              "radius": "sharp",
+              "font": "mono"
+            },
+            "category": "appearance",
+            "description": "Workspace theme, color palette, density, radius, and typography"
+          }
+        ],
+        "providers": []
+      }
+    },
+    {
+      "kind": "appearance_put",
+      "body": {
+        "density": "small"
+      },
+      "expected": {
+        "status": 400,
+        "message": "Unsupported density 'small'"
+      },
+      "snapshot": {
+        "settings": [
+          {
+            "key": "appearance.preferences",
+            "value": {
+              "mode": "dark",
+              "palette": "sapphire",
+              "density": "compact",
+              "radius": "sharp",
+              "font": "mono"
+            },
+            "category": "appearance",
+            "description": "Workspace theme, color palette, density, radius, and typography"
+          }
+        ],
+        "providers": []
+      }
+    },
+    {
+      "kind": "appearance_put",
+      "body": {
+        "radius": "circle"
+      },
+      "expected": {
+        "status": 400,
+        "message": "Unsupported radius 'circle'"
+      },
+      "snapshot": {
+        "settings": [
+          {
+            "key": "appearance.preferences",
+            "value": {
+              "mode": "dark",
+              "palette": "sapphire",
+              "density": "compact",
+              "radius": "sharp",
+              "font": "mono"
+            },
+            "category": "appearance",
+            "description": "Workspace theme, color palette, density, radius, and typography"
+          }
+        ],
+        "providers": []
+      }
+    },
+    {
+      "kind": "compliance",
+      "expected": {
+        "status": 200,
+        "body": {}
+      },
+      "snapshot": {
+        "settings": [
+          {
+            "key": "appearance.preferences",
+            "value": {
+              "mode": "dark",
+              "palette": "sapphire",
+              "density": "compact",
+              "radius": "sharp",
+              "font": "mono"
+            },
+            "category": "appearance",
+            "description": "Workspace theme, color palette, density, radius, and typography"
+          }
+        ],
+        "providers": []
+      }
+    },
+    {
+      "kind": "compliance_put",
+      "query": {
+        "ec": true,
+        "es": false
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "success": true
+        }
+      },
+      "snapshot": {
+        "settings": [
+          {
+            "key": "appearance.preferences",
+            "value": {
+              "mode": "dark",
+              "palette": "sapphire",
+              "density": "compact",
+              "radius": "sharp",
+              "font": "mono"
+            },
+            "category": "appearance",
+            "description": "Workspace theme, color palette, density, radius, and typography"
+          },
+          {
+            "key": "enable_consent_requirement",
+            "value": "true",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_suppression_list",
+            "value": "false",
+            "category": "compliance",
+            "description": null
+          }
+        ],
+        "providers": []
+      }
+    },
+    {
+      "kind": "compliance",
+      "expected": {
+        "status": 200,
+        "body": {
+          "enable_consent_requirement": "true",
+          "enable_suppression_list": "false"
+        }
+      },
+      "snapshot": {
+        "settings": [
+          {
+            "key": "appearance.preferences",
+            "value": {
+              "mode": "dark",
+              "palette": "sapphire",
+              "density": "compact",
+              "radius": "sharp",
+              "font": "mono"
+            },
+            "category": "appearance",
+            "description": "Workspace theme, color palette, density, radius, and typography"
+          },
+          {
+            "key": "enable_consent_requirement",
+            "value": "true",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_suppression_list",
+            "value": "false",
+            "category": "compliance",
+            "description": null
+          }
+        ],
+        "providers": []
+      }
+    },
+    {
+      "kind": "compliance_put",
+      "query": {
+        "ea": false,
+        "ek": true
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "success": true
+        }
+      },
+      "snapshot": {
+        "settings": [
+          {
+            "key": "appearance.preferences",
+            "value": {
+              "mode": "dark",
+              "palette": "sapphire",
+              "density": "compact",
+              "radius": "sharp",
+              "font": "mono"
+            },
+            "category": "appearance",
+            "description": "Workspace theme, color palette, density, radius, and typography"
+          },
+          {
+            "key": "enable_consent_requirement",
+            "value": "true",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_suppression_list",
+            "value": "false",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_auto_opt_out",
+            "value": "false",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_campaign_suppression",
+            "value": "true",
+            "category": "compliance",
+            "description": null
+          }
+        ],
+        "providers": []
+      }
+    },
+    {
+      "kind": "compliance_put",
+      "query": {},
+      "expected": {
+        "status": 200,
+        "body": {
+          "success": true
+        }
+      },
+      "snapshot": {
+        "settings": [
+          {
+            "key": "appearance.preferences",
+            "value": {
+              "mode": "dark",
+              "palette": "sapphire",
+              "density": "compact",
+              "radius": "sharp",
+              "font": "mono"
+            },
+            "category": "appearance",
+            "description": "Workspace theme, color palette, density, radius, and typography"
+          },
+          {
+            "key": "enable_consent_requirement",
+            "value": "true",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_suppression_list",
+            "value": "false",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_auto_opt_out",
+            "value": "false",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_campaign_suppression",
+            "value": "true",
+            "category": "compliance",
+            "description": null
+          }
+        ],
+        "providers": []
+      }
+    },
+    {
+      "kind": "compliance",
+      "expected": {
+        "status": 200,
+        "body": {
+          "enable_consent_requirement": "true",
+          "enable_suppression_list": "false",
+          "enable_auto_opt_out": "false",
+          "enable_campaign_suppression": "true"
+        }
+      },
+      "snapshot": {
+        "settings": [
+          {
+            "key": "appearance.preferences",
+            "value": {
+              "mode": "dark",
+              "palette": "sapphire",
+              "density": "compact",
+              "radius": "sharp",
+              "font": "mono"
+            },
+            "category": "appearance",
+            "description": "Workspace theme, color palette, density, radius, and typography"
+          },
+          {
+            "key": "enable_consent_requirement",
+            "value": "true",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_suppression_list",
+            "value": "false",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_auto_opt_out",
+            "value": "false",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_campaign_suppression",
+            "value": "true",
+            "category": "compliance",
+            "description": null
+          }
+        ],
+        "providers": []
+      }
+    },
+    {
+      "kind": "muted",
+      "expected": {
+        "status": 200,
+        "body": {
+          "senders": [
+            "MTN",
+            "AIRTEL"
+          ],
+          "defaults": [
+            "MTN",
+            "AIRTEL"
+          ]
+        }
+      },
+      "snapshot": {
+        "settings": [
+          {
+            "key": "appearance.preferences",
+            "value": {
+              "mode": "dark",
+              "palette": "sapphire",
+              "density": "compact",
+              "radius": "sharp",
+              "font": "mono"
+            },
+            "category": "appearance",
+            "description": "Workspace theme, color palette, density, radius, and typography"
+          },
+          {
+            "key": "enable_consent_requirement",
+            "value": "true",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_suppression_list",
+            "value": "false",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_auto_opt_out",
+            "value": "false",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_campaign_suppression",
+            "value": "true",
+            "category": "compliance",
+            "description": null
+          }
+        ],
+        "providers": []
+      }
+    },
+    {
+      "kind": "muted_put",
+      "senders": " mtn, AIRTEL,mtn, , 0 ",
+      "expected": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "senders": [
+            "MTN",
+            "AIRTEL",
+            "0"
+          ]
+        }
+      },
+      "snapshot": {
+        "settings": [
+          {
+            "key": "appearance.preferences",
+            "value": {
+              "mode": "dark",
+              "palette": "sapphire",
+              "density": "compact",
+              "radius": "sharp",
+              "font": "mono"
+            },
+            "category": "appearance",
+            "description": "Workspace theme, color palette, density, radius, and typography"
+          },
+          {
+            "key": "enable_consent_requirement",
+            "value": "true",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_suppression_list",
+            "value": "false",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_auto_opt_out",
+            "value": "false",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_campaign_suppression",
+            "value": "true",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "notifications.muted_senders",
+            "value": "MTN,AIRTEL,0",
+            "category": "notifications",
+            "description": "Sender IDs that never trigger Pushover alerts (comma-separated)"
+          }
+        ],
+        "providers": []
+      }
+    },
+    {
+      "kind": "muted",
+      "expected": {
+        "status": 200,
+        "body": {
+          "senders": [
+            "MTN",
+            "AIRTEL",
+            "0"
+          ],
+          "defaults": [
+            "MTN",
+            "AIRTEL"
+          ]
+        }
+      },
+      "snapshot": {
+        "settings": [
+          {
+            "key": "appearance.preferences",
+            "value": {
+              "mode": "dark",
+              "palette": "sapphire",
+              "density": "compact",
+              "radius": "sharp",
+              "font": "mono"
+            },
+            "category": "appearance",
+            "description": "Workspace theme, color palette, density, radius, and typography"
+          },
+          {
+            "key": "enable_consent_requirement",
+            "value": "true",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_suppression_list",
+            "value": "false",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_auto_opt_out",
+            "value": "false",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_campaign_suppression",
+            "value": "true",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "notifications.muted_senders",
+            "value": "MTN,AIRTEL,0",
+            "category": "notifications",
+            "description": "Sender IDs that never trigger Pushover alerts (comma-separated)"
+          }
+        ],
+        "providers": []
+      }
+    },
+    {
+      "kind": "muted_put",
+      "senders": "straße, STRASSE, café, Café, ı, i, ﬁ",
+      "expected": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "senders": [
+            "STRASSE",
+            "CAFÉ",
+            "I",
+            "FI"
+          ]
+        }
+      },
+      "snapshot": {
+        "settings": [
+          {
+            "key": "appearance.preferences",
+            "value": {
+              "mode": "dark",
+              "palette": "sapphire",
+              "density": "compact",
+              "radius": "sharp",
+              "font": "mono"
+            },
+            "category": "appearance",
+            "description": "Workspace theme, color palette, density, radius, and typography"
+          },
+          {
+            "key": "enable_consent_requirement",
+            "value": "true",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_suppression_list",
+            "value": "false",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_auto_opt_out",
+            "value": "false",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_campaign_suppression",
+            "value": "true",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "notifications.muted_senders",
+            "value": "STRASSE,CAFÉ,I,FI",
+            "category": "notifications",
+            "description": "Sender IDs that never trigger Pushover alerts (comma-separated)"
+          }
+        ],
+        "providers": []
+      }
+    },
+    {
+      "kind": "muted",
+      "expected": {
+        "status": 200,
+        "body": {
+          "senders": [
+            "STRASSE",
+            "CAFÉ",
+            "I",
+            "FI"
+          ],
+          "defaults": [
+            "MTN",
+            "AIRTEL"
+          ]
+        }
+      },
+      "snapshot": {
+        "settings": [
+          {
+            "key": "appearance.preferences",
+            "value": {
+              "mode": "dark",
+              "palette": "sapphire",
+              "density": "compact",
+              "radius": "sharp",
+              "font": "mono"
+            },
+            "category": "appearance",
+            "description": "Workspace theme, color palette, density, radius, and typography"
+          },
+          {
+            "key": "enable_consent_requirement",
+            "value": "true",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_suppression_list",
+            "value": "false",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_auto_opt_out",
+            "value": "false",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_campaign_suppression",
+            "value": "true",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "notifications.muted_senders",
+            "value": "STRASSE,CAFÉ,I,FI",
+            "category": "notifications",
+            "description": "Sender IDs that never trigger Pushover alerts (comma-separated)"
+          }
+        ],
+        "providers": []
+      }
+    },
+    {
+      "kind": "muted_put",
+      "senders": "",
+      "expected": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "senders": []
+        }
+      },
+      "snapshot": {
+        "settings": [
+          {
+            "key": "appearance.preferences",
+            "value": {
+              "mode": "dark",
+              "palette": "sapphire",
+              "density": "compact",
+              "radius": "sharp",
+              "font": "mono"
+            },
+            "category": "appearance",
+            "description": "Workspace theme, color palette, density, radius, and typography"
+          },
+          {
+            "key": "enable_consent_requirement",
+            "value": "true",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_suppression_list",
+            "value": "false",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_auto_opt_out",
+            "value": "false",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_campaign_suppression",
+            "value": "true",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "notifications.muted_senders",
+            "value": "",
+            "category": "notifications",
+            "description": "Sender IDs that never trigger Pushover alerts (comma-separated)"
+          }
+        ],
+        "providers": []
+      }
+    },
+    {
+      "kind": "muted",
+      "expected": {
+        "status": 200,
+        "body": {
+          "senders": [],
+          "defaults": [
+            "MTN",
+            "AIRTEL"
+          ]
+        }
+      },
+      "snapshot": {
+        "settings": [
+          {
+            "key": "appearance.preferences",
+            "value": {
+              "mode": "dark",
+              "palette": "sapphire",
+              "density": "compact",
+              "radius": "sharp",
+              "font": "mono"
+            },
+            "category": "appearance",
+            "description": "Workspace theme, color palette, density, radius, and typography"
+          },
+          {
+            "key": "enable_consent_requirement",
+            "value": "true",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_suppression_list",
+            "value": "false",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_auto_opt_out",
+            "value": "false",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_campaign_suppression",
+            "value": "true",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "notifications.muted_senders",
+            "value": "",
+            "category": "notifications",
+            "description": "Sender IDs that never trigger Pushover alerts (comma-separated)"
+          }
+        ],
+        "providers": []
+      }
+    },
+    {
+      "kind": "muted_put",
+      "senders": "  Αθηνα, αθηνα, σ,ς,Σ,İ, i ",
+      "expected": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "senders": [
+            "ΑΘΗΝΑ",
+            "Σ",
+            "İ",
+            "I"
+          ]
+        }
+      },
+      "snapshot": {
+        "settings": [
+          {
+            "key": "appearance.preferences",
+            "value": {
+              "mode": "dark",
+              "palette": "sapphire",
+              "density": "compact",
+              "radius": "sharp",
+              "font": "mono"
+            },
+            "category": "appearance",
+            "description": "Workspace theme, color palette, density, radius, and typography"
+          },
+          {
+            "key": "enable_consent_requirement",
+            "value": "true",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_suppression_list",
+            "value": "false",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_auto_opt_out",
+            "value": "false",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_campaign_suppression",
+            "value": "true",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "notifications.muted_senders",
+            "value": "ΑΘΗΝΑ,Σ,İ,I",
+            "category": "notifications",
+            "description": "Sender IDs that never trigger Pushover alerts (comma-separated)"
+          }
+        ],
+        "providers": []
+      }
+    },
+    {
+      "kind": "muted",
+      "expected": {
+        "status": 200,
+        "body": {
+          "senders": [
+            "ΑΘΗΝΑ",
+            "Σ",
+            "İ",
+            "I"
+          ],
+          "defaults": [
+            "MTN",
+            "AIRTEL"
+          ]
+        }
+      },
+      "snapshot": {
+        "settings": [
+          {
+            "key": "appearance.preferences",
+            "value": {
+              "mode": "dark",
+              "palette": "sapphire",
+              "density": "compact",
+              "radius": "sharp",
+              "font": "mono"
+            },
+            "category": "appearance",
+            "description": "Workspace theme, color palette, density, radius, and typography"
+          },
+          {
+            "key": "enable_consent_requirement",
+            "value": "true",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_suppression_list",
+            "value": "false",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_auto_opt_out",
+            "value": "false",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_campaign_suppression",
+            "value": "true",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "notifications.muted_senders",
+            "value": "ΑΘΗΝΑ,Σ,İ,I",
+            "category": "notifications",
+            "description": "Sender IDs that never trigger Pushover alerts (comma-separated)"
+          }
+        ],
+        "providers": []
+      }
+    },
+    {
+      "kind": "muted_put",
+      "senders": "MTN,　AIRTEL,MTN",
+      "expected": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "senders": [
+            "MTN",
+            "AIRTEL"
+          ]
+        }
+      },
+      "snapshot": {
+        "settings": [
+          {
+            "key": "appearance.preferences",
+            "value": {
+              "mode": "dark",
+              "palette": "sapphire",
+              "density": "compact",
+              "radius": "sharp",
+              "font": "mono"
+            },
+            "category": "appearance",
+            "description": "Workspace theme, color palette, density, radius, and typography"
+          },
+          {
+            "key": "enable_consent_requirement",
+            "value": "true",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_suppression_list",
+            "value": "false",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_auto_opt_out",
+            "value": "false",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_campaign_suppression",
+            "value": "true",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "notifications.muted_senders",
+            "value": "MTN,AIRTEL",
+            "category": "notifications",
+            "description": "Sender IDs that never trigger Pushover alerts (comma-separated)"
+          }
+        ],
+        "providers": []
+      }
+    },
+    {
+      "kind": "muted",
+      "expected": {
+        "status": 200,
+        "body": {
+          "senders": [
+            "MTN",
+            "AIRTEL"
+          ],
+          "defaults": [
+            "MTN",
+            "AIRTEL"
+          ]
+        }
+      },
+      "snapshot": {
+        "settings": [
+          {
+            "key": "appearance.preferences",
+            "value": {
+              "mode": "dark",
+              "palette": "sapphire",
+              "density": "compact",
+              "radius": "sharp",
+              "font": "mono"
+            },
+            "category": "appearance",
+            "description": "Workspace theme, color palette, density, radius, and typography"
+          },
+          {
+            "key": "enable_consent_requirement",
+            "value": "true",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_suppression_list",
+            "value": "false",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_auto_opt_out",
+            "value": "false",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_campaign_suppression",
+            "value": "true",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "notifications.muted_senders",
+            "value": "MTN,AIRTEL",
+            "category": "notifications",
+            "description": "Sender IDs that never trigger Pushover alerts (comma-separated)"
+          }
+        ],
+        "providers": []
+      }
+    },
+    {
+      "kind": "notifications",
+      "expected": {
+        "status": 200,
+        "body": {
+          "providers": []
+        }
+      },
+      "snapshot": {
+        "settings": [
+          {
+            "key": "appearance.preferences",
+            "value": {
+              "mode": "dark",
+              "palette": "sapphire",
+              "density": "compact",
+              "radius": "sharp",
+              "font": "mono"
+            },
+            "category": "appearance",
+            "description": "Workspace theme, color palette, density, radius, and typography"
+          },
+          {
+            "key": "enable_consent_requirement",
+            "value": "true",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_suppression_list",
+            "value": "false",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_auto_opt_out",
+            "value": "false",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_campaign_suppression",
+            "value": "true",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "notifications.muted_senders",
+            "value": "MTN,AIRTEL",
+            "category": "notifications",
+            "description": "Sender IDs that never trigger Pushover alerts (comma-separated)"
+          }
+        ],
+        "providers": []
+      }
+    },
+    {
+      "kind": "notification_put",
+      "provider": "invalid",
+      "query": {},
+      "expected": {
+        "status": 400,
+        "message": "Invalid"
+      },
+      "snapshot": {
+        "settings": [
+          {
+            "key": "appearance.preferences",
+            "value": {
+              "mode": "dark",
+              "palette": "sapphire",
+              "density": "compact",
+              "radius": "sharp",
+              "font": "mono"
+            },
+            "category": "appearance",
+            "description": "Workspace theme, color palette, density, radius, and typography"
+          },
+          {
+            "key": "enable_consent_requirement",
+            "value": "true",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_suppression_list",
+            "value": "false",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_auto_opt_out",
+            "value": "false",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_campaign_suppression",
+            "value": "true",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "notifications.muted_senders",
+            "value": "MTN,AIRTEL",
+            "category": "notifications",
+            "description": "Sender IDs that never trigger Pushover alerts (comma-separated)"
+          }
+        ],
+        "providers": []
+      }
+    },
+    {
+      "kind": "notification_put",
+      "provider": "pushover",
+      "query": {
+        "user_key": "synthetic-user",
+        "app_token": "synthetic-token",
+        "is_enabled": true
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "success": true
+        }
+      },
+      "snapshot": {
+        "settings": [
+          {
+            "key": "appearance.preferences",
+            "value": {
+              "mode": "dark",
+              "palette": "sapphire",
+              "density": "compact",
+              "radius": "sharp",
+              "font": "mono"
+            },
+            "category": "appearance",
+            "description": "Workspace theme, color palette, density, radius, and typography"
+          },
+          {
+            "key": "enable_consent_requirement",
+            "value": "true",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_suppression_list",
+            "value": "false",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_auto_opt_out",
+            "value": "false",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_campaign_suppression",
+            "value": "true",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "notifications.muted_senders",
+            "value": "MTN,AIRTEL",
+            "category": "notifications",
+            "description": "Sender IDs that never trigger Pushover alerts (comma-separated)"
+          }
+        ],
+        "providers": [
+          {
+            "provider": "pushover",
+            "is_enabled": true,
+            "credentials": {
+              "user_key": "synthetic-user",
+              "app_token": "synthetic-token"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "kind": "notifications",
+      "expected": {
+        "status": 200,
+        "body": {
+          "providers": [
+            {
+              "id": 1,
+              "provider": "pushover",
+              "is_enabled": true,
+              "notify_new_reply": true,
+              "notify_campaign_completed": false,
+              "notify_campaign_failed": true,
+              "notify_gateway_offline": true,
+              "notify_followup_due": true,
+              "notify_system_error": true
+            }
+          ]
+        }
+      },
+      "snapshot": {
+        "settings": [
+          {
+            "key": "appearance.preferences",
+            "value": {
+              "mode": "dark",
+              "palette": "sapphire",
+              "density": "compact",
+              "radius": "sharp",
+              "font": "mono"
+            },
+            "category": "appearance",
+            "description": "Workspace theme, color palette, density, radius, and typography"
+          },
+          {
+            "key": "enable_consent_requirement",
+            "value": "true",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_suppression_list",
+            "value": "false",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_auto_opt_out",
+            "value": "false",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_campaign_suppression",
+            "value": "true",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "notifications.muted_senders",
+            "value": "MTN,AIRTEL",
+            "category": "notifications",
+            "description": "Sender IDs that never trigger Pushover alerts (comma-separated)"
+          }
+        ],
+        "providers": [
+          {
+            "provider": "pushover",
+            "is_enabled": true,
+            "credentials": {
+              "user_key": "synthetic-user",
+              "app_token": "synthetic-token"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "kind": "notification_put",
+      "provider": "pushover",
+      "query": {
+        "user_key": "replacement"
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "success": true
+        }
+      },
+      "snapshot": {
+        "settings": [
+          {
+            "key": "appearance.preferences",
+            "value": {
+              "mode": "dark",
+              "palette": "sapphire",
+              "density": "compact",
+              "radius": "sharp",
+              "font": "mono"
+            },
+            "category": "appearance",
+            "description": "Workspace theme, color palette, density, radius, and typography"
+          },
+          {
+            "key": "enable_consent_requirement",
+            "value": "true",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_suppression_list",
+            "value": "false",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_auto_opt_out",
+            "value": "false",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_campaign_suppression",
+            "value": "true",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "notifications.muted_senders",
+            "value": "MTN,AIRTEL",
+            "category": "notifications",
+            "description": "Sender IDs that never trigger Pushover alerts (comma-separated)"
+          }
+        ],
+        "providers": [
+          {
+            "provider": "pushover",
+            "is_enabled": true,
+            "credentials": {
+              "user_key": "replacement",
+              "app_token": "synthetic-token"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "kind": "notifications",
+      "expected": {
+        "status": 200,
+        "body": {
+          "providers": [
+            {
+              "id": 1,
+              "provider": "pushover",
+              "is_enabled": true,
+              "notify_new_reply": true,
+              "notify_campaign_completed": false,
+              "notify_campaign_failed": true,
+              "notify_gateway_offline": true,
+              "notify_followup_due": true,
+              "notify_system_error": true
+            }
+          ]
+        }
+      },
+      "snapshot": {
+        "settings": [
+          {
+            "key": "appearance.preferences",
+            "value": {
+              "mode": "dark",
+              "palette": "sapphire",
+              "density": "compact",
+              "radius": "sharp",
+              "font": "mono"
+            },
+            "category": "appearance",
+            "description": "Workspace theme, color palette, density, radius, and typography"
+          },
+          {
+            "key": "enable_consent_requirement",
+            "value": "true",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_suppression_list",
+            "value": "false",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_auto_opt_out",
+            "value": "false",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_campaign_suppression",
+            "value": "true",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "notifications.muted_senders",
+            "value": "MTN,AIRTEL",
+            "category": "notifications",
+            "description": "Sender IDs that never trigger Pushover alerts (comma-separated)"
+          }
+        ],
+        "providers": [
+          {
+            "provider": "pushover",
+            "is_enabled": true,
+            "credentials": {
+              "user_key": "replacement",
+              "app_token": "synthetic-token"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "kind": "notification_put",
+      "provider": "pushover",
+      "query": {
+        "app_token": ""
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "success": true
+        }
+      },
+      "snapshot": {
+        "settings": [
+          {
+            "key": "appearance.preferences",
+            "value": {
+              "mode": "dark",
+              "palette": "sapphire",
+              "density": "compact",
+              "radius": "sharp",
+              "font": "mono"
+            },
+            "category": "appearance",
+            "description": "Workspace theme, color palette, density, radius, and typography"
+          },
+          {
+            "key": "enable_consent_requirement",
+            "value": "true",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_suppression_list",
+            "value": "false",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_auto_opt_out",
+            "value": "false",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_campaign_suppression",
+            "value": "true",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "notifications.muted_senders",
+            "value": "MTN,AIRTEL",
+            "category": "notifications",
+            "description": "Sender IDs that never trigger Pushover alerts (comma-separated)"
+          }
+        ],
+        "providers": [
+          {
+            "provider": "pushover",
+            "is_enabled": true,
+            "credentials": {
+              "user_key": "replacement",
+              "app_token": ""
+            }
+          }
+        ]
+      }
+    },
+    {
+      "kind": "notification_put",
+      "provider": "pushover",
+      "query": {
+        "is_enabled": false
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "success": true
+        }
+      },
+      "snapshot": {
+        "settings": [
+          {
+            "key": "appearance.preferences",
+            "value": {
+              "mode": "dark",
+              "palette": "sapphire",
+              "density": "compact",
+              "radius": "sharp",
+              "font": "mono"
+            },
+            "category": "appearance",
+            "description": "Workspace theme, color palette, density, radius, and typography"
+          },
+          {
+            "key": "enable_consent_requirement",
+            "value": "true",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_suppression_list",
+            "value": "false",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_auto_opt_out",
+            "value": "false",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_campaign_suppression",
+            "value": "true",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "notifications.muted_senders",
+            "value": "MTN,AIRTEL",
+            "category": "notifications",
+            "description": "Sender IDs that never trigger Pushover alerts (comma-separated)"
+          }
+        ],
+        "providers": [
+          {
+            "provider": "pushover",
+            "is_enabled": false,
+            "credentials": {
+              "user_key": "replacement",
+              "app_token": ""
+            }
+          }
+        ]
+      }
+    },
+    {
+      "kind": "notifications",
+      "expected": {
+        "status": 200,
+        "body": {
+          "providers": [
+            {
+              "id": 1,
+              "provider": "pushover",
+              "is_enabled": false,
+              "notify_new_reply": true,
+              "notify_campaign_completed": false,
+              "notify_campaign_failed": true,
+              "notify_gateway_offline": true,
+              "notify_followup_due": true,
+              "notify_system_error": true
+            }
+          ]
+        }
+      },
+      "snapshot": {
+        "settings": [
+          {
+            "key": "appearance.preferences",
+            "value": {
+              "mode": "dark",
+              "palette": "sapphire",
+              "density": "compact",
+              "radius": "sharp",
+              "font": "mono"
+            },
+            "category": "appearance",
+            "description": "Workspace theme, color palette, density, radius, and typography"
+          },
+          {
+            "key": "enable_consent_requirement",
+            "value": "true",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_suppression_list",
+            "value": "false",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_auto_opt_out",
+            "value": "false",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "enable_campaign_suppression",
+            "value": "true",
+            "category": "compliance",
+            "description": null
+          },
+          {
+            "key": "notifications.muted_senders",
+            "value": "MTN,AIRTEL",
+            "category": "notifications",
+            "description": "Sender IDs that never trigger Pushover alerts (comma-separated)"
+          }
+        ],
+        "providers": [
+          {
+            "provider": "pushover",
+            "is_enabled": false,
+            "credentials": {
+              "user_key": "replacement",
+              "app_token": ""
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "dto": [
+    {
+      "input": null,
+      "ok": false
+    },
+    {
+      "input": [],
+      "ok": false
+    },
+    {
+      "input": {},
+      "ok": true,
+      "expected": {}
+    },
+    {
+      "input": {
+        "mode": null
+      },
+      "ok": true,
+      "expected": {
+        "mode": null
+      }
+    },
+    {
+      "input": {
+        "mode": 1
+      },
+      "ok": false
+    },
+    {
+      "input": {
+        "mode": false
+      },
+      "ok": false
+    },
+    {
+      "input": {
+        "mode": []
+      },
+      "ok": false
+    },
+    {
+      "input": {
+        "palette": "emerald"
+      },
+      "ok": true,
+      "expected": {
+        "palette": "emerald"
+      }
+    },
+    {
+      "input": {
+        "density": {}
+      },
+      "ok": false
+    },
+    {
+      "input": {
+        "font_scale": "large"
+      },
+      "ok": true,
+      "expected": {
+        "font_scale": "large"
+      }
+    },
+    {
+      "input": {
+        "unknown": "ignored"
+      },
+      "ok": true,
+      "expected": {}
+    }
+  ],
+  "scope": "Selected actual original settings/schema/service functions, synthetic SQLite and clock. Synthetic source encryption marker, not Fernet/AES equivalence. Native credential envelopes, admin writes, malformed stored preferences, JSON-not-query secrets, aliases and resource guards are separate intentional safety tests. No real WordPress/MySQL/provider/HTTP/browser/concurrency proof."
+}

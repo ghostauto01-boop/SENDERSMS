@@ -2,9 +2,9 @@
 
 Build: **0.11.0-dev**. WordPress is the native application backend; no original Python service is the proposed runtime. Original repository application files remain unchanged.
 
-**420 missing handlers, 88 partially implemented handlers, zero native-certified contracts, 508 source method/path contracts in total.** A partial handler has actual implementation, but does not mean its complete workflow, UI, dependencies and native behavior are certified. Every endpoint remains in the release backlog until those gates pass. Raw handler counts are not a percent-complete estimate.
+**412 missing handlers, 96 partially implemented handlers, zero native-certified contracts, 508 source method/path contracts in total.** A partial handler has actual implementation, but does not mean its complete workflow, UI, dependencies and native behavior are certified. Every endpoint remains in the release backlog until those gates pass. Raw handler counts are not a percent-complete estimate.
 
-Fresh offline evidence: 38,376 functional PHP-WASM assertions, 74 first-party syntax checks, 165 unchanged original frontend hashes. Offline evidence is **not** real WordPress/MySQL/HTTP/provider/browser certification. This checklist is the full current implementation/release backlog, not a claim that software can be guaranteed to run perfectly on every host.
+Fresh offline evidence: 38,736 functional PHP-WASM assertions, 76 first-party syntax checks, 165 unchanged original frontend hashes. Offline evidence is **not** real WordPress/MySQL/HTTP/provider/browser certification. This checklist is the full current implementation/release backlog, not a claim that software can be guaranteed to run perfectly on every host.
 
 ## Implementation order and acceptance gates
 
@@ -97,7 +97,7 @@ All counts below are derived from `docs/contracts.json`. Missing = no native han
 | overview | 3 | 0 | 0 |
 | send | 7 | 0 | 0 |
 | sequences | 0 | 6 | 0 |
-| settings | 32 | 0 | 0 |
+| settings | 24 | 8 | 0 |
 | system | 2 | 0 | 0 |
 | templates | 0 | 10 | 0 |
 | validator | 8 | 0 | 0 |
@@ -324,16 +324,16 @@ This exhaustive list includes partially implemented routes because none is yet n
 | GET | `/api/v1/sequences/` | Implemented partially; native/full-workflow proof required |
 | GET | `/api/v1/sequences/{sequence_id}` | Implemented partially; native/full-workflow proof required |
 | GET | `/api/v1/settings/access` | Missing implementation |
-| GET | `/api/v1/settings/appearance` | Missing implementation |
+| GET | `/api/v1/settings/appearance` | Implemented partially; native/full-workflow proof required |
 | GET | `/api/v1/settings/callgate` | Missing implementation |
 | GET | `/api/v1/settings/callgate/webhooks` | Missing implementation |
-| GET | `/api/v1/settings/compliance` | Missing implementation |
+| GET | `/api/v1/settings/compliance` | Implemented partially; native/full-workflow proof required |
 | GET | `/api/v1/settings/gateway` | Missing implementation |
 | GET | `/api/v1/settings/gateway/phones` | Missing implementation |
 | GET | `/api/v1/settings/gateway/webhooks` | Missing implementation |
 | GET | `/api/v1/settings/google-oauth` | Missing implementation |
-| GET | `/api/v1/settings/notifications` | Missing implementation |
-| GET | `/api/v1/settings/notifications/muted-senders` | Missing implementation |
+| GET | `/api/v1/settings/notifications` | Implemented partially; native/full-workflow proof required |
+| GET | `/api/v1/settings/notifications/muted-senders` | Implemented partially; native/full-workflow proof required |
 | GET | `/api/v1/system/errors` | Missing implementation |
 | GET | `/api/v1/system/health` | Missing implementation |
 | GET | `/api/v1/templates` | Implemented partially; native/full-workflow proof required |
@@ -607,14 +607,14 @@ This exhaustive list includes partially implemented routes because none is yet n
 | PUT | `/api/v1/lists/{list_id}` | Implemented partially; native/full-workflow proof required |
 | PUT | `/api/v1/sequences/{sequence_id}` | Implemented partially; native/full-workflow proof required |
 | PUT | `/api/v1/settings/access` | Missing implementation |
-| PUT | `/api/v1/settings/appearance` | Missing implementation |
+| PUT | `/api/v1/settings/appearance` | Implemented partially; native/full-workflow proof required |
 | PUT | `/api/v1/settings/callgate` | Missing implementation |
-| PUT | `/api/v1/settings/compliance` | Missing implementation |
+| PUT | `/api/v1/settings/compliance` | Implemented partially; native/full-workflow proof required |
 | PUT | `/api/v1/settings/gateway/phones/{phone_id}` | Missing implementation |
 | PUT | `/api/v1/settings/gateway/routing` | Missing implementation |
 | PUT | `/api/v1/settings/gateway/sim` | Missing implementation |
 | PUT | `/api/v1/settings/google-oauth` | Missing implementation |
-| PUT | `/api/v1/settings/notifications/muted-senders` | Missing implementation |
-| PUT | `/api/v1/settings/notifications/{provider}` | Missing implementation |
+| PUT | `/api/v1/settings/notifications/muted-senders` | Implemented partially; native/full-workflow proof required |
+| PUT | `/api/v1/settings/notifications/{provider}` | Implemented partially; native/full-workflow proof required |
 | PUT | `/api/v1/templates/{template_id}` | Implemented partially; native/full-workflow proof required |
 | PUT | `/api/v1/variables/{variable_id}` | Implemented partially; native/full-workflow proof required |

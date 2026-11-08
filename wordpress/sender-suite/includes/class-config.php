@@ -1,7 +1,7 @@
 <?php
 namespace SenderSuite;
 
-/** Encrypted active auth settings. Source provider settings are metadata only until implemented. */
+/** Encrypted active auth settings. Runtime secrets use separately purpose-bound vault methods; other source environment settings remain metadata. */
 final class Config {
     private $vault;private $read;private $write;private $values;
     private const DEFAULTS=array('APP_NAME'=>'Sendify','APP_ENV'=>'production','ADMIN_USERNAME'=>'admin','ADMIN_PASSWORD'=>null,'LOGIN_PASSWORD'=>null,'SECRET_KEY'=>null,'ACCESS_TOKEN_EXPIRE_MINUTES'=>1440,'RATE_LIMIT_LOGIN'=>'10/minute');
@@ -13,5 +13,8 @@ final class Config {
     public function ready() {return is_string($this->get('SECRET_KEY'))&&strlen($this->get('SECRET_KEY'))>=32&&Compat::strip($this->get('ADMIN_PASSWORD')??'')!=='';}
     public function save(array $updates) { $this->load();$data=array_merge($this->values,$updates);$this->validate($data);$encrypted=array();foreach($data as $name=>$value){$encrypted[$name]=$this->vault->seal('config/'.$name,json_encode($value,JSON_THROW_ON_ERROR));}($this->write)($encrypted);$this->values=$data; }
     public function setup($username,$password) { $username=Compat::strip($username);if($username===''||Compat::length($username)>150||!is_string($password)||Compat::strip($password)===''){throw new \InvalidArgumentException('Enter an operator username and a nonblank password.');}$updates=array('ADMIN_USERNAME'=>$username,'ADMIN_PASSWORD'=>$password);if(!$this->get('SECRET_KEY')){$updates['SECRET_KEY']=bin2hex(random_bytes(32));}$this->save($updates); }
+    /** Internal, row/purpose-bound secret protection. Never exposed as an arbitrary REST encrypt/decrypt API. */
+    public function sealRuntimeSecret($field,$plaintext) { return $this->vault->seal('runtime/'.$field,$plaintext); }
+    public function openRuntimeSecret($field,$envelope) { return $this->vault->open('runtime/'.$field,$envelope); }
     public function __debugInfo(){return array('configuration'=>'[redacted]');}public function __serialize(){throw new \RuntimeException('Configuration serialization forbidden.');}public function __sleep(){throw new \RuntimeException('Configuration serialization forbidden.');}
 }

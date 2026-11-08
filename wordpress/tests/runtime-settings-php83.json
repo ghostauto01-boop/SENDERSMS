@@ -1,0 +1,13 @@
+{
+  "ok": true,
+  "assertions": 137,
+  "diffs": [],
+  "php": "8.3.36",
+  "source_operations": 36,
+  "source_dto_cases": 11,
+  "scope": "Actual selected source settings with synthetic SQLite/clock and separately tested native secret envelopes, fail-closed recovery, resource/enum/alias guards and injected conflicts. No actual WordPress/MySQL/concurrency/provider/browser certification.",
+  "native_wordpress_verified": false,
+  "native_mysql_verified": false,
+  "notifications_sent": 0,
+  "suite": "runtime-settings"
+}
