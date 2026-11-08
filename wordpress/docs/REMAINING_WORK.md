@@ -1,8 +1,8 @@
 # Remaining WordPress recreation work
 
-502 missing source handlers,6 partial health/auth handlers,0 fully certified contracts. The administrator CSV diagnostic is not the original source import API.
+487 missing source handlers,21 partial health/auth/contact/list handlers,0 fully certified contracts. The administrator CSV diagnostic is not the original source import API.
 
-Every row is outstanding, including the partial health route until native HTTP certification. See README.md for actual implemented utilities and fresh test boundaries.
+Every row is outstanding, including all partial handlers until native HTTP certification. See README.md for actual implemented utilities and fresh test boundaries.
 
 | Method | Path | Source | State |
 |---|---|---|---|
@@ -132,15 +132,15 @@ Every row is outstanding, including the partial health route until native HTTP c
 | GET | /api/v1/campaigns/{campaign_id}/analytics | backend/app/api/v1/campaigns.py:610 | missing original application handler |
 | GET | /api/v1/campaigns/{campaign_id}/conversations | backend/app/api/v1/campaigns.py:634 | missing original application handler |
 | GET | /api/v1/campaigns/{campaign_id}/performance | backend/app/api/v1/campaigns.py:763 | missing original application handler |
-| GET | /api/v1/contacts | backend/app/api/v1/contacts.py:186 | missing original application handler |
-| GET | /api/v1/contacts/ | backend/app/api/v1/contacts.py:186 | missing original application handler |
+| GET | /api/v1/contacts | backend/app/api/v1/contacts.py:186 | partial handler; native WordPress/HTTP unverified |
+| GET | /api/v1/contacts/ | backend/app/api/v1/contacts.py:186 | partial handler; native WordPress/HTTP unverified |
 | GET | /api/v1/contacts/enrich/status | backend/app/api/v1/contacts.py:1496 | missing original application handler |
 | GET | /api/v1/contacts/export | backend/app/api/v1/contacts.py:349 | missing original application handler |
 | GET | /api/v1/contacts/export/csv | backend/app/api/v1/contacts.py:1663 | missing original application handler |
 | GET | /api/v1/contacts/import/jobs/{job_id} | backend/app/api/v1/contacts.py:1334 | missing original application handler |
 | GET | /api/v1/contacts/import/jobs/{job_id}/errors.csv | backend/app/api/v1/contacts.py:1367 | missing original application handler |
-| GET | /api/v1/contacts/tags/ | backend/app/api/v1/contacts.py:546 | missing original application handler |
-| GET | /api/v1/contacts/{contact_id} | backend/app/api/v1/contacts.py:588 | missing original application handler |
+| GET | /api/v1/contacts/tags/ | backend/app/api/v1/contacts.py:546 | partial handler; native WordPress/HTTP unverified |
+| GET | /api/v1/contacts/{contact_id} | backend/app/api/v1/contacts.py:588 | partial handler; native WordPress/HTTP unverified |
 | GET | /api/v1/contacts/{contact_id}/activity | backend/app/api/v1/contacts.py:1803 | missing original application handler |
 | GET | /api/v1/dashboard/charts | backend/app/api/v1/dashboard.py:205 | missing original application handler |
 | GET | /api/v1/dashboard/stats | backend/app/api/v1/dashboard.py:38 | missing original application handler |
@@ -186,10 +186,10 @@ Every row is outstanding, including the partial health route until native HTTP c
 | GET | /api/v1/invoices/{invoice_id} | backend/app/api/v1/invoices.py:1086 | missing original application handler |
 | GET | /api/v1/invoices/{invoice_id}/events | backend/app/api/v1/invoices.py:1470 | missing original application handler |
 | GET | /api/v1/invoices/{invoice_id}/payments | backend/app/api/v1/invoices.py:1460 | missing original application handler |
-| GET | /api/v1/lists | backend/app/api/v1/lists.py:77 | missing original application handler |
-| GET | /api/v1/lists/ | backend/app/api/v1/lists.py:77 | missing original application handler |
-| GET | /api/v1/lists/{list_id}/contacts | backend/app/api/v1/lists.py:263 | missing original application handler |
-| GET | /api/v1/lists/{list_id}/stats | backend/app/api/v1/lists.py:619 | missing original application handler |
+| GET | /api/v1/lists | backend/app/api/v1/lists.py:77 | partial handler; native WordPress/HTTP unverified |
+| GET | /api/v1/lists/ | backend/app/api/v1/lists.py:77 | partial handler; native WordPress/HTTP unverified |
+| GET | /api/v1/lists/{list_id}/contacts | backend/app/api/v1/lists.py:263 | partial handler; native WordPress/HTTP unverified |
+| GET | /api/v1/lists/{list_id}/stats | backend/app/api/v1/lists.py:619 | partial handler; native WordPress/HTTP unverified |
 | GET | /api/v1/mail/messages | backend/app/api/v1/mail.py:80 | missing original application handler |
 | GET | /api/v1/mail/messages/{mailbox_id}/{provider_message_id} | backend/app/api/v1/mail.py:99 | missing original application handler |
 | GET | /api/v1/mail/overview | backend/app/api/v1/mail.py:67 | missing original application handler |
@@ -355,7 +355,7 @@ Every row is outstanding, including the partial health route until native HTTP c
 | POST | /api/v1/campaigns/{campaign_id}/start | backend/app/api/v1/campaigns.py:394 | missing original application handler |
 | POST | /api/v1/campaigns/{campaign_id}/stop | backend/app/api/v1/campaigns.py:576 | missing original application handler |
 | POST | /api/v1/campaigns/{campaign_id}/validate | backend/app/api/v1/campaigns.py:321 | missing original application handler |
-| POST | /api/v1/contacts/ | backend/app/api/v1/contacts.py:602 | missing original application handler |
+| POST | /api/v1/contacts/ | backend/app/api/v1/contacts.py:602 | partial handler; native WordPress/HTTP unverified |
 | POST | /api/v1/contacts/bulk | backend/app/api/v1/contacts.py:978 | missing original application handler |
 | POST | /api/v1/contacts/clean | backend/app/api/v1/contacts.py:477 | missing original application handler |
 | POST | /api/v1/contacts/enrich | backend/app/api/v1/contacts.py:1558 | missing original application handler |
@@ -417,12 +417,12 @@ Every row is outstanding, including the partial health route until native HTTP c
 | POST | /api/v1/invoices/{invoice_id}/rotate-link | backend/app/api/v1/invoices.py:1489 | missing original application handler |
 | POST | /api/v1/invoices/{invoice_id}/send | backend/app/api/v1/invoices.py:1275 | missing original application handler |
 | POST | /api/v1/invoices/{invoice_id}/void | backend/app/api/v1/invoices.py:1323 | missing original application handler |
-| POST | /api/v1/lists/ | backend/app/api/v1/lists.py:172 | missing original application handler |
+| POST | /api/v1/lists/ | backend/app/api/v1/lists.py:172 | partial handler; native WordPress/HTTP unverified |
 | POST | /api/v1/lists/{list_id}/clean | backend/app/api/v1/lists.py:521 | missing original application handler |
-| POST | /api/v1/lists/{list_id}/contacts | backend/app/api/v1/lists.py:315 | missing original application handler |
-| POST | /api/v1/lists/{list_id}/contacts/add-all | backend/app/api/v1/lists.py:387 | missing original application handler |
+| POST | /api/v1/lists/{list_id}/contacts | backend/app/api/v1/lists.py:315 | partial handler; native WordPress/HTTP unverified |
+| POST | /api/v1/lists/{list_id}/contacts/add-all | backend/app/api/v1/lists.py:387 | partial handler; native WordPress/HTTP unverified |
 | POST | /api/v1/lists/{list_id}/contacts/delete | backend/app/api/v1/lists.py:464 | missing original application handler |
-| POST | /api/v1/lists/{list_id}/contacts/remove | backend/app/api/v1/lists.py:417 | missing original application handler |
+| POST | /api/v1/lists/{list_id}/contacts/remove | backend/app/api/v1/lists.py:417 | partial handler; native WordPress/HTTP unverified |
 | POST | /api/v1/lists/{list_id}/validate-emails | backend/app/api/v1/lists.py:547 | missing original application handler |
 | POST | /api/v1/mail/messages/{mailbox_id}/{provider_message_id}/delete | backend/app/api/v1/mail.py:155 | missing original application handler |
 | POST | /api/v1/mail/messages/{mailbox_id}/{provider_message_id}/flags | backend/app/api/v1/mail.py:117 | missing original application handler |
@@ -498,9 +498,9 @@ Every row is outstanding, including the partial health route until native HTTP c
 | PUT | /api/v1/calls/config | backend/app/api/v1/calls.py:78 | missing original application handler |
 | PUT | /api/v1/campaign-followups/{followup_id} | backend/app/api/v1/campaign_followups.py:212 | missing original application handler |
 | PUT | /api/v1/campaigns/{campaign_id} | backend/app/api/v1/campaigns.py:221 | missing original application handler |
-| PUT | /api/v1/contacts/{contact_id} | backend/app/api/v1/contacts.py:663 | missing original application handler |
+| PUT | /api/v1/contacts/{contact_id} | backend/app/api/v1/contacts.py:663 | partial handler; native WordPress/HTTP unverified |
 | PUT | /api/v1/invoices/settings | backend/app/api/v1/invoices.py:298 | missing original application handler |
-| PUT | /api/v1/lists/{list_id} | backend/app/api/v1/lists.py:194 | missing original application handler |
+| PUT | /api/v1/lists/{list_id} | backend/app/api/v1/lists.py:194 | partial handler; native WordPress/HTTP unverified |
 | PUT | /api/v1/sequences/{sequence_id} | backend/app/api/v1/sequences.py:163 | missing original application handler |
 | PUT | /api/v1/settings/access | backend/app/api/v1/settings.py:28 | missing original application handler |
 | PUT | /api/v1/settings/appearance | backend/app/api/v1/settings.py:633 | missing original application handler |

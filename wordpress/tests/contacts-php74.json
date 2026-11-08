@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "assertions": 136,
+  "diffs": [],
+  "php": "7.4.34-dev",
+  "source_operations": 48,
+  "source_dto_cases": 38,
+  "scope": "Selected original AST with five synthetic SQLite tables and fixed clock; not native MySQL, real WP, HTTP, ORM relationships, collation or concurrent correctness",
+  "native_mysql_verified": false,
+  "native_wordpress_verified": false,
+  "suite": "contacts"
+}
