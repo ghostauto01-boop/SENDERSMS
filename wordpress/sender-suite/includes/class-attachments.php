@@ -25,6 +25,7 @@ final class Attachments {
         if (is_object($v)) { $out=array(); foreach ($v as $k=>$value) { $out[]=self::quote((string)$k).': '.self::repr($value); } return '{'.implode(', ',$out).'}'; }
         return Templating::text($v);
     }
+    public static function pythonText($v) { return self::text($v); }
     private static function text($v) { return is_array($v)||is_object($v)?self::repr($v):Templating::text($v); }
     private static function cut($s,$n) { preg_match('/\A.{0,'.$n.'}/us',$s,$m); return $m[0]??''; }
     /** Python's permissive ASCII base64 decoder size semantics, without allocating decoded files. */

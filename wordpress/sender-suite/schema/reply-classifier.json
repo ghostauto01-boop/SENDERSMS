@@ -1,0 +1,467 @@
+{
+  "positive": {
+    "yes": 2.0,
+    "yeah": 2.0,
+    "yep": 2.0,
+    "yup": 2.0,
+    "ya": 1.5,
+    "yay": 2.0,
+    "sure": 1.5,
+    "ok": 1.0,
+    "okay": 1.0,
+    "okey": 1.0,
+    "k": 0.6,
+    "kk": 1.0,
+    "correct": 2.0,
+    "right": 1.0,
+    "confirmed": 2.0,
+    "confirm": 1.0,
+    "interested": 2.0,
+    "love": 1.5,
+    "like": 0.8,
+    "great": 1.5,
+    "good": 1.0,
+    "nice": 1.0,
+    "awesome": 1.5,
+    "perfect": 1.5,
+    "fine": 1.0,
+    "cool": 1.2,
+    "yes please": 2.5,
+    "that's us": 2.5,
+    "thats us": 2.5,
+    "this is us": 2.5,
+    "we are": 1.0,
+    "it is": 0.6,
+    "yes o": 2.5,
+    "yes oo": 2.5,
+    "na we": 2.0,
+    "na us": 2.0,
+    "yes we are": 3.0,
+    "we are the": 2.0,
+    "interested o": 3.0,
+    "am interested": 3.0,
+    "i'm interested": 3.0,
+    "i am interested": 3.0,
+    "i dey interested": 3.0,
+    "i dey": 1.0,
+    "send": 0.5,
+    "yes send": 2.5,
+    "go ahead": 1.5,
+    "continue": 1.0,
+    "will do": 1.0,
+    "sounds good": 2.0,
+    "no problem": 1.0,
+    "no wahala": 1.5,
+    "no issues": 1.0,
+    "alright": 1.0,
+    "all good": 1.5,
+    "all set": 1.0,
+    "thanks": 0.5,
+    "thank you": 0.5,
+    "appreciate": 0.8,
+    "available": 1.0,
+    "open": 0.6
+  },
+  "negative": {
+    "no": 1.5,
+    "nope": 2.0,
+    "nah": 2.0,
+    "not": 1.0,
+    "never": 1.2,
+    "wrong": 2.0,
+    "wrong number": 3.0,
+    "mistake": 1.5,
+    "who is this": 2.0,
+    "who's this": 2.0,
+    "who are you": 2.0,
+    "unknown": 1.0,
+    "stranger": 1.0,
+    "don't know you": 2.5,
+    "dont know you": 2.5,
+    "don't know this": 2.0,
+    "not interested": 3.0,
+    "not intrested": 3.0,
+    "no interest": 3.0,
+    "not me": 2.5,
+    "not us": 2.5,
+    "not ours": 2.5,
+    "that's not": 2.0,
+    "thats not": 2.0,
+    "we are not": 2.5,
+    "we're not": 2.5,
+    "this is not": 2.5,
+    "this isnt": 2.5,
+    "is not": 2.0,
+    "isn't us": 2.5,
+    "isnt us": 2.5,
+    "not the": 2.0,
+    "not this": 2.0,
+    "different": 1.0,
+    "someone else": 2.5,
+    "another": 0.8,
+    "other": 0.8,
+    "remove": 2.0,
+    "delete": 1.5,
+    "stop": 2.5,
+    "unsubscribe": 2.5,
+    "cancel": 2.0,
+    "opt out": 3.0,
+    "don't text": 3.0,
+    "dont text": 3.0,
+    "stop texting": 3.0,
+    "stop messaging": 3.0,
+    "leave me": 2.5,
+    "leave me alone": 3.0,
+    "abeg": 0.5,
+    "abeg no": 2.0,
+    "abeg stop": 3.0,
+    "abeg remove": 3.0,
+    "wahala": 1.5,
+    "annoying": 2.0,
+    "annoyed": 2.0,
+    "angry": 1.5,
+    "bad": 1.0,
+    "terrible": 1.5,
+    "hate": 1.5,
+    "not now": 2.0,
+    "later": 0.4,
+    "no longer": 2.0,
+    "no thanks": 2.0,
+    "no thank you": 2.0,
+    "not really": 1.5,
+    "nothing": 0.5,
+    "never mind": 1.5,
+    "nevermind": 1.5,
+    "leave": 1.2,
+    "quit": 1.2
+  },
+  "intents": [
+    [
+      "wrong_number",
+      "\\bwrong number\\b"
+    ],
+    [
+      "wrong_number",
+      "\\bwrong no\\b"
+    ],
+    [
+      "wrong_number",
+      "\\bwho is this\\b"
+    ],
+    [
+      "wrong_number",
+      "\\bwho's this\\b"
+    ],
+    [
+      "wrong_number",
+      "\\bwho are you\\b"
+    ],
+    [
+      "wrong_number",
+      "\\bwho be this\\b"
+    ],
+    [
+      "wrong_number",
+      "\\bdont know you\\b"
+    ],
+    [
+      "wrong_number",
+      "\\bdon't know you\\b"
+    ],
+    [
+      "wrong_number",
+      "\\bi don't know you\\b"
+    ],
+    [
+      "wrong_number",
+      "\\bnever heard\\b"
+    ],
+    [
+      "wrong_number",
+      "\\bnot me\\b"
+    ],
+    [
+      "wrong_number",
+      "\\bnot us\\b"
+    ],
+    [
+      "wrong_number",
+      "\\bnot ours\\b"
+    ],
+    [
+      "wrong_number",
+      "\\byou have the wrong\\b"
+    ],
+    [
+      "wrong_number",
+      "\\bwrong person\\b"
+    ],
+    [
+      "opt_out",
+      "\\bstop\\b"
+    ],
+    [
+      "opt_out",
+      "\\bunsubscribe\\b"
+    ],
+    [
+      "opt_out",
+      "\\bcancel\\b"
+    ],
+    [
+      "opt_out",
+      "\\bopt[\\s-]?out\\b"
+    ],
+    [
+      "opt_out",
+      "\\bremove me\\b"
+    ],
+    [
+      "opt_out",
+      "\\bdelete me\\b"
+    ],
+    [
+      "opt_out",
+      "\\bdont text\\b"
+    ],
+    [
+      "opt_out",
+      "\\bdon't text\\b"
+    ],
+    [
+      "opt_out",
+      "\\bstop texting\\b"
+    ],
+    [
+      "opt_out",
+      "\\bstop messaging\\b"
+    ],
+    [
+      "opt_out",
+      "\\bleave me alone\\b"
+    ],
+    [
+      "opt_out",
+      "\\babeg stop\\b"
+    ],
+    [
+      "opt_out",
+      "\\babeg remove\\b"
+    ],
+    [
+      "not_interested",
+      "\\bnot interested\\b"
+    ],
+    [
+      "not_interested",
+      "\\bnot intrested\\b"
+    ],
+    [
+      "not_interested",
+      "\\bno interest\\b"
+    ],
+    [
+      "not_interested",
+      "\\bnot now\\b"
+    ],
+    [
+      "not_interested",
+      "\\bno thanks\\b"
+    ],
+    [
+      "not_interested",
+      "\\bno thank you\\b"
+    ],
+    [
+      "not_interested",
+      "\\bam not interested\\b"
+    ],
+    [
+      "not_interested",
+      "\\bi'm not interested\\b"
+    ],
+    [
+      "not_interested",
+      "\\bnot interested o\\b"
+    ],
+    [
+      "interested",
+      "\\binterested\\b"
+    ],
+    [
+      "interested",
+      "\\bam interested\\b"
+    ],
+    [
+      "interested",
+      "\\bi'm interested\\b"
+    ],
+    [
+      "interested",
+      "\\bi am interested\\b"
+    ],
+    [
+      "interested",
+      "\\bi dey interested\\b"
+    ],
+    [
+      "interested",
+      "\\byes please\\b"
+    ],
+    [
+      "interested",
+      "\\bgo ahead\\b"
+    ],
+    [
+      "interested",
+      "\\bsounds good\\b"
+    ],
+    [
+      "interested",
+      "\\bsend it\\b"
+    ],
+    [
+      "interested",
+      "\\bsend me\\b"
+    ],
+    [
+      "confirm_business_question",
+      "\\bis this\\b"
+    ],
+    [
+      "confirm_business_question",
+      "\\bare you\\b"
+    ],
+    [
+      "confirm_business_question",
+      "\\bu be\\b"
+    ],
+    [
+      "confirm_business_question",
+      "\\buna be\\b"
+    ],
+    [
+      "confirm_business_question",
+      "\\bis that\\b"
+    ],
+    [
+      "confirm_business_question",
+      "\\bis your\\b"
+    ],
+    [
+      "confirm_business_question",
+      "\\bis this the\\b"
+    ],
+    [
+      "confirm_business_question",
+      "\\bam i speaking\\b"
+    ],
+    [
+      "confirm_business_question",
+      "\\bam i talking\\b"
+    ],
+    [
+      "confirm_business_question",
+      "\\bis this really\\b"
+    ],
+    [
+      "pricing_question",
+      "\\bhow much\\b"
+    ],
+    [
+      "pricing_question",
+      "\\bprice\\b"
+    ],
+    [
+      "pricing_question",
+      "\\bprices\\b"
+    ],
+    [
+      "pricing_question",
+      "\\bpricing\\b"
+    ],
+    [
+      "pricing_question",
+      "\\bcost\\b"
+    ],
+    [
+      "pricing_question",
+      "\\bfee\\b"
+    ],
+    [
+      "pricing_question",
+      "\\bfees\\b"
+    ],
+    [
+      "pricing_question",
+      "\\brate card\\b"
+    ],
+    [
+      "pricing_question",
+      "\\bcharges\\b"
+    ],
+    [
+      "hours_question",
+      "\\bopen\\b"
+    ],
+    [
+      "hours_question",
+      "\\bclose\\b"
+    ],
+    [
+      "hours_question",
+      "\\bclosing\\b"
+    ],
+    [
+      "hours_question",
+      "\\bopening\\b"
+    ],
+    [
+      "hours_question",
+      "\\bhours\\b"
+    ],
+    [
+      "hours_question",
+      "\\bwhat time\\b"
+    ],
+    [
+      "hours_question",
+      "\\bwhen do you\\b"
+    ],
+    [
+      "hours_question",
+      "\\btoday\\b"
+    ],
+    [
+      "hours_question",
+      "\\btomorrow\\b"
+    ],
+    [
+      "greeting",
+      "^\\s*(hi|hello|hey|hallo|good\\s*(morning|afternoon|evening|day))\\b"
+    ],
+    [
+      "thanks",
+      "\\bthanks\\b"
+    ],
+    [
+      "thanks",
+      "\\bthank you\\b"
+    ],
+    [
+      "thanks",
+      "\\bappreciate\\b"
+    ],
+    [
+      "thanks",
+      "\\bgod bless\\b"
+    ],
+    [
+      "thanks",
+      "\\bwell done\\b"
+    ]
+  ],
+  "positive_confirm": "^(yes|yeah|yep|yup|ya|correct|right|confirmed|true|yes o|yes oo|na we|na us|it is|we are|yes we are|that's us|thats us|this is us|yes please|ok|okay|sure)\\b",
+  "negative_confirm": "^(no|nope|nah|wrong|not me|not us|not ours|not this|no o|no oo|false|no it|it's not|its not|we are not|we're not|this is not|is not|not the|no it's not)\\b",
+  "leading_negation": "^\\s*(no|not|nah|nope|never|wrong|don't|dont|doesn't|doesnt|isn't|isnt|aren't|arent)\\b"
+}

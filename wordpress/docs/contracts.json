@@ -140,7 +140,7 @@
     "sources": [
       "backend/app/api/v1/automations.py:130"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -149,7 +149,7 @@
     "sources": [
       "backend/app/api/v1/autoreply.py:134"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -878,7 +878,7 @@
     "sources": [
       "backend/app/api/v1/automations.py:43"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -887,7 +887,7 @@
     "sources": [
       "backend/app/api/v1/automations.py:43"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -896,7 +896,7 @@
     "sources": [
       "backend/app/api/v1/automations.py:88"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -905,7 +905,7 @@
     "sources": [
       "backend/app/api/v1/autoreply.py:44"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -914,7 +914,7 @@
     "sources": [
       "backend/app/api/v1/autoreply.py:44"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -923,7 +923,7 @@
     "sources": [
       "backend/app/api/v1/autoreply.py:87"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -1807,7 +1807,7 @@
     "sources": [
       "backend/app/api/v1/notifications.py:33"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -1816,7 +1816,7 @@
     "sources": [
       "backend/app/api/v1/notifications.py:33"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -1843,7 +1843,7 @@
     "sources": [
       "backend/app/api/v1/notifications.py:55"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -2870,7 +2870,7 @@
     "sources": [
       "backend/app/api/v1/ai.py:24"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -2906,7 +2906,7 @@
     "sources": [
       "backend/app/api/v1/automations.py:60"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -2915,7 +2915,7 @@
     "sources": [
       "backend/app/api/v1/automations.py:144"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -2924,7 +2924,7 @@
     "sources": [
       "backend/app/api/v1/autoreply.py:67"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -2933,7 +2933,7 @@
     "sources": [
       "backend/app/api/v1/autoreply.py:148"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -3932,7 +3932,7 @@
     "sources": [
       "backend/app/api/v1/notifications.py:80"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -3941,7 +3941,7 @@
     "sources": [
       "backend/app/api/v1/notifications.py:67"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -4382,7 +4382,7 @@
     "sources": [
       "backend/app/api/v1/automations.py:100"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -4391,7 +4391,7 @@
     "sources": [
       "backend/app/api/v1/autoreply.py:99"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
