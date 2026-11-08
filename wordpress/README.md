@@ -15,7 +15,9 @@ All recreated files are inside `wordpress/` on the session branch. Original `bac
 - One public REST health handler and five initial own-application auth handlers (access/admin/login/logout/me), at `/wp-json/sender-suite/v1/`. These are not yet mapped to the original `/api/v1/` URLs or certified against real WordPress HTTP. Other application APIs are deliberately not registered as fake successful placeholders.
 - Own-app-authenticated contact creation/read/edit, duplicate checks, phone/email normalization, tag replacement/addition/removal, channel/status/list filtering, allowlisted sorting and stable contact pagination.
 - Own-app-authenticated list creation/edit/listing, live membership counts, member browsing, deduplicated addition, server-scoped add-all, non-destructive removal and status statistics. Contact/list deletion and CSV persistence are **not** implemented; this is not yet complete CRUD.
-- Explicit source-model defaults for these five business tables; no assumption that Python application defaults become native SQL defaults.
+- Variable-registry creation/editing/deletion, built-in protection, discovery from custom fields, aliases, fallbacks, source/search filters and authenticated message analysis. This is **not** a finished template library or sending workflow.
+- Source-derived text rendering (double/single braces, greeting fallbacks, unknown-variable marking, cleanup and scalar formatting) and source-compatible SMS segment estimates. No HTML sanitization or carrier billing is certified.
+- Explicit source-model defaults for these business tables; no assumption that Python application defaults become native SQL defaults.
 - Argon2-only production password codec, HS256 cookie sessions, current-account activation/role checks, same-origin guards, scoped JSONP/envelope hardening and persistent login throttling. Production crypto, real cookies and concurrent native throttling remain unverified. WordPress administrator login is not an application-session bypass.
 -132 freshly compiled unchanged frontend assets, with available production dependency notices retained. They are **not served at the site root** while original API URL integration and business workflows are missing.
 - Reproducible generation, test and recovery-packaging tools. Caches/node_modules/environment files are excluded from recovery packaging.
@@ -24,13 +26,13 @@ All recreated files are inside `wordpress/` on the session branch. Original `bac
 
 See `tests/checks-summary.json` and `tests/frontend-evidence.json`.
 
--28,926 functional assertions across PHP WASM7.4.34-dev and8.3.36, including offline account/DTO and auth-dispatch tests.
--34 first-party PHP syntax checks.
+-31,778 functional assertions across PHP WASM7.4.34-dev and8.3.36, including offline account/DTO and auth-dispatch tests.
+-40 first-party PHP syntax checks.
 -3,075 vendor parser checks, **reported separately from functional coverage**. The PHP8-only guarded mbstring bootstrap is intentionally not parsed with PHP7.4. Parser memory is raised to512M only inside that test.
 -1,547 vendor file hashes and165 unchanged frontend source hashes verified.
--Recorded unchanged frontend run (not rerun in this auth iteration):269 tests/43 files pass; production build passes and generates132 assets. A jsdom navigation warning is not native browser workflow proof.
+-Recorded unchanged frontend run (not rerun in this iteration):269 tests/43 files pass; production build passes and generates132 assets. A jsdom navigation warning is not native browser workflow proof.
 
-No native MySQL/MariaDB, real WordPress activation, real login, HTTP upload, scheduler or browser workflow is certified by these tests. Current WordPress tests are hook/request/response mocks, not a booted WordPress server. Contact/list comparisons additionally cover 48 original-source AST operations and 38 DTO cases against five synthetic SQLite tables, with a fixed clock and omitted ORM relationships. Each runtime adds 71 mock data-dispatch assertions, including fault-injected rollback, authentication, path-ID protection, query binding and membership retry tests. They do not establish FK cleanup, native collation, concurrent idempotency, real uploads, or browser integration. Auth comparisons cover 21 original-source AST business scenarios and 24 DTO cases with an explicitly synthetic password codec and two-table SQLite account adapter. The 57 dispatch assertions per runtime additionally simulate rate counters without expiry; they do not prove MySQL SQL, expiry, atomicity, HTTP, Argon2 or browser behavior. Previous38,646-assertion/363-HTTP-case claims describe the missing build and are **not reused as current evidence**.
+No native MySQL/MariaDB, real WordPress activation, real login, HTTP upload, scheduler or browser workflow is certified by these tests. Current WordPress tests are hook/request/response mocks, not a booted WordPress server. Contact/list comparisons additionally cover 48 original-source AST operations and 38 DTO cases against five synthetic SQLite tables, with a fixed clock and omitted ORM relationships. Each runtime adds 94 mock data-dispatch assertions, including fault-injected rollback, authentication, path-ID protection, query binding and membership retry tests. They do not establish FK cleanup, native collation, concurrent idempotency, real uploads, or browser integration. The variable suite adds 420 pure-source render cases (render/context/unknown checks), 27 source-registry operations, 32 DTO cases, 50 source segment-estimate cases and 17 scalar-conversion cases. Registry comparison uses synthetic SQLite with an explicitly monotonic committed-ID adapter setting; it is not native identity allocation or concurrency proof. Non-standard JSON NaN/Infinity, all float representations, native collation, HTML safety and carrier billing are not certified. Auth comparisons cover 21 original-source AST business scenarios and 24 DTO cases with an explicitly synthetic password codec and two-table SQLite account adapter. The 57 dispatch assertions per runtime additionally simulate rate counters without expiry; they do not prove MySQL SQL, expiry, atomicity, HTTP, Argon2 or browser behavior. Previous38,646-assertion/363-HTTP-case claims describe the missing build and are **not reused as current evidence**.
 
 ## Download and operator setup
 
@@ -66,6 +68,7 @@ python3 wordpress/tools/generate_csv_fixtures.py
 python3 -m pip install --target wordpress/.cache/python sqlalchemy==2.0.36 aiosqlite==0.20.0 pydantic==2.10.3
 python3 wordpress/tools/generate_auth_fixtures.py
 python3 wordpress/tools/generate_contact_fixtures.py
+python3 wordpress/tools/generate_variable_fixtures.py
 python3 wordpress/tools/run_checks.py
 python3 wordpress/tools/checkpoint.py
 python3 wordpress/tools/package_plugin.py
@@ -94,13 +97,15 @@ All paths below are relative to `/wp-json/sender-suite/v1/`, require an own-appl
 - `GET/POST lists/{id}/contacts` (POST body is a JSON integer array).
 - `POST lists/{id}/contacts/add-all` (JSON filters); `POST lists/{id}/contacts/remove` (JSON `contact_ids`, or `scope: "all"` with optional `search`). Removal changes memberships only, not contact records.
 - `GET lists/{id}/stats`.
+- `GET/POST variables/`; `PUT/DELETE variables/{id}`; `POST variables/sync`.
+- `POST variables/preview` uses query `body` and optional `contact_id`, as in the source API. It reports resolved/empty/unknown placeholders without sending.
 
-These handlers have actual persistence logic, not placeholder successes. They remain development-only: most other source APIs, all sending workers, native-engine behavior and the full application interface are still outstanding. List-member tie ordering follows the original created-at-only query; it has not acquired the stable tie-breaking used by the main contact listing. Concurrent duplicate-name/email checks and membership races still need native review. Explicit-null writes to non-null model columns and internal-error envelope parity remain uncertified.
+These handlers have actual persistence logic, not placeholder successes. They remain development-only: most other source APIs, all sending workers, native-engine behavior and the full application interface are still outstanding. List-member tie ordering follows the original created-at-only query; it has not acquired the stable tie-breaking used by the main contact listing. Concurrent duplicate-name/email checks and membership races still need native review. Variable sync preserves the original helper’s behavior, including potentially stale counters for keys absent from a later scan. Deleting an imported registry entry leaves contact data intact, so a later sync can rediscover it. Explicit-null writes to non-null model columns and internal-error envelope parity remain uncertified.
 
 ## Remaining work
 
-`docs/contracts.json` and `docs/REMAINING_WORK.md` retain every source method/path. Current status: **487 missing handlers,21 partial health/auth/contact/list handlers,0 fully certified contracts**. The CSV service/admin diagnostic is not counted as a restored source HTTP handler.
+`docs/contracts.json` and `docs/REMAINING_WORK.md` retain every source method/path. Current status: **480 missing handlers,28 partial health/auth/contact/list/variable handlers,0 fully certified contracts**. The CSV service/admin diagnostic is not counted as a restored source HTTP handler.
 
-Native auth/account/session/rate-limit certification and concurrency recovery, full settings/provider wiring, contact/list deletion and related-record cleanup, remaining bulk actions and synchronous imports/merges, jobs/status/errors/URL import, email accounts/verification, campaigns/follow-ups, inbox/SMS/calls, scheduler, webhooks, invoices/calendar, variables/templates, AI/MCP, analytics/notifications, complete migration, unchanged frontend integration and native release tests still need recreation/implementation. Do not expose the unchanged frontend as a working application until those routes and permissions exist.
+Native auth/account/session/rate-limit certification and concurrency recovery, full settings/provider wiring, contact/list deletion and related-record cleanup, remaining bulk actions and synchronous imports/merges, jobs/status/errors/URL import, email accounts/verification, campaigns/follow-ups, inbox/SMS/calls, scheduler, webhooks, invoices/calendar, remaining variable/profile and template-library workflows, AI/MCP, analytics/notifications, complete migration, unchanged frontend integration and native release tests still need recreation/implementation. Do not expose the unchanged frontend as a working application until those routes and permissions exist.
 
 This is a recovery/development checkpoint, not completion of the full request.

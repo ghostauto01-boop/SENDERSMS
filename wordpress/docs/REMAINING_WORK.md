@@ -1,6 +1,6 @@
 # Remaining WordPress recreation work
 
-487 missing source handlers,21 partial health/auth/contact/list handlers,0 fully certified contracts. The administrator CSV diagnostic is not the original source import API.
+480 missing source handlers,28 partial health/auth/contact/list/variable handlers,0 fully certified contracts. The administrator CSV diagnostic is not the original source import API.
 
 Every row is outstanding, including all partial handlers until native HTTP certification. See README.md for actual implemented utilities and fresh test boundaries.
 
@@ -42,7 +42,7 @@ Every row is outstanding, including all partial handlers until native HTTP certi
 | DELETE | /api/v1/settings/gateway/phones/{phone_id} | backend/app/api/v1/settings.py:501 | missing original application handler |
 | DELETE | /api/v1/settings/gateway/webhooks/{webhook_id} | backend/app/api/v1/settings.py:142 | missing original application handler |
 | DELETE | /api/v1/templates/{template_id} | backend/app/api/v1/templates.py:306 | missing original application handler |
-| DELETE | /api/v1/variables/{variable_id} | backend/app/api/v1/variables.py:163 | missing original application handler |
+| DELETE | /api/v1/variables/{variable_id} | backend/app/api/v1/variables.py:163 | partial handler; native WordPress/HTTP unverified |
 | DELETE | /connectors/{key}/mcp | backend/app/api/v1/mcp.py:353 | missing original application handler |
 | DELETE | /mcp | backend/app/api/v1/mcp.py:313 | missing original application handler |
 | DELETE | /mcp/ | backend/app/api/v1/mcp.py:313 | missing original application handler |
@@ -239,8 +239,8 @@ Every row is outstanding, including all partial handlers until native HTTP certi
 | GET | /api/v1/validator/jobs | backend/app/api/v1/validator.py:186 | missing original application handler |
 | GET | /api/v1/validator/jobs/{job_id} | backend/app/api/v1/validator.py:199 | missing original application handler |
 | GET | /api/v1/validator/status | backend/app/api/v1/validator.py:83 | missing original application handler |
-| GET | /api/v1/variables | backend/app/api/v1/variables.py:33 | missing original application handler |
-| GET | /api/v1/variables/ | backend/app/api/v1/variables.py:33 | missing original application handler |
+| GET | /api/v1/variables | backend/app/api/v1/variables.py:33 | partial handler; native WordPress/HTTP unverified |
+| GET | /api/v1/variables/ | backend/app/api/v1/variables.py:33 | partial handler; native WordPress/HTTP unverified |
 | GET | /api/v1/variables/contact/{contact_id}/profile | backend/app/api/v1/variables.py:204 | missing original application handler |
 | GET | /api/v1/webhooks/callgate | backend/app/api/v1/webhooks.py:566 | missing original application handler |
 | GET | /api/v1/webhooks/logs | backend/app/api/v1/webhooks.py:708 | missing original application handler |
@@ -467,9 +467,9 @@ Every row is outstanding, including all partial handlers until native HTTP certi
 | POST | /api/v1/validator/jobs/{job_id}/cancel | backend/app/api/v1/validator.py:211 | missing original application handler |
 | POST | /api/v1/validator/selection | backend/app/api/v1/validator.py:143 | missing original application handler |
 | POST | /api/v1/validator/self-test | backend/app/api/v1/validator.py:105 | missing original application handler |
-| POST | /api/v1/variables/ | backend/app/api/v1/variables.py:85 | missing original application handler |
-| POST | /api/v1/variables/preview | backend/app/api/v1/variables.py:186 | missing original application handler |
-| POST | /api/v1/variables/sync | backend/app/api/v1/variables.py:76 | missing original application handler |
+| POST | /api/v1/variables/ | backend/app/api/v1/variables.py:85 | partial handler; native WordPress/HTTP unverified |
+| POST | /api/v1/variables/preview | backend/app/api/v1/variables.py:186 | partial handler; native WordPress/HTTP unverified |
+| POST | /api/v1/variables/sync | backend/app/api/v1/variables.py:76 | partial handler; native WordPress/HTTP unverified |
 | POST | /api/v1/webhooks/brevo | backend/app/api/v1/webhooks.py:628 | missing original application handler |
 | POST | /api/v1/webhooks/brevo/{account_id} | backend/app/api/v1/webhooks.py:628 | missing original application handler |
 | POST | /api/v1/webhooks/callgate | backend/app/api/v1/webhooks.py:431 | missing original application handler |
@@ -513,4 +513,4 @@ Every row is outstanding, including all partial handlers until native HTTP certi
 | PUT | /api/v1/settings/notifications/muted-senders | backend/app/api/v1/settings.py:165 | missing original application handler |
 | PUT | /api/v1/settings/notifications/{provider} | backend/app/api/v1/settings.py:172 | missing original application handler |
 | PUT | /api/v1/templates/{template_id} | backend/app/api/v1/templates.py:262 | missing original application handler |
-| PUT | /api/v1/variables/{variable_id} | backend/app/api/v1/variables.py:123 | missing original application handler |
+| PUT | /api/v1/variables/{variable_id} | backend/app/api/v1/variables.py:123 | partial handler; native WordPress/HTTP unverified |

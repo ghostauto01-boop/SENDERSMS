@@ -1,0 +1,57 @@
+[
+  [
+    "first_name",
+    "First Name",
+    "Contact's first name. Falls back to the business name, then 'there'."
+  ],
+  [
+    "last_name",
+    "Last Name",
+    "Contact's surname."
+  ],
+  [
+    "full_name",
+    "Full Name",
+    "First and last name joined."
+  ],
+  [
+    "business_name",
+    "Business Name",
+    "Company / brand name."
+  ],
+  [
+    "phone_number",
+    "Phone Number",
+    "Normalized phone number."
+  ],
+  [
+    "email",
+    "Email",
+    "Email address."
+  ],
+  [
+    "city",
+    "City",
+    "City or town."
+  ],
+  [
+    "state",
+    "State",
+    "State, region or province."
+  ],
+  [
+    "country",
+    "Country",
+    "Country."
+  ],
+  [
+    "website",
+    "Website",
+    "Website URL."
+  ],
+  [
+    "industry",
+    "Industry",
+    "Industry / sector / niche."
+  ]
+]

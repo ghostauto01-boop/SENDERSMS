@@ -4,7 +4,7 @@ namespace SenderSuite;
 /** Explicit non-sending application endpoints. Never generic table exposure or successful stubs. */
 final class DataRoutes {
     public static function definitions() {
-        return array('/contacts/?'=>array('GET','POST'), '/contacts/tags/?'=>array('GET'), '/contacts/(?P<contact_id>-?[0-9]+)'=>array('GET','PUT'), '/lists/?'=>array('GET','POST'), '/lists/(?P<list_id>-?[0-9]+)'=>array('PUT'), '/lists/(?P<list_id>-?[0-9]+)/contacts'=>array('GET','POST'), '/lists/(?P<list_id>-?[0-9]+)/contacts/add-all'=>array('POST'), '/lists/(?P<list_id>-?[0-9]+)/contacts/remove'=>array('POST'), '/lists/(?P<list_id>-?[0-9]+)/stats'=>array('GET'));
+        return array_merge(VariableRoutes::definitions(),array('/contacts/?'=>array('GET','POST'), '/contacts/tags/?'=>array('GET'), '/contacts/(?P<contact_id>-?[0-9]+)'=>array('GET','PUT'), '/lists/?'=>array('GET','POST'), '/lists/(?P<list_id>-?[0-9]+)'=>array('PUT'), '/lists/(?P<list_id>-?[0-9]+)/contacts'=>array('GET','POST'), '/lists/(?P<list_id>-?[0-9]+)/contacts/add-all'=>array('POST'), '/lists/(?P<list_id>-?[0-9]+)/contacts/remove'=>array('POST'), '/lists/(?P<list_id>-?[0-9]+)/stats'=>array('GET')));
     }
     public static function register() {
         foreach (self::definitions() as $path=>$methods) {
@@ -28,11 +28,12 @@ final class DataRoutes {
         if ($max!==null && $out>$max) { throw new ValidationFailure('Input should be less than or equal to '.$max,$field); }
         return $out;
     }
+    public static function boolean($value,$field){if(is_bool($value)){return $value;}if(in_array($value,array(0,1,0.0,1.0),true)){return (bool)$value;}if(is_string($value)&&in_array(strtolower($value),array('0','1','false','true','f','t','off','on','no','yes','n','y'),true)){return in_array(strtolower($value),array('1','true','t','on','yes','y'),true);}throw new ValidationFailure('Input should be a valid boolean, unable to interpret input',$field);}
     public static function ids($value,$field='contact_ids') {
         if (!is_array($value)) { throw new ValidationFailure('Input should be a valid list',$field); }
         $out=array(); foreach ($value as $i=>$v) { $out[]=self::integer($v,$field.'.'.$i); } return $out;
     }
-    private static function text(array $q,$name,$default=null,$min=null,$max=null) {
+    public static function text(array $q,$name,$default=null,$min=null,$max=null) {
         if (!array_key_exists($name,$q)) { return $default; }
         $v=$q[$name];
         if (!is_string($v)) { throw new ValidationFailure('Input should be a valid string',$name); }
@@ -46,7 +47,7 @@ final class DataRoutes {
         foreach (array('list_id','exclude_list_id') as $name) { if (array_key_exists($name,$q) && $q[$name]!==null) { $out[$name]=self::integer($q[$name],$name); } }
         return $out;
     }
-    private static function body($request) {
+    public static function body($request) {
         $raw=$request->get_body();
         if ($raw==='') { throw new ValidationFailure('Field required'); }
         try { return json_decode($raw,false,512,JSON_THROW_ON_ERROR); } catch (\Throwable $e) { throw new ValidationFailure('JSON decode error'); }
@@ -61,7 +62,8 @@ final class DataRoutes {
             if ($user===null) { throw new AuthFailure(401,'Not authenticated'); }
             $path=trim(substr($request->get_route(),strlen('/sender-suite/v1/')),'/'); $method=$request->get_method(); $q=$request->get_query_params();
             $contacts=new Contacts($c['db']); $lists=new ContactLists($c['db']); $status=200;
-            $data=$c['db']->transaction(function()use($path,$method,$q,$request,$contacts,$lists,&$status){
+            $data=$c['db']->transaction(function()use($path,$method,$q,$request,$contacts,$lists,$c,&$status){
+                if ($path==='variables'||strpos($path,'variables/')===0) { return VariableRoutes::handle($request,$c,$status); }
                 if ($path==='contacts') {
                     if ($method==='POST') { $status=201; return $contacts->create(self::body($request)); }
                     if ($method==='GET') { return $contacts->listing(self::filters($q),self::integer($q['page']??1,'page',1),self::integer($q['per_page']??25,'per_page',1,100)); }
