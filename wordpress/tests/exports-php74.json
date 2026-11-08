@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "assertions": 68,
+  "diffs": [],
+  "source_operations": 34,
+  "php": "7.4.34-dev",
+  "scope": "Selected real source exports plus disclosed CSV safety adjustments, synthetic SQLite read scenarios and cursor/resource guards. Not native WordPress/MySQL/HTTP/browser or concurrent snapshot certification.",
+  "native_wordpress_verified": false,
+  "native_mysql_verified": false,
+  "provider_messages_sent": 0,
+  "suite": "exports"
+}

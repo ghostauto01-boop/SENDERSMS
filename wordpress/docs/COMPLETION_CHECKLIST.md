@@ -2,9 +2,9 @@
 
 Build: **0.11.0-dev**. WordPress is the native application backend; no original Python service is the proposed runtime. Original repository application files remain unchanged.
 
-**422 missing handlers, 86 partially implemented handlers, zero native-certified contracts, 508 source method/path contracts in total.** A partial handler has actual implementation, but does not mean its complete workflow, UI, dependencies and native behavior are certified. Every endpoint remains in the release backlog until those gates pass. Raw handler counts are not a percent-complete estimate.
+**420 missing handlers, 88 partially implemented handlers, zero native-certified contracts, 508 source method/path contracts in total.** A partial handler has actual implementation, but does not mean its complete workflow, UI, dependencies and native behavior are certified. Every endpoint remains in the release backlog until those gates pass. Raw handler counts are not a percent-complete estimate.
 
-Fresh offline evidence: 38,174 functional PHP-WASM assertions, 72 first-party syntax checks, 165 unchanged original frontend hashes. Offline evidence is **not** real WordPress/MySQL/HTTP/provider/browser certification. This checklist is the full current implementation/release backlog, not a claim that software can be guaranteed to run perfectly on every host.
+Fresh offline evidence: 38,376 functional PHP-WASM assertions, 74 first-party syntax checks, 165 unchanged original frontend hashes. Offline evidence is **not** real WordPress/MySQL/HTTP/provider/browser certification. This checklist is the full current implementation/release backlog, not a claim that software can be guaranteed to run perfectly on every host.
 
 ## Implementation order and acceptance gates
 
@@ -20,7 +20,7 @@ Fresh offline evidence: 38,174 functional PHP-WASM assertions, 72 first-party sy
 - [ ] Finish all exact methods/paths in the endpoint inventory below with source-compatible validation, responses, permissions and substantive behavior; never replace missing features with fake successful stubs.
 - [ ] Complete settings/provider wiring beyond the eight initial encrypted auth settings; all source configuration families, redacted outputs, secret storage, URL validation and rotation.
 - [ ] Complete remaining profile/account/session workflows and roles/permissions.
-- [ ] Certify implemented contact/list deletion, dependency cleanup and bulk actions on native hosts; complete exports/enrichment, email verification, aliases/suppression and export/data-management workflows. Avoid deleting shared calendar attendees or unrelated records.
+- [ ] Certify implemented contact/list deletion, dependency cleanup and bulk actions on native hosts; certify implemented JSON/CSV exports and complete enrichment, email verification, aliases/suppression and export/data-management workflows. Avoid deleting shared calendar attendees or unrelated records.
 - [ ] Validate upload preview, synchronous imports, background jobs/progress/error reports and URL imports on native hosts, including consent preservation, atomic batches, crashes, duplicate IDs/memberships, locks, public-address pinning/TLS, limits and retention. These APIs are implemented, not native-certified.
 - [ ] Implement actual SMS transports, provider/device/gateway configuration, one-to-one/bulk sends, scheduling, delivery/status reconciliation, bounded retries and error handling.
 - [ ] Implement complete email accounts/mailboxes/transports, domains/DNS verification, SMTP/provider/OAuth paths, sender selection, bulk/one-to-one mail, attachments, threading, suppression, unsubscribe/list headers, bounce/open/click tracking and inbox ingestion.
@@ -81,7 +81,7 @@ All counts below are derived from `docs/contracts.json`. Missing = no native han
 | calls | 11 | 0 | 0 |
 | campaign_followups | 9 | 0 | 0 |
 | campaigns | 18 | 0 | 0 |
-| contacts | 5 | 20 | 0 |
+| contacts | 3 | 22 | 0 |
 | dashboard | 2 | 0 | 0 |
 | email | 41 | 0 | 0 |
 | followups | 7 | 0 | 0 |
@@ -239,8 +239,8 @@ This exhaustive list includes partially implemented routes because none is yet n
 | GET | `/api/v1/contacts` | Implemented partially; native/full-workflow proof required |
 | GET | `/api/v1/contacts/` | Implemented partially; native/full-workflow proof required |
 | GET | `/api/v1/contacts/enrich/status` | Missing implementation |
-| GET | `/api/v1/contacts/export` | Missing implementation |
-| GET | `/api/v1/contacts/export/csv` | Missing implementation |
+| GET | `/api/v1/contacts/export` | Implemented partially; native/full-workflow proof required |
+| GET | `/api/v1/contacts/export/csv` | Implemented partially; native/full-workflow proof required |
 | GET | `/api/v1/contacts/import/jobs/{job_id}` | Implemented partially; native/full-workflow proof required |
 | GET | `/api/v1/contacts/import/jobs/{job_id}/errors.csv` | Implemented partially; native/full-workflow proof required |
 | GET | `/api/v1/contacts/tags/` | Implemented partially; native/full-workflow proof required |

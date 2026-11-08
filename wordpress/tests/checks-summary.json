@@ -1,7 +1,7 @@
 {
   "ok": true,
-  "php_lint_checks": 72,
-  "php_assertions": 38174,
+  "php_lint_checks": 74,
+  "php_assertions": 38376,
   "vendor_parser_checks": 3075,
   "vendor_hash_checks": 1547,
   "unchanged_frontend_files": 165,
@@ -69,7 +69,7 @@
     },
     {
       "ok": true,
-      "assertions": 422,
+      "assertions": 455,
       "diffs": [],
       "php": "7.4.34-dev",
       "scope": "Offline requests/responses with synthetic password codec, seventy-three synthetic SQLite application tables, fault-injected transaction failure; not real WP/HTTP/Argon2/native MySQL/concurrency proof",
@@ -199,6 +199,18 @@
       "native_mysql_verified": false,
       "provider_messages_sent": 0,
       "suite": "contact-actions"
+    },
+    {
+      "ok": true,
+      "assertions": 68,
+      "diffs": [],
+      "source_operations": 34,
+      "php": "7.4.34-dev",
+      "scope": "Selected real source exports plus disclosed CSV safety adjustments, synthetic SQLite read scenarios and cursor/resource guards. Not native WordPress/MySQL/HTTP/browser or concurrent snapshot certification.",
+      "native_wordpress_verified": false,
+      "native_mysql_verified": false,
+      "provider_messages_sent": 0,
+      "suite": "exports"
     },
     {
       "ok": true,
@@ -270,7 +282,7 @@
     },
     {
       "ok": true,
-      "assertions": 422,
+      "assertions": 455,
       "diffs": [],
       "php": "8.3.36",
       "scope": "Offline requests/responses with synthetic password codec, seventy-three synthetic SQLite application tables, fault-injected transaction failure; not real WP/HTTP/Argon2/native MySQL/concurrency proof",
@@ -400,6 +412,18 @@
       "native_mysql_verified": false,
       "provider_messages_sent": 0,
       "suite": "contact-actions"
+    },
+    {
+      "ok": true,
+      "assertions": 68,
+      "diffs": [],
+      "source_operations": 34,
+      "php": "8.3.36",
+      "scope": "Selected real source exports plus disclosed CSV safety adjustments, synthetic SQLite read scenarios and cursor/resource guards. Not native WordPress/MySQL/HTTP/browser or concurrent snapshot certification.",
+      "native_wordpress_verified": false,
+      "native_mysql_verified": false,
+      "provider_messages_sent": 0,
+      "suite": "exports"
     },
     {
       "ok": true,

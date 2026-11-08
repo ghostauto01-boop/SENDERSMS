@@ -4,7 +4,7 @@ namespace SenderSuite;
 /** Explicit non-sending application endpoints. Never generic table exposure or successful stubs. */
 final class DataRoutes {
     public static function definitions() {
-        return array_merge(Sequences::definitions(),Analytics::definitions(),VariableRoutes::definitions(),TemplateRoutes::definitions(),ReplyRoutes::definitions(),NotificationCenter::definitions(),ImportRoutes::definitions(),array('/contacts/?'=>array('GET','POST'), '/contacts/tags/?'=>array('GET'), '/contacts/(?P<contact_id>-?[0-9]+)'=>array('GET','PUT','DELETE'), '/contacts/bulk'=>array('POST'), '/contacts/clean'=>array('POST'), '/contacts/quarantine/generated'=>array('POST'), '/contacts/(?P<contact_id>-?[0-9]+)/activity'=>array('GET'), '/contacts/(?P<contact_id>-?[0-9]+)/(?P<action>email-opt-in|email-opt-out|sms-opt-in)'=>array('POST'), '/lists/?'=>array('GET','POST'), '/lists/(?P<list_id>-?[0-9]+)'=>array('PUT','DELETE'), '/lists/(?P<list_id>-?[0-9]+)/contacts/delete'=>array('POST'), '/lists/(?P<list_id>-?[0-9]+)/clean'=>array('POST'), '/lists/(?P<list_id>-?[0-9]+)/contacts'=>array('GET','POST'), '/lists/(?P<list_id>-?[0-9]+)/contacts/add-all'=>array('POST'), '/lists/(?P<list_id>-?[0-9]+)/contacts/remove'=>array('POST'), '/lists/(?P<list_id>-?[0-9]+)/stats'=>array('GET')));
+        return array_merge(ContactExport::definitions(),Sequences::definitions(),Analytics::definitions(),VariableRoutes::definitions(),TemplateRoutes::definitions(),ReplyRoutes::definitions(),NotificationCenter::definitions(),ImportRoutes::definitions(),array('/contacts/?'=>array('GET','POST'), '/contacts/tags/?'=>array('GET'), '/contacts/(?P<contact_id>-?[0-9]+)'=>array('GET','PUT','DELETE'), '/contacts/bulk'=>array('POST'), '/contacts/clean'=>array('POST'), '/contacts/quarantine/generated'=>array('POST'), '/contacts/(?P<contact_id>-?[0-9]+)/activity'=>array('GET'), '/contacts/(?P<contact_id>-?[0-9]+)/(?P<action>email-opt-in|email-opt-out|sms-opt-in)'=>array('POST'), '/lists/?'=>array('GET','POST'), '/lists/(?P<list_id>-?[0-9]+)'=>array('PUT','DELETE'), '/lists/(?P<list_id>-?[0-9]+)/contacts/delete'=>array('POST'), '/lists/(?P<list_id>-?[0-9]+)/clean'=>array('POST'), '/lists/(?P<list_id>-?[0-9]+)/contacts'=>array('GET','POST'), '/lists/(?P<list_id>-?[0-9]+)/contacts/add-all'=>array('POST'), '/lists/(?P<list_id>-?[0-9]+)/contacts/remove'=>array('POST'), '/lists/(?P<list_id>-?[0-9]+)/stats'=>array('GET')));
     }
     public static function register() {
         foreach (self::definitions() as $path=>$methods) {
@@ -73,6 +73,7 @@ final class DataRoutes {
                 if ($path==='ai/classify'||$path==='autoreply'||strpos($path,'autoreply/')===0||$path==='automations'||strpos($path,'automations/')===0) { return ReplyRoutes::handle($request,$c,$status); }
                 if ($path==='templates'||strpos($path,'templates/')===0) { return TemplateRoutes::handle($request,$c,$status); }
                 if ($path==='variables'||strpos($path,'variables/')===0) { return VariableRoutes::handle($request,$c,$status); }
+                if (in_array($path,array('contacts/export','contacts/export/csv'),true) && $method==='GET') { return ContactExport::handle($request,$c); }
                 if ($path==='contacts/bulk' && $method==='POST') { return $actions->bulk(self::body($request)); }
                 if ($path==='contacts/clean' && $method==='POST') { return $actions->clean(null,false,array_key_exists('delete_bad',$q)?self::boolean($q['delete_bad'],'delete_bad'):false); }
                 if ($path==='contacts/quarantine/generated' && $method==='POST') { return $actions->quarantine(array_key_exists('dry_run',$q)?self::boolean($q['dry_run'],'dry_run'):true); }
@@ -127,7 +128,7 @@ final class DataRoutes {
                 throw new AuthFailure(404,'Not Found');
             });
             $response=AuthRoutes::response($data,$status,$id);
-            if ($data instanceof ImportErrorReport) { $response->header('Content-Type','text/csv; charset=UTF-8'); $response->header('Content-Disposition','attachment; filename="'.$data->filename.'"'); $response->header('X-Content-Type-Options','nosniff'); }
+            if ($data instanceof ImportErrorReport || $data instanceof ContactCsvDownload) { $response->header('Content-Type','text/csv; charset=UTF-8'); $response->header('Content-Disposition','attachment; filename="'.$data->filename.'"'); $response->header('X-Content-Type-Options','nosniff'); }
             return $response;
         } catch (ValidationFailure $e) {
             return AuthRoutes::response(AuthRoutes::error(422,$e->getMessage(),$id,$e->field,true),422,$id);

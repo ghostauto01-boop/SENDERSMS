@@ -1,6 +1,6 @@
 # Remaining WordPress recreation work
 
-422 missing source handlers,86 partial health/auth/contact/list/variable/template/reply/classification/notification/import/analytics/sequence handlers,0 fully certified contracts. The administrator CSV diagnostic is not the original source import API.
+420 missing source handlers,88 partial health/auth/contact/list/variable/template/reply/classification/notification/import/analytics/sequence handlers,0 fully certified contracts. The administrator CSV diagnostic is not the original source import API.
 
 Every row is outstanding, including all partial handlers until native HTTP certification. See README.md for actual implemented utilities and fresh test boundaries.
 
@@ -135,8 +135,8 @@ Every row is outstanding, including all partial handlers until native HTTP certi
 | GET | /api/v1/contacts | backend/app/api/v1/contacts.py:186 | partial handler; native WordPress/HTTP unverified |
 | GET | /api/v1/contacts/ | backend/app/api/v1/contacts.py:186 | partial handler; native WordPress/HTTP unverified |
 | GET | /api/v1/contacts/enrich/status | backend/app/api/v1/contacts.py:1496 | missing original application handler |
-| GET | /api/v1/contacts/export | backend/app/api/v1/contacts.py:349 | missing original application handler |
-| GET | /api/v1/contacts/export/csv | backend/app/api/v1/contacts.py:1663 | missing original application handler |
+| GET | /api/v1/contacts/export | backend/app/api/v1/contacts.py:349 | partial handler; native WordPress/HTTP unverified |
+| GET | /api/v1/contacts/export/csv | backend/app/api/v1/contacts.py:1663 | partial handler; native WordPress/HTTP unverified |
 | GET | /api/v1/contacts/import/jobs/{job_id} | backend/app/api/v1/contacts.py:1334 | partial handler; native WordPress/HTTP unverified |
 | GET | /api/v1/contacts/import/jobs/{job_id}/errors.csv | backend/app/api/v1/contacts.py:1367 | partial handler; native WordPress/HTTP unverified |
 | GET | /api/v1/contacts/tags/ | backend/app/api/v1/contacts.py:546 | partial handler; native WordPress/HTTP unverified |
