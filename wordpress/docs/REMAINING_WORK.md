@@ -1,6 +1,6 @@
 # Remaining WordPress recreation work
 
-480 missing source handlers,28 partial health/auth/contact/list/variable handlers,0 fully certified contracts. The administrator CSV diagnostic is not the original source import API.
+470 missing source handlers,38 partial health/auth/contact/list/variable/template handlers,0 fully certified contracts. The administrator CSV diagnostic is not the original source import API.
 
 Every row is outstanding, including all partial handlers until native HTTP certification. See README.md for actual implemented utilities and fresh test boundaries.
 
@@ -41,7 +41,7 @@ Every row is outstanding, including all partial handlers until native HTTP certi
 | DELETE | /api/v1/settings/callgate/webhooks/{webhook_id} | backend/app/api/v1/settings.py:287 | missing original application handler |
 | DELETE | /api/v1/settings/gateway/phones/{phone_id} | backend/app/api/v1/settings.py:501 | missing original application handler |
 | DELETE | /api/v1/settings/gateway/webhooks/{webhook_id} | backend/app/api/v1/settings.py:142 | missing original application handler |
-| DELETE | /api/v1/templates/{template_id} | backend/app/api/v1/templates.py:306 | missing original application handler |
+| DELETE | /api/v1/templates/{template_id} | backend/app/api/v1/templates.py:306 | partial handler; native WordPress/HTTP unverified |
 | DELETE | /api/v1/variables/{variable_id} | backend/app/api/v1/variables.py:163 | partial handler; native WordPress/HTTP unverified |
 | DELETE | /connectors/{key}/mcp | backend/app/api/v1/mcp.py:353 | missing original application handler |
 | DELETE | /mcp | backend/app/api/v1/mcp.py:313 | missing original application handler |
@@ -232,10 +232,10 @@ Every row is outstanding, including all partial handlers until native HTTP certi
 | GET | /api/v1/settings/notifications/muted-senders | backend/app/api/v1/settings.py:158 | missing original application handler |
 | GET | /api/v1/system/errors | backend/app/api/v1/system.py:291 | missing original application handler |
 | GET | /api/v1/system/health | backend/app/api/v1/system.py:47 | missing original application handler |
-| GET | /api/v1/templates | backend/app/api/v1/templates.py:95 | missing original application handler |
-| GET | /api/v1/templates/ | backend/app/api/v1/templates.py:95 | missing original application handler |
-| GET | /api/v1/templates/categories | backend/app/api/v1/templates.py:126 | missing original application handler |
-| GET | /api/v1/templates/{template_id} | backend/app/api/v1/templates.py:201 | missing original application handler |
+| GET | /api/v1/templates | backend/app/api/v1/templates.py:95 | partial handler; native WordPress/HTTP unverified |
+| GET | /api/v1/templates/ | backend/app/api/v1/templates.py:95 | partial handler; native WordPress/HTTP unverified |
+| GET | /api/v1/templates/categories | backend/app/api/v1/templates.py:126 | partial handler; native WordPress/HTTP unverified |
+| GET | /api/v1/templates/{template_id} | backend/app/api/v1/templates.py:201 | partial handler; native WordPress/HTTP unverified |
 | GET | /api/v1/validator/jobs | backend/app/api/v1/validator.py:186 | missing original application handler |
 | GET | /api/v1/validator/jobs/{job_id} | backend/app/api/v1/validator.py:199 | missing original application handler |
 | GET | /api/v1/validator/status | backend/app/api/v1/validator.py:83 | missing original application handler |
@@ -458,10 +458,10 @@ Every row is outstanding, including all partial handlers until native HTTP certi
 | POST | /api/v1/settings/gateway/register-webhook | backend/app/api/v1/settings.py:78 | missing original application handler |
 | POST | /api/v1/settings/gateway/test | backend/app/api/v1/settings.py:72 | missing original application handler |
 | POST | /api/v1/settings/notifications/{provider}/test | backend/app/api/v1/settings.py:184 | missing original application handler |
-| POST | /api/v1/templates/ | backend/app/api/v1/templates.py:215 | missing original application handler |
-| POST | /api/v1/templates/preview | backend/app/api/v1/templates.py:141 | missing original application handler |
-| POST | /api/v1/templates/{template_id}/duplicate | backend/app/api/v1/templates.py:321 | missing original application handler |
-| POST | /api/v1/templates/{template_id}/to-email | backend/app/api/v1/templates.py:353 | missing original application handler |
+| POST | /api/v1/templates/ | backend/app/api/v1/templates.py:215 | partial handler; native WordPress/HTTP unverified |
+| POST | /api/v1/templates/preview | backend/app/api/v1/templates.py:141 | partial handler; native WordPress/HTTP unverified |
+| POST | /api/v1/templates/{template_id}/duplicate | backend/app/api/v1/templates.py:321 | partial handler; native WordPress/HTTP unverified |
+| POST | /api/v1/templates/{template_id}/to-email | backend/app/api/v1/templates.py:353 | partial handler; native WordPress/HTTP unverified |
 | POST | /api/v1/validator/batch | backend/app/api/v1/validator.py:281 | missing original application handler |
 | POST | /api/v1/validator/jobs | backend/app/api/v1/validator.py:159 | missing original application handler |
 | POST | /api/v1/validator/jobs/{job_id}/cancel | backend/app/api/v1/validator.py:211 | missing original application handler |
@@ -512,5 +512,5 @@ Every row is outstanding, including all partial handlers until native HTTP certi
 | PUT | /api/v1/settings/google-oauth | backend/app/api/v1/settings.py:357 | missing original application handler |
 | PUT | /api/v1/settings/notifications/muted-senders | backend/app/api/v1/settings.py:165 | missing original application handler |
 | PUT | /api/v1/settings/notifications/{provider} | backend/app/api/v1/settings.py:172 | missing original application handler |
-| PUT | /api/v1/templates/{template_id} | backend/app/api/v1/templates.py:262 | missing original application handler |
+| PUT | /api/v1/templates/{template_id} | backend/app/api/v1/templates.py:262 | partial handler; native WordPress/HTTP unverified |
 | PUT | /api/v1/variables/{variable_id} | backend/app/api/v1/variables.py:123 | partial handler; native WordPress/HTTP unverified |

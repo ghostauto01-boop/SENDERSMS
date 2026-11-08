@@ -320,7 +320,7 @@
     "sources": [
       "backend/app/api/v1/templates.py:306"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -2041,7 +2041,7 @@
     "sources": [
       "backend/app/api/v1/templates.py:95"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -2050,7 +2050,7 @@
     "sources": [
       "backend/app/api/v1/templates.py:95"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -2059,7 +2059,7 @@
     "sources": [
       "backend/app/api/v1/templates.py:126"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -2068,7 +2068,7 @@
     "sources": [
       "backend/app/api/v1/templates.py:201"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -4076,7 +4076,7 @@
     "sources": [
       "backend/app/api/v1/templates.py:215"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -4085,7 +4085,7 @@
     "sources": [
       "backend/app/api/v1/templates.py:141"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -4094,7 +4094,7 @@
     "sources": [
       "backend/app/api/v1/templates.py:321"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -4103,7 +4103,7 @@
     "sources": [
       "backend/app/api/v1/templates.py:353"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -4562,7 +4562,7 @@
     "sources": [
       "backend/app/api/v1/templates.py:262"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {

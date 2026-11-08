@@ -1,9 +1,9 @@
 {
   "ok": true,
-  "assertions": 94,
+  "assertions": 137,
   "diffs": [],
   "php": "7.4.34-dev",
-  "scope": "Offline requests/responses with synthetic password codec, six synthetic SQLite business tables, fault-injected transaction failure; not real WP/HTTP/Argon2/native MySQL/concurrency proof",
+  "scope": "Offline requests/responses with synthetic password codec, seven synthetic SQLite business tables, fault-injected transaction failure; not real WP/HTTP/Argon2/native MySQL/concurrency proof",
   "native_wordpress_verified": false,
   "native_mysql_verified": false,
   "suite": "data-routes"

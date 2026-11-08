@@ -26,6 +26,7 @@ final class Records {
             elseif ($column['nullable']) { $data[$name] = null; }
             else { throw new \InvalidArgumentException('Required model value missing: '.$name); }
         }
+        foreach ($data as $name => &$value) { if ($spec['columns'][$name]['type'] === 'Integer' && is_bool($value)) { $value = (int)$value; } } unset($value);
         $id = $this->db->insert($table, $data);
         return $this->db->one($table, array('id' => $id));
     }

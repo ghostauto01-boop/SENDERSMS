@@ -4,7 +4,7 @@ namespace SenderSuite;
 /** Explicit non-sending application endpoints. Never generic table exposure or successful stubs. */
 final class DataRoutes {
     public static function definitions() {
-        return array_merge(VariableRoutes::definitions(),array('/contacts/?'=>array('GET','POST'), '/contacts/tags/?'=>array('GET'), '/contacts/(?P<contact_id>-?[0-9]+)'=>array('GET','PUT'), '/lists/?'=>array('GET','POST'), '/lists/(?P<list_id>-?[0-9]+)'=>array('PUT'), '/lists/(?P<list_id>-?[0-9]+)/contacts'=>array('GET','POST'), '/lists/(?P<list_id>-?[0-9]+)/contacts/add-all'=>array('POST'), '/lists/(?P<list_id>-?[0-9]+)/contacts/remove'=>array('POST'), '/lists/(?P<list_id>-?[0-9]+)/stats'=>array('GET')));
+        return array_merge(VariableRoutes::definitions(),TemplateRoutes::definitions(),array('/contacts/?'=>array('GET','POST'), '/contacts/tags/?'=>array('GET'), '/contacts/(?P<contact_id>-?[0-9]+)'=>array('GET','PUT'), '/lists/?'=>array('GET','POST'), '/lists/(?P<list_id>-?[0-9]+)'=>array('PUT'), '/lists/(?P<list_id>-?[0-9]+)/contacts'=>array('GET','POST'), '/lists/(?P<list_id>-?[0-9]+)/contacts/add-all'=>array('POST'), '/lists/(?P<list_id>-?[0-9]+)/contacts/remove'=>array('POST'), '/lists/(?P<list_id>-?[0-9]+)/stats'=>array('GET')));
     }
     public static function register() {
         foreach (self::definitions() as $path=>$methods) {
@@ -63,6 +63,7 @@ final class DataRoutes {
             $path=trim(substr($request->get_route(),strlen('/sender-suite/v1/')),'/'); $method=$request->get_method(); $q=$request->get_query_params();
             $contacts=new Contacts($c['db']); $lists=new ContactLists($c['db']); $status=200;
             $data=$c['db']->transaction(function()use($path,$method,$q,$request,$contacts,$lists,$c,&$status){
+                if ($path==='templates'||strpos($path,'templates/')===0) { return TemplateRoutes::handle($request,$c,$status); }
                 if ($path==='variables'||strpos($path,'variables/')===0) { return VariableRoutes::handle($request,$c,$status); }
                 if ($path==='contacts') {
                     if ($method==='POST') { $status=201; return $contacts->create(self::body($request)); }
@@ -109,6 +110,7 @@ final class DataRoutes {
             return AuthRoutes::response(AuthRoutes::error(422,$e->getMessage(),$id,$e->field,true),422,$id);
         } catch (AuthFailure $e) {
             $body=AuthRoutes::error($e->status,$e->getMessage(),$id);
+            if ($e instanceof DetailedFailure) { foreach ($e->detail as $k=>$v) { if (in_array($k,array('code','field','hint'),true) || !array_key_exists($k,$body)) { $body[$k]=$v; } } }
             if ($e instanceof ListNameConflict) { $body['code']='LIST_NAME_EXISTS'; $body['existing_id']=$e->existingId; }
             return AuthRoutes::response($body,$e->status,$id);
         } catch (\Throwable $e) {

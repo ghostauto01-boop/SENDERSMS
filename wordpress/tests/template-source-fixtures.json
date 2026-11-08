@@ -1,0 +1,2278 @@
+{
+  "operations": [
+    {
+      "op": "create",
+      "body": {
+        "name": "Welcome",
+        "category": "SMS",
+        "body": "Hi {{first_name}}",
+        "subject": "ignored",
+        "attachments": [
+          {
+            "name": "ignored",
+            "content": "YQ=="
+          }
+        ],
+        "include_unsubscribe": false
+      },
+      "expected": {
+        "status": 201,
+        "body": {
+          "id": 1,
+          "name": "Welcome",
+          "category": "SMS",
+          "channel": "sms",
+          "body": "Hi {{first_name}}",
+          "subject": null,
+          "html_body": null,
+          "preheader": null,
+          "email_account_id": null,
+          "attachments": [],
+          "include_unsubscribe": true,
+          "char_count": 17,
+          "segment_count": 1,
+          "is_active": true,
+          "use_count": 0,
+          "created_at": "2026-01-02T12:00:00.123456",
+          "updated_at": "2026-01-02T12:00:00.123456"
+        }
+      },
+      "template_count": 1
+    },
+    {
+      "op": "create",
+      "body": {
+        "name": "Bad",
+        "body": "{{frist_name}} {{unobtainium}}"
+      },
+      "expected": {
+        "status": 422,
+        "detail": {
+          "code": "UNKNOWN_TEMPLATE_VARIABLES",
+          "message": "This message uses variables that do not exist: {{frist_name}} (did you mean {{first_name}}?), {{unobtainium}}. Fix the spelling, or add the variable on the Variables page.",
+          "unknown": [
+            "frist_name",
+            "unobtainium"
+          ],
+          "suggestions": {
+            "frist_name": "first_name"
+          }
+        }
+      },
+      "template_count": 1
+    },
+    {
+      "op": "create",
+      "body": {
+        "name": "Email no body",
+        "channel": "email",
+        "subject": "Subject"
+      },
+      "expected": {
+        "status": 422,
+        "message": "An email template needs a body (or an HTML body)"
+      },
+      "template_count": 1
+    },
+    {
+      "op": "create",
+      "body": {
+        "name": "Email no subject",
+        "channel": "email",
+        "body": "Text"
+      },
+      "expected": {
+        "status": 422,
+        "message": "An email template needs a subject line"
+      },
+      "template_count": 1
+    },
+    {
+      "op": "create",
+      "body": {
+        "name": "Email",
+        "category": "Mail",
+        "channel": "email",
+        "subject": "Hi {{business_name}}",
+        "body": "Plain",
+        "html_body": "<b>{{first_name}}</b>",
+        "attachments": [
+          {
+            "name": "test.txt",
+            "content_base64": "YQ=="
+          }
+        ],
+        "include_unsubscribe": false
+      },
+      "expected": {
+        "status": 201,
+        "body": {
+          "id": 2,
+          "name": "Email",
+          "category": "Mail",
+          "channel": "email",
+          "body": "Plain",
+          "subject": "Hi {{business_name}}",
+          "html_body": "<b>{{first_name}}</b>",
+          "preheader": null,
+          "email_account_id": null,
+          "attachments": [
+            {
+              "name": "test.txt",
+              "content_type": "application/octet-stream",
+              "size": 1
+            }
+          ],
+          "include_unsubscribe": false,
+          "char_count": 5,
+          "segment_count": 1,
+          "is_active": true,
+          "use_count": 0,
+          "created_at": "2026-01-02T12:00:00.123456",
+          "updated_at": "2026-01-02T12:00:00.123456"
+        }
+      },
+      "template_count": 2
+    },
+    {
+      "op": "create",
+      "body": {
+        "name": "Zeros",
+        "channel": "email",
+        "subject": "0",
+        "body": "0"
+      },
+      "expected": {
+        "status": 201,
+        "body": {
+          "id": 3,
+          "name": "Zeros",
+          "category": null,
+          "channel": "email",
+          "body": "0",
+          "subject": "0",
+          "html_body": null,
+          "preheader": null,
+          "email_account_id": null,
+          "attachments": [],
+          "include_unsubscribe": true,
+          "char_count": 1,
+          "segment_count": 1,
+          "is_active": true,
+          "use_count": 0,
+          "created_at": "2026-01-02T12:00:00.123456",
+          "updated_at": "2026-01-02T12:00:00.123456"
+        }
+      },
+      "template_count": 3
+    },
+    {
+      "op": "list",
+      "expected": {
+        "status": 200,
+        "body": {
+          "total": 3,
+          "items": [
+            {
+              "id": 1,
+              "name": "Welcome",
+              "category": "SMS",
+              "channel": "sms",
+              "body": "Hi {{first_name}}",
+              "subject": null,
+              "html_body": null,
+              "preheader": null,
+              "email_account_id": null,
+              "attachments": [],
+              "include_unsubscribe": true,
+              "char_count": 17,
+              "segment_count": 1,
+              "is_active": true,
+              "use_count": 0,
+              "created_at": "2026-01-02T12:00:00.123456",
+              "updated_at": "2026-01-02T12:00:00.123456"
+            },
+            {
+              "id": 2,
+              "name": "Email",
+              "category": "Mail",
+              "channel": "email",
+              "body": "Plain",
+              "subject": "Hi {{business_name}}",
+              "html_body": "<b>{{first_name}}</b>",
+              "preheader": null,
+              "email_account_id": null,
+              "attachments": [
+                {
+                  "name": "test.txt",
+                  "content_type": "application/octet-stream",
+                  "size": 1
+                }
+              ],
+              "include_unsubscribe": false,
+              "char_count": 5,
+              "segment_count": 1,
+              "is_active": true,
+              "use_count": 0,
+              "created_at": "2026-01-02T12:00:00.123456",
+              "updated_at": "2026-01-02T12:00:00.123456"
+            },
+            {
+              "id": 3,
+              "name": "Zeros",
+              "category": null,
+              "channel": "email",
+              "body": "0",
+              "subject": "0",
+              "html_body": null,
+              "preheader": null,
+              "email_account_id": null,
+              "attachments": [],
+              "include_unsubscribe": true,
+              "char_count": 1,
+              "segment_count": 1,
+              "is_active": true,
+              "use_count": 0,
+              "created_at": "2026-01-02T12:00:00.123456",
+              "updated_at": "2026-01-02T12:00:00.123456"
+            }
+          ]
+        }
+      },
+      "template_count": 3
+    },
+    {
+      "op": "list",
+      "channel": "sms",
+      "expected": {
+        "status": 200,
+        "body": {
+          "total": 1,
+          "items": [
+            {
+              "id": 1,
+              "name": "Welcome",
+              "category": "SMS",
+              "channel": "sms",
+              "body": "Hi {{first_name}}",
+              "subject": null,
+              "html_body": null,
+              "preheader": null,
+              "email_account_id": null,
+              "attachments": [],
+              "include_unsubscribe": true,
+              "char_count": 17,
+              "segment_count": 1,
+              "is_active": true,
+              "use_count": 0,
+              "created_at": "2026-01-02T12:00:00.123456",
+              "updated_at": "2026-01-02T12:00:00.123456"
+            }
+          ]
+        }
+      },
+      "template_count": 3
+    },
+    {
+      "op": "list",
+      "channel": "email",
+      "expected": {
+        "status": 200,
+        "body": {
+          "total": 2,
+          "items": [
+            {
+              "id": 2,
+              "name": "Email",
+              "category": "Mail",
+              "channel": "email",
+              "body": "Plain",
+              "subject": "Hi {{business_name}}",
+              "html_body": "<b>{{first_name}}</b>",
+              "preheader": null,
+              "email_account_id": null,
+              "attachments": [
+                {
+                  "name": "test.txt",
+                  "content_type": "application/octet-stream",
+                  "size": 1
+                }
+              ],
+              "include_unsubscribe": false,
+              "char_count": 5,
+              "segment_count": 1,
+              "is_active": true,
+              "use_count": 0,
+              "created_at": "2026-01-02T12:00:00.123456",
+              "updated_at": "2026-01-02T12:00:00.123456"
+            },
+            {
+              "id": 3,
+              "name": "Zeros",
+              "category": null,
+              "channel": "email",
+              "body": "0",
+              "subject": "0",
+              "html_body": null,
+              "preheader": null,
+              "email_account_id": null,
+              "attachments": [],
+              "include_unsubscribe": true,
+              "char_count": 1,
+              "segment_count": 1,
+              "is_active": true,
+              "use_count": 0,
+              "created_at": "2026-01-02T12:00:00.123456",
+              "updated_at": "2026-01-02T12:00:00.123456"
+            }
+          ]
+        }
+      },
+      "template_count": 3
+    },
+    {
+      "op": "list",
+      "channel": "bad",
+      "expected": {
+        "status": 422,
+        "message": "channel must be one of ['sms', 'email']"
+      },
+      "template_count": 3
+    },
+    {
+      "op": "list",
+      "search": "welcome",
+      "expected": {
+        "status": 200,
+        "body": {
+          "total": 1,
+          "items": [
+            {
+              "id": 1,
+              "name": "Welcome",
+              "category": "SMS",
+              "channel": "sms",
+              "body": "Hi {{first_name}}",
+              "subject": null,
+              "html_body": null,
+              "preheader": null,
+              "email_account_id": null,
+              "attachments": [],
+              "include_unsubscribe": true,
+              "char_count": 17,
+              "segment_count": 1,
+              "is_active": true,
+              "use_count": 0,
+              "created_at": "2026-01-02T12:00:00.123456",
+              "updated_at": "2026-01-02T12:00:00.123456"
+            }
+          ]
+        }
+      },
+      "template_count": 3
+    },
+    {
+      "op": "list",
+      "category": "SMS",
+      "expected": {
+        "status": 200,
+        "body": {
+          "total": 1,
+          "items": [
+            {
+              "id": 1,
+              "name": "Welcome",
+              "category": "SMS",
+              "channel": "sms",
+              "body": "Hi {{first_name}}",
+              "subject": null,
+              "html_body": null,
+              "preheader": null,
+              "email_account_id": null,
+              "attachments": [],
+              "include_unsubscribe": true,
+              "char_count": 17,
+              "segment_count": 1,
+              "is_active": true,
+              "use_count": 0,
+              "created_at": "2026-01-02T12:00:00.123456",
+              "updated_at": "2026-01-02T12:00:00.123456"
+            }
+          ]
+        }
+      },
+      "template_count": 3
+    },
+    {
+      "op": "list",
+      "page": 2,
+      "per_page": 1,
+      "expected": {
+        "status": 200,
+        "body": {
+          "total": 3,
+          "items": [
+            {
+              "id": 2,
+              "name": "Email",
+              "category": "Mail",
+              "channel": "email",
+              "body": "Plain",
+              "subject": "Hi {{business_name}}",
+              "html_body": "<b>{{first_name}}</b>",
+              "preheader": null,
+              "email_account_id": null,
+              "attachments": [
+                {
+                  "name": "test.txt",
+                  "content_type": "application/octet-stream",
+                  "size": 1
+                }
+              ],
+              "include_unsubscribe": false,
+              "char_count": 5,
+              "segment_count": 1,
+              "is_active": true,
+              "use_count": 0,
+              "created_at": "2026-01-02T12:00:00.123456",
+              "updated_at": "2026-01-02T12:00:00.123456"
+            }
+          ]
+        }
+      },
+      "template_count": 3
+    },
+    {
+      "op": "categories",
+      "expected": {
+        "status": 200,
+        "body": {
+          "items": [
+            "Mail",
+            "SMS"
+          ]
+        }
+      },
+      "template_count": 3
+    },
+    {
+      "op": "categories",
+      "channel": "email",
+      "expected": {
+        "status": 200,
+        "body": {
+          "items": [
+            "Mail"
+          ]
+        }
+      },
+      "template_count": 3
+    },
+    {
+      "op": "get",
+      "id": 1,
+      "expected": {
+        "status": 200,
+        "body": {
+          "id": 1,
+          "name": "Welcome",
+          "category": "SMS",
+          "channel": "sms",
+          "body": "Hi {{first_name}}",
+          "subject": null,
+          "html_body": null,
+          "preheader": null,
+          "email_account_id": null,
+          "attachments": [],
+          "include_unsubscribe": true,
+          "char_count": 17,
+          "segment_count": 1,
+          "is_active": true,
+          "use_count": 0,
+          "created_at": "2026-01-02T12:00:00.123456",
+          "updated_at": "2026-01-02T12:00:00.123456"
+        }
+      },
+      "template_count": 3
+    },
+    {
+      "op": "get",
+      "id": 404,
+      "expected": {
+        "status": 404,
+        "message": "Template not found"
+      },
+      "template_count": 3
+    },
+    {
+      "op": "update",
+      "id": 1,
+      "body": {
+        "body": "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^",
+        "is_active": false
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "id": 1,
+          "name": "Welcome",
+          "category": "SMS",
+          "channel": "sms",
+          "body": "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^",
+          "subject": null,
+          "html_body": null,
+          "preheader": null,
+          "email_account_id": null,
+          "attachments": [],
+          "include_unsubscribe": true,
+          "char_count": 71,
+          "segment_count": 2,
+          "is_active": false,
+          "use_count": 0,
+          "created_at": "2026-01-02T12:00:00.123456",
+          "updated_at": "2026-01-02T12:00:00.123456"
+        }
+      },
+      "template_count": 3
+    },
+    {
+      "op": "duplicate",
+      "id": 1,
+      "expected": {
+        "status": 200,
+        "body": {
+          "id": 4,
+          "name": "Welcome (Copy)",
+          "category": "SMS",
+          "channel": "sms",
+          "body": "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^",
+          "subject": null,
+          "html_body": null,
+          "preheader": null,
+          "email_account_id": null,
+          "attachments": [],
+          "include_unsubscribe": true,
+          "char_count": 71,
+          "segment_count": 2,
+          "is_active": true,
+          "use_count": 0,
+          "created_at": "2026-01-02T12:00:00.123456",
+          "updated_at": "2026-01-02T12:00:00.123456"
+        }
+      },
+      "template_count": 4
+    },
+    {
+      "op": "to_email",
+      "id": 1,
+      "expected": {
+        "status": 200,
+        "body": {
+          "id": 5,
+          "name": "Welcome (Email)",
+          "category": "SMS",
+          "channel": "email",
+          "body": "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^",
+          "subject": "Welcome",
+          "html_body": null,
+          "preheader": null,
+          "email_account_id": null,
+          "attachments": [],
+          "include_unsubscribe": true,
+          "char_count": 71,
+          "segment_count": 1,
+          "is_active": true,
+          "use_count": 0,
+          "created_at": "2026-01-02T12:00:00.123456",
+          "updated_at": "2026-01-02T12:00:00.123456"
+        }
+      },
+      "template_count": 5
+    },
+    {
+      "op": "to_email",
+      "id": 2,
+      "expected": {
+        "status": 400,
+        "message": "That template is already an email template"
+      },
+      "template_count": 5
+    },
+    {
+      "op": "update",
+      "id": 2,
+      "body": {
+        "subject": " "
+      },
+      "expected": {
+        "status": 422,
+        "message": "An email template needs a subject line"
+      },
+      "template_count": 5
+    },
+    {
+      "op": "update",
+      "id": 2,
+      "body": {
+        "body": "New {{city}}",
+        "attachments": null
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "id": 2,
+          "name": "Email",
+          "category": "Mail",
+          "channel": "email",
+          "body": "New {{city}}",
+          "subject": "Hi {{business_name}}",
+          "html_body": "<b>{{first_name}}</b>",
+          "preheader": null,
+          "email_account_id": null,
+          "attachments": [],
+          "include_unsubscribe": false,
+          "char_count": 12,
+          "segment_count": 1,
+          "is_active": true,
+          "use_count": 0,
+          "created_at": "2026-01-02T12:00:00.123456",
+          "updated_at": "2026-01-02T12:00:00.123456"
+        }
+      },
+      "template_count": 5
+    },
+    {
+      "op": "update",
+      "id": 1,
+      "body": {
+        "body": "{{frist_name}}"
+      },
+      "expected": {
+        "status": 422,
+        "detail": {
+          "code": "UNKNOWN_TEMPLATE_VARIABLES",
+          "message": "This message uses a variable that does not exist: {{frist_name}} (did you mean {{first_name}}?). Fix the spelling, or add the variable on the Variables page.",
+          "unknown": [
+            "frist_name"
+          ],
+          "suggestions": {
+            "frist_name": "first_name"
+          }
+        }
+      },
+      "template_count": 5
+    },
+    {
+      "op": "get",
+      "id": 1,
+      "expected": {
+        "status": 200,
+        "body": {
+          "id": 1,
+          "name": "Welcome",
+          "category": "SMS",
+          "channel": "sms",
+          "body": "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^",
+          "subject": null,
+          "html_body": null,
+          "preheader": null,
+          "email_account_id": null,
+          "attachments": [],
+          "include_unsubscribe": true,
+          "char_count": 71,
+          "segment_count": 2,
+          "is_active": false,
+          "use_count": 0,
+          "created_at": "2026-01-02T12:00:00.123456",
+          "updated_at": "2026-01-02T12:00:00.123456"
+        }
+      },
+      "template_count": 5
+    },
+    {
+      "op": "preview",
+      "body": "Hi {{first_name}}, {{brand}} {{frist_name}}",
+      "subject": "{{business_name}}",
+      "channel": "email",
+      "expected": {
+        "status": 200,
+        "body": {
+          "preview": "Hi John, [UNKNOWN VARIABLE: frist_name]",
+          "subject": "Acme Ltd",
+          "html": null,
+          "char_count": 39,
+          "segment_count": 1,
+          "channel": "email",
+          "contact": null,
+          "sample": true,
+          "unknown_variables": [
+            "frist_name"
+          ],
+          "warnings": [
+            "{{frist_name}} is not a known variable — did you mean {{first_name}}? A real send would remove it, and saving a template with it is refused."
+          ]
+        }
+      },
+      "template_count": 5
+    },
+    {
+      "op": "preview",
+      "body": "Hello {{first_name}}",
+      "first_name": "Ada",
+      "expected": {
+        "status": 200,
+        "body": {
+          "preview": "Hello Ada",
+          "subject": null,
+          "html": null,
+          "char_count": 9,
+          "segment_count": 1,
+          "channel": "sms",
+          "contact": null,
+          "sample": true,
+          "unknown_variables": [],
+          "warnings": []
+        }
+      },
+      "template_count": 5
+    },
+    {
+      "op": "preview",
+      "body": "x",
+      "contact_id": 0,
+      "expected": {
+        "status": 404,
+        "message": "Contact not found"
+      },
+      "template_count": 5
+    },
+    {
+      "op": "seed_contact",
+      "body": {
+        "first_name": "Ada",
+        "business_name": "Shop",
+        "custom_fields": "{\"Pain Point\": \"time\"}"
+      },
+      "expected": {
+        "status": 201,
+        "body": {
+          "id": 1,
+          "first_name": "Ada",
+          "last_name": null,
+          "business_name": "Shop",
+          "phone_number": null,
+          "email": "fixture@business.ng",
+          "city": null,
+          "state": null,
+          "country": null,
+          "website": null,
+          "industry": null,
+          "source": null,
+          "lead_status": "new",
+          "consent_status": "unknown",
+          "has_consented": false,
+          "is_opted_out": false,
+          "is_undeliverable": false,
+          "undeliverable_reason": null,
+          "delivery_fail_count": 0,
+          "is_email_opted_out": false,
+          "email_status": "active",
+          "email_opted_out_at": null,
+          "email_opt_out_reason": null,
+          "is_email_undeliverable": false,
+          "emails_sent": 0,
+          "emails_received": 0,
+          "last_emailed_at": null,
+          "email_source": "manual",
+          "email_verified": false,
+          "email_verified_at": null,
+          "email_verdict": null,
+          "email_confidence": null,
+          "email_enriched_at": null,
+          "email_enrichment_note": null,
+          "opt_out_reason": null,
+          "opted_out_at": null,
+          "notes": null,
+          "custom_fields": "{\"Pain Point\": \"time\"}",
+          "tags": [],
+          "messages_sent": 0,
+          "messages_received": 0,
+          "last_contacted_at": null,
+          "last_reply_at": null,
+          "created_at": "2026-01-02T12:00:00.123456",
+          "updated_at": "2026-01-02T12:00:00.123456"
+        }
+      },
+      "template_count": 5
+    },
+    {
+      "op": "create",
+      "body": {
+        "name": "Custom",
+        "body": "Hi {{pain_point}}"
+      },
+      "expected": {
+        "status": 201,
+        "body": {
+          "id": 6,
+          "name": "Custom",
+          "category": null,
+          "channel": "sms",
+          "body": "Hi {{pain_point}}",
+          "subject": null,
+          "html_body": null,
+          "preheader": null,
+          "email_account_id": null,
+          "attachments": [],
+          "include_unsubscribe": true,
+          "char_count": 17,
+          "segment_count": 1,
+          "is_active": true,
+          "use_count": 0,
+          "created_at": "2026-01-02T12:00:00.123456",
+          "updated_at": "2026-01-02T12:00:00.123456"
+        }
+      },
+      "template_count": 6
+    },
+    {
+      "op": "preview",
+      "body": "Hi {{first_name}} {{Pain Point}} {{Pain Point|fallback}}",
+      "contact_id": 1,
+      "expected": {
+        "status": 200,
+        "body": {
+          "preview": "Hi Ada time time",
+          "subject": null,
+          "html": null,
+          "char_count": 16,
+          "segment_count": 1,
+          "channel": "sms",
+          "contact": {
+            "id": 1,
+            "name": "Ada"
+          },
+          "sample": false,
+          "unknown_variables": [],
+          "warnings": []
+        }
+      },
+      "template_count": 6
+    },
+    {
+      "op": "create",
+      "body": {
+        "name": "Unknown email",
+        "channel": "email",
+        "subject": "{{frist_name}}",
+        "html_body": "<p>Mail</p>"
+      },
+      "expected": {
+        "status": 422,
+        "detail": {
+          "code": "UNKNOWN_TEMPLATE_VARIABLES",
+          "message": "This message uses a variable that does not exist: {{frist_name}} (did you mean {{first_name}}?). Fix the spelling, or add the variable on the Variables page.",
+          "unknown": [
+            "frist_name"
+          ],
+          "suggestions": {
+            "frist_name": "first_name"
+          }
+        }
+      },
+      "template_count": 6
+    },
+    {
+      "op": "delete",
+      "id": 3,
+      "expected": {
+        "status": 204,
+        "body": null
+      },
+      "template_count": 5
+    },
+    {
+      "op": "get",
+      "id": 3,
+      "expected": {
+        "status": 404,
+        "message": "Template not found"
+      },
+      "template_count": 5
+    },
+    {
+      "op": "list",
+      "expected": {
+        "status": 200,
+        "body": {
+          "total": 5,
+          "items": [
+            {
+              "id": 1,
+              "name": "Welcome",
+              "category": "SMS",
+              "channel": "sms",
+              "body": "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^",
+              "subject": null,
+              "html_body": null,
+              "preheader": null,
+              "email_account_id": null,
+              "attachments": [],
+              "include_unsubscribe": true,
+              "char_count": 71,
+              "segment_count": 2,
+              "is_active": false,
+              "use_count": 0,
+              "created_at": "2026-01-02T12:00:00.123456",
+              "updated_at": "2026-01-02T12:00:00.123456"
+            },
+            {
+              "id": 2,
+              "name": "Email",
+              "category": "Mail",
+              "channel": "email",
+              "body": "New {{city}}",
+              "subject": "Hi {{business_name}}",
+              "html_body": "<b>{{first_name}}</b>",
+              "preheader": null,
+              "email_account_id": null,
+              "attachments": [],
+              "include_unsubscribe": false,
+              "char_count": 12,
+              "segment_count": 1,
+              "is_active": true,
+              "use_count": 0,
+              "created_at": "2026-01-02T12:00:00.123456",
+              "updated_at": "2026-01-02T12:00:00.123456"
+            },
+            {
+              "id": 4,
+              "name": "Welcome (Copy)",
+              "category": "SMS",
+              "channel": "sms",
+              "body": "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^",
+              "subject": null,
+              "html_body": null,
+              "preheader": null,
+              "email_account_id": null,
+              "attachments": [],
+              "include_unsubscribe": true,
+              "char_count": 71,
+              "segment_count": 2,
+              "is_active": true,
+              "use_count": 0,
+              "created_at": "2026-01-02T12:00:00.123456",
+              "updated_at": "2026-01-02T12:00:00.123456"
+            },
+            {
+              "id": 5,
+              "name": "Welcome (Email)",
+              "category": "SMS",
+              "channel": "email",
+              "body": "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^",
+              "subject": "Welcome",
+              "html_body": null,
+              "preheader": null,
+              "email_account_id": null,
+              "attachments": [],
+              "include_unsubscribe": true,
+              "char_count": 71,
+              "segment_count": 1,
+              "is_active": true,
+              "use_count": 0,
+              "created_at": "2026-01-02T12:00:00.123456",
+              "updated_at": "2026-01-02T12:00:00.123456"
+            },
+            {
+              "id": 6,
+              "name": "Custom",
+              "category": null,
+              "channel": "sms",
+              "body": "Hi {{pain_point}}",
+              "subject": null,
+              "html_body": null,
+              "preheader": null,
+              "email_account_id": null,
+              "attachments": [],
+              "include_unsubscribe": true,
+              "char_count": 17,
+              "segment_count": 1,
+              "is_active": true,
+              "use_count": 0,
+              "created_at": "2026-01-02T12:00:00.123456",
+              "updated_at": "2026-01-02T12:00:00.123456"
+            }
+          ]
+        }
+      },
+      "template_count": 5
+    }
+  ],
+  "dto": [
+    {
+      "update": false,
+      "input": null,
+      "expected": {
+        "message": "Input should be a valid dictionary or object to extract fields from",
+        "field": null
+      }
+    },
+    {
+      "update": false,
+      "input": [],
+      "expected": {
+        "message": "Input should be a valid dictionary or object to extract fields from",
+        "field": null
+      }
+    },
+    {
+      "update": false,
+      "input": {},
+      "expected": {
+        "message": "Field required",
+        "field": "name"
+      }
+    },
+    {
+      "update": false,
+      "input": {
+        "name": null
+      },
+      "expected": {
+        "message": "Input should be a valid string",
+        "field": "name"
+      }
+    },
+    {
+      "update": false,
+      "input": {
+        "name": 5
+      },
+      "expected": {
+        "message": "Input should be a valid string",
+        "field": "name"
+      }
+    },
+    {
+      "update": false,
+      "input": {
+        "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      },
+      "expected": {
+        "message": "String should have at most 255 characters",
+        "field": "name"
+      }
+    },
+    {
+      "update": false,
+      "input": {
+        "name": "ok",
+        "body": null
+      },
+      "expected": {
+        "message": "Input should be a valid string",
+        "field": "body"
+      }
+    },
+    {
+      "update": false,
+      "input": {
+        "name": "ok",
+        "channel": "fax"
+      },
+      "expected": {
+        "message": "Input should be 'sms' or 'email'",
+        "field": "channel"
+      }
+    },
+    {
+      "update": false,
+      "input": {
+        "name": "ok",
+        "channel": null
+      },
+      "expected": {
+        "message": "Input should be 'sms' or 'email'",
+        "field": "channel"
+      }
+    },
+    {
+      "update": false,
+      "input": {
+        "name": "ok",
+        "subject": "ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+      },
+      "expected": {
+        "message": "String should have at most 500 characters",
+        "field": "subject"
+      }
+    },
+    {
+      "update": false,
+      "input": {
+        "name": "ok",
+        "preheader": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      },
+      "expected": {
+        "message": "String should have at most 500 characters",
+        "field": "preheader"
+      }
+    },
+    {
+      "update": false,
+      "input": {
+        "name": "ok",
+        "attachments": {}
+      },
+      "expected": {
+        "message": "Input should be a valid list",
+        "field": "attachments"
+      }
+    },
+    {
+      "update": false,
+      "input": {
+        "name": "ok",
+        "attachments": [
+          4
+        ]
+      },
+      "expected": {
+        "message": "Input should be a valid dictionary",
+        "field": "attachments.0"
+      }
+    },
+    {
+      "update": false,
+      "input": {
+        "name": "ok",
+        "attachments": [
+          []
+        ]
+      },
+      "expected": {
+        "message": "Input should be a valid dictionary",
+        "field": "attachments.0"
+      }
+    },
+    {
+      "update": false,
+      "input": {
+        "name": "ok",
+        "attachments": [
+          {}
+        ]
+      },
+      "expected": {
+        "body": {
+          "name": "ok",
+          "category": null,
+          "body": "",
+          "channel": "sms",
+          "subject": null,
+          "html_body": null,
+          "preheader": null,
+          "email_account_id": null,
+          "attachments": [
+            {}
+          ],
+          "include_unsubscribe": true
+        }
+      }
+    },
+    {
+      "update": false,
+      "input": {
+        "name": "ok",
+        "email_account_id": "1.0"
+      },
+      "expected": {
+        "body": {
+          "name": "ok",
+          "category": null,
+          "body": "",
+          "channel": "sms",
+          "subject": null,
+          "html_body": null,
+          "preheader": null,
+          "email_account_id": 1,
+          "attachments": null,
+          "include_unsubscribe": true
+        }
+      }
+    },
+    {
+      "update": false,
+      "input": {
+        "name": "ok",
+        "email_account_id": false
+      },
+      "expected": {
+        "body": {
+          "name": "ok",
+          "category": null,
+          "body": "",
+          "channel": "sms",
+          "subject": null,
+          "html_body": null,
+          "preheader": null,
+          "email_account_id": 0,
+          "attachments": null,
+          "include_unsubscribe": true
+        }
+      }
+    },
+    {
+      "update": false,
+      "input": {
+        "name": "ok",
+        "include_unsubscribe": "false"
+      },
+      "expected": {
+        "body": {
+          "name": "ok",
+          "category": null,
+          "body": "",
+          "channel": "sms",
+          "subject": null,
+          "html_body": null,
+          "preheader": null,
+          "email_account_id": null,
+          "attachments": null,
+          "include_unsubscribe": false
+        }
+      }
+    },
+    {
+      "update": false,
+      "input": {
+        "name": "ok",
+        "include_unsubscribe": null
+      },
+      "expected": {
+        "message": "Input should be a valid boolean",
+        "field": "include_unsubscribe"
+      }
+    },
+    {
+      "update": false,
+      "input": {
+        "is_active": null
+      },
+      "expected": {
+        "message": "Field required",
+        "field": "name"
+      }
+    },
+    {
+      "update": false,
+      "input": {
+        "name": "ok",
+        "extra": "ignored"
+      },
+      "expected": {
+        "body": {
+          "name": "ok",
+          "category": null,
+          "body": "",
+          "channel": "sms",
+          "subject": null,
+          "html_body": null,
+          "preheader": null,
+          "email_account_id": null,
+          "attachments": null,
+          "include_unsubscribe": true
+        }
+      }
+    },
+    {
+      "update": true,
+      "input": null,
+      "expected": {
+        "message": "Input should be a valid dictionary or object to extract fields from",
+        "field": null
+      }
+    },
+    {
+      "update": true,
+      "input": [],
+      "expected": {
+        "message": "Input should be a valid dictionary or object to extract fields from",
+        "field": null
+      }
+    },
+    {
+      "update": true,
+      "input": {},
+      "expected": {
+        "body": {}
+      }
+    },
+    {
+      "update": true,
+      "input": {
+        "name": null
+      },
+      "expected": {
+        "body": {
+          "name": null
+        }
+      }
+    },
+    {
+      "update": true,
+      "input": {
+        "name": 5
+      },
+      "expected": {
+        "message": "Input should be a valid string",
+        "field": "name"
+      }
+    },
+    {
+      "update": true,
+      "input": {
+        "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      },
+      "expected": {
+        "body": {
+          "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        }
+      }
+    },
+    {
+      "update": true,
+      "input": {
+        "name": "ok",
+        "body": null
+      },
+      "expected": {
+        "body": {
+          "name": "ok",
+          "body": null
+        }
+      }
+    },
+    {
+      "update": true,
+      "input": {
+        "name": "ok",
+        "channel": "fax"
+      },
+      "expected": {
+        "body": {
+          "name": "ok"
+        }
+      }
+    },
+    {
+      "update": true,
+      "input": {
+        "name": "ok",
+        "channel": null
+      },
+      "expected": {
+        "body": {
+          "name": "ok"
+        }
+      }
+    },
+    {
+      "update": true,
+      "input": {
+        "name": "ok",
+        "subject": "ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+      },
+      "expected": {
+        "message": "String should have at most 500 characters",
+        "field": "subject"
+      }
+    },
+    {
+      "update": true,
+      "input": {
+        "name": "ok",
+        "preheader": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      },
+      "expected": {
+        "message": "String should have at most 500 characters",
+        "field": "preheader"
+      }
+    },
+    {
+      "update": true,
+      "input": {
+        "name": "ok",
+        "attachments": {}
+      },
+      "expected": {
+        "message": "Input should be a valid list",
+        "field": "attachments"
+      }
+    },
+    {
+      "update": true,
+      "input": {
+        "name": "ok",
+        "attachments": [
+          4
+        ]
+      },
+      "expected": {
+        "message": "Input should be a valid dictionary",
+        "field": "attachments.0"
+      }
+    },
+    {
+      "update": true,
+      "input": {
+        "name": "ok",
+        "attachments": [
+          []
+        ]
+      },
+      "expected": {
+        "message": "Input should be a valid dictionary",
+        "field": "attachments.0"
+      }
+    },
+    {
+      "update": true,
+      "input": {
+        "name": "ok",
+        "attachments": [
+          {}
+        ]
+      },
+      "expected": {
+        "body": {
+          "name": "ok",
+          "attachments": [
+            {}
+          ]
+        }
+      }
+    },
+    {
+      "update": true,
+      "input": {
+        "name": "ok",
+        "email_account_id": "1.0"
+      },
+      "expected": {
+        "body": {
+          "name": "ok",
+          "email_account_id": 1
+        }
+      }
+    },
+    {
+      "update": true,
+      "input": {
+        "name": "ok",
+        "email_account_id": false
+      },
+      "expected": {
+        "body": {
+          "name": "ok",
+          "email_account_id": 0
+        }
+      }
+    },
+    {
+      "update": true,
+      "input": {
+        "name": "ok",
+        "include_unsubscribe": "false"
+      },
+      "expected": {
+        "body": {
+          "name": "ok",
+          "include_unsubscribe": false
+        }
+      }
+    },
+    {
+      "update": true,
+      "input": {
+        "name": "ok",
+        "include_unsubscribe": null
+      },
+      "expected": {
+        "body": {
+          "name": "ok",
+          "include_unsubscribe": null
+        }
+      }
+    },
+    {
+      "update": true,
+      "input": {
+        "is_active": null
+      },
+      "expected": {
+        "body": {
+          "is_active": null
+        }
+      }
+    },
+    {
+      "update": true,
+      "input": {
+        "name": "ok",
+        "extra": "ignored"
+      },
+      "expected": {
+        "body": {
+          "name": "ok"
+        }
+      }
+    }
+  ],
+  "attachments": [
+    {
+      "input": null,
+      "expected": [],
+      "expected_dump": null,
+      "expected_summary": []
+    },
+    {
+      "input": [],
+      "expected": [],
+      "expected_dump": null,
+      "expected_summary": []
+    },
+    {
+      "input": [
+        4,
+        null,
+        {},
+        [],
+        {
+          "name": "x",
+          "content": "YQ=="
+        }
+      ],
+      "expected": [
+        {
+          "name": "x",
+          "content": "YQ==",
+          "content_type": "application/octet-stream",
+          "size": 1
+        }
+      ],
+      "expected_dump": "[{\"name\": \"x\", \"content\": \"YQ==\", \"content_type\": \"application/octet-stream\", \"size\": 1}]",
+      "expected_summary": [
+        {
+          "name": "x",
+          "content_type": "application/octet-stream",
+          "size": 1
+        }
+      ]
+    },
+    {
+      "input": [
+        {
+          "name": "0",
+          "content_base64": "YQ=="
+        },
+        {
+          "name": 0,
+          "content": "YQ=="
+        },
+        {
+          "name": true,
+          "content": true
+        },
+        {
+          "name": {
+            "x": "y"
+          },
+          "content": "YQ=="
+        }
+      ],
+      "expected": [
+        {
+          "name": "0",
+          "content": "YQ==",
+          "content_type": "application/octet-stream",
+          "size": 1
+        },
+        {
+          "name": "True",
+          "content": "True",
+          "content_type": "application/octet-stream",
+          "size": 3
+        },
+        {
+          "name": "{'x': 'y'}",
+          "content": "YQ==",
+          "content_type": "application/octet-stream",
+          "size": 1
+        }
+      ],
+      "expected_dump": "[{\"name\": \"0\", \"content\": \"YQ==\", \"content_type\": \"application/octet-stream\", \"size\": 1}, {\"name\": \"True\", \"content\": \"True\", \"content_type\": \"application/octet-stream\", \"size\": 3}, {\"name\": \"{'x': 'y'}\", \"content\": \"YQ==\", \"content_type\": \"application/octet-stream\", \"size\": 1}]",
+      "expected_summary": [
+        {
+          "name": "0",
+          "content_type": "application/octet-stream",
+          "size": 1
+        },
+        {
+          "name": "True",
+          "content_type": "application/octet-stream",
+          "size": 3
+        },
+        {
+          "name": "{'x': 'y'}",
+          "content_type": "application/octet-stream",
+          "size": 1
+        }
+      ]
+    },
+    {
+      "input": [
+        {
+          "name": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+          "content": "data:text/plain;base64,YQ==",
+          "content_type": "ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+        }
+      ],
+      "expected": [
+        {
+          "name": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+          "content": "YQ==",
+          "content_type": "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé",
+          "size": 1
+        }
+      ],
+      "expected_dump": "[{\"name\": \"\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\\ud83d\\ude00\", \"content\": \"YQ==\", \"content_type\": \"\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\\u00e9\", \"size\": 1}]",
+      "expected_summary": [
+        {
+          "name": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+          "content_type": "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé",
+          "size": 1
+        }
+      ]
+    },
+    {
+      "input": [
+        {
+          "name": "x",
+          "content": "YQ=="
+        },
+        {
+          "name": "x",
+          "content": "YQ"
+        },
+        {
+          "name": "x",
+          "content": "YQ="
+        },
+        {
+          "name": "x",
+          "content": "YQ=abc"
+        },
+        {
+          "name": "x",
+          "content": "YQ==abc"
+        },
+        {
+          "name": "x",
+          "content": "Y Q = = \n"
+        },
+        {
+          "name": "x",
+          "content": "abc"
+        },
+        {
+          "name": "x",
+          "content": "abcd"
+        },
+        {
+          "name": "x",
+          "content": "a===bcd"
+        },
+        {
+          "name": "x",
+          "content": "===="
+        },
+        {
+          "name": "x",
+          "content": "a"
+        },
+        {
+          "name": "x",
+          "content": "!"
+        },
+        {
+          "name": "x",
+          "content": "@@@@"
+        },
+        {
+          "name": "x",
+          "content": "é"
+        },
+        {
+          "name": "x",
+          "content": "data:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,YQ=="
+        }
+      ],
+      "expected": [
+        {
+          "name": "x",
+          "content": "YQ==",
+          "content_type": "application/octet-stream",
+          "size": 1
+        },
+        {
+          "name": "x",
+          "content": "YQ==abc",
+          "content_type": "application/octet-stream",
+          "size": 1
+        },
+        {
+          "name": "x",
+          "content": "Y Q = =",
+          "content_type": "application/octet-stream",
+          "size": 1
+        },
+        {
+          "name": "x",
+          "content": "abcd",
+          "content_type": "application/octet-stream",
+          "size": 3
+        },
+        {
+          "name": "x",
+          "content": "a===bcd",
+          "content_type": "application/octet-stream",
+          "size": 3
+        },
+        {
+          "name": "x",
+          "content": "====",
+          "content_type": "application/octet-stream",
+          "size": 0
+        },
+        {
+          "name": "x",
+          "content": "!",
+          "content_type": "application/octet-stream",
+          "size": 0
+        },
+        {
+          "name": "x",
+          "content": "@@@@",
+          "content_type": "application/octet-stream",
+          "size": 0
+        }
+      ],
+      "expected_dump": "[{\"name\": \"x\", \"content\": \"YQ==\", \"content_type\": \"application/octet-stream\", \"size\": 1}, {\"name\": \"x\", \"content\": \"YQ==abc\", \"content_type\": \"application/octet-stream\", \"size\": 1}, {\"name\": \"x\", \"content\": \"Y Q = =\", \"content_type\": \"application/octet-stream\", \"size\": 1}, {\"name\": \"x\", \"content\": \"abcd\", \"content_type\": \"application/octet-stream\", \"size\": 3}, {\"name\": \"x\", \"content\": \"a===bcd\", \"content_type\": \"application/octet-stream\", \"size\": 3}, {\"name\": \"x\", \"content\": \"====\", \"content_type\": \"application/octet-stream\", \"size\": 0}, {\"name\": \"x\", \"content\": \"!\", \"content_type\": \"application/octet-stream\", \"size\": 0}, {\"name\": \"x\", \"content\": \"@@@@\", \"content_type\": \"application/octet-stream\", \"size\": 0}]",
+      "expected_summary": [
+        {
+          "name": "x",
+          "content_type": "application/octet-stream",
+          "size": 1
+        },
+        {
+          "name": "x",
+          "content_type": "application/octet-stream",
+          "size": 1
+        },
+        {
+          "name": "x",
+          "content_type": "application/octet-stream",
+          "size": 1
+        },
+        {
+          "name": "x",
+          "content_type": "application/octet-stream",
+          "size": 3
+        },
+        {
+          "name": "x",
+          "content_type": "application/octet-stream",
+          "size": 3
+        },
+        {
+          "name": "x",
+          "content_type": "application/octet-stream",
+          "size": 0
+        },
+        {
+          "name": "x",
+          "content_type": "application/octet-stream",
+          "size": 0
+        },
+        {
+          "name": "x",
+          "content_type": "application/octet-stream",
+          "size": 0
+        }
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "sizes": [
+        0
+      ],
+      "summary": [],
+      "stored_sha256": null
+    },
+    {
+      "sizes": [
+        4194304
+      ],
+      "summary": [
+        {
+          "name": "file-0",
+          "content_type": "application/octet-stream",
+          "size": 4194304
+        }
+      ],
+      "stored_sha256": "ba71ce25f373343681ba091c5172a34a1750eb4d400db3e87a0cce6474a4ae72"
+    },
+    {
+      "sizes": [
+        4194305,
+        2
+      ],
+      "summary": [
+        {
+          "name": "file-1",
+          "content_type": "application/octet-stream",
+          "size": 2
+        }
+      ],
+      "stored_sha256": "b2e8920291b15f910091dcffd1527198a93738fa2a38e5c6eb47c765a20ba662"
+    },
+    {
+      "sizes": [
+        4194304,
+        4194304,
+        1
+      ],
+      "summary": [
+        {
+          "name": "file-0",
+          "content_type": "application/octet-stream",
+          "size": 4194304
+        },
+        {
+          "name": "file-1",
+          "content_type": "application/octet-stream",
+          "size": 4194304
+        }
+      ],
+      "stored_sha256": "b36010b6ce8e97f9d7680eec0a3ba85999e736a630184e26c103f9240297b019"
+    },
+    {
+      "sizes": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "summary": [
+        {
+          "name": "file-0",
+          "content_type": "application/octet-stream",
+          "size": 1
+        },
+        {
+          "name": "file-1",
+          "content_type": "application/octet-stream",
+          "size": 1
+        },
+        {
+          "name": "file-2",
+          "content_type": "application/octet-stream",
+          "size": 1
+        },
+        {
+          "name": "file-3",
+          "content_type": "application/octet-stream",
+          "size": 1
+        },
+        {
+          "name": "file-4",
+          "content_type": "application/octet-stream",
+          "size": 1
+        },
+        {
+          "name": "file-5",
+          "content_type": "application/octet-stream",
+          "size": 1
+        },
+        {
+          "name": "file-6",
+          "content_type": "application/octet-stream",
+          "size": 1
+        },
+        {
+          "name": "file-7",
+          "content_type": "application/octet-stream",
+          "size": 1
+        },
+        {
+          "name": "file-8",
+          "content_type": "application/octet-stream",
+          "size": 1
+        },
+        {
+          "name": "file-9",
+          "content_type": "application/octet-stream",
+          "size": 1
+        }
+      ],
+      "stored_sha256": "39e890df3c0d004759575a900d8ff9144e517d35d32b736bd96dc32eb8f51c23"
+    },
+    {
+      "sizes": [
+        3145728,
+        3145728,
+        3145728
+      ],
+      "summary": [
+        {
+          "name": "file-0",
+          "content_type": "application/octet-stream",
+          "size": 3145728
+        },
+        {
+          "name": "file-1",
+          "content_type": "application/octet-stream",
+          "size": 3145728
+        }
+      ],
+      "stored_sha256": "466db3aeec6b236d7c25a2225eb2ea46adeccf056db3e83565e8e2916f79ee78"
+    }
+  ],
+  "suggestions": [
+    {
+      "name": "frist_name",
+      "known": [],
+      "expected": null
+    },
+    {
+      "name": "firs name",
+      "known": [],
+      "expected": null
+    },
+    {
+      "name": "painpont",
+      "known": [],
+      "expected": null
+    },
+    {
+      "name": "pian",
+      "known": [],
+      "expected": null
+    },
+    {
+      "name": "unknown",
+      "known": [],
+      "expected": null
+    },
+    {
+      "name": "name",
+      "known": [],
+      "expected": null
+    },
+    {
+      "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "known": [],
+      "expected": null
+    },
+    {
+      "name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "known": [],
+      "expected": null
+    },
+    {
+      "name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaac",
+      "known": [],
+      "expected": null
+    },
+    {
+      "name": "frist_name",
+      "known": [
+        "first_name",
+        "last_name",
+        "full_name",
+        "name"
+      ],
+      "expected": "first_name"
+    },
+    {
+      "name": "firs name",
+      "known": [
+        "first_name",
+        "last_name",
+        "full_name",
+        "name"
+      ],
+      "expected": "first_name"
+    },
+    {
+      "name": "painpont",
+      "known": [
+        "first_name",
+        "last_name",
+        "full_name",
+        "name"
+      ],
+      "expected": null
+    },
+    {
+      "name": "pian",
+      "known": [
+        "first_name",
+        "last_name",
+        "full_name",
+        "name"
+      ],
+      "expected": null
+    },
+    {
+      "name": "unknown",
+      "known": [
+        "first_name",
+        "last_name",
+        "full_name",
+        "name"
+      ],
+      "expected": null
+    },
+    {
+      "name": "name",
+      "known": [
+        "first_name",
+        "last_name",
+        "full_name",
+        "name"
+      ],
+      "expected": "name"
+    },
+    {
+      "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "known": [
+        "first_name",
+        "last_name",
+        "full_name",
+        "name"
+      ],
+      "expected": null
+    },
+    {
+      "name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "known": [
+        "first_name",
+        "last_name",
+        "full_name",
+        "name"
+      ],
+      "expected": null
+    },
+    {
+      "name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaac",
+      "known": [
+        "first_name",
+        "last_name",
+        "full_name",
+        "name"
+      ],
+      "expected": null
+    },
+    {
+      "name": "frist_name",
+      "known": [
+        "pain",
+        "paid",
+        "pain_point",
+        "point",
+        "city"
+      ],
+      "expected": null
+    },
+    {
+      "name": "firs name",
+      "known": [
+        "pain",
+        "paid",
+        "pain_point",
+        "point",
+        "city"
+      ],
+      "expected": null
+    },
+    {
+      "name": "painpont",
+      "known": [
+        "pain",
+        "paid",
+        "pain_point",
+        "point",
+        "city"
+      ],
+      "expected": "pain_point"
+    },
+    {
+      "name": "pian",
+      "known": [
+        "pain",
+        "paid",
+        "pain_point",
+        "point",
+        "city"
+      ],
+      "expected": "pain"
+    },
+    {
+      "name": "unknown",
+      "known": [
+        "pain",
+        "paid",
+        "pain_point",
+        "point",
+        "city"
+      ],
+      "expected": null
+    },
+    {
+      "name": "name",
+      "known": [
+        "pain",
+        "paid",
+        "pain_point",
+        "point",
+        "city"
+      ],
+      "expected": null
+    },
+    {
+      "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "known": [
+        "pain",
+        "paid",
+        "pain_point",
+        "point",
+        "city"
+      ],
+      "expected": null
+    },
+    {
+      "name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "known": [
+        "pain",
+        "paid",
+        "pain_point",
+        "point",
+        "city"
+      ],
+      "expected": null
+    },
+    {
+      "name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaac",
+      "known": [
+        "pain",
+        "paid",
+        "pain_point",
+        "point",
+        "city"
+      ],
+      "expected": null
+    },
+    {
+      "name": "frist_name",
+      "known": [
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab",
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      ],
+      "expected": null
+    },
+    {
+      "name": "firs name",
+      "known": [
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab",
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      ],
+      "expected": null
+    },
+    {
+      "name": "painpont",
+      "known": [
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab",
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      ],
+      "expected": null
+    },
+    {
+      "name": "pian",
+      "known": [
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab",
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      ],
+      "expected": null
+    },
+    {
+      "name": "unknown",
+      "known": [
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab",
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      ],
+      "expected": null
+    },
+    {
+      "name": "name",
+      "known": [
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab",
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      ],
+      "expected": null
+    },
+    {
+      "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "known": [
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab",
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      ],
+      "expected": null
+    },
+    {
+      "name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "known": [
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab",
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      ],
+      "expected": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaac",
+      "known": [
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab",
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      ],
+      "expected": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab"
+    }
+  ],
+  "scope": "Selected original template/attachment/preview AST; synthetic SQLite with explicit monotonic committed IDs, fixed clock and omitted relationships; not native DB/HTTP/WP/provider/HTML-safety certification"
+}

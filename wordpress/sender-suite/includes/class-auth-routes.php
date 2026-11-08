@@ -3,6 +3,7 @@ namespace SenderSuite;
 
 final class ValidationFailure extends \RuntimeException {public $field;public function __construct($message,$field=null){$this->field=$field;parent::__construct($message);}}
 class AuthFailure extends \RuntimeException {public $status;public function __construct($status,$message){$this->status=$status;parent::__construct($message);}}
+final class DetailedFailure extends AuthFailure {public $detail;public function __construct($status,array $detail){$this->detail=$detail;parent::__construct($status,$detail['message']??'Request rejected.');}}
 final class AuthRoutes {
     private static $context;
     public static function context(){if(self::$context===null){$wpdb=$GLOBALS['wpdb'];$db=new Database($wpdb,new Schema($wpdb->prefix));$vault=new Vault(wp_salt('auth').wp_salt('secure_auth'));$config=Config::database($db,$wpdb->prefix,$vault);self::$context=array('db'=>$db,'config'=>$config,'auth'=>new AppAuth($db,$config),'prefix'=>$wpdb->prefix);}return self::$context;}
