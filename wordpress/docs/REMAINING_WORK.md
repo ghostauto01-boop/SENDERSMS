@@ -1,6 +1,6 @@
 # Remaining WordPress recreation work
 
-376 missing source handlers,132 partial health/auth/contact/list/variable/template/reply/classification/notification/import/analytics/sequence/settings/calendar/invoice/inbox handlers,0 fully certified contracts. The administrator CSV diagnostic is not the original source import API.
+375 missing source handlers,133 partial health/auth/contact/list/variable/template/reply/classification/notification/import/analytics/sequence/settings/calendar/invoice/inbox/status-webhook handlers,0 fully certified contracts. The administrator CSV diagnostic is not the original source import API.
 
 Every row is outstanding, including all partial handlers until native HTTP certification. See README.md for actual implemented utilities and fresh test boundaries.
 
@@ -474,7 +474,7 @@ Every row is outstanding, including all partial handlers until native HTTP certi
 | POST | /api/v1/webhooks/brevo/{account_id} | backend/app/api/v1/webhooks.py:628 | missing original application handler |
 | POST | /api/v1/webhooks/callgate | backend/app/api/v1/webhooks.py:431 | missing original application handler |
 | POST | /api/v1/webhooks/smsgate/inbound | backend/app/api/v1/webhooks.py:570 | missing original application handler |
-| POST | /api/v1/webhooks/smsgateway | backend/app/api/v1/webhooks.py:228 | missing original application handler |
+| POST | /api/v1/webhooks/smsgateway | backend/app/api/v1/webhooks.py:228 | partial handler; native WordPress/HTTP unverified |
 | POST | /api/v1/webhooks/smsgateway/phone/{phone_id} | backend/app/api/v1/webhooks.py:217 | missing original application handler |
 | POST | /connectors/{key}/mcp | backend/app/api/v1/mcp.py:338 | missing original application handler |
 | POST | /connectors/{key}/oauth/authorize | backend/app/api/v1/mcp.py:667 | missing original application handler |

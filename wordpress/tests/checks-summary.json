@@ -1,7 +1,7 @@
 {
   "ok": true,
-  "php_lint_checks": 82,
-  "php_assertions": 41190,
+  "php_lint_checks": 84,
+  "php_assertions": 41630,
   "vendor_parser_checks": 3075,
   "vendor_hash_checks": 1547,
   "unchanged_frontend_files": 165,
@@ -69,7 +69,7 @@
     },
     {
       "ok": true,
-      "assertions": 614,
+      "assertions": 634,
       "diffs": [],
       "php": "7.4.34-dev",
       "scope": "Offline requests/responses with synthetic password codec, seventy-three synthetic SQLite application tables, fault-injected transaction failure; not real WP/HTTP/Argon2/native MySQL/concurrency proof",
@@ -266,6 +266,19 @@
       "provider_requests": 0,
       "messages_sent": 0,
       "suite": "inbox"
+    },
+    {
+      "ok": true,
+      "assertions": 200,
+      "diffs": [],
+      "php": "7.4.34-dev",
+      "source_signature_vectors": 60,
+      "source_reconciliation_operations": 19,
+      "native_wordpress_verified": false,
+      "native_mysql_verified": false,
+      "gateway_connectivity_verified": false,
+      "scope": "Selected original AST/SQLite synthetic HMAC and state parity, deliberate terminal/dedup safety hardening, fault rollback; no real HTTP/gateway/send/concurrency proof",
+      "suite": "sms-receipts"
     },
     {
       "ok": true,
@@ -337,7 +350,7 @@
     },
     {
       "ok": true,
-      "assertions": 614,
+      "assertions": 634,
       "diffs": [],
       "php": "8.3.36",
       "scope": "Offline requests/responses with synthetic password codec, seventy-three synthetic SQLite application tables, fault-injected transaction failure; not real WP/HTTP/Argon2/native MySQL/concurrency proof",
@@ -534,6 +547,19 @@
       "provider_requests": 0,
       "messages_sent": 0,
       "suite": "inbox"
+    },
+    {
+      "ok": true,
+      "assertions": 200,
+      "diffs": [],
+      "php": "8.3.36",
+      "source_signature_vectors": 60,
+      "source_reconciliation_operations": 19,
+      "native_wordpress_verified": false,
+      "native_mysql_verified": false,
+      "gateway_connectivity_verified": false,
+      "scope": "Selected original AST/SQLite synthetic HMAC and state parity, deliberate terminal/dedup safety hardening, fault rollback; no real HTTP/gateway/send/concurrency proof",
+      "suite": "sms-receipts"
     },
     {
       "ok": true,

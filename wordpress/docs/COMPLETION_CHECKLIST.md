@@ -2,9 +2,9 @@
 
 Build: **0.11.0-dev**. WordPress is the native application backend; no original Python service is the proposed runtime. Original repository application files remain unchanged.
 
-**376 missing handlers, 132 partially implemented handlers, zero native-certified contracts, 508 source method/path contracts in total.** A partial handler has actual implementation, but does not mean its complete workflow, UI, dependencies and native behavior are certified. Every endpoint remains in the release backlog until those gates pass. Raw handler counts are not a percent-complete estimate.
+**375 missing handlers, 133 partially implemented handlers, zero native-certified contracts, 508 source method/path contracts in total.** A partial handler has actual implementation, but does not mean its complete workflow, UI, dependencies and native behavior are certified. Every endpoint remains in the release backlog until those gates pass. Raw handler counts are not a percent-complete estimate.
 
-Fresh offline evidence: 41,190 functional PHP-WASM assertions, 82 first-party syntax checks, 165 unchanged original frontend hashes. Offline evidence is **not** real WordPress/MySQL/HTTP/provider/browser certification. This checklist is the full current implementation/release backlog, not a claim that software can be guaranteed to run perfectly on every host.
+Fresh offline evidence: 41,630 functional PHP-WASM assertions, 84 first-party syntax checks, 165 unchanged original frontend hashes. Offline evidence is **not** real WordPress/MySQL/HTTP/provider/browser certification. This checklist is the full current implementation/release backlog, not a claim that software can be guaranteed to run perfectly on every host.
 
 ## Implementation order and acceptance gates
 
@@ -28,7 +28,7 @@ Fresh offline evidence: 41,190 functional PHP-WASM assertions, 82 first-party sy
 - [ ] Finish sequence execution (builder CRUD/validation/version snapshots now implemented), standalone/campaign follow-ups, due/overdue handling, quiet hours, timezone/DST behavior, retries and stop-on-reply/opt-out policies.
 - [ ] Qualify implemented stored inbox/conversation reads, read/unread/labels, campaign attribution/filters, private template previews and sequence-pause controls on native hosts. Complete replies, attachments/HTML, large-thread pagination/export, receiving/polling/sync, inbound lifecycle, worker integration and the native inbox UI.
 - [ ] Implement calls/CallGate: configuration, handsets/devices, dial requests, call logs and authenticated event/webhook lifecycle. Call analytics alone is not calling.
-- [ ] Implement webhook registration/verification, exact raw-body signature handling, replay protection, deduplication, event ordering, rate limits, retries and redacted logs.
+- [ ] Qualify implemented status-only SMS-Gate raw-body HMAC, encrypted signing-key configuration, receipt deduplication and transactional reconciliation on native hosts. Complete webhook registration, phone-specific keys, inbound/call/email events, rate limits, retry/recovery tooling, retention and redacted diagnostics; verify the documented first-terminal-wins policy against actual gateway behavior.
 - [ ] Wire auto-reply/If-Then rule execution, per-contact cooldowns, counters and supported actions into actual inbound events. Rule CRUD/classification/non-sending tests already exist; action execution does not.
 - [ ] Qualify implemented calendar-only booking CRUD, attendee/conversation/pipeline effects, status actions, filters and previews on native hosts; complete calendar UI, invitations/reminder workers/retries and delivery-time policy. Qualify implemented draft invoice CRUD/items/totals/numbering/audit/duplication and guarded deletion on native hosts; complete invoice settings/public links/payments/reversals/refunds/PDF/email workflows, financial/domain review, concurrency and recovery.
 - [ ] Complete dashboards/overview/unified managers and reporting. Five analytics read APIs now exist; complete dashboard, email/manager analytics and native validation remain outstanding.
@@ -102,7 +102,7 @@ All counts below are derived from `docs/contracts.json`. Missing = no native han
 | templates | 0 | 10 | 0 |
 | validator | 8 | 0 | 0 |
 | variables | 1 | 7 | 0 |
-| webhooks | 9 | 0 | 0 |
+| webhooks | 8 | 1 | 0 |
 
 ## Every remaining source contract
 
@@ -578,7 +578,7 @@ This exhaustive list includes partially implemented routes because none is yet n
 | POST | `/api/v1/webhooks/brevo/{account_id}` | Missing implementation |
 | POST | `/api/v1/webhooks/callgate` | Missing implementation |
 | POST | `/api/v1/webhooks/smsgate/inbound` | Missing implementation |
-| POST | `/api/v1/webhooks/smsgateway` | Missing implementation |
+| POST | `/api/v1/webhooks/smsgateway` | Implemented partially; native/full-workflow proof required |
 | POST | `/api/v1/webhooks/smsgateway/phone/{phone_id}` | Missing implementation |
 | POST | `/connectors/{key}/mcp` | Missing implementation |
 | POST | `/connectors/{key}/oauth/authorize` | Missing implementation |

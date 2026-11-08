@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Real HTTP against an isolated CI site. No provider messages or external requests."""
-import http.cookiejar,json,os,subprocess,time,urllib.error,urllib.parse,urllib.request
+import hashlib,hmac,http.cookiejar,json,os,subprocess,time,urllib.error,urllib.parse,urllib.request
 from pathlib import Path
 E=Path(os.environ['NATIVE_WP_EVIDENCE']);BASE='http://127.0.0.1:8080';checks=0;failures=[]
 cookie_roundtrip=False
@@ -129,6 +129,15 @@ try:
  s,b,h=request('GET',f'inbox/conversations/{thread}');check('native inbox opening retains label',b.get('status'),'opportunity')
  s,b,h=request('POST',f'inbox/conversations/{thread}/stop-sequence');check('native inbox pause stored',b.get('sequence_paused'),True)
  s,b,h=request('POST',f'inbox/conversations/{thread}/resume-sequence');check('native inbox resume flag only',b.get('sequence_paused'),False)
+ # Status-only webhook admission/configuration probes. Never contacts a provider or fabricates a send.
+ s,b,h=request('GET','settings/gateway/webhook-signing',authenticated=False);check('native signer metadata private',s,401)
+ signing='synthetic-native-ci-signing-key-0123456789'
+ s,b,h=request('PUT','settings/gateway/webhook-signing',{'secret':signing});check('native signer encrypted setup',s,200);check('native signer not echoed',signing not in json.dumps(b))
+ for event in ('sms:received','sms:delivered'):
+  receipt={'id':'synthetic-native-'+event,'event':event,'payload':{'messageId':'uncommitted-native-receipt'}};ts=str(int(time.time()));sig=hmac.new(signing.encode(),json.dumps(receipt).encode()+ts.encode(),hashlib.sha256).hexdigest()
+  s,b,h=request('POST','webhooks/smsgateway',receipt,headers={'X-Timestamp':ts,'X-Signature':sig},authenticated=False);check('native unsupported/unmatched receipt is retryable '+event,s,503);check('native receipt no-store '+event,h.get('Cache-Control'),'no-store')
+ s,b,h=request('POST','webhooks/smsgateway',receipt,authenticated=False);check('native unsigned callback refused',s,401)
+ s,b,h=request('PUT','settings/gateway/webhook-signing',{'secret':''});check('native signer explicitly disabled',b.get('configured'),False)
  s,b,h=request('POST','auth/logout');check('native logout',s,200)
  s,b,h=request('GET','contacts');check('native logout clears browser cookie',s,401)
 except Exception as e:failures.append({'exception':type(e).__name__,'message':str(e)})
