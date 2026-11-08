@@ -10,6 +10,8 @@ final class SQLiteAuthDB {
         if(in_array('contact_variables',$names,true)){foreach(array('field_key','shortcode') as $key){$this->pdo->exec('CREATE UNIQUE INDEX variable_'.$key.' ON test_sender_suite_contact_variables('.$key.')');}}
         if(in_array('email_contact_addresses',$names,true)){$this->pdo->exec('CREATE UNIQUE INDEX alias_address ON test_sender_suite_email_contact_addresses(email_address)');}
         if(in_array('notification_providers',$names,true)){$this->pdo->exec('CREATE UNIQUE INDEX notification_provider_name ON test_sender_suite_notification_providers(provider)');}
+        if(in_array('invoices',$names,true)){foreach(array('number','public_token') as $field){$this->pdo->exec('CREATE UNIQUE INDEX invoice_'.$field.' ON test_sender_suite_invoices('.$field.')');}}
+        if(in_array('invoice_payments',$names,true)){$this->pdo->exec('CREATE UNIQUE INDEX invoice_payment_reference ON test_sender_suite_invoice_payments(provider,reference)');}
         if(in_array('contacts',$names,true)){$this->pdo->exec('CREATE UNIQUE INDEX contact_phone ON test_sender_suite_contacts(phone_number)');}
         if(in_array('tags',$names,true)){$this->pdo->exec('CREATE UNIQUE INDEX tag_name ON test_sender_suite_tags(name)');}
         if(in_array('contact_list_members',$names,true)){$this->pdo->exec('CREATE UNIQUE INDEX list_member ON test_sender_suite_contact_list_members(list_id,contact_id)');}

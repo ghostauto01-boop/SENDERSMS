@@ -1,0 +1,16 @@
+{
+  "ok": true,
+  "assertions": 866,
+  "diffs": [],
+  "php": "8.3.36",
+  "source_operations": 32,
+  "source_totals_cases": 400,
+  "python_rounding_cases": 333,
+  "source_dto_cases": 34,
+  "scope": "Actual selected source invoice AST, synthetic SQLite/UTC/clock/UUID/settings, reconstructed relationships, source-compatible binary64 totals within signed SQL INT limits, injected rollback/conflict and draft-only safety policy. Token/checkout URL/updated_at comparisons explicitly excluded. No WP/MySQL/native concurrency/browser/PDF/email/payments certification.",
+  "native_wordpress_verified": false,
+  "native_mysql_verified": false,
+  "provider_requests": 0,
+  "payments_recorded": 0,
+  "suite": "invoices"
+}

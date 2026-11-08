@@ -1,6 +1,6 @@
 # Remaining WordPress recreation work
 
-397 missing source handlers,111 partial health/auth/contact/list/variable/template/reply/classification/notification/import/analytics/sequence/settings/calendar handlers,0 fully certified contracts. The administrator CSV diagnostic is not the original source import API.
+388 missing source handlers,120 partial health/auth/contact/list/variable/template/reply/classification/notification/import/analytics/sequence/settings/calendar/invoice handlers,0 fully certified contracts. The administrator CSV diagnostic is not the original source import API.
 
 Every row is outstanding, including all partial handlers until native HTTP certification. See README.md for actual implemented utilities and fresh test boundaries.
 
@@ -32,7 +32,7 @@ Every row is outstanding, including all partial handlers until native HTTP certi
 | DELETE | /api/v1/email/domains/{domain_id} | backend/app/api/v1/email.py:412 | missing original application handler |
 | DELETE | /api/v1/email/suppression/{entry_id} | backend/app/api/v1/email.py:1669 | missing original application handler |
 | DELETE | /api/v1/followups/{followup_id} | backend/app/api/v1/followups.py:213 | missing original application handler |
-| DELETE | /api/v1/invoices/{invoice_id} | backend/app/api/v1/invoices.py:1203 | missing original application handler |
+| DELETE | /api/v1/invoices/{invoice_id} | backend/app/api/v1/invoices.py:1203 | partial handler; native WordPress/HTTP unverified |
 | DELETE | /api/v1/lists/{list_id} | backend/app/api/v1/lists.py:213 | partial handler; native WordPress/HTTP unverified |
 | DELETE | /api/v1/mailbox/{mailbox_id} | backend/app/api/v1/mailbox.py:559 | missing original application handler |
 | DELETE | /api/v1/mcp/clients/{client_pk} | backend/app/api/v1/mcp.py:1188 | missing original application handler |
@@ -175,7 +175,7 @@ Every row is outstanding, including all partial handlers until native HTTP certi
 | GET | /api/v1/inbox/conversations/{conversation_id} | backend/app/api/v1/inbox.py:237 | missing original application handler |
 | GET | /api/v1/inbox/conversations/{conversation_id}/templates/{template_id}/preview | backend/app/api/v1/inbox.py:262 | missing original application handler |
 | GET | /api/v1/inbox/device-info | backend/app/api/v1/inbox.py:503 | missing original application handler |
-| GET | /api/v1/invoices | backend/app/api/v1/invoices.py:779 | missing original application handler |
+| GET | /api/v1/invoices | backend/app/api/v1/invoices.py:779 | partial handler; native WordPress/HTTP unverified |
 | GET | /api/v1/invoices/analytics | backend/app/api/v1/invoices.py:351 | missing original application handler |
 | GET | /api/v1/invoices/currencies | backend/app/api/v1/invoices.py:333 | missing original application handler |
 | GET | /api/v1/invoices/links | backend/app/api/v1/invoices.py:1015 | missing original application handler |
@@ -183,9 +183,9 @@ Every row is outstanding, including all partial handlers until native HTTP certi
 | GET | /api/v1/invoices/public/{token} | backend/app/api/v1/invoices.py:644 | missing original application handler |
 | GET | /api/v1/invoices/public/{token}/verify | backend/app/api/v1/invoices.py:725 | missing original application handler |
 | GET | /api/v1/invoices/settings | backend/app/api/v1/invoices.py:292 | missing original application handler |
-| GET | /api/v1/invoices/{invoice_id} | backend/app/api/v1/invoices.py:1086 | missing original application handler |
-| GET | /api/v1/invoices/{invoice_id}/events | backend/app/api/v1/invoices.py:1470 | missing original application handler |
-| GET | /api/v1/invoices/{invoice_id}/payments | backend/app/api/v1/invoices.py:1460 | missing original application handler |
+| GET | /api/v1/invoices/{invoice_id} | backend/app/api/v1/invoices.py:1086 | partial handler; native WordPress/HTTP unverified |
+| GET | /api/v1/invoices/{invoice_id}/events | backend/app/api/v1/invoices.py:1470 | partial handler; native WordPress/HTTP unverified |
+| GET | /api/v1/invoices/{invoice_id}/payments | backend/app/api/v1/invoices.py:1460 | partial handler; native WordPress/HTTP unverified |
 | GET | /api/v1/lists | backend/app/api/v1/lists.py:77 | partial handler; native WordPress/HTTP unverified |
 | GET | /api/v1/lists/ | backend/app/api/v1/lists.py:77 | partial handler; native WordPress/HTTP unverified |
 | GET | /api/v1/lists/{list_id}/contacts | backend/app/api/v1/lists.py:263 | partial handler; native WordPress/HTTP unverified |
@@ -274,7 +274,7 @@ Every row is outstanding, including all partial handlers until native HTTP certi
 | PATCH | /api/v1/ai-agent/sessions/{session_id} | backend/app/api/v1/ai_agent.py:487 | missing original application handler |
 | PATCH | /api/v1/campaigns/{campaign_id} | backend/app/api/v1/campaigns.py:221 | missing original application handler |
 | PATCH | /api/v1/email/accounts/{account_id} | backend/app/api/v1/email.py:256 | missing original application handler |
-| PATCH | /api/v1/invoices/{invoice_id} | backend/app/api/v1/invoices.py:1096 | missing original application handler |
+| PATCH | /api/v1/invoices/{invoice_id} | backend/app/api/v1/invoices.py:1096 | partial handler; native WordPress/HTTP unverified |
 | PATCH | /api/v1/mailbox/{mailbox_id} | backend/app/api/v1/mailbox.py:536 | missing original application handler |
 | POST | /api/v1/ads/audiences | backend/app/api/v1/ads.py:1675 | missing original application handler |
 | POST | /api/v1/ads/audiences/{audience_id}/attach | backend/app/api/v1/ads.py:1772 | missing original application handler |
@@ -405,18 +405,18 @@ Every row is outstanding, including all partial handlers until native HTTP certi
 | POST | /api/v1/inbox/poll-now | backend/app/api/v1/inbox.py:768 | missing original application handler |
 | POST | /api/v1/inbox/register-webhook | backend/app/api/v1/inbox.py:527 | missing original application handler |
 | POST | /api/v1/inbox/sync-full | backend/app/api/v1/inbox.py:544 | missing original application handler |
-| POST | /api/v1/invoices | backend/app/api/v1/invoices.py:851 | missing original application handler |
+| POST | /api/v1/invoices | backend/app/api/v1/invoices.py:851 | partial handler; native WordPress/HTTP unverified |
 | POST | /api/v1/invoices/links | backend/app/api/v1/invoices.py:946 | missing original application handler |
 | POST | /api/v1/invoices/paystack/webhook | backend/app/api/v1/invoices.py:537 | missing original application handler |
 | POST | /api/v1/invoices/public/{token}/pay | backend/app/api/v1/invoices.py:658 | missing original application handler |
 | POST | /api/v1/invoices/settings/test | backend/app/api/v1/invoices.py:308 | missing original application handler |
-| POST | /api/v1/invoices/{invoice_id}/duplicate | backend/app/api/v1/invoices.py:1216 | missing original application handler |
+| POST | /api/v1/invoices/{invoice_id}/duplicate | backend/app/api/v1/invoices.py:1216 | partial handler; native WordPress/HTTP unverified |
 | POST | /api/v1/invoices/{invoice_id}/pay | backend/app/api/v1/invoices.py:1338 | missing original application handler |
 | POST | /api/v1/invoices/{invoice_id}/payments | backend/app/api/v1/invoices.py:1409 | missing original application handler |
 | POST | /api/v1/invoices/{invoice_id}/remind | backend/app/api/v1/invoices.py:1288 | missing original application handler |
 | POST | /api/v1/invoices/{invoice_id}/rotate-link | backend/app/api/v1/invoices.py:1489 | missing original application handler |
 | POST | /api/v1/invoices/{invoice_id}/send | backend/app/api/v1/invoices.py:1275 | missing original application handler |
-| POST | /api/v1/invoices/{invoice_id}/void | backend/app/api/v1/invoices.py:1323 | missing original application handler |
+| POST | /api/v1/invoices/{invoice_id}/void | backend/app/api/v1/invoices.py:1323 | partial handler; native WordPress/HTTP unverified |
 | POST | /api/v1/lists/ | backend/app/api/v1/lists.py:172 | partial handler; native WordPress/HTTP unverified |
 | POST | /api/v1/lists/{list_id}/clean | backend/app/api/v1/lists.py:521 | partial handler; native WordPress/HTTP unverified |
 | POST | /api/v1/lists/{list_id}/contacts | backend/app/api/v1/lists.py:315 | partial handler; native WordPress/HTTP unverified |

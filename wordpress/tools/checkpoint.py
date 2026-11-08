@@ -21,13 +21,14 @@ partial.update({('DELETE','/api/v1/contacts/{contact_id}'),('POST','/api/v1/cont
 partial.update({('GET','/api/v1/contacts/export'),('GET','/api/v1/contacts/export/csv')})
 partial.update({('GET','/api/v1/settings/appearance'),('PUT','/api/v1/settings/appearance'),('GET','/api/v1/settings/compliance'),('PUT','/api/v1/settings/compliance'),('GET','/api/v1/settings/notifications'),('GET','/api/v1/settings/notifications/muted-senders'),('PUT','/api/v1/settings/notifications/muted-senders'),('PUT','/api/v1/settings/notifications/{provider}')})
 partial.update({('GET','/api/v1/calendar'),('GET','/api/v1/calendar/'),('POST','/api/v1/calendar/'),('GET','/api/v1/calendar/upcoming'),('GET','/api/v1/calendar/day'),('GET','/api/v1/calendar/tags'),('GET','/api/v1/calendar/tags/all'),('GET','/api/v1/calendar/{meeting_id}'),('PUT','/api/v1/calendar/{meeting_id}'),('DELETE','/api/v1/calendar/{meeting_id}'),('GET','/api/v1/calendar/{meeting_id}/preview'),('POST','/api/v1/calendar/{meeting_id}/confirm'),('POST','/api/v1/calendar/{meeting_id}/complete'),('POST','/api/v1/calendar/{meeting_id}/cancel'),('POST','/api/v1/calendar/{meeting_id}/no-show')})
+partial.update({('GET','/api/v1/invoices'),('POST','/api/v1/invoices'),('GET','/api/v1/invoices/{invoice_id}'),('PATCH','/api/v1/invoices/{invoice_id}'),('DELETE','/api/v1/invoices/{invoice_id}'),('POST','/api/v1/invoices/{invoice_id}/duplicate'),('POST','/api/v1/invoices/{invoice_id}/void'),('GET','/api/v1/invoices/{invoice_id}/payments'),('GET','/api/v1/invoices/{invoice_id}/events')})
 assert partial.issubset(pairs), 'A reported partial path is absent from the source inventory'
 
 contracts=[{'method':method,'path':path,'sources':[r['source'] for r in rows],'state':'partial handler; native WordPress/HTTP unverified' if (method,path) in partial else 'missing original application handler','certified':False} for (method,path),rows in sorted(pairs.items())]
 assert len(contracts)==508
-assert sum(c['state'].startswith('partial') for c in contracts)==111
+assert sum(c['state'].startswith('partial') for c in contracts)==120
 (D/'docs/contracts.json').write_text(json.dumps(contracts,indent=2)+'\n')
-text='# Remaining WordPress recreation work\n\n397 missing source handlers,111 partial health/auth/contact/list/variable/template/reply/classification/notification/import/analytics/sequence/settings/calendar handlers,0 fully certified contracts. The administrator CSV diagnostic is not the original source import API.\n\nEvery row is outstanding, including all partial handlers until native HTTP certification. See README.md for actual implemented utilities and fresh test boundaries.\n\n| Method | Path | Source | State |\n|---|---|---|---|\n'
+text='# Remaining WordPress recreation work\n\n388 missing source handlers,120 partial health/auth/contact/list/variable/template/reply/classification/notification/import/analytics/sequence/settings/calendar/invoice handlers,0 fully certified contracts. The administrator CSV diagnostic is not the original source import API.\n\nEvery row is outstanding, including all partial handlers until native HTTP certification. See README.md for actual implemented utilities and fresh test boundaries.\n\n| Method | Path | Source | State |\n|---|---|---|---|\n'
 for c in contracts:text+='| '+c['method']+' | '+c['path'].replace('|','\\|')+' | '+', '.join(c['sources'])+' | '+c['state']+' |\n'
 (D/'docs/REMAINING_WORK.md').write_text(text)
 log=D/'.cache/frontend-test.log'
@@ -37,4 +38,4 @@ if log.is_file():
  build=(D/'.cache/frontend-build.log').read_text();assert 'built in' in build
  record={'test_command':'npm test -- --reporter=dot','tests_passed':int(tests[1]),'test_files_passed':int(files[1]),'test_output_sha256':hashlib.sha256(raw).hexdigest(),'build_command':'npm run build -- --outDir ../wordpress/sender-suite/app','build_passed':True,'built_asset_files':sum(p.is_file() for p in (D/'sender-suite/app').rglob('*')),'original_frontend_modified':False,'native_wordpress_browser_verified':False,'note':'Fresh stdout from actual execution, not earlier conversation counts; jsdom navigation warning is not browser coverage'}
  (D/'tests/frontend-evidence.json').write_text(json.dumps(record,indent=2)+'\n')
-print(json.dumps({'source_contracts':len(contracts),'missing_handlers':397,'partial_handlers':111,'certified':0}))
+print(json.dumps({'source_contracts':len(contracts),'missing_handlers':388,'partial_handlers':120,'certified':0}))

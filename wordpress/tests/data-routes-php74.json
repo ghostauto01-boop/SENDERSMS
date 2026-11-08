@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "assertions": 539,
+  "assertions": 578,
   "diffs": [],
   "php": "7.4.34-dev",
   "scope": "Offline requests/responses with synthetic password codec, seventy-three synthetic SQLite application tables, fault-injected transaction failure; not real WP/HTTP/Argon2/native MySQL/concurrency proof",

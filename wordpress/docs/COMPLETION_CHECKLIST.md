@@ -2,9 +2,9 @@
 
 Build: **0.11.0-dev**. WordPress is the native application backend; no original Python service is the proposed runtime. Original repository application files remain unchanged.
 
-**397 missing handlers, 111 partially implemented handlers, zero native-certified contracts, 508 source method/path contracts in total.** A partial handler has actual implementation, but does not mean its complete workflow, UI, dependencies and native behavior are certified. Every endpoint remains in the release backlog until those gates pass. Raw handler counts are not a percent-complete estimate.
+**388 missing handlers, 120 partially implemented handlers, zero native-certified contracts, 508 source method/path contracts in total.** A partial handler has actual implementation, but does not mean its complete workflow, UI, dependencies and native behavior are certified. Every endpoint remains in the release backlog until those gates pass. Raw handler counts are not a percent-complete estimate.
 
-Fresh offline evidence: 39,114 functional PHP-WASM assertions, 78 first-party syntax checks, 165 unchanged original frontend hashes. Offline evidence is **not** real WordPress/MySQL/HTTP/provider/browser certification. This checklist is the full current implementation/release backlog, not a claim that software can be guaranteed to run perfectly on every host.
+Fresh offline evidence: 40,924 functional PHP-WASM assertions, 80 first-party syntax checks, 165 unchanged original frontend hashes. Offline evidence is **not** real WordPress/MySQL/HTTP/provider/browser certification. This checklist is the full current implementation/release backlog, not a claim that software can be guaranteed to run perfectly on every host.
 
 ## Implementation order and acceptance gates
 
@@ -30,7 +30,7 @@ Fresh offline evidence: 39,114 functional PHP-WASM assertions, 78 first-party sy
 - [ ] Implement calls/CallGate: configuration, handsets/devices, dial requests, call logs and authenticated event/webhook lifecycle. Call analytics alone is not calling.
 - [ ] Implement webhook registration/verification, exact raw-body signature handling, replay protection, deduplication, event ordering, rate limits, retries and redacted logs.
 - [ ] Wire auto-reply/If-Then rule execution, per-contact cooldowns, counters and supported actions into actual inbound events. Rule CRUD/classification/non-sending tests already exist; action execution does not.
-- [ ] Qualify implemented calendar-only booking CRUD, attendee/conversation/pipeline effects, status actions, filters and previews on native hosts; complete calendar UI, invitations/reminder workers/retries and delivery-time policy. Complete invoices/items/payments/PDF/email workflows and safe deletion semantics.
+- [ ] Qualify implemented calendar-only booking CRUD, attendee/conversation/pipeline effects, status actions, filters and previews on native hosts; complete calendar UI, invitations/reminder workers/retries and delivery-time policy. Qualify implemented draft invoice CRUD/items/totals/numbering/audit/duplication and guarded deletion on native hosts; complete invoice settings/public links/payments/reversals/refunds/PDF/email workflows, financial/domain review, concurrency and recovery.
 - [ ] Complete dashboards/overview/unified managers and reporting. Five analytics read APIs now exist; complete dashboard, email/manager analytics and native validation remain outstanding.
 - [ ] Complete notification delivery, browser push subscriptions, provider/browser permission handling, setup guide and live setup summaries. Notification read-state APIs alone do not deliver notifications.
 - [ ] Complete AI assistant/agent sessions, files/memory/skills/tools, external-provider configuration, explicit action permissions and safe tool execution; complete MCP endpoints and authentication, SSE/NDJSON streaming, disconnects, buffering/proxy timeouts and browser cancellation.
@@ -87,7 +87,7 @@ All counts below are derived from `docs/contracts.json`. Missing = no native han
 | followups | 7 | 0 | 0 |
 | guide | 3 | 0 | 0 |
 | inbox | 20 | 0 | 0 |
-| invoices | 26 | 0 | 0 |
+| invoices | 17 | 9 | 0 |
 | lists | 1 | 12 | 0 |
 | mail | 8 | 0 | 0 |
 | mailbox | 14 | 0 | 0 |
@@ -136,7 +136,7 @@ This exhaustive list includes partially implemented routes because none is yet n
 | DELETE | `/api/v1/email/domains/{domain_id}` | Missing implementation |
 | DELETE | `/api/v1/email/suppression/{entry_id}` | Missing implementation |
 | DELETE | `/api/v1/followups/{followup_id}` | Missing implementation |
-| DELETE | `/api/v1/invoices/{invoice_id}` | Missing implementation |
+| DELETE | `/api/v1/invoices/{invoice_id}` | Implemented partially; native/full-workflow proof required |
 | DELETE | `/api/v1/lists/{list_id}` | Implemented partially; native/full-workflow proof required |
 | DELETE | `/api/v1/mailbox/{mailbox_id}` | Missing implementation |
 | DELETE | `/api/v1/mcp/clients/{client_pk}` | Missing implementation |
@@ -279,7 +279,7 @@ This exhaustive list includes partially implemented routes because none is yet n
 | GET | `/api/v1/inbox/conversations/{conversation_id}` | Missing implementation |
 | GET | `/api/v1/inbox/conversations/{conversation_id}/templates/{template_id}/preview` | Missing implementation |
 | GET | `/api/v1/inbox/device-info` | Missing implementation |
-| GET | `/api/v1/invoices` | Missing implementation |
+| GET | `/api/v1/invoices` | Implemented partially; native/full-workflow proof required |
 | GET | `/api/v1/invoices/analytics` | Missing implementation |
 | GET | `/api/v1/invoices/currencies` | Missing implementation |
 | GET | `/api/v1/invoices/links` | Missing implementation |
@@ -287,9 +287,9 @@ This exhaustive list includes partially implemented routes because none is yet n
 | GET | `/api/v1/invoices/public/{token}` | Missing implementation |
 | GET | `/api/v1/invoices/public/{token}/verify` | Missing implementation |
 | GET | `/api/v1/invoices/settings` | Missing implementation |
-| GET | `/api/v1/invoices/{invoice_id}` | Missing implementation |
-| GET | `/api/v1/invoices/{invoice_id}/events` | Missing implementation |
-| GET | `/api/v1/invoices/{invoice_id}/payments` | Missing implementation |
+| GET | `/api/v1/invoices/{invoice_id}` | Implemented partially; native/full-workflow proof required |
+| GET | `/api/v1/invoices/{invoice_id}/events` | Implemented partially; native/full-workflow proof required |
+| GET | `/api/v1/invoices/{invoice_id}/payments` | Implemented partially; native/full-workflow proof required |
 | GET | `/api/v1/lists` | Implemented partially; native/full-workflow proof required |
 | GET | `/api/v1/lists/` | Implemented partially; native/full-workflow proof required |
 | GET | `/api/v1/lists/{list_id}/contacts` | Implemented partially; native/full-workflow proof required |
@@ -378,7 +378,7 @@ This exhaustive list includes partially implemented routes because none is yet n
 | PATCH | `/api/v1/ai-agent/sessions/{session_id}` | Missing implementation |
 | PATCH | `/api/v1/campaigns/{campaign_id}` | Missing implementation |
 | PATCH | `/api/v1/email/accounts/{account_id}` | Missing implementation |
-| PATCH | `/api/v1/invoices/{invoice_id}` | Missing implementation |
+| PATCH | `/api/v1/invoices/{invoice_id}` | Implemented partially; native/full-workflow proof required |
 | PATCH | `/api/v1/mailbox/{mailbox_id}` | Missing implementation |
 | POST | `/api/v1/ads/audiences` | Missing implementation |
 | POST | `/api/v1/ads/audiences/{audience_id}/attach` | Missing implementation |
@@ -509,18 +509,18 @@ This exhaustive list includes partially implemented routes because none is yet n
 | POST | `/api/v1/inbox/poll-now` | Missing implementation |
 | POST | `/api/v1/inbox/register-webhook` | Missing implementation |
 | POST | `/api/v1/inbox/sync-full` | Missing implementation |
-| POST | `/api/v1/invoices` | Missing implementation |
+| POST | `/api/v1/invoices` | Implemented partially; native/full-workflow proof required |
 | POST | `/api/v1/invoices/links` | Missing implementation |
 | POST | `/api/v1/invoices/paystack/webhook` | Missing implementation |
 | POST | `/api/v1/invoices/public/{token}/pay` | Missing implementation |
 | POST | `/api/v1/invoices/settings/test` | Missing implementation |
-| POST | `/api/v1/invoices/{invoice_id}/duplicate` | Missing implementation |
+| POST | `/api/v1/invoices/{invoice_id}/duplicate` | Implemented partially; native/full-workflow proof required |
 | POST | `/api/v1/invoices/{invoice_id}/pay` | Missing implementation |
 | POST | `/api/v1/invoices/{invoice_id}/payments` | Missing implementation |
 | POST | `/api/v1/invoices/{invoice_id}/remind` | Missing implementation |
 | POST | `/api/v1/invoices/{invoice_id}/rotate-link` | Missing implementation |
 | POST | `/api/v1/invoices/{invoice_id}/send` | Missing implementation |
-| POST | `/api/v1/invoices/{invoice_id}/void` | Missing implementation |
+| POST | `/api/v1/invoices/{invoice_id}/void` | Implemented partially; native/full-workflow proof required |
 | POST | `/api/v1/lists/` | Implemented partially; native/full-workflow proof required |
 | POST | `/api/v1/lists/{list_id}/clean` | Implemented partially; native/full-workflow proof required |
 | POST | `/api/v1/lists/{list_id}/contacts` | Implemented partially; native/full-workflow proof required |

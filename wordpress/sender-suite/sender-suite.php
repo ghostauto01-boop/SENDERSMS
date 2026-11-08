@@ -8,6 +8,6 @@
  * Text Domain: sender-suite
  */
 if (!defined('ABSPATH')) { exit; }
-foreach (array('schema','database','vault','compat','phone','number-filter','csv-reader','csv-preview','config','auth','auth-routes','records','runtime-settings','contacts','contact-lists','contact-actions','contact-export','templating','suggestions','attachments','variables','variable-routes','templates','template-routes','reply-classifier','reply-rules','reply-routes','notification-center','csv-import','csv-url','import-jobs','import-routes','analytics','sequences','calendar','data-routes','installer','plugin') as $sender_suite_file) { require_once __DIR__.'/includes/class-'.$sender_suite_file.'.php'; }
+foreach (array('schema','database','vault','compat','phone','number-filter','csv-reader','csv-preview','config','auth','auth-routes','records','runtime-settings','contacts','contact-lists','contact-actions','contact-export','templating','suggestions','attachments','variables','variable-routes','templates','template-routes','reply-classifier','reply-rules','reply-routes','notification-center','csv-import','csv-url','import-jobs','import-routes','analytics','sequences','calendar','invoices','data-routes','installer','plugin') as $sender_suite_file) { require_once __DIR__.'/includes/class-'.$sender_suite_file.'.php'; }
 unset($sender_suite_file);
 \SenderSuite\Plugin::boot(__FILE__);

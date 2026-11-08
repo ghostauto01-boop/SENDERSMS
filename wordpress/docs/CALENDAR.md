@@ -66,7 +66,7 @@ The original calendar frontend still assumes sending defaults and the original A
 - **30 source DTO acceptance cases**, with explicit native null-field safety differences.
 - **6 actual-source meeting-placeholder cases**, including midnight, noon and offset year rollover.
 - **148 calendar assertions per PHP runtime**, including first-save and update/delete rollback, synthetic attendee-only conflicts, monotonic timestamps, protected pipeline stages, immediate attendee replacement, range/date/link validation, delivery refusal and oversized response admission.
-- **539 shared dispatcher assertions per runtime**, including calendar session/origin controls, persistence, filters/day/tags/preview/status/delete, redacted failures, disabled delivery and the existing modules.
+- **578 shared dispatcher assertions per runtime**, including calendar session/origin controls, persistence, filters/day/tags/preview/status/delete, redacted failures, disabled delivery and the existing modules.
 
 UTC timestamp representations normalize for source comparisons; `updated_at` is excluded because native monotonic timestamps intentionally differ from the fixed source clock. Fresh reference HTTP probes were added for isolated CI but were **not executed**. Zero provider messages were sent.
 

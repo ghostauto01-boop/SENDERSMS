@@ -1,7 +1,7 @@
 {
   "ok": true,
-  "php_lint_checks": 78,
-  "php_assertions": 39114,
+  "php_lint_checks": 80,
+  "php_assertions": 40924,
   "vendor_parser_checks": 3075,
   "vendor_hash_checks": 1547,
   "unchanged_frontend_files": 165,
@@ -69,7 +69,7 @@
     },
     {
       "ok": true,
-      "assertions": 539,
+      "assertions": 578,
       "diffs": [],
       "php": "7.4.34-dev",
       "scope": "Offline requests/responses with synthetic password codec, seventy-three synthetic SQLite application tables, fault-injected transaction failure; not real WP/HTTP/Argon2/native MySQL/concurrency proof",
@@ -237,6 +237,22 @@
       "native_mysql_verified": false,
       "provider_messages_sent": 0,
       "suite": "calendar"
+    },
+    {
+      "ok": true,
+      "assertions": 866,
+      "diffs": [],
+      "php": "7.4.34-dev",
+      "source_operations": 32,
+      "source_totals_cases": 400,
+      "python_rounding_cases": 333,
+      "source_dto_cases": 34,
+      "scope": "Actual selected source invoice AST, synthetic SQLite/UTC/clock/UUID/settings, reconstructed relationships, source-compatible binary64 totals within signed SQL INT limits, injected rollback/conflict and draft-only safety policy. Token/checkout URL/updated_at comparisons explicitly excluded. No WP/MySQL/native concurrency/browser/PDF/email/payments certification.",
+      "native_wordpress_verified": false,
+      "native_mysql_verified": false,
+      "provider_requests": 0,
+      "payments_recorded": 0,
+      "suite": "invoices"
     },
     {
       "ok": true,
@@ -308,7 +324,7 @@
     },
     {
       "ok": true,
-      "assertions": 539,
+      "assertions": 578,
       "diffs": [],
       "php": "8.3.36",
       "scope": "Offline requests/responses with synthetic password codec, seventy-three synthetic SQLite application tables, fault-injected transaction failure; not real WP/HTTP/Argon2/native MySQL/concurrency proof",
@@ -476,6 +492,22 @@
       "native_mysql_verified": false,
       "provider_messages_sent": 0,
       "suite": "calendar"
+    },
+    {
+      "ok": true,
+      "assertions": 866,
+      "diffs": [],
+      "php": "8.3.36",
+      "source_operations": 32,
+      "source_totals_cases": 400,
+      "python_rounding_cases": 333,
+      "source_dto_cases": 34,
+      "scope": "Actual selected source invoice AST, synthetic SQLite/UTC/clock/UUID/settings, reconstructed relationships, source-compatible binary64 totals within signed SQL INT limits, injected rollback/conflict and draft-only safety policy. Token/checkout URL/updated_at comparisons explicitly excluded. No WP/MySQL/native concurrency/browser/PDF/email/payments certification.",
+      "native_wordpress_verified": false,
+      "native_mysql_verified": false,
+      "provider_requests": 0,
+      "payments_recorded": 0,
+      "suite": "invoices"
     },
     {
       "ok": true,

@@ -42,7 +42,7 @@ Writes use conditional prior-value comparisons to fail on detected conflicts; cr
 - **11 source appearance DTO cases**.
 - Source encryption is an explicitly synthetic oracle marker; comparisons inspect selected logical credentials, not ciphertext parity.
 - **137 assertions per PHP runtime** in the settings suite, including native vault round trips, redaction, tamper/copy/prefix rejection, complete replacement of unreadable values, failed-first-save cleanup, write failures, simulated compare-and-swap conflicts, late-invalid-field rollback, category repair, enum/size guards and malformed stored state.
-- **539 shared dispatcher assertions per runtime**, including settings login/origin/admin-role enforcement, query-secret refusal, persisted JSON secrets, private reads, long compliance aliases and rollback.
+- **578 shared dispatcher assertions per runtime**, including settings login/origin/admin-role enforcement, query-secret refusal, persisted JSON secrets, private reads, long compliance aliases and rollback.
 
 All execution is PHP-WASM with synthetic SQLite, a fixed source clock and isolated test keys. This does not certify real WordPress/PHP hosting, MySQL/MariaDB, HTTP/browser behaviour, role-management UI, provider credentials, concurrency, encryption rotation or actual notification delivery. No notifications or real provider messages were sent. Native HTTP smoke references include non-sending settings checks but remain unexecuted.
 

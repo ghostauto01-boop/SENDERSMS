@@ -239,7 +239,7 @@
     "sources": [
       "backend/app/api/v1/invoices.py:1203"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -1527,7 +1527,7 @@
     "sources": [
       "backend/app/api/v1/invoices.py:779"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -1599,7 +1599,7 @@
     "sources": [
       "backend/app/api/v1/invoices.py:1086"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -1608,7 +1608,7 @@
     "sources": [
       "backend/app/api/v1/invoices.py:1470"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -1617,7 +1617,7 @@
     "sources": [
       "backend/app/api/v1/invoices.py:1460"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -2420,7 +2420,7 @@
     "sources": [
       "backend/app/api/v1/invoices.py:1096"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -3599,7 +3599,7 @@
     "sources": [
       "backend/app/api/v1/invoices.py:851"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -3644,7 +3644,7 @@
     "sources": [
       "backend/app/api/v1/invoices.py:1216"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -3698,7 +3698,7 @@
     "sources": [
       "backend/app/api/v1/invoices.py:1323"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
