@@ -25,13 +25,14 @@ partial.update({('GET','/api/v1/invoices'),('POST','/api/v1/invoices'),('GET','/
 partial.update({('GET','/api/v1/inbox/conversations'),('GET','/api/v1/inbox/campaign-filters'),('GET','/api/v1/inbox/conversations/{conversation_id}'),('GET','/api/v1/inbox/conversations/{conversation_id}/templates/{template_id}/preview')} | {('POST','/api/v1/inbox/conversations/{conversation_id}/'+action) for action in ('mark-interested','mark-not-interested','mark-close','mark-opportunity','status','mark-unread','stop-sequence','resume-sequence')})
 partial.add(('POST','/api/v1/webhooks/smsgateway'))
 partial.update({('GET','/api/v1/followups'),('GET','/api/v1/followups/'),('POST','/api/v1/followups/'),('DELETE','/api/v1/followups/{followup_id}'),('POST','/api/v1/followups/{followup_id}/skip'),('POST','/api/v1/followups/{followup_id}/reschedule')})
+partial.update({('GET','/api/v1/settings/access'),('PUT','/api/v1/settings/access'),('GET','/api/v1/variables/contact/{contact_id}/profile'),('GET','/api/v1/dashboard/stats'),('GET','/api/v1/dashboard/charts')})
 assert partial.issubset(pairs), 'A reported partial path is absent from the source inventory'
 
 contracts=[{'method':method,'path':path,'sources':[r['source'] for r in rows],'state':'partial handler; native WordPress/HTTP unverified' if (method,path) in partial else 'missing original application handler','certified':False} for (method,path),rows in sorted(pairs.items())]
 assert len(contracts)==508
-assert sum(c['state'].startswith('partial') for c in contracts)==139
+assert sum(c['state'].startswith('partial') for c in contracts)==144
 (D/'docs/contracts.json').write_text(json.dumps(contracts,indent=2)+'\n')
-text='# Remaining WordPress recreation work\n\n369 missing source handlers,139 partial health/auth/contact/list/variable/template/reply/classification/notification/import/analytics/sequence/settings/calendar/invoice/inbox/status-webhook/follow-up-control handlers,0 fully certified contracts. The administrator CSV diagnostic is not the original source import API.\n\nEvery row is outstanding, including all partial handlers until native HTTP certification. See README.md for actual implemented utilities and fresh test boundaries.\n\n| Method | Path | Source | State |\n|---|---|---|---|\n'
+text='# Remaining WordPress recreation work\n\n364 missing source handlers,144 partial health/auth/contact/list/variable/template/reply/classification/notification/import/analytics/sequence/settings/calendar/invoice/inbox/status-webhook/follow-up-control/access/profile/dashboard handlers,0 fully certified contracts. The administrator CSV diagnostic is not the original source import API.\n\nEvery row is outstanding, including all partial handlers until native HTTP certification. See README.md for actual implemented utilities and fresh test boundaries.\n\n| Method | Path | Source | State |\n|---|---|---|---|\n'
 for c in contracts:text+='| '+c['method']+' | '+c['path'].replace('|','\\|')+' | '+', '.join(c['sources'])+' | '+c['state']+' |\n'
 (D/'docs/REMAINING_WORK.md').write_text(text)
 log=D/'.cache/frontend-test.log'
@@ -41,4 +42,4 @@ if log.is_file():
  build=(D/'.cache/frontend-build.log').read_text();assert 'built in' in build
  record={'test_command':'npm test -- --reporter=dot','tests_passed':int(tests[1]),'test_files_passed':int(files[1]),'test_output_sha256':hashlib.sha256(raw).hexdigest(),'build_command':'npm run build -- --outDir ../wordpress/sender-suite/app','build_passed':True,'built_asset_files':sum(p.is_file() for p in (D/'sender-suite/app').rglob('*')),'original_frontend_modified':False,'native_wordpress_browser_verified':False,'note':'Fresh stdout from actual execution, not earlier conversation counts; jsdom navigation warning is not browser coverage'}
  (D/'tests/frontend-evidence.json').write_text(json.dumps(record,indent=2)+'\n')
-print(json.dumps({'source_contracts':len(contracts),'missing_handlers':369,'partial_handlers':139,'certified':0}))
+print(json.dumps({'source_contracts':len(contracts),'missing_handlers':364,'partial_handlers':144,'certified':0}))

@@ -19,7 +19,15 @@ final class AppAuth {
     private $db;private $config;private $passwords;private $clock;
     public function __construct(Database $db,Config $config,$passwords=null,callable $clock=null){$this->db=$db;$this->config=$config;$this->passwords=$passwords??new Passwords();$this->clock=$clock??function(){return (new \DateTimeImmutable('now',new \DateTimeZone('UTC')))->format('Y-m-d H:i:s.u');};}
     private function now(){return ($this->clock)();}
-    public function siteHash(){$value=$this->db->one('system_settings',array('key'=>'auth.password_hash'))['value']??null;return $value===null||$value===''?null:$value;}
+    public function siteHash(){
+        $flag=$this->db->one('system_settings',array('key'=>'auth.password_required'));
+        if($flag&&!in_array(strtolower(Compat::strip($flag['value']??'')),array('1','true','yes','on'),true)){return null;}
+        $value=$this->db->one('system_settings',array('key'=>'auth.password_hash'))['value']??null;
+        return $value===null||$value===''?null:$value;
+    }
+    /** Internal credential/renewal helpers; no caller-selectable codec on REST routes. */
+    public function hashSitePassword($plain){return $this->passwords->hash($plain);}
+    public function renewSessionToken(array $user){return (new Tokens($this->config->get('SECRET_KEY'),$this->config->get('ACCESS_TOKEN_EXPIRE_MINUTES')))->sign(array('sub'=>(string)$user['id'],'role'=>$user['role']));}
     private function accepted(){ $admin=Compat::strip($this->config->get('ADMIN_PASSWORD')??'');$legacy=Compat::strip($this->config->get('LOGIN_PASSWORD')??'');return $admin!==''?array($admin):($legacy!==''?array($legacy):array()); }
     public function access(){ $admin=Compat::strip($this->config->get('ADMIN_PASSWORD')??'');$legacy=$admin===''&&Compat::strip($this->config->get('LOGIN_PASSWORD')??'')!=='';$site=$this->siteHash();$source=$admin!==''?'admin':($site!==null?'site':($legacy?'legacy':'none'));return array('password_required'=>$admin!==''||$legacy||$site!==null,'password_set'=>$site!==null,'source'=>$source,'hint'=>$source==='admin'?'Enter the admin password for this deployment.':($source==='site'?'Enter the password saved in Settings → Site access.':($source==='legacy'?"Enter this deployment's login password.":''))); }
     private function admin(){ $name=$this->config->get('ADMIN_USERNAME');$user=$this->db->one('users',array('username'=>$name));$now=$this->now();if($user===null){$id=$this->db->insert('users',array('username'=>$name,'password_hash'=>$this->passwords->hash($this->config->get('ADMIN_PASSWORD')??''),'display_name'=>'Administrator','role'=>'admin','is_active'=>true,'created_at'=>$now,'updated_at'=>$now));$user=$this->db->one('users',array('id'=>$id));} $changes=array();if(!$user['is_active']){$changes['is_active']=true;}if(!$this->passwords->verify($this->config->get('ADMIN_PASSWORD')??'',$user['password_hash'])){$changes['password_hash']=$this->passwords->hash($this->config->get('ADMIN_PASSWORD')??'');}if($changes){$changes['updated_at']=$now;$this->db->update('users',$changes,array('id'=>$user['id']));$user=array_merge($user,$changes);}return $user; }

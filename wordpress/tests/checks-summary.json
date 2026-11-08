@@ -1,7 +1,7 @@
 {
   "ok": true,
-  "php_lint_checks": 86,
-  "php_assertions": 42122,
+  "php_lint_checks": 92,
+  "php_assertions": 42532,
   "vendor_parser_checks": 3075,
   "vendor_hash_checks": 1547,
   "unchanged_frontend_files": 165,
@@ -69,7 +69,7 @@
     },
     {
       "ok": true,
-      "assertions": 668,
+      "assertions": 716,
       "diffs": [],
       "php": "7.4.34-dev",
       "scope": "Offline requests/responses with synthetic password codec, seventy-three synthetic SQLite application tables, fault-injected transaction failure; not real WP/HTTP/Argon2/native MySQL/concurrency proof",
@@ -293,6 +293,32 @@
       "workers_verified": false,
       "scope": "Selected source/empty-sender/fixed-clock SQLite, deliberate history/pause/consent/link guards, fault rollback; no sends, actual worker, native HTTP/MySQL/concurrency or browser proof",
       "suite": "followups"
+    },
+    {
+      "ok": true,
+      "assertions": 91,
+      "diffs": [],
+      "php": "7.4.34-dev",
+      "source_access_cases": 8,
+      "source_dto_cases": 7,
+      "source_profile_cases": 7,
+      "native_wordpress_verified": false,
+      "native_argon2_verified": false,
+      "native_mysql_verified": false,
+      "scope": "Actual selected source with synthetic SHA codec and fixed-clock SQLite; hardened disable/legacy semantics, conditional-write/rollback/resource tests; not native crypto, HTTP, concurrent races or browser proof",
+      "suite": "access-profile"
+    },
+    {
+      "ok": true,
+      "assertions": 66,
+      "diffs": [],
+      "php": "7.4.34-dev",
+      "source_operations": 24,
+      "native_wordpress_verified": false,
+      "native_mysql_verified": false,
+      "gateway_connectivity_verified": false,
+      "scope": "Actual selected dashboard/metrics source and read-only SQLite snapshots; intentional not_verified gateway status and resource guards; not native HTTP/MySQL/query-load/concurrency/provider/browser proof",
+      "suite": "dashboard"
     },
     {
       "ok": true,
@@ -364,7 +390,7 @@
     },
     {
       "ok": true,
-      "assertions": 668,
+      "assertions": 716,
       "diffs": [],
       "php": "8.3.36",
       "scope": "Offline requests/responses with synthetic password codec, seventy-three synthetic SQLite application tables, fault-injected transaction failure; not real WP/HTTP/Argon2/native MySQL/concurrency proof",
@@ -588,6 +614,32 @@
       "workers_verified": false,
       "scope": "Selected source/empty-sender/fixed-clock SQLite, deliberate history/pause/consent/link guards, fault rollback; no sends, actual worker, native HTTP/MySQL/concurrency or browser proof",
       "suite": "followups"
+    },
+    {
+      "ok": true,
+      "assertions": 91,
+      "diffs": [],
+      "php": "8.3.36",
+      "source_access_cases": 8,
+      "source_dto_cases": 7,
+      "source_profile_cases": 7,
+      "native_wordpress_verified": false,
+      "native_argon2_verified": false,
+      "native_mysql_verified": false,
+      "scope": "Actual selected source with synthetic SHA codec and fixed-clock SQLite; hardened disable/legacy semantics, conditional-write/rollback/resource tests; not native crypto, HTTP, concurrent races or browser proof",
+      "suite": "access-profile"
+    },
+    {
+      "ok": true,
+      "assertions": 66,
+      "diffs": [],
+      "php": "8.3.36",
+      "source_operations": 24,
+      "native_wordpress_verified": false,
+      "native_mysql_verified": false,
+      "gateway_connectivity_verified": false,
+      "scope": "Actual selected dashboard/metrics source and read-only SQLite snapshots; intentional not_verified gateway status and resource guards; not native HTTP/MySQL/query-load/concurrency/provider/browser proof",
+      "suite": "dashboard"
     },
     {
       "ok": true,

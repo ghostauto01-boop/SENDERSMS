@@ -1,0 +1,14 @@
+{
+  "ok": true,
+  "assertions": 91,
+  "diffs": [],
+  "php": "8.3.36",
+  "source_access_cases": 8,
+  "source_dto_cases": 7,
+  "source_profile_cases": 7,
+  "native_wordpress_verified": false,
+  "native_argon2_verified": false,
+  "native_mysql_verified": false,
+  "scope": "Actual selected source with synthetic SHA codec and fixed-clock SQLite; hardened disable/legacy semantics, conditional-write/rollback/resource tests; not native crypto, HTTP, concurrent races or browser proof",
+  "suite": "access-profile"
+}

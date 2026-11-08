@@ -147,10 +147,22 @@ try:
  s,b,h=request('POST',f'followups/{followup}/skip');check('native follow-up skip',b.get('success'),True)
  s,b,h=request('POST',f'followups/{followup}/reschedule',query={'new_time':future});check('native follow-up reschedule',s,200)
  s,b,h=request('DELETE',f'followups/{followup}');check('native unsent follow-up deletion',s,204)
+ # Optional shared operator credential: actual Argon2 and post-commit cookie smoke probes.
+ s,b,h=request('GET','settings/access',authenticated=False);check('native access metadata private',s,401)
+ alternate='Isolated-alternate-only-2357'
+ s,b,h=request('PUT','settings/access',{'password_required':True,'password':alternate});check('native alternate credential save',s,200);check('native alternate metadata',b,{'password_required':True,'password_set':True});check('native alternate not echoed',alternate not in json.dumps(b));check('native alternate renewal HttpOnly','HttpOnly' in h.get('Set-Cookie',''))
+ s,b,h=request('POST','auth/login',{'username':'unknown','password':alternate},authenticated=False);check('native alternate Argon2id login',s,200)
+ s,b,h=request('PUT','settings/access',{'password_required':False});check('native alternate disabled',b,{'password_required':False,'password_set':False})
+ s,b,h=request('POST','auth/login',{'username':'unknown','password':alternate},authenticated=False);check('native disabled alternate refused',s,401)
+ s,b,h=request('GET','auth/access');check('native operator password remains mandatory',b.get('password_required'),True)
+ s,b,h=request('GET',f'variables/contact/{contact}/profile');check('native contact variable profile',s,200);check('native contact profile ID',b.get('contact_id'),contact);check('native profile no-store',h.get('Cache-Control'),'no-store')
+ for path in ('stats','charts'):
+  s,b,h=request('GET','dashboard/'+path);check('native dashboard '+path,s,200);check('native dashboard no-store '+path,h.get('Cache-Control'),'no-store')
+  if path=='stats':check('native dashboard never fabricates gateway connectivity',b.get('gateway_status'),'not_verified')
  s,b,h=request('POST','auth/logout');check('native logout',s,200)
  s,b,h=request('GET','contacts');check('native logout clears browser cookie',s,401)
 except Exception as e:failures.append({'exception':type(e).__name__,'message':str(e)})
 finally:
- result=dict(ok=not failures,assertions=checks,failures=failures,native_wordpress_http=True,native_mysql=True,actual_http_cookie_roundtrip=cookie_roundtrip,provider_messages_sent=0,complete_application=False,production_ready=False,scope='Actual HTTP/WordPress/MySQL smoke checks for implemented auth/contact/list/variable/template/synchronous import/job/CSV report/analytics/sequence-builder/lifecycle/export/settings/calendar/invoice/inbox/follow-up-control paths and explicit native import worker (not actual WP cron dispatch); not full contract/SPA/browser/native concurrency/destructive FK/migration/provider certification')
+ result=dict(ok=not failures,assertions=checks,failures=failures,native_wordpress_http=True,native_mysql=True,actual_http_cookie_roundtrip=cookie_roundtrip,provider_messages_sent=0,complete_application=False,production_ready=False,scope='Actual HTTP/WordPress/MySQL smoke checks for implemented auth/contact/list/variable/template/synchronous import/job/CSV report/analytics/sequence-builder/lifecycle/export/settings/calendar/invoice/inbox/follow-up-control/access/profile/dashboard paths and explicit native import worker (not actual WP cron dispatch); not full contract/SPA/browser/native concurrency/destructive FK/migration/provider certification')
  (E/'native-http.json').write_text(json.dumps(result,indent=2)+'\n');print(json.dumps(result));(E/'private-test-cookie.json').unlink(missing_ok=True)
 raise SystemExit(bool(failures))

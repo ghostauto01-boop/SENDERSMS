@@ -2,9 +2,9 @@
 
 Build: **0.11.0-dev**. WordPress is the native application backend; no original Python service is the proposed runtime. Original repository application files remain unchanged.
 
-**369 missing handlers, 139 partially implemented handlers, zero native-certified contracts, 508 source method/path contracts in total.** A partial handler has actual implementation, but does not mean its complete workflow, UI, dependencies and native behavior are certified. Every endpoint remains in the release backlog until those gates pass. Raw handler counts are not a percent-complete estimate.
+**364 missing handlers, 144 partially implemented handlers, zero native-certified contracts, 508 source method/path contracts in total.** A partial handler has actual implementation, but does not mean its complete workflow, UI, dependencies and native behavior are certified. Every endpoint remains in the release backlog until those gates pass. Raw handler counts are not a percent-complete estimate.
 
-Fresh offline evidence: 42,122 functional PHP-WASM assertions, 86 first-party syntax checks, 165 unchanged original frontend hashes. Offline evidence is **not** real WordPress/MySQL/HTTP/provider/browser certification. This checklist is the full current implementation/release backlog, not a claim that software can be guaranteed to run perfectly on every host.
+Fresh offline evidence: 42,532 functional PHP-WASM assertions, 92 first-party syntax checks, 165 unchanged original frontend hashes. Offline evidence is **not** real WordPress/MySQL/HTTP/provider/browser certification. This checklist is the full current implementation/release backlog, not a claim that software can be guaranteed to run perfectly on every host.
 
 ## Implementation order and acceptance gates
 
@@ -19,7 +19,7 @@ Fresh offline evidence: 42,122 functional PHP-WASM assertions, 86 first-party sy
 ### 2. Full native API/workflow implementation
 - [ ] Finish all exact methods/paths in the endpoint inventory below with source-compatible validation, responses, permissions and substantive behavior; never replace missing features with fake successful stubs.
 - [ ] Complete settings/provider wiring beyond the nine active encrypted auth/scheduling settings; all source configuration families, redacted outputs, secret storage, URL validation and rotation.
-- [ ] Complete remaining profile/account/session workflows and roles/permissions.
+- [ ] Qualify implemented optional shared operator credential settings and contact-variable profiles on native hosts; complete remaining profile/account/session workflows, role/permission management and session revocation. See `ACCESS_PROFILE_DASHBOARD.md`.
 - [ ] Certify implemented contact/list deletion, dependency cleanup and bulk actions on native hosts; certify implemented JSON/CSV exports and complete enrichment, email verification, aliases/suppression and export/data-management workflows. Avoid deleting shared calendar attendees or unrelated records.
 - [ ] Validate upload preview, synchronous imports, background jobs/progress/error reports and URL imports on native hosts, including consent preservation, atomic batches, crashes, duplicate IDs/memberships, locks, public-address pinning/TLS, limits and retention. These APIs are implemented, not native-certified.
 - [ ] Implement actual SMS transports, provider/device/gateway configuration, one-to-one/bulk sends, scheduling, delivery/status reconciliation, bounded retries and error handling.
@@ -31,7 +31,7 @@ Fresh offline evidence: 42,122 functional PHP-WASM assertions, 86 first-party sy
 - [ ] Qualify implemented status-only SMS-Gate raw-body HMAC, encrypted signing-key configuration, receipt deduplication and transactional reconciliation on native hosts. Complete webhook registration, phone-specific keys, inbound/call/email events, rate limits, retry/recovery tooling, retention and redacted diagnostics; verify the documented first-terminal-wins policy against actual gateway behavior.
 - [ ] Wire auto-reply/If-Then rule execution, per-contact cooldowns, counters and supported actions into actual inbound events. Rule CRUD/classification/non-sending tests already exist; action execution does not.
 - [ ] Qualify implemented calendar-only booking CRUD, attendee/conversation/pipeline effects, status actions, filters and previews on native hosts; complete calendar UI, invitations/reminder workers/retries and delivery-time policy. Qualify implemented draft invoice CRUD/items/totals/numbering/audit/duplication and guarded deletion on native hosts; complete invoice settings/public links/payments/reversals/refunds/PDF/email workflows, financial/domain review, concurrency and recovery.
-- [ ] Complete dashboards/overview/unified managers and reporting. Five analytics read APIs now exist; complete dashboard, email/manager analytics and native validation remain outstanding.
+- [ ] Complete dashboards/overview/unified managers and reporting. Five analytics APIs and stored dashboard stats/charts now exist; complete dashboard UI, real provider health, unified overview, email/manager analytics and native validation remain outstanding.
 - [ ] Complete notification delivery, browser push subscriptions, provider/browser permission handling, setup guide and live setup summaries. Notification read-state APIs alone do not deliver notifications.
 - [ ] Complete AI assistant/agent sessions, files/memory/skills/tools, external-provider configuration, explicit action permissions and safe tool execution; complete MCP endpoints and authentication, SSE/NDJSON streaming, disconnects, buffering/proxy timeouts and browser cancellation.
 - [ ] Complete validator/verification tools, diagnostics, persisted system errors and accurate worker/queue health (not source Redis/Celery status fabricated for WordPress).
