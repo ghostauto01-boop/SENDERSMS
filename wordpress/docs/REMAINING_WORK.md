@@ -1,6 +1,6 @@
 # Remaining WordPress recreation work
 
-433 missing source handlers,75 partial health/auth/contact/list/variable/template/reply/classification/notification/import/analytics/sequence handlers,0 fully certified contracts. The administrator CSV diagnostic is not the original source import API.
+422 missing source handlers,86 partial health/auth/contact/list/variable/template/reply/classification/notification/import/analytics/sequence handlers,0 fully certified contracts. The administrator CSV diagnostic is not the original source import API.
 
 Every row is outstanding, including all partial handlers until native HTTP certification. See README.md for actual implemented utilities and fresh test boundaries.
 
@@ -27,13 +27,13 @@ Every row is outstanding, including all partial handlers until native HTTP certi
 | DELETE | /api/v1/calls/webhooks/{webhook_id} | backend/app/api/v1/calls.py:160 | missing original application handler |
 | DELETE | /api/v1/campaign-followups/{followup_id} | backend/app/api/v1/campaign_followups.py:247 | missing original application handler |
 | DELETE | /api/v1/campaigns/{campaign_id} | backend/app/api/v1/campaigns.py:596 | missing original application handler |
-| DELETE | /api/v1/contacts/{contact_id} | backend/app/api/v1/contacts.py:963 | missing original application handler |
+| DELETE | /api/v1/contacts/{contact_id} | backend/app/api/v1/contacts.py:963 | partial handler; native WordPress/HTTP unverified |
 | DELETE | /api/v1/email/accounts/{account_id} | backend/app/api/v1/email.py:295 | missing original application handler |
 | DELETE | /api/v1/email/domains/{domain_id} | backend/app/api/v1/email.py:412 | missing original application handler |
 | DELETE | /api/v1/email/suppression/{entry_id} | backend/app/api/v1/email.py:1669 | missing original application handler |
 | DELETE | /api/v1/followups/{followup_id} | backend/app/api/v1/followups.py:213 | missing original application handler |
 | DELETE | /api/v1/invoices/{invoice_id} | backend/app/api/v1/invoices.py:1203 | missing original application handler |
-| DELETE | /api/v1/lists/{list_id} | backend/app/api/v1/lists.py:213 | missing original application handler |
+| DELETE | /api/v1/lists/{list_id} | backend/app/api/v1/lists.py:213 | partial handler; native WordPress/HTTP unverified |
 | DELETE | /api/v1/mailbox/{mailbox_id} | backend/app/api/v1/mailbox.py:559 | missing original application handler |
 | DELETE | /api/v1/mcp/clients/{client_pk} | backend/app/api/v1/mcp.py:1188 | missing original application handler |
 | DELETE | /api/v1/mcp/tokens/{token_id} | backend/app/api/v1/mcp.py:1000 | missing original application handler |
@@ -141,7 +141,7 @@ Every row is outstanding, including all partial handlers until native HTTP certi
 | GET | /api/v1/contacts/import/jobs/{job_id}/errors.csv | backend/app/api/v1/contacts.py:1367 | partial handler; native WordPress/HTTP unverified |
 | GET | /api/v1/contacts/tags/ | backend/app/api/v1/contacts.py:546 | partial handler; native WordPress/HTTP unverified |
 | GET | /api/v1/contacts/{contact_id} | backend/app/api/v1/contacts.py:588 | partial handler; native WordPress/HTTP unverified |
-| GET | /api/v1/contacts/{contact_id}/activity | backend/app/api/v1/contacts.py:1803 | missing original application handler |
+| GET | /api/v1/contacts/{contact_id}/activity | backend/app/api/v1/contacts.py:1803 | partial handler; native WordPress/HTTP unverified |
 | GET | /api/v1/dashboard/charts | backend/app/api/v1/dashboard.py:205 | missing original application handler |
 | GET | /api/v1/dashboard/stats | backend/app/api/v1/dashboard.py:38 | missing original application handler |
 | GET | /api/v1/email/accounts | backend/app/api/v1/email.py:154 | missing original application handler |
@@ -356,18 +356,18 @@ Every row is outstanding, including all partial handlers until native HTTP certi
 | POST | /api/v1/campaigns/{campaign_id}/stop | backend/app/api/v1/campaigns.py:576 | missing original application handler |
 | POST | /api/v1/campaigns/{campaign_id}/validate | backend/app/api/v1/campaigns.py:321 | missing original application handler |
 | POST | /api/v1/contacts/ | backend/app/api/v1/contacts.py:602 | partial handler; native WordPress/HTTP unverified |
-| POST | /api/v1/contacts/bulk | backend/app/api/v1/contacts.py:978 | missing original application handler |
-| POST | /api/v1/contacts/clean | backend/app/api/v1/contacts.py:477 | missing original application handler |
+| POST | /api/v1/contacts/bulk | backend/app/api/v1/contacts.py:978 | partial handler; native WordPress/HTTP unverified |
+| POST | /api/v1/contacts/clean | backend/app/api/v1/contacts.py:477 | partial handler; native WordPress/HTTP unverified |
 | POST | /api/v1/contacts/enrich | backend/app/api/v1/contacts.py:1558 | missing original application handler |
 | POST | /api/v1/contacts/import/csv | backend/app/api/v1/contacts.py:1393 | partial handler; native WordPress/HTTP unverified |
 | POST | /api/v1/contacts/import/jobs | backend/app/api/v1/contacts.py:1241 | partial handler; native WordPress/HTTP unverified |
 | POST | /api/v1/contacts/import/preview | backend/app/api/v1/contacts.py:1227 | partial handler; native WordPress/HTTP unverified |
 | POST | /api/v1/contacts/import/url | backend/app/api/v1/contacts.py:1274 | partial handler; native WordPress/HTTP unverified |
-| POST | /api/v1/contacts/quarantine/generated | backend/app/api/v1/contacts.py:569 | missing original application handler |
+| POST | /api/v1/contacts/quarantine/generated | backend/app/api/v1/contacts.py:569 | partial handler; native WordPress/HTTP unverified |
 | POST | /api/v1/contacts/validate-emails | backend/app/api/v1/contacts.py:495 | missing original application handler |
-| POST | /api/v1/contacts/{contact_id}/email-opt-in | backend/app/api/v1/contacts.py:1749 | missing original application handler |
-| POST | /api/v1/contacts/{contact_id}/email-opt-out | backend/app/api/v1/contacts.py:1725 | missing original application handler |
-| POST | /api/v1/contacts/{contact_id}/sms-opt-in | backend/app/api/v1/contacts.py:1773 | missing original application handler |
+| POST | /api/v1/contacts/{contact_id}/email-opt-in | backend/app/api/v1/contacts.py:1749 | partial handler; native WordPress/HTTP unverified |
+| POST | /api/v1/contacts/{contact_id}/email-opt-out | backend/app/api/v1/contacts.py:1725 | partial handler; native WordPress/HTTP unverified |
+| POST | /api/v1/contacts/{contact_id}/sms-opt-in | backend/app/api/v1/contacts.py:1773 | partial handler; native WordPress/HTTP unverified |
 | POST | /api/v1/email/accounts | backend/app/api/v1/email.py:226 | missing original application handler |
 | POST | /api/v1/email/accounts/{account_id}/default | backend/app/api/v1/email.py:507 | missing original application handler |
 | POST | /api/v1/email/accounts/{account_id}/test | backend/app/api/v1/email.py:522 | missing original application handler |
@@ -418,10 +418,10 @@ Every row is outstanding, including all partial handlers until native HTTP certi
 | POST | /api/v1/invoices/{invoice_id}/send | backend/app/api/v1/invoices.py:1275 | missing original application handler |
 | POST | /api/v1/invoices/{invoice_id}/void | backend/app/api/v1/invoices.py:1323 | missing original application handler |
 | POST | /api/v1/lists/ | backend/app/api/v1/lists.py:172 | partial handler; native WordPress/HTTP unverified |
-| POST | /api/v1/lists/{list_id}/clean | backend/app/api/v1/lists.py:521 | missing original application handler |
+| POST | /api/v1/lists/{list_id}/clean | backend/app/api/v1/lists.py:521 | partial handler; native WordPress/HTTP unverified |
 | POST | /api/v1/lists/{list_id}/contacts | backend/app/api/v1/lists.py:315 | partial handler; native WordPress/HTTP unverified |
 | POST | /api/v1/lists/{list_id}/contacts/add-all | backend/app/api/v1/lists.py:387 | partial handler; native WordPress/HTTP unverified |
-| POST | /api/v1/lists/{list_id}/contacts/delete | backend/app/api/v1/lists.py:464 | missing original application handler |
+| POST | /api/v1/lists/{list_id}/contacts/delete | backend/app/api/v1/lists.py:464 | partial handler; native WordPress/HTTP unverified |
 | POST | /api/v1/lists/{list_id}/contacts/remove | backend/app/api/v1/lists.py:417 | partial handler; native WordPress/HTTP unverified |
 | POST | /api/v1/lists/{list_id}/validate-emails | backend/app/api/v1/lists.py:547 | missing original application handler |
 | POST | /api/v1/mail/messages/{mailbox_id}/{provider_message_id}/delete | backend/app/api/v1/mail.py:155 | missing original application handler |

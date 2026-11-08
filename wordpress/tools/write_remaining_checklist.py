@@ -27,7 +27,7 @@ Fresh offline evidence: {summary['php_assertions']:,} functional PHP-WASM assert
 - [ ] Finish all exact methods/paths in the endpoint inventory below with source-compatible validation, responses, permissions and substantive behavior; never replace missing features with fake successful stubs.
 - [ ] Complete settings/provider wiring beyond the eight initial encrypted auth settings; all source configuration families, redacted outputs, secret storage, URL validation and rotation.
 - [ ] Complete remaining profile/account/session workflows and roles/permissions.
-- [ ] Complete contact/list deletion, related-record cleanup, bulk actions, enrichment, email verification, aliases/suppression and export/data-management workflows. Avoid deleting shared calendar attendees or unrelated records.
+- [ ] Certify implemented contact/list deletion, dependency cleanup and bulk actions on native hosts; complete exports/enrichment, email verification, aliases/suppression and export/data-management workflows. Avoid deleting shared calendar attendees or unrelated records.
 - [ ] Validate upload preview, synchronous imports, background jobs/progress/error reports and URL imports on native hosts, including consent preservation, atomic batches, crashes, duplicate IDs/memberships, locks, public-address pinning/TLS, limits and retention. These APIs are implemented, not native-certified.
 - [ ] Implement actual SMS transports, provider/device/gateway configuration, one-to-one/bulk sends, scheduling, delivery/status reconciliation, bounded retries and error handling.
 - [ ] Implement complete email accounts/mailboxes/transports, domains/DNS verification, SMTP/provider/OAuth paths, sender selection, bulk/one-to-one mail, attachments, threading, suppression, unsubscribe/list headers, bounce/open/click tracking and inbox ingestion.
@@ -69,7 +69,7 @@ Fresh offline evidence: {summary['php_assertions']:,} functional PHP-WASM assert
 
 ## Current package meaning
 
-`sender-suite-development.zip` is the **current incomplete development plugin**, not the requested finished application. Its archive layout/CRC are checked, but real WordPress activation and production operation have not been verified. Do not install it on a production messaging site. The ZIP includes this checklist and offline evidence so the remaining work is not hidden.
+`sender-suite-development.zip` is an **older incomplete development snapshot**, not the requested finished application. Its archive layout/CRC are checked, but real WordPress activation and production operation have not been verified. Do not install it on a production messaging site. No new interim archive was produced for ongoing lifecycle work. The existing ZIP does not contain all current working-tree changes; it is not a ready release.
 
 ## API inventory by source module
 

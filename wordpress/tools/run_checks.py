@@ -10,7 +10,7 @@ for version in ('7.4','8.3'):
   p=subprocess.run([str(cli),'-l',str(file)],cwd=ROOT,env=env,capture_output=True,text=True,timeout=30)
   if p.returncode or 'No syntax errors detected' not in p.stdout:raise RuntimeError('PHP syntax failed: '+str(file))
   lint+=1
- for suite in ('core','csv','hooks','auth','auth-routes','contacts','data-routes','variables','templates','reply','import','import-jobs','url-import','analytics','sequences','vendor-parse'):
+ for suite in ('core','csv','hooks','auth','auth-routes','contacts','data-routes','variables','templates','reply','import','import-jobs','url-import','analytics','sequences','contact-actions','vendor-parse'):
   p=subprocess.run([str(cli),str(D/'tests'/f'{suite}-test.php')],cwd=ROOT,env=env,capture_output=True,text=True,timeout=90)
   try:record=json.loads(p.stdout)
   except json.JSONDecodeError:raise RuntimeError('No structured PHP success for '+suite+' '+version+'; stdout: '+p.stdout[:500])

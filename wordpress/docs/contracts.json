@@ -194,7 +194,7 @@
     "sources": [
       "backend/app/api/v1/contacts.py:963"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -248,7 +248,7 @@
     "sources": [
       "backend/app/api/v1/lists.py:213"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -1220,7 +1220,7 @@
     "sources": [
       "backend/app/api/v1/contacts.py:1803"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -3158,7 +3158,7 @@
     "sources": [
       "backend/app/api/v1/contacts.py:978"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -3167,7 +3167,7 @@
     "sources": [
       "backend/app/api/v1/contacts.py:477"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -3221,7 +3221,7 @@
     "sources": [
       "backend/app/api/v1/contacts.py:569"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -3239,7 +3239,7 @@
     "sources": [
       "backend/app/api/v1/contacts.py:1749"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -3248,7 +3248,7 @@
     "sources": [
       "backend/app/api/v1/contacts.py:1725"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -3257,7 +3257,7 @@
     "sources": [
       "backend/app/api/v1/contacts.py:1773"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -3716,7 +3716,7 @@
     "sources": [
       "backend/app/api/v1/lists.py:521"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -3743,7 +3743,7 @@
     "sources": [
       "backend/app/api/v1/lists.py:464"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {

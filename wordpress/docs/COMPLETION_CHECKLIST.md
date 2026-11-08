@@ -2,9 +2,9 @@
 
 Build: **0.11.0-dev**. WordPress is the native application backend; no original Python service is the proposed runtime. Original repository application files remain unchanged.
 
-**433 missing handlers, 75 partially implemented handlers, zero native-certified contracts, 508 source method/path contracts in total.** A partial handler has actual implementation, but does not mean its complete workflow, UI, dependencies and native behavior are certified. Every endpoint remains in the release backlog until those gates pass. Raw handler counts are not a percent-complete estimate.
+**422 missing handlers, 86 partially implemented handlers, zero native-certified contracts, 508 source method/path contracts in total.** A partial handler has actual implementation, but does not mean its complete workflow, UI, dependencies and native behavior are certified. Every endpoint remains in the release backlog until those gates pass. Raw handler counts are not a percent-complete estimate.
 
-Fresh offline evidence: 36,718 functional PHP-WASM assertions, 68 first-party syntax checks, 165 unchanged original frontend hashes. Offline evidence is **not** real WordPress/MySQL/HTTP/provider/browser certification. This checklist is the full current implementation/release backlog, not a claim that software can be guaranteed to run perfectly on every host.
+Fresh offline evidence: 38,174 functional PHP-WASM assertions, 72 first-party syntax checks, 165 unchanged original frontend hashes. Offline evidence is **not** real WordPress/MySQL/HTTP/provider/browser certification. This checklist is the full current implementation/release backlog, not a claim that software can be guaranteed to run perfectly on every host.
 
 ## Implementation order and acceptance gates
 
@@ -20,7 +20,7 @@ Fresh offline evidence: 36,718 functional PHP-WASM assertions, 68 first-party sy
 - [ ] Finish all exact methods/paths in the endpoint inventory below with source-compatible validation, responses, permissions and substantive behavior; never replace missing features with fake successful stubs.
 - [ ] Complete settings/provider wiring beyond the eight initial encrypted auth settings; all source configuration families, redacted outputs, secret storage, URL validation and rotation.
 - [ ] Complete remaining profile/account/session workflows and roles/permissions.
-- [ ] Complete contact/list deletion, related-record cleanup, bulk actions, enrichment, email verification, aliases/suppression and export/data-management workflows. Avoid deleting shared calendar attendees or unrelated records.
+- [ ] Certify implemented contact/list deletion, dependency cleanup and bulk actions on native hosts; complete exports/enrichment, email verification, aliases/suppression and export/data-management workflows. Avoid deleting shared calendar attendees or unrelated records.
 - [ ] Validate upload preview, synchronous imports, background jobs/progress/error reports and URL imports on native hosts, including consent preservation, atomic batches, crashes, duplicate IDs/memberships, locks, public-address pinning/TLS, limits and retention. These APIs are implemented, not native-certified.
 - [ ] Implement actual SMS transports, provider/device/gateway configuration, one-to-one/bulk sends, scheduling, delivery/status reconciliation, bounded retries and error handling.
 - [ ] Implement complete email accounts/mailboxes/transports, domains/DNS verification, SMTP/provider/OAuth paths, sender selection, bulk/one-to-one mail, attachments, threading, suppression, unsubscribe/list headers, bounce/open/click tracking and inbox ingestion.
@@ -62,7 +62,7 @@ Fresh offline evidence: 36,718 functional PHP-WASM assertions, 68 first-party sy
 
 ## Current package meaning
 
-`sender-suite-development.zip` is the **current incomplete development plugin**, not the requested finished application. Its archive layout/CRC are checked, but real WordPress activation and production operation have not been verified. Do not install it on a production messaging site. The ZIP includes this checklist and offline evidence so the remaining work is not hidden.
+`sender-suite-development.zip` is an **older incomplete development snapshot**, not the requested finished application. Its archive layout/CRC are checked, but real WordPress activation and production operation have not been verified. Do not install it on a production messaging site. No new interim archive was produced for ongoing lifecycle work. The existing ZIP does not contain all current working-tree changes; it is not a ready release.
 
 ## API inventory by source module
 
@@ -81,14 +81,14 @@ All counts below are derived from `docs/contracts.json`. Missing = no native han
 | calls | 11 | 0 | 0 |
 | campaign_followups | 9 | 0 | 0 |
 | campaigns | 18 | 0 | 0 |
-| contacts | 13 | 12 | 0 |
+| contacts | 5 | 20 | 0 |
 | dashboard | 2 | 0 | 0 |
 | email | 41 | 0 | 0 |
 | followups | 7 | 0 | 0 |
 | guide | 3 | 0 | 0 |
 | inbox | 20 | 0 | 0 |
 | invoices | 26 | 0 | 0 |
-| lists | 4 | 9 | 0 |
+| lists | 1 | 12 | 0 |
 | mail | 8 | 0 | 0 |
 | mailbox | 14 | 0 | 0 |
 | main | 10 | 1 | 0 |
@@ -131,13 +131,13 @@ This exhaustive list includes partially implemented routes because none is yet n
 | DELETE | `/api/v1/calls/webhooks/{webhook_id}` | Missing implementation |
 | DELETE | `/api/v1/campaign-followups/{followup_id}` | Missing implementation |
 | DELETE | `/api/v1/campaigns/{campaign_id}` | Missing implementation |
-| DELETE | `/api/v1/contacts/{contact_id}` | Missing implementation |
+| DELETE | `/api/v1/contacts/{contact_id}` | Implemented partially; native/full-workflow proof required |
 | DELETE | `/api/v1/email/accounts/{account_id}` | Missing implementation |
 | DELETE | `/api/v1/email/domains/{domain_id}` | Missing implementation |
 | DELETE | `/api/v1/email/suppression/{entry_id}` | Missing implementation |
 | DELETE | `/api/v1/followups/{followup_id}` | Missing implementation |
 | DELETE | `/api/v1/invoices/{invoice_id}` | Missing implementation |
-| DELETE | `/api/v1/lists/{list_id}` | Missing implementation |
+| DELETE | `/api/v1/lists/{list_id}` | Implemented partially; native/full-workflow proof required |
 | DELETE | `/api/v1/mailbox/{mailbox_id}` | Missing implementation |
 | DELETE | `/api/v1/mcp/clients/{client_pk}` | Missing implementation |
 | DELETE | `/api/v1/mcp/tokens/{token_id}` | Missing implementation |
@@ -245,7 +245,7 @@ This exhaustive list includes partially implemented routes because none is yet n
 | GET | `/api/v1/contacts/import/jobs/{job_id}/errors.csv` | Implemented partially; native/full-workflow proof required |
 | GET | `/api/v1/contacts/tags/` | Implemented partially; native/full-workflow proof required |
 | GET | `/api/v1/contacts/{contact_id}` | Implemented partially; native/full-workflow proof required |
-| GET | `/api/v1/contacts/{contact_id}/activity` | Missing implementation |
+| GET | `/api/v1/contacts/{contact_id}/activity` | Implemented partially; native/full-workflow proof required |
 | GET | `/api/v1/dashboard/charts` | Missing implementation |
 | GET | `/api/v1/dashboard/stats` | Missing implementation |
 | GET | `/api/v1/email/accounts` | Missing implementation |
@@ -460,18 +460,18 @@ This exhaustive list includes partially implemented routes because none is yet n
 | POST | `/api/v1/campaigns/{campaign_id}/stop` | Missing implementation |
 | POST | `/api/v1/campaigns/{campaign_id}/validate` | Missing implementation |
 | POST | `/api/v1/contacts/` | Implemented partially; native/full-workflow proof required |
-| POST | `/api/v1/contacts/bulk` | Missing implementation |
-| POST | `/api/v1/contacts/clean` | Missing implementation |
+| POST | `/api/v1/contacts/bulk` | Implemented partially; native/full-workflow proof required |
+| POST | `/api/v1/contacts/clean` | Implemented partially; native/full-workflow proof required |
 | POST | `/api/v1/contacts/enrich` | Missing implementation |
 | POST | `/api/v1/contacts/import/csv` | Implemented partially; native/full-workflow proof required |
 | POST | `/api/v1/contacts/import/jobs` | Implemented partially; native/full-workflow proof required |
 | POST | `/api/v1/contacts/import/preview` | Implemented partially; native/full-workflow proof required |
 | POST | `/api/v1/contacts/import/url` | Implemented partially; native/full-workflow proof required |
-| POST | `/api/v1/contacts/quarantine/generated` | Missing implementation |
+| POST | `/api/v1/contacts/quarantine/generated` | Implemented partially; native/full-workflow proof required |
 | POST | `/api/v1/contacts/validate-emails` | Missing implementation |
-| POST | `/api/v1/contacts/{contact_id}/email-opt-in` | Missing implementation |
-| POST | `/api/v1/contacts/{contact_id}/email-opt-out` | Missing implementation |
-| POST | `/api/v1/contacts/{contact_id}/sms-opt-in` | Missing implementation |
+| POST | `/api/v1/contacts/{contact_id}/email-opt-in` | Implemented partially; native/full-workflow proof required |
+| POST | `/api/v1/contacts/{contact_id}/email-opt-out` | Implemented partially; native/full-workflow proof required |
+| POST | `/api/v1/contacts/{contact_id}/sms-opt-in` | Implemented partially; native/full-workflow proof required |
 | POST | `/api/v1/email/accounts` | Missing implementation |
 | POST | `/api/v1/email/accounts/{account_id}/default` | Missing implementation |
 | POST | `/api/v1/email/accounts/{account_id}/test` | Missing implementation |
@@ -522,10 +522,10 @@ This exhaustive list includes partially implemented routes because none is yet n
 | POST | `/api/v1/invoices/{invoice_id}/send` | Missing implementation |
 | POST | `/api/v1/invoices/{invoice_id}/void` | Missing implementation |
 | POST | `/api/v1/lists/` | Implemented partially; native/full-workflow proof required |
-| POST | `/api/v1/lists/{list_id}/clean` | Missing implementation |
+| POST | `/api/v1/lists/{list_id}/clean` | Implemented partially; native/full-workflow proof required |
 | POST | `/api/v1/lists/{list_id}/contacts` | Implemented partially; native/full-workflow proof required |
 | POST | `/api/v1/lists/{list_id}/contacts/add-all` | Implemented partially; native/full-workflow proof required |
-| POST | `/api/v1/lists/{list_id}/contacts/delete` | Missing implementation |
+| POST | `/api/v1/lists/{list_id}/contacts/delete` | Implemented partially; native/full-workflow proof required |
 | POST | `/api/v1/lists/{list_id}/contacts/remove` | Implemented partially; native/full-workflow proof required |
 | POST | `/api/v1/lists/{list_id}/validate-emails` | Missing implementation |
 | POST | `/api/v1/mail/messages/{mailbox_id}/{provider_message_id}/delete` | Missing implementation |
