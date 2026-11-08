@@ -1,0 +1,13 @@
+{
+  "ok": true,
+  "assertions": 80,
+  "diffs": [],
+  "php": "8.3.36",
+  "source_operations": 23,
+  "helper_cases": 34,
+  "scope": "Original synchronous import API/service/alias helpers, fixed clock, isolated SQLite with monotonic committed ids and omitted relationships. No actual uploads/WP/native MySQL/collation/concurrency/large-file hosting/jobs/URL/DNS/providers certification.",
+  "native_wordpress_verified": false,
+  "native_mysql_verified": false,
+  "provider_messages_sent": 0,
+  "suite": "import"
+}

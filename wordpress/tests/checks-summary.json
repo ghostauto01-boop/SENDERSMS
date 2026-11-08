@@ -1,14 +1,14 @@
 {
   "ok": true,
-  "php_lint_checks": 56,
-  "php_assertions": 35128,
+  "php_lint_checks": 60,
+  "php_assertions": 35380,
   "vendor_parser_checks": 3075,
   "vendor_hash_checks": 1547,
   "unchanged_frontend_files": 165,
   "records": [
     {
       "ok": true,
-      "assertions": 4017,
+      "assertions": 4021,
       "php": "7.4.34-dev",
       "scope": "schema plan, crypto utilities and SQL mocks only",
       "native_mysql_verified": false,
@@ -69,10 +69,10 @@
     },
     {
       "ok": true,
-      "assertions": 192,
+      "assertions": 234,
       "diffs": [],
       "php": "7.4.34-dev",
-      "scope": "Offline requests/responses with synthetic password codec, twelve synthetic SQLite business tables, fault-injected transaction failure; not real WP/HTTP/Argon2/native MySQL/concurrency proof",
+      "scope": "Offline requests/responses with synthetic password codec, thirteen synthetic SQLite business tables, fault-injected transaction failure; not real WP/HTTP/Argon2/native MySQL/concurrency proof",
       "native_wordpress_verified": false,
       "native_mysql_verified": false,
       "suite": "data-routes"
@@ -121,6 +121,19 @@
       "native_wordpress_verified": false,
       "provider_messages_sent": 0,
       "suite": "reply"
+    },
+    {
+      "ok": true,
+      "assertions": 80,
+      "diffs": [],
+      "php": "7.4.34-dev",
+      "source_operations": 23,
+      "helper_cases": 34,
+      "scope": "Original synchronous import API/service/alias helpers, fixed clock, isolated SQLite with monotonic committed ids and omitted relationships. No actual uploads/WP/native MySQL/collation/concurrency/large-file hosting/jobs/URL/DNS/providers certification.",
+      "native_wordpress_verified": false,
+      "native_mysql_verified": false,
+      "provider_messages_sent": 0,
+      "suite": "import"
     },
     {
       "ok": true,
@@ -131,7 +144,7 @@
     },
     {
       "ok": true,
-      "assertions": 4017,
+      "assertions": 4021,
       "php": "8.3.36",
       "scope": "schema plan, crypto utilities and SQL mocks only",
       "native_mysql_verified": false,
@@ -192,10 +205,10 @@
     },
     {
       "ok": true,
-      "assertions": 192,
+      "assertions": 234,
       "diffs": [],
       "php": "8.3.36",
-      "scope": "Offline requests/responses with synthetic password codec, twelve synthetic SQLite business tables, fault-injected transaction failure; not real WP/HTTP/Argon2/native MySQL/concurrency proof",
+      "scope": "Offline requests/responses with synthetic password codec, thirteen synthetic SQLite business tables, fault-injected transaction failure; not real WP/HTTP/Argon2/native MySQL/concurrency proof",
       "native_wordpress_verified": false,
       "native_mysql_verified": false,
       "suite": "data-routes"
@@ -244,6 +257,19 @@
       "native_wordpress_verified": false,
       "provider_messages_sent": 0,
       "suite": "reply"
+    },
+    {
+      "ok": true,
+      "assertions": 80,
+      "diffs": [],
+      "php": "8.3.36",
+      "source_operations": 23,
+      "helper_cases": 34,
+      "scope": "Original synchronous import API/service/alias helpers, fixed clock, isolated SQLite with monotonic committed ids and omitted relationships. No actual uploads/WP/native MySQL/collation/concurrency/large-file hosting/jobs/URL/DNS/providers certification.",
+      "native_wordpress_verified": false,
+      "native_mysql_verified": false,
+      "provider_messages_sent": 0,
+      "suite": "import"
     },
     {
       "ok": true,

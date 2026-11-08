@@ -4,7 +4,7 @@ namespace SenderSuite;
 /** Explicit non-sending application endpoints. Never generic table exposure or successful stubs. */
 final class DataRoutes {
     public static function definitions() {
-        return array_merge(VariableRoutes::definitions(),TemplateRoutes::definitions(),ReplyRoutes::definitions(),NotificationCenter::definitions(),array('/contacts/?'=>array('GET','POST'), '/contacts/tags/?'=>array('GET'), '/contacts/(?P<contact_id>-?[0-9]+)'=>array('GET','PUT'), '/lists/?'=>array('GET','POST'), '/lists/(?P<list_id>-?[0-9]+)'=>array('PUT'), '/lists/(?P<list_id>-?[0-9]+)/contacts'=>array('GET','POST'), '/lists/(?P<list_id>-?[0-9]+)/contacts/add-all'=>array('POST'), '/lists/(?P<list_id>-?[0-9]+)/contacts/remove'=>array('POST'), '/lists/(?P<list_id>-?[0-9]+)/stats'=>array('GET')));
+        return array_merge(VariableRoutes::definitions(),TemplateRoutes::definitions(),ReplyRoutes::definitions(),NotificationCenter::definitions(),ImportRoutes::definitions(),array('/contacts/?'=>array('GET','POST'), '/contacts/tags/?'=>array('GET'), '/contacts/(?P<contact_id>-?[0-9]+)'=>array('GET','PUT'), '/lists/?'=>array('GET','POST'), '/lists/(?P<list_id>-?[0-9]+)'=>array('PUT'), '/lists/(?P<list_id>-?[0-9]+)/contacts'=>array('GET','POST'), '/lists/(?P<list_id>-?[0-9]+)/contacts/add-all'=>array('POST'), '/lists/(?P<list_id>-?[0-9]+)/contacts/remove'=>array('POST'), '/lists/(?P<list_id>-?[0-9]+)/stats'=>array('GET')));
     }
     public static function register() {
         foreach (self::definitions() as $path=>$methods) {
@@ -63,6 +63,7 @@ final class DataRoutes {
             $path=trim(substr($request->get_route(),strlen('/sender-suite/v1/')),'/'); $method=$request->get_method(); $q=$request->get_query_params();
             $contacts=new Contacts($c['db']); $lists=new ContactLists($c['db']); $status=200;
             $data=$c['db']->transaction(function()use($path,$method,$q,$request,$contacts,$lists,$c,&$status){
+                if ($path==='contacts/import/preview'||$path==='contacts/import/csv') { return ImportRoutes::handle($request,$c); }
                 if ($path==='notifications'||strpos($path,'notifications/')===0) { return NotificationCenter::handle($request,$c); }
                 if ($path==='ai/classify'||$path==='autoreply'||strpos($path,'autoreply/')===0||$path==='automations'||strpos($path,'automations/')===0) { return ReplyRoutes::handle($request,$c,$status); }
                 if ($path==='templates'||strpos($path,'templates/')===0) { return TemplateRoutes::handle($request,$c,$status); }

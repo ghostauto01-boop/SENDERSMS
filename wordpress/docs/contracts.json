@@ -3185,7 +3185,7 @@
     "sources": [
       "backend/app/api/v1/contacts.py:1393"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -3203,7 +3203,7 @@
     "sources": [
       "backend/app/api/v1/contacts.py:1227"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {

@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "assertions": 4017,
+  "assertions": 4021,
   "php": "7.4.34-dev",
   "scope": "schema plan, crypto utilities and SQL mocks only",
   "native_mysql_verified": false,

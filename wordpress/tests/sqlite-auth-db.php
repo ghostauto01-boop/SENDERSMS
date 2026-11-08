@@ -7,6 +7,7 @@ final class SQLiteAuthDB {
         $models=json_decode(file_get_contents(__DIR__.'/../sender-suite/schema/models.json'),true,512,JSON_THROW_ON_ERROR);
         foreach($names as $name){$parts=array();foreach($models[$name]['columns'] as $key=>$column){$sql='"'.$key.'" ';if($column['auto_increment']){$sql.='INTEGER PRIMARY KEY AUTOINCREMENT';}else{$sql.=in_array($column['type'],array('Integer','Boolean'),true)?'INTEGER':'TEXT';if(!$column['nullable']){$sql.=' NOT NULL';}}$parts[]=$sql;}$this->pdo->exec('CREATE TABLE "test_sender_suite_'.$name.'" ('.implode(',',$parts).')');}
         if(in_array('contact_variables',$names,true)){foreach(array('field_key','shortcode') as $key){$this->pdo->exec('CREATE UNIQUE INDEX variable_'.$key.' ON test_sender_suite_contact_variables('.$key.')');}}
+        if(in_array('email_contact_addresses',$names,true)){$this->pdo->exec('CREATE UNIQUE INDEX alias_address ON test_sender_suite_email_contact_addresses(email_address)');}
         if(in_array('contacts',$names,true)){$this->pdo->exec('CREATE UNIQUE INDEX contact_phone ON test_sender_suite_contacts(phone_number)');}
         if(in_array('tags',$names,true)){$this->pdo->exec('CREATE UNIQUE INDEX tag_name ON test_sender_suite_tags(name)');}
         if(in_array('contact_list_members',$names,true)){$this->pdo->exec('CREATE UNIQUE INDEX list_member ON test_sender_suite_contact_list_members(list_id,contact_id)');}

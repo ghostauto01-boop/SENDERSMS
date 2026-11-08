@@ -1,6 +1,6 @@
 # Remaining WordPress recreation work
 
-450 missing source handlers,58 partial health/auth/contact/list/variable/template/reply/classification/notification handlers,0 fully certified contracts. The administrator CSV diagnostic is not the original source import API.
+448 missing source handlers,60 partial health/auth/contact/list/variable/template/reply/classification/notification/import handlers,0 fully certified contracts. The administrator CSV diagnostic is not the original source import API.
 
 Every row is outstanding, including all partial handlers until native HTTP certification. See README.md for actual implemented utilities and fresh test boundaries.
 
@@ -359,9 +359,9 @@ Every row is outstanding, including all partial handlers until native HTTP certi
 | POST | /api/v1/contacts/bulk | backend/app/api/v1/contacts.py:978 | missing original application handler |
 | POST | /api/v1/contacts/clean | backend/app/api/v1/contacts.py:477 | missing original application handler |
 | POST | /api/v1/contacts/enrich | backend/app/api/v1/contacts.py:1558 | missing original application handler |
-| POST | /api/v1/contacts/import/csv | backend/app/api/v1/contacts.py:1393 | missing original application handler |
+| POST | /api/v1/contacts/import/csv | backend/app/api/v1/contacts.py:1393 | partial handler; native WordPress/HTTP unverified |
 | POST | /api/v1/contacts/import/jobs | backend/app/api/v1/contacts.py:1241 | missing original application handler |
-| POST | /api/v1/contacts/import/preview | backend/app/api/v1/contacts.py:1227 | missing original application handler |
+| POST | /api/v1/contacts/import/preview | backend/app/api/v1/contacts.py:1227 | partial handler; native WordPress/HTTP unverified |
 | POST | /api/v1/contacts/import/url | backend/app/api/v1/contacts.py:1274 | missing original application handler |
 | POST | /api/v1/contacts/quarantine/generated | backend/app/api/v1/contacts.py:569 | missing original application handler |
 | POST | /api/v1/contacts/validate-emails | backend/app/api/v1/contacts.py:495 | missing original application handler |
