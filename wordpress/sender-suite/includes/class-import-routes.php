@@ -4,7 +4,7 @@ namespace SenderSuite;
 /** Own-application multipart uploads. Temporary input is never saved to WP media. */
 final class ImportRoutes {
     private static $uploadReader=null; // Reflection-only synthetic upload seam used by offline tests.
-    public static function definitions() { return array('/contacts/import/preview'=>array('POST'),'/contacts/import/csv'=>array('POST'),'/contacts/import/jobs'=>array('POST'),'/contacts/import/jobs/(?P<job_id>[^/]+)'=>array('GET'),'/contacts/import/jobs/(?P<job_id>[^/]+)/errors\.csv'=>array('GET')); }
+    public static function definitions() { return array('/contacts/import/preview'=>array('POST'),'/contacts/import/csv'=>array('POST'),'/contacts/import/url'=>array('POST'),'/contacts/import/jobs'=>array('POST'),'/contacts/import/jobs/(?P<job_id>[^/]+)'=>array('GET'),'/contacts/import/jobs/(?P<job_id>[^/]+)/errors\.csv'=>array('GET')); }
     private static function upload($request) {
         $files=$request->get_file_params(); $file=$files['file']??null;
         if (!is_array($file)) { throw new ValidationFailure('Field required','file'); }

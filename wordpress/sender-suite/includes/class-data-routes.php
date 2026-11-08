@@ -61,9 +61,11 @@ final class DataRoutes {
             $user=$c['auth']->current(isset($_COOKIE['sendsms_session'])?wp_unslash($_COOKIE['sendsms_session']):null);
             if ($user===null) { throw new AuthFailure(401,'Not authenticated'); }
             $path=trim(substr($request->get_route(),strlen('/sender-suite/v1/')),'/'); $method=$request->get_method(); $q=$request->get_query_params();
-            if ($path==='contacts/import/jobs' && $method==='POST' && !ImportJobs::ensureSchedule()) { throw new AuthFailure(503,'WordPress could not schedule the import queue.'); }
+            if (in_array($path,array('contacts/import/jobs','contacts/import/url'),true) && $method==='POST' && !ImportJobs::ensureSchedule()) { throw new AuthFailure(503,'WordPress could not schedule the import queue.'); }
+            $remote=$path==='contacts/import/url' && $method==='POST'?CsvUrl::fetch(CsvUrl::input(self::body($request))):null;
             $contacts=new Contacts($c['db']); $lists=new ContactLists($c['db']); $status=200;
-            $data=$c['db']->transaction(function()use($path,$method,$q,$request,$contacts,$lists,$c,$user,&$status){
+            $data=$c['db']->transaction(function()use($path,$method,$q,$request,$contacts,$lists,$c,$user,$remote,&$status){
+                if ($remote!==null) { $status=202;return ImportJobs::out((new ImportJobs($c['db']))->create($remote['bytes'],$remote['filename'],$remote['options'],$user)); }
                 if (strpos($path,'contacts/import/')===0) { return ImportRoutes::handle($request,$c,$status,$user); }
                 if ($path==='notifications'||strpos($path,'notifications/')===0) { return NotificationCenter::handle($request,$c); }
                 if ($path==='ai/classify'||$path==='autoreply'||strpos($path,'autoreply/')===0||$path==='automations'||strpos($path,'automations/')===0) { return ReplyRoutes::handle($request,$c,$status); }

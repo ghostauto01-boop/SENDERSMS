@@ -1,7 +1,7 @@
 {
   "ok": true,
-  "php_lint_checks": 62,
-  "php_assertions": 35614,
+  "php_lint_checks": 64,
+  "php_assertions": 36064,
   "vendor_parser_checks": 3075,
   "vendor_hash_checks": 1547,
   "unchanged_frontend_files": 165,
@@ -69,7 +69,7 @@
     },
     {
       "ok": true,
-      "assertions": 286,
+      "assertions": 324,
       "diffs": [],
       "php": "7.4.34-dev",
       "scope": "Offline requests/responses with synthetic password codec, fourteen synthetic SQLite business tables, fault-injected transaction failure; not real WP/HTTP/Argon2/native MySQL/concurrency proof",
@@ -146,6 +146,19 @@
       "native_mysql_verified": false,
       "provider_messages_sent": 0,
       "suite": "import-jobs"
+    },
+    {
+      "ok": true,
+      "assertions": 187,
+      "diffs": [],
+      "php": "7.4.34-dev",
+      "source_dto_cases": 24,
+      "source_operations": 14,
+      "scope": "Actual original URL DTO/endpoint comparisons with explicitly fake DNS/HTTP and synthetic SQLite; separate conservative IP/URL/streaming-limit tests. No real DNS/TLS/cURL/HTTP/MySQL/WordPress/SSRF bypass/concurrency proof.",
+      "native_wordpress_verified": false,
+      "real_network_verified": false,
+      "provider_messages_sent": 0,
+      "suite": "url-import"
     },
     {
       "ok": true,
@@ -217,7 +230,7 @@
     },
     {
       "ok": true,
-      "assertions": 286,
+      "assertions": 324,
       "diffs": [],
       "php": "8.3.36",
       "scope": "Offline requests/responses with synthetic password codec, fourteen synthetic SQLite business tables, fault-injected transaction failure; not real WP/HTTP/Argon2/native MySQL/concurrency proof",
@@ -294,6 +307,19 @@
       "native_mysql_verified": false,
       "provider_messages_sent": 0,
       "suite": "import-jobs"
+    },
+    {
+      "ok": true,
+      "assertions": 187,
+      "diffs": [],
+      "php": "8.3.36",
+      "source_dto_cases": 24,
+      "source_operations": 14,
+      "scope": "Actual original URL DTO/endpoint comparisons with explicitly fake DNS/HTTP and synthetic SQLite; separate conservative IP/URL/streaming-limit tests. No real DNS/TLS/cURL/HTTP/MySQL/WordPress/SSRF bypass/concurrency proof.",
+      "native_wordpress_verified": false,
+      "real_network_verified": false,
+      "provider_messages_sent": 0,
+      "suite": "url-import"
     },
     {
       "ok": true,

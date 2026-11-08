@@ -3212,7 +3212,7 @@
     "sources": [
       "backend/app/api/v1/contacts.py:1274"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {

@@ -73,6 +73,7 @@ try:
  s,b,h=request('GET','templates/'+str(email),query={'_fields':'name','_envelope':'1','_jsonp':'evil','_method':'DELETE'});check('WP reserved flags cannot change source method/shape',s,200);check('WP fields/envelope bypass disabled','id' in b and 'body' in b and 'attachments' in b);check('WP JSONP disabled','javascript' not in h.get('Content-Type',''))
  s,b,h=request('DELETE','templates/'+str(email));check('native template delete',s,204);check('native 204 empty body',b,None)
  s,b,h=request('GET','templates/'+str(email));check('native deleted template missing',s,404)
+ s,b,h=request('POST','contacts/import/url',{'url':'https://csv.example.net/leads.csv'});check('native URL respects isolated WordPress network block',s,503)
  # Actual SAPI multipart uploads and actual MySQL worker execution, no synthetic reader.
  s,b,h=upload('contacts/import/jobs',b'Email\nno-session@business.ng\n',authenticated=False);check('native anonymous upload denied',s,401)
  s,b,h=upload('contacts/import/preview',b'Email,Import Note\npreview-only@business.ng,preview\n');check('native multipart preview',s,200);check('native multipart preview rows',b.get('total_rows'),1)

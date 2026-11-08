@@ -63,8 +63,29 @@ The cached stored list count can lag after a partial failure, as in the source w
 
 The isolated native reference harness now contains real multipart and raw-report HTTP checks plus an explicit native CLI worker; it has not run. It does not yet test actual WordPress cron dispatch or concurrent lock contenders.
 
+## Public URL imports (implemented, real transport unverified)
+
+`POST contacts/import/url` accepts the original strict JSON request: required `url` (8–2048 characters), optional `file_name`, `list_id`, `new_list_name`, `skip_duplicates`, `column_mapping`, `tags` (array or comma-separated string), and `auto_tag_rules`. Unknown properties, malformed field types, overlong tags and non-object rules fail validation. It fetches the CSV during the authenticated request, **outside the job SQL transaction**, then creates the same durable job and returns HTTP 202. The existing worker/polling/private-error-report workflow handles it thereafter. Download/validation/database failures do not leave new destination lists or pretend jobs behind.
+
+### Transport and safety boundaries
+
+- Only HTTP/HTTPS, ASCII public hostnames (including already-punycoded IDNs), or canonical public IPv4/IPv6 addresses. Credentials, fragments, raw whitespace/control characters, backslashes, ambiguous numeric IP spellings and local/reserved hostnames are rejected.
+- All returned DNS addresses are checked. Private, loopback, link-local, shared, documentation, multicast, reserved/special/transition ranges and known metadata endpoints are denied. IPv6 acceptance is conservatively limited to ordinary global unicast. Empty/unusable DNS answers fail closed.
+- The chosen validated address is pinned with PHP cURL `CURLOPT_RESOLVE`; literal addresses are canonicalized and need no DNS lookup. A fresh cURL handle keeps the original hostname for TLS hostname verification while preventing a second unpinned hostname resolution. Redirects are disabled, no cookies/credentials are supplied, netrc is ignored, and ambient proxies are explicitly disabled. TLS peer and hostname verification remain enabled. There is **no unpinned streams/HTTP fallback**.
+- A 10-second connect and 20-second total cURL deadline, 64 KiB cumulative response-header cap and streaming 20 MiB body cap apply. Declared oversize bodies are rejected before reading the body; chunked/lying/missing-length bodies are independently bounded. DNS resolution is host-managed and not covered by the cURL transfer deadline.
+- Host PHP **cURL support is required for URL downloads**. Missing support returns 503 rather than degrading address pinning. System DNS/CA configuration, IPv6 cURL support, hosting egress policy, memory and execution limits need native-host review.
+- The WordPress `WP_HTTP_BLOCK_EXTERNAL` switch denies downloads before DNS, conservatively even if an accessible-host exception exists. Explicit `pre_http_request` short-circuit policy results are likewise treated as a denial, not trusted cached response bytes. This is a dedicated pinned PHP transport, **not the generic WordPress HTTP transport**: WordPress proxy settings, HTTP cache responses and arbitrary HTTP-argument rewrites are not used. Host/plugin network-policy compatibility must be reviewed before production use.
+- For additional safety this implementation only permits ports 80/443 and rejects compressed responses instead of inflating them. These conservative restrictions (plus special-IP/ASCII-host/fragment restrictions and tighter transfer limits) are deliberate differences from the original httpx implementation. It is not universal URL-behavior parity.
+- Fetched content is not executed or saved to media; queued content and terminal error/report privacy follow the same database boundaries as uploaded jobs.
+
+### Evidence
+
+`tools/generate_url_import_fixtures.py` executes 24 original Pydantic request cases and 14 actual original URL-handler operations with forcibly fake DNS/httpx and isolated SQLite. Additional native policy/streaming tests cover IP range boundaries, mixed private/public answers, metadata targets, URL ambiguities, redirect refusal, declared and streamed overflow, exact-size success, header overflow, encodings and WordPress network blocks (187 assertions per PHP runtime). Dispatcher checks prove auth/origin/DTO checks before DNS/HTTP, network fetch outside the SQL transaction, queue/worker integration, and SQL rollback. These are explicitly **not real DNS, TLS, cURL, WordPress, MySQL or SSRF-bypass certification**.
+
+The isolated native HTTP reference now includes a negative URL-import check under the WordPress network kill switch. It has not run, and it does not establish positive native URL downloads.
+
 ## Still missing
 
-URL fetching and complete frontend import wizard integration remain missing. These APIs now cover the upload-job polling/report workflow, but the unchanged frontend is not yet a fully integrated WordPress application. Native cron, real uploads, MySQL locks/transactions, browser behavior and production-host resource limits still need actual execution and review.
+Complete frontend import wizard integration remains missing. These APIs now cover the upload-job polling/report workflow, but the unchanged frontend is not yet a fully integrated WordPress application. Native cron, real uploads, MySQL locks/transactions, browser behavior and production-host resource limits still need actual execution and review.
 
 PHP/web-server `upload_max_filesize`, `post_max_size`, memory and execution limits can be lower than the plugin's 20 MiB cap. They need isolated host testing/configuration; this plugin cannot override pre-request SAPI upload limits. Do not treat this development build as production ready or as the completed migration.
