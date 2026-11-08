@@ -1076,7 +1076,7 @@
     "sources": [
       "backend/app/api/v1/campaigns.py:53"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -1085,7 +1085,7 @@
     "sources": [
       "backend/app/api/v1/campaigns.py:53"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -1103,7 +1103,7 @@
     "sources": [
       "backend/app/api/v1/campaigns.py:131"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -1112,7 +1112,7 @@
     "sources": [
       "backend/app/api/v1/campaigns.py:610"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -1121,7 +1121,7 @@
     "sources": [
       "backend/app/api/v1/campaigns.py:634"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {

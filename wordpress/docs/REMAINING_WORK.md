@@ -1,6 +1,6 @@
 # Remaining WordPress recreation work
 
-364 missing source handlers,144 partial health/auth/contact/list/variable/template/reply/classification/notification/import/analytics/sequence/settings/calendar/invoice/inbox/status-webhook/follow-up-control/access/profile/dashboard handlers,0 fully certified contracts. The administrator CSV diagnostic is not the original source import API.
+359 missing source handlers,149 partial health/auth/contact/list/variable/template/reply/classification/notification/import/analytics/sequence/settings/calendar/invoice/inbox/status-webhook/follow-up-control/access/profile/dashboard/campaign-reporting handlers,0 fully certified contracts. The administrator CSV diagnostic is not the original source import API.
 
 Every row is outstanding, including all partial handlers until native HTTP certification. See README.md for actual implemented utilities and fresh test boundaries.
 
@@ -125,12 +125,12 @@ Every row is outstanding, including all partial handlers until native HTTP certi
 | GET | /api/v1/campaign-followups/campaigns/{campaign_id} | backend/app/api/v1/campaign_followups.py:100 | missing original application handler |
 | GET | /api/v1/campaign-followups/{followup_id}/log | backend/app/api/v1/campaign_followups.py:405 | missing original application handler |
 | GET | /api/v1/campaign-followups/{followup_id}/preview | backend/app/api/v1/campaign_followups.py:323 | missing original application handler |
-| GET | /api/v1/campaigns | backend/app/api/v1/campaigns.py:53 | missing original application handler |
-| GET | /api/v1/campaigns/ | backend/app/api/v1/campaigns.py:53 | missing original application handler |
+| GET | /api/v1/campaigns | backend/app/api/v1/campaigns.py:53 | partial handler; native WordPress/HTTP unverified |
+| GET | /api/v1/campaigns/ | backend/app/api/v1/campaigns.py:53 | partial handler; native WordPress/HTTP unverified |
 | GET | /api/v1/campaigns/reconcile | backend/app/api/v1/campaigns.py:106 | missing original application handler |
-| GET | /api/v1/campaigns/{campaign_id} | backend/app/api/v1/campaigns.py:131 | missing original application handler |
-| GET | /api/v1/campaigns/{campaign_id}/analytics | backend/app/api/v1/campaigns.py:610 | missing original application handler |
-| GET | /api/v1/campaigns/{campaign_id}/conversations | backend/app/api/v1/campaigns.py:634 | missing original application handler |
+| GET | /api/v1/campaigns/{campaign_id} | backend/app/api/v1/campaigns.py:131 | partial handler; native WordPress/HTTP unverified |
+| GET | /api/v1/campaigns/{campaign_id}/analytics | backend/app/api/v1/campaigns.py:610 | partial handler; native WordPress/HTTP unverified |
+| GET | /api/v1/campaigns/{campaign_id}/conversations | backend/app/api/v1/campaigns.py:634 | partial handler; native WordPress/HTTP unverified |
 | GET | /api/v1/campaigns/{campaign_id}/performance | backend/app/api/v1/campaigns.py:763 | missing original application handler |
 | GET | /api/v1/contacts | backend/app/api/v1/contacts.py:186 | partial handler; native WordPress/HTTP unverified |
 | GET | /api/v1/contacts/ | backend/app/api/v1/contacts.py:186 | partial handler; native WordPress/HTTP unverified |

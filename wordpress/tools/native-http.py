@@ -159,10 +159,16 @@ try:
  for path in ('stats','charts'):
   s,b,h=request('GET','dashboard/'+path);check('native dashboard '+path,s,200);check('native dashboard no-store '+path,h.get('Cache-Control'),'no-store')
   if path=='stats':check('native dashboard never fabricates gateway connectivity',b.get('gateway_status'),'not_verified')
+ # Stored classic campaign reports; no test campaign is launched or reconciled.
+ s,b,h=request('GET','campaigns',authenticated=False);check('native campaign reports private',s,401)
+ s,b,h=request('GET','campaigns',query={'channel':'all'});check('native stored campaign list',s,200);check('native campaign list shape',isinstance(b.get('items'),list));check('native campaign list no-store',h.get('Cache-Control'),'no-store')
+ s,b,h=request('GET','campaigns',query={'channel':'typo'});check('native campaign channel typo refused',s,422)
+ for tail in ('','/analytics','/conversations'):
+  s,b,h=request('GET','campaigns/9223372036854775807'+tail);check('native missing classic campaign '+tail,s,404)
  s,b,h=request('POST','auth/logout');check('native logout',s,200)
  s,b,h=request('GET','contacts');check('native logout clears browser cookie',s,401)
 except Exception as e:failures.append({'exception':type(e).__name__,'message':str(e)})
 finally:
- result=dict(ok=not failures,assertions=checks,failures=failures,native_wordpress_http=True,native_mysql=True,actual_http_cookie_roundtrip=cookie_roundtrip,provider_messages_sent=0,complete_application=False,production_ready=False,scope='Actual HTTP/WordPress/MySQL smoke checks for implemented auth/contact/list/variable/template/synchronous import/job/CSV report/analytics/sequence-builder/lifecycle/export/settings/calendar/invoice/inbox/follow-up-control/access/profile/dashboard paths and explicit native import worker (not actual WP cron dispatch); not full contract/SPA/browser/native concurrency/destructive FK/migration/provider certification')
+ result=dict(ok=not failures,assertions=checks,failures=failures,native_wordpress_http=True,native_mysql=True,actual_http_cookie_roundtrip=cookie_roundtrip,provider_messages_sent=0,complete_application=False,production_ready=False,scope='Actual HTTP/WordPress/MySQL smoke checks for implemented auth/contact/list/variable/template/synchronous import/job/CSV report/analytics/sequence-builder/lifecycle/export/settings/calendar/invoice/inbox/follow-up-control/access/profile/dashboard/campaign-reporting paths and explicit native import worker (not actual WP cron dispatch); not full contract/SPA/browser/native concurrency/destructive FK/migration/provider certification')
  (E/'native-http.json').write_text(json.dumps(result,indent=2)+'\n');print(json.dumps(result));(E/'private-test-cookie.json').unlink(missing_ok=True)
 raise SystemExit(bool(failures))
