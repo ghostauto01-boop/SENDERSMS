@@ -32,7 +32,7 @@ Fresh offline evidence: {summary['php_assertions']:,} functional PHP-WASM assert
 - [ ] Implement actual SMS transports, provider/device/gateway configuration, one-to-one/bulk sends, scheduling, delivery/status reconciliation, bounded retries and error handling.
 - [ ] Implement complete email accounts/mailboxes/transports, domains/DNS verification, SMTP/provider/OAuth paths, sender selection, bulk/one-to-one mail, attachments, threading, suppression, unsubscribe/list headers, bounce/open/click tracking and inbox ingestion.
 - [ ] Implement both classic campaigns and Ads Manager: drafts, audiences/sets/creatives, assignment/targeting, transitions, budgets/throttles, queues, pause/resume/stop/delete, attribution, follow-up steps/templates/tasks and reconciliation.
-- [ ] Implement sequences, standalone/campaign follow-ups, due/overdue handling, quiet hours, timezone/DST behavior, retries and stop-on-reply/opt-out policies.
+- [ ] Finish sequence execution (builder CRUD/validation/version snapshots now implemented), standalone/campaign follow-ups, due/overdue handling, quiet hours, timezone/DST behavior, retries and stop-on-reply/opt-out policies.
 - [ ] Implement inbox/conversation reads, replies, read/unread state, attachments, searches/filters, campaign attribution, polling/sync and inbound-message lifecycle.
 - [ ] Implement calls/CallGate: configuration, handsets/devices, dial requests, call logs and authenticated event/webhook lifecycle. Call analytics alone is not calling.
 - [ ] Implement webhook registration/verification, exact raw-body signature handling, replay protection, deduplication, event ordering, rate limits, retries and redacted logs.

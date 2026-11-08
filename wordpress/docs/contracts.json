@@ -284,7 +284,7 @@
     "sources": [
       "backend/app/api/v1/sequences.py:243"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -1897,7 +1897,7 @@
     "sources": [
       "backend/app/api/v1/sequences.py:69"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -1906,7 +1906,7 @@
     "sources": [
       "backend/app/api/v1/sequences.py:69"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -1915,7 +1915,7 @@
     "sources": [
       "backend/app/api/v1/sequences.py:104"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -3995,7 +3995,7 @@
     "sources": [
       "backend/app/api/v1/sequences.py:119"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -4463,7 +4463,7 @@
     "sources": [
       "backend/app/api/v1/sequences.py:163"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {

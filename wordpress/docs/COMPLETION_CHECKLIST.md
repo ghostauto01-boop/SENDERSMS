@@ -1,10 +1,10 @@
 # Complete remaining-work checklist — INCOMPLETE
 
-Build: **0.10.0-dev**. WordPress is the native application backend; no original Python service is the proposed runtime. Original repository application files remain unchanged.
+Build: **0.11.0-dev**. WordPress is the native application backend; no original Python service is the proposed runtime. Original repository application files remain unchanged.
 
-**439 missing handlers, 69 partially implemented handlers, zero native-certified contracts, 508 source method/path contracts in total.** A partial handler has actual implementation, but does not mean its complete workflow, UI, dependencies and native behavior are certified. Every endpoint remains in the release backlog until those gates pass. Raw handler counts are not a percent-complete estimate.
+**433 missing handlers, 75 partially implemented handlers, zero native-certified contracts, 508 source method/path contracts in total.** A partial handler has actual implementation, but does not mean its complete workflow, UI, dependencies and native behavior are certified. Every endpoint remains in the release backlog until those gates pass. Raw handler counts are not a percent-complete estimate.
 
-Fresh offline evidence: 36,350 functional PHP-WASM assertions, 66 first-party syntax checks, 165 unchanged original frontend hashes. Offline evidence is **not** real WordPress/MySQL/HTTP/provider/browser certification. This checklist is the full current implementation/release backlog, not a claim that software can be guaranteed to run perfectly on every host.
+Fresh offline evidence: 36,718 functional PHP-WASM assertions, 68 first-party syntax checks, 165 unchanged original frontend hashes. Offline evidence is **not** real WordPress/MySQL/HTTP/provider/browser certification. This checklist is the full current implementation/release backlog, not a claim that software can be guaranteed to run perfectly on every host.
 
 ## Implementation order and acceptance gates
 
@@ -25,7 +25,7 @@ Fresh offline evidence: 36,350 functional PHP-WASM assertions, 66 first-party sy
 - [ ] Implement actual SMS transports, provider/device/gateway configuration, one-to-one/bulk sends, scheduling, delivery/status reconciliation, bounded retries and error handling.
 - [ ] Implement complete email accounts/mailboxes/transports, domains/DNS verification, SMTP/provider/OAuth paths, sender selection, bulk/one-to-one mail, attachments, threading, suppression, unsubscribe/list headers, bounce/open/click tracking and inbox ingestion.
 - [ ] Implement both classic campaigns and Ads Manager: drafts, audiences/sets/creatives, assignment/targeting, transitions, budgets/throttles, queues, pause/resume/stop/delete, attribution, follow-up steps/templates/tasks and reconciliation.
-- [ ] Implement sequences, standalone/campaign follow-ups, due/overdue handling, quiet hours, timezone/DST behavior, retries and stop-on-reply/opt-out policies.
+- [ ] Finish sequence execution (builder CRUD/validation/version snapshots now implemented), standalone/campaign follow-ups, due/overdue handling, quiet hours, timezone/DST behavior, retries and stop-on-reply/opt-out policies.
 - [ ] Implement inbox/conversation reads, replies, read/unread state, attachments, searches/filters, campaign attribution, polling/sync and inbound-message lifecycle.
 - [ ] Implement calls/CallGate: configuration, handsets/devices, dial requests, call logs and authenticated event/webhook lifecycle. Call analytics alone is not calling.
 - [ ] Implement webhook registration/verification, exact raw-body signature handling, replay protection, deduplication, event ordering, rate limits, retries and redacted logs.
@@ -96,7 +96,7 @@ All counts below are derived from `docs/contracts.json`. Missing = no native han
 | notifications | 5 | 5 | 0 |
 | overview | 3 | 0 | 0 |
 | send | 7 | 0 | 0 |
-| sequences | 6 | 0 | 0 |
+| sequences | 0 | 6 | 0 |
 | settings | 32 | 0 | 0 |
 | system | 2 | 0 | 0 |
 | templates | 0 | 10 | 0 |
@@ -141,7 +141,7 @@ This exhaustive list includes partially implemented routes because none is yet n
 | DELETE | `/api/v1/mailbox/{mailbox_id}` | Missing implementation |
 | DELETE | `/api/v1/mcp/clients/{client_pk}` | Missing implementation |
 | DELETE | `/api/v1/mcp/tokens/{token_id}` | Missing implementation |
-| DELETE | `/api/v1/sequences/{sequence_id}` | Missing implementation |
+| DELETE | `/api/v1/sequences/{sequence_id}` | Implemented partially; native/full-workflow proof required |
 | DELETE | `/api/v1/settings/callgate/webhooks/{webhook_id}` | Missing implementation |
 | DELETE | `/api/v1/settings/gateway/phones/{phone_id}` | Missing implementation |
 | DELETE | `/api/v1/settings/gateway/webhooks/{webhook_id}` | Missing implementation |
@@ -320,9 +320,9 @@ This exhaustive list includes partially implemented routes because none is yet n
 | GET | `/api/v1/overview/metrics` | Missing implementation |
 | GET | `/api/v1/send/history` | Missing implementation |
 | GET | `/api/v1/send/scheduled` | Missing implementation |
-| GET | `/api/v1/sequences` | Missing implementation |
-| GET | `/api/v1/sequences/` | Missing implementation |
-| GET | `/api/v1/sequences/{sequence_id}` | Missing implementation |
+| GET | `/api/v1/sequences` | Implemented partially; native/full-workflow proof required |
+| GET | `/api/v1/sequences/` | Implemented partially; native/full-workflow proof required |
+| GET | `/api/v1/sequences/{sequence_id}` | Implemented partially; native/full-workflow proof required |
 | GET | `/api/v1/settings/access` | Missing implementation |
 | GET | `/api/v1/settings/appearance` | Missing implementation |
 | GET | `/api/v1/settings/callgate` | Missing implementation |
@@ -553,7 +553,7 @@ This exhaustive list includes partially implemented routes because none is yet n
 | POST | `/api/v1/send/scheduled/{sid}/cancel` | Missing implementation |
 | POST | `/api/v1/send/scheduled/{sid}/retry` | Missing implementation |
 | POST | `/api/v1/send/validate` | Missing implementation |
-| POST | `/api/v1/sequences/` | Missing implementation |
+| POST | `/api/v1/sequences/` | Implemented partially; native/full-workflow proof required |
 | POST | `/api/v1/settings/callgate/register-webhook` | Missing implementation |
 | POST | `/api/v1/settings/callgate/test` | Missing implementation |
 | POST | `/api/v1/settings/gateway/phones` | Missing implementation |
@@ -605,7 +605,7 @@ This exhaustive list includes partially implemented routes because none is yet n
 | PUT | `/api/v1/contacts/{contact_id}` | Implemented partially; native/full-workflow proof required |
 | PUT | `/api/v1/invoices/settings` | Missing implementation |
 | PUT | `/api/v1/lists/{list_id}` | Implemented partially; native/full-workflow proof required |
-| PUT | `/api/v1/sequences/{sequence_id}` | Missing implementation |
+| PUT | `/api/v1/sequences/{sequence_id}` | Implemented partially; native/full-workflow proof required |
 | PUT | `/api/v1/settings/access` | Missing implementation |
 | PUT | `/api/v1/settings/appearance` | Missing implementation |
 | PUT | `/api/v1/settings/callgate` | Missing implementation |

@@ -89,10 +89,17 @@ try:
  for endpoint in ('overview','timeseries','funnel','by-campaign','calls'):
   s,b,h=request('GET','analytics/'+endpoint);check('native analytics '+endpoint,s,200);check('native analytics no-store '+endpoint,h.get('Cache-Control'),'no-store')
  s,b,h=request('GET','analytics/overview',query={'channel':'fax'});check('native analytics channel validation',s,422)
+ s,b,h=request('POST','sequences/',{'name':'Native sequence','steps':[{'step_order':0,'step_type':'send_sms','config':'Hello'}]});check('native sequence create',s,201);seq=b.get('id')
+ s,b,h=request('GET',f'sequences/{seq}');check('native sequence initial version',b.get('current_version'),1);check('native sequence content',b.get('steps',[{}])[0].get('config'),'Hello')
+ s,b,h=request('PUT',f'sequences/{seq}',{'steps':[{'step_order':0,'step_type':'send_sms','config':'Revised'},{'step_order':1,'step_type':'stop'}]});check('native sequence revision',b.get('version'),2)
+ s,b,h=request('PUT',f'sequences/{seq}',{'channel':'email'});check('native sequence channel-only mismatch denied',s,400)
+ s,b,h=request('GET',f'sequences/{seq}');check('native failed sequence update preserves channel',b.get('channel'),'sms');check('native failed sequence update preserves version',b.get('current_version'),2)
+ s,b,h=request('DELETE',f'sequences/{seq}');check('native unused sequence deletion',s,204);check('native sequence delete empty response',b,None)
+ s,b,h=request('GET',f'sequences/{seq}');check('native deleted sequence missing',s,404)
  s,b,h=request('POST','auth/logout');check('native logout',s,200)
  s,b,h=request('GET','contacts');check('native logout clears browser cookie',s,401)
 except Exception as e:failures.append({'exception':type(e).__name__,'message':str(e)})
 finally:
- result=dict(ok=not failures,assertions=checks,failures=failures,native_wordpress_http=True,native_mysql=True,actual_http_cookie_roundtrip=cookie_roundtrip,provider_messages_sent=0,complete_application=False,production_ready=False,scope='Actual HTTP/WordPress/MySQL smoke checks for implemented auth/contact/list/variable/template/synchronous import/job/CSV report/analytics paths and explicit native import worker (not actual WP cron dispatch); not full contract/SPA/browser/native concurrency/destructive FK/migration/provider certification')
+ result=dict(ok=not failures,assertions=checks,failures=failures,native_wordpress_http=True,native_mysql=True,actual_http_cookie_roundtrip=cookie_roundtrip,provider_messages_sent=0,complete_application=False,production_ready=False,scope='Actual HTTP/WordPress/MySQL smoke checks for implemented auth/contact/list/variable/template/synchronous import/job/CSV report/analytics/sequence-builder paths and explicit native import worker (not actual WP cron dispatch); not full contract/SPA/browser/native concurrency/destructive FK/migration/provider certification')
  (E/'native-http.json').write_text(json.dumps(result,indent=2)+'\n');print(json.dumps(result));(E/'private-test-cookie.json').unlink(missing_ok=True)
 raise SystemExit(bool(failures))

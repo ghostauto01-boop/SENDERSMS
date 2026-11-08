@@ -1,7 +1,7 @@
 {
   "ok": true,
-  "php_lint_checks": 66,
-  "php_assertions": 36350,
+  "php_lint_checks": 68,
+  "php_assertions": 36718,
   "vendor_parser_checks": 3075,
   "vendor_hash_checks": 1547,
   "unchanged_frontend_files": 165,
@@ -69,10 +69,10 @@
     },
     {
       "ok": true,
-      "assertions": 356,
+      "assertions": 381,
       "diffs": [],
       "php": "7.4.34-dev",
-      "scope": "Offline requests/responses with synthetic password codec, nineteen synthetic SQLite business tables, fault-injected transaction failure; not real WP/HTTP/Argon2/native MySQL/concurrency proof",
+      "scope": "Offline requests/responses with synthetic password codec, twenty-two synthetic SQLite business tables, fault-injected transaction failure; not real WP/HTTP/Argon2/native MySQL/concurrency proof",
       "native_wordpress_verified": false,
       "native_mysql_verified": false,
       "suite": "data-routes"
@@ -172,6 +172,20 @@
       "native_mysql_verified": false,
       "provider_messages_sent": 0,
       "suite": "analytics"
+    },
+    {
+      "ok": true,
+      "assertions": 159,
+      "diffs": [],
+      "php": "7.4.34-dev",
+      "source_operations": 40,
+      "source_dto_cases": 42,
+      "helper_cases": 16,
+      "scope": "Selected original sequence schemas/service/routes, fixed clock and synthetic SQLite; omitted FKs and reconstructed two delete-orphan relationships. Known UTC timestamp normalization only. No WP/MySQL/concurrency/version races/campaign execution or provider sends certification.",
+      "native_wordpress_verified": false,
+      "native_mysql_verified": false,
+      "provider_messages_sent": 0,
+      "suite": "sequences"
     },
     {
       "ok": true,
@@ -243,10 +257,10 @@
     },
     {
       "ok": true,
-      "assertions": 356,
+      "assertions": 381,
       "diffs": [],
       "php": "8.3.36",
-      "scope": "Offline requests/responses with synthetic password codec, nineteen synthetic SQLite business tables, fault-injected transaction failure; not real WP/HTTP/Argon2/native MySQL/concurrency proof",
+      "scope": "Offline requests/responses with synthetic password codec, twenty-two synthetic SQLite business tables, fault-injected transaction failure; not real WP/HTTP/Argon2/native MySQL/concurrency proof",
       "native_wordpress_verified": false,
       "native_mysql_verified": false,
       "suite": "data-routes"
@@ -346,6 +360,20 @@
       "native_mysql_verified": false,
       "provider_messages_sent": 0,
       "suite": "analytics"
+    },
+    {
+      "ok": true,
+      "assertions": 159,
+      "diffs": [],
+      "php": "8.3.36",
+      "source_operations": 40,
+      "source_dto_cases": 42,
+      "helper_cases": 16,
+      "scope": "Selected original sequence schemas/service/routes, fixed clock and synthetic SQLite; omitted FKs and reconstructed two delete-orphan relationships. Known UTC timestamp normalization only. No WP/MySQL/concurrency/version races/campaign execution or provider sends certification.",
+      "native_wordpress_verified": false,
+      "native_mysql_verified": false,
+      "provider_messages_sent": 0,
+      "suite": "sequences"
     },
     {
       "ok": true,

@@ -1,0 +1,14 @@
+{
+  "ok": true,
+  "assertions": 159,
+  "diffs": [],
+  "php": "7.4.34-dev",
+  "source_operations": 40,
+  "source_dto_cases": 42,
+  "helper_cases": 16,
+  "scope": "Selected original sequence schemas/service/routes, fixed clock and synthetic SQLite; omitted FKs and reconstructed two delete-orphan relationships. Known UTC timestamp normalization only. No WP/MySQL/concurrency/version races/campaign execution or provider sends certification.",
+  "native_wordpress_verified": false,
+  "native_mysql_verified": false,
+  "provider_messages_sent": 0,
+  "suite": "sequences"
+}
