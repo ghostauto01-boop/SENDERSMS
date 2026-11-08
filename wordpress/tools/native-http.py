@@ -3,6 +3,7 @@
 import http.cookiejar,json,os,time,urllib.error,urllib.parse,urllib.request
 from pathlib import Path
 E=Path(os.environ['NATIVE_WP_EVIDENCE']);BASE='http://127.0.0.1:8080';checks=0;failures=[]
+cookie_roundtrip=False
 jar=http.cookiejar.CookieJar();client=urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar));anonymous=urllib.request.build_opener();private=json.loads((E/'private-test-cookie.json').read_text())
 def check(label,actual,expected=True):
  global checks
@@ -29,7 +30,7 @@ try:
  s,b,h=request('POST','templates/',{'name':'No session'},headers={'Cookie':private['name']+'='+private['value']},authenticated=False);check('real WordPress admin cookie cannot bypass app login',s,401)
  s,b,h=request('POST','auth/login',{'username':'native_operator','password':'WRONG'});check('bad login',s,401)
  s,b,h=request('POST','auth/login',{'username':'native_operator','password':'Isolated-operator-test-only-2357'});check('actual HTTP Argon2id login',s,200);check('login body does not expose JWT','token' not in b);check('HttpOnly cookie','HttpOnly' in h.get('Set-Cookie',''));check('SameSite cookie','samesite=lax' in h.get('Set-Cookie','').lower());check('native cookie jar populated',any(c.name=='sendsms_session' for c in jar));check('login no-store',h.get('Cache-Control'),'no-store')
- s,b,h=request('GET','auth/me');check('native cookie roundtrip',s,200);check('operator username',b.get('username'),'native_operator')
+ s,b,h=request('GET','auth/me');check('native cookie roundtrip',s,200);cookie_roundtrip=s==200 and b.get('username')=='native_operator';check('operator username',b.get('username'),'native_operator')
  s,b,h=request('POST','contacts/',{'first_name':'Ada','email':'<Ada@business.ng>,','tags':'Buyer,buyer'});check('native contact create',s,201);contact=b.get('id');check('native email normalization',b.get('email'),'ada@business.ng');check('native tag deduplication',b.get('tags'),['Buyer']);check('native internal identity hidden','email_lower' not in b)
  s,b,h=request('POST','contacts/',{'first_name':'Other','email':'ADA@business.ng'});check('native contact duplicate merge',s,201);check('native duplicate keeps ID',b.get('id'),contact)
  s,b,h=request('PUT','contacts/'+str(contact),{'first_name':'Ada'});check('native contact update',s,200)
@@ -60,6 +61,6 @@ try:
  s,b,h=request('GET','contacts');check('native logout clears browser cookie',s,401)
 except Exception as e:failures.append({'exception':type(e).__name__,'message':str(e)})
 finally:
- result=dict(ok=not failures,assertions=checks,failures=failures,native_wordpress_http=True,native_mysql=True,actual_http_cookie_roundtrip=True,provider_messages_sent=0,complete_application=False,production_ready=False,scope='Actual HTTP/WordPress/MySQL smoke checks for implemented auth/contact/list/variable/template paths only; not full contract/SPA/browser/native concurrency/destructive FK/migration/provider certification')
+ result=dict(ok=not failures,assertions=checks,failures=failures,native_wordpress_http=True,native_mysql=True,actual_http_cookie_roundtrip=cookie_roundtrip,provider_messages_sent=0,complete_application=False,production_ready=False,scope='Actual HTTP/WordPress/MySQL smoke checks for implemented auth/contact/list/variable/template paths only; not full contract/SPA/browser/native concurrency/destructive FK/migration/provider certification')
  (E/'native-http.json').write_text(json.dumps(result,indent=2)+'\n');print(json.dumps(result));(E/'private-test-cookie.json').unlink(missing_ok=True)
 raise SystemExit(bool(failures))

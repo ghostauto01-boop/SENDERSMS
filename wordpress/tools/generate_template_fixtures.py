@@ -3,14 +3,18 @@
 Synthetic SQLite, fixed clock, omitted relationships and explicit monotonic committed IDs.
 No provider/network/environment/production database access.
 """
-import ast,asyncio,base64,datetime,hashlib,importlib.util,json,logging,types
+import ast,asyncio,base64,datetime,hashlib,importlib.util,json,logging,random,types
 from pathlib import Path
 D=Path(__file__).resolve().parents[1];ROOT=D.parent
 spec=importlib.util.spec_from_file_location('offline_variables_reference',D/'tools/generate_variable_fixtures.py');vg=importlib.util.module_from_spec(spec);spec.loader.exec_module(vg);cg=vg.cg;ns=vg.ns
 cg.load('backend/app/models/template.py',{'Template'},models=True);ns['Template'].__table__.dialect_options['sqlite']['autoincrement']=True
 cg.load('backend/app/schemas/template.py',{'TemplateCreate','TemplateUpdate','TemplateOut'},dict_ns:=dict(ns,datetime=datetime.datetime))
 for n in ('TemplateCreate','TemplateUpdate','TemplateOut'):ns[n]=dict_ns[n]
-ns.update(MAX_ATTACHMENTS=10,MAX_ATTACHMENT_BYTES=4*1024*1024,MAX_ATTACHMENTS_TOTAL_BYTES=8*1024*1024,VALID_CHANNELS=('sms','email'),DEFAULT_SAMPLE={'first_name':'John','last_name':'Doe','business_name':'Acme Ltd','phone_number':'08012345678','email':'john.doe@example.com','city':'Lagos','state':'Lagos','website':'https://example.com','industry':'Technology'})
+def literal(path,name):
+ for node in ast.parse((ROOT/path).read_text()).body:
+  if isinstance(node,ast.Assign) and any(isinstance(t,ast.Name) and t.id==name for t in node.targets):return ast.literal_eval(node.value)
+ raise RuntimeError('Missing source literal '+name)
+ns.update(MAX_ATTACHMENTS=10,MAX_ATTACHMENT_BYTES=4*1024*1024,MAX_ATTACHMENTS_TOTAL_BYTES=8*1024*1024,VALID_CHANNELS=literal('backend/app/api/v1/templates.py','VALID_CHANNELS'),DEFAULT_SAMPLE=literal('backend/app/services/variable_service.py','DEFAULT_SAMPLE'))
 ns['count_sms_segments']=vg.phone['count_sms_segments']
 cg.load('backend/app/services/email_service.py',{'clean_attachments','dump_attachments','load_attachments','attachment_summary'})
 cg.load('backend/app/services/variable_service.py',{'known_variable_keys','unknown_in','suggest','unknown_variables_error','render_preview'})
@@ -24,6 +28,12 @@ boundaries=[]
 for sizes in [[0],[4*1024*1024],[4*1024*1024+1,2],[4*1024*1024,4*1024*1024,1],[1]*11,[3*1024*1024]*3]:
  items=[{'name':f'file-{i}','content':base64.b64encode(b'a'*n).decode()} for i,n in enumerate(sizes)];cleaned=ns['clean_attachments'](items);raw=ns['dump_attachments'](cleaned);boundaries.append({'sizes':sizes,'summary':ns['attachment_summary'](raw),'stored_sha256':hashlib.sha256(raw.encode()).hexdigest() if raw else None})
 suggestions=[{'name':n,'known':known,'expected':ns['suggest'](n,set(known))} for known in [[],['first_name','last_name','full_name','name'],['pain','paid','pain_point','point','city'],['a'*150,'a'*149+'b','b'*150]] for n in ['frist_name','firs name','painpont','pian','unknown','name','x'*201,'a'*201,'a'*149+'c']]
+rng=random.Random(9051)
+pool=['0','id','app','apple','apply','paid','pain','pain_point','point','industry','first_name','last_name','mobile','phone_number']
+for _ in range(100):
+ known=rng.sample(pool,rng.randint(2,len(pool)));word=rng.choice(pool);word=word[1:] if rng.choice([False,True]) else word[:-1]+'x'
+ suggestions.append({'name':word,'known':known,'expected':ns['suggest'](word,set(known))})
+
 ops=[]
 def add(op,**kw):ops.append(dict(op=op,**kw))
 add('create',body={'name':'Welcome','category':'SMS','body':'Hi {{first_name}}','subject':'ignored','attachments':[{'name':'ignored','content':'YQ=='}],'include_unsubscribe':False})
@@ -36,6 +46,7 @@ add('list');add('list',channel='sms');add('list',channel='email');add('list',cha
 add('update',id=1,body={'body':'^'*71,'is_active':False});add('duplicate',id=1);add('to_email',id=1);add('to_email',id=2);add('update',id=2,body={'subject':' '});add('update',id=2,body={'body':'New {{city}}','attachments':None});add('update',id=1,body={'body':'{{frist_name}}'});add('get',id=1)
 add('preview',body='Hi {{first_name}}, {{brand}} {{frist_name}}',subject='{{business_name}}',channel='email');add('preview',body='Hello {{first_name}}',first_name='Ada');add('preview',body='x',contact_id=0)
 add('seed_contact',body={'first_name':'Ada','business_name':'Shop','custom_fields':json.dumps({'Pain Point':'time'})});add('create',body={'name':'Custom','body':'Hi {{pain_point}}'});add('preview',body='Hi {{first_name}} {{Pain Point}} {{Pain Point|fallback}}',contact_id=1);add('create',body={'name':'Unknown email','channel':'email','subject':'{{frist_name}}','html_body':'<p>Mail</p>'});add('delete',id=3);add('get',id=3);add('list')
+add('create',body={'name':'Long email','channel':'email','subject':'x','body':'é'*999});add('create',body={'name':'HTML email','channel':'email','subject':'HTML','html_body':'<p>é</p>'});add('update',id=1,body={});add('preview',body='');add('preview',body='{{first_name}}',first_name='0',channel='unknown')
 async def main():
  engine=cg.create_async_engine('sqlite+aiosqlite:///:memory:')
  async with engine.begin() as con:await con.run_sync(cg.Base.metadata.create_all)

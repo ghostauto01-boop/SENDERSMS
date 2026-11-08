@@ -1006,6 +1006,140 @@
         }
       },
       "template_count": 5
+    },
+    {
+      "op": "create",
+      "body": {
+        "name": "Long email",
+        "channel": "email",
+        "subject": "x",
+        "body": "ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+      },
+      "expected": {
+        "status": 201,
+        "body": {
+          "id": 7,
+          "name": "Long email",
+          "category": null,
+          "channel": "email",
+          "body": "ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé",
+          "subject": "x",
+          "html_body": null,
+          "preheader": null,
+          "email_account_id": null,
+          "attachments": [],
+          "include_unsubscribe": true,
+          "char_count": 999,
+          "segment_count": 2,
+          "is_active": true,
+          "use_count": 0,
+          "created_at": "2026-01-02T12:00:00.123456",
+          "updated_at": "2026-01-02T12:00:00.123456"
+        }
+      },
+      "template_count": 6
+    },
+    {
+      "op": "create",
+      "body": {
+        "name": "HTML email",
+        "channel": "email",
+        "subject": "HTML",
+        "html_body": "<p>é</p>"
+      },
+      "expected": {
+        "status": 201,
+        "body": {
+          "id": 8,
+          "name": "HTML email",
+          "category": null,
+          "channel": "email",
+          "body": "",
+          "subject": "HTML",
+          "html_body": "<p>é</p>",
+          "preheader": null,
+          "email_account_id": null,
+          "attachments": [],
+          "include_unsubscribe": true,
+          "char_count": 0,
+          "segment_count": 1,
+          "is_active": true,
+          "use_count": 0,
+          "created_at": "2026-01-02T12:00:00.123456",
+          "updated_at": "2026-01-02T12:00:00.123456"
+        }
+      },
+      "template_count": 7
+    },
+    {
+      "op": "update",
+      "id": 1,
+      "body": {},
+      "expected": {
+        "status": 200,
+        "body": {
+          "id": 1,
+          "name": "Welcome",
+          "category": "SMS",
+          "channel": "sms",
+          "body": "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^",
+          "subject": null,
+          "html_body": null,
+          "preheader": null,
+          "email_account_id": null,
+          "attachments": [],
+          "include_unsubscribe": true,
+          "char_count": 71,
+          "segment_count": 2,
+          "is_active": false,
+          "use_count": 0,
+          "created_at": "2026-01-02T12:00:00.123456",
+          "updated_at": "2026-01-02T12:00:00.123456"
+        }
+      },
+      "template_count": 7
+    },
+    {
+      "op": "preview",
+      "body": "",
+      "expected": {
+        "status": 200,
+        "body": {
+          "preview": "",
+          "subject": null,
+          "html": null,
+          "char_count": 0,
+          "segment_count": 1,
+          "channel": "sms",
+          "contact": null,
+          "sample": true,
+          "unknown_variables": [],
+          "warnings": []
+        }
+      },
+      "template_count": 7
+    },
+    {
+      "op": "preview",
+      "body": "{{first_name}}",
+      "first_name": "0",
+      "channel": "unknown",
+      "expected": {
+        "status": 200,
+        "body": {
+          "preview": "0",
+          "subject": null,
+          "html": null,
+          "char_count": 1,
+          "segment_count": 1,
+          "channel": "sms",
+          "contact": null,
+          "sample": true,
+          "unknown_variables": [],
+          "warnings": []
+        }
+      },
+      "template_count": 7
     }
   ],
   "dto": [
@@ -2272,6 +2406,1405 @@
         "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
       ],
       "expected": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab"
+    },
+    {
+      "name": "pain_poinx",
+      "known": [
+        "phone_number",
+        "last_name",
+        "id",
+        "pain_point"
+      ],
+      "expected": "pain_point"
+    },
+    {
+      "name": "phone_numbex",
+      "known": [
+        "industry",
+        "phone_number",
+        "0",
+        "apply",
+        "app"
+      ],
+      "expected": "phone_number"
+    },
+    {
+      "name": "aid",
+      "known": [
+        "last_name",
+        "phone_number"
+      ],
+      "expected": null
+    },
+    {
+      "name": "applx",
+      "known": [
+        "app",
+        "pain_point"
+      ],
+      "expected": "app"
+    },
+    {
+      "name": "d",
+      "known": [
+        "apple",
+        "point",
+        "mobile",
+        "last_name",
+        "paid",
+        "pain",
+        "first_name",
+        "id",
+        "apply",
+        "phone_number",
+        "0",
+        "industry",
+        "app"
+      ],
+      "expected": null
+    },
+    {
+      "name": "obile",
+      "known": [
+        "app",
+        "industry",
+        "id",
+        "apple",
+        "mobile",
+        "paid",
+        "0",
+        "pain",
+        "last_name",
+        "first_name",
+        "phone_number",
+        "pain_point"
+      ],
+      "expected": "mobile"
+    },
+    {
+      "name": "paix",
+      "known": [
+        "industry",
+        "id",
+        "last_name",
+        "first_name",
+        "point",
+        "pain",
+        "app",
+        "phone_number"
+      ],
+      "expected": "pain"
+    },
+    {
+      "name": "poinx",
+      "known": [
+        "apply",
+        "id",
+        "pain",
+        "app",
+        "phone_number",
+        "paid",
+        "first_name",
+        "point",
+        "pain_point",
+        "apple",
+        "industry",
+        "mobile",
+        "0"
+      ],
+      "expected": "point"
+    },
+    {
+      "name": "pply",
+      "known": [
+        "mobile",
+        "0",
+        "apple",
+        "pain_point"
+      ],
+      "expected": null
+    },
+    {
+      "name": "paix",
+      "known": [
+        "apple",
+        "pain_point"
+      ],
+      "expected": null
+    },
+    {
+      "name": "pain_poinx",
+      "known": [
+        "apple",
+        "first_name",
+        "phone_number",
+        "apply",
+        "last_name"
+      ],
+      "expected": null
+    },
+    {
+      "name": "aid",
+      "known": [
+        "first_name",
+        "paid",
+        "point"
+      ],
+      "expected": "paid"
+    },
+    {
+      "name": "ix",
+      "known": [
+        "pain",
+        "0",
+        "first_name",
+        "last_name",
+        "mobile"
+      ],
+      "expected": null
+    },
+    {
+      "name": "ix",
+      "known": [
+        "apple",
+        "first_name"
+      ],
+      "expected": null
+    },
+    {
+      "name": "hone_number",
+      "known": [
+        "apple",
+        "mobile",
+        "pain",
+        "apply",
+        "app",
+        "pain_point",
+        "phone_number",
+        "id",
+        "point"
+      ],
+      "expected": "phone_number"
+    },
+    {
+      "name": "last_namx",
+      "known": [
+        "0",
+        "apple",
+        "industry",
+        "id",
+        "point",
+        "app",
+        "apply",
+        "last_name",
+        "first_name",
+        "pain",
+        "mobile",
+        "pain_point",
+        "paid",
+        "phone_number"
+      ],
+      "expected": "last_name"
+    },
+    {
+      "name": "obile",
+      "known": [
+        "mobile",
+        "first_name",
+        "0",
+        "industry",
+        "apple",
+        "phone_number",
+        "last_name",
+        "app",
+        "id",
+        "point",
+        "pain_point",
+        "pain",
+        "apply"
+      ],
+      "expected": "mobile"
+    },
+    {
+      "name": "apx",
+      "known": [
+        "point",
+        "app",
+        "apply",
+        "paid"
+      ],
+      "expected": null
+    },
+    {
+      "name": "ix",
+      "known": [
+        "pain_point",
+        "first_name",
+        "point",
+        "0",
+        "app",
+        "phone_number",
+        "industry",
+        "id",
+        "mobile",
+        "paid",
+        "last_name",
+        "apple",
+        "apply",
+        "pain"
+      ],
+      "expected": null
+    },
+    {
+      "name": "pply",
+      "known": [
+        "first_name",
+        "phone_number",
+        "mobile",
+        "id"
+      ],
+      "expected": null
+    },
+    {
+      "name": "hone_number",
+      "known": [
+        "last_name",
+        "id",
+        "pain_point",
+        "0",
+        "first_name",
+        "pain",
+        "industry"
+      ],
+      "expected": null
+    },
+    {
+      "name": "ain_point",
+      "known": [
+        "mobile",
+        "paid",
+        "id",
+        "pain_point",
+        "0",
+        "first_name",
+        "phone_number",
+        "apple",
+        "last_name",
+        "pain",
+        "point",
+        "app",
+        "apply"
+      ],
+      "expected": "pain_point"
+    },
+    {
+      "name": "ain",
+      "known": [
+        "industry",
+        "apple",
+        "apply",
+        "first_name",
+        "point",
+        "last_name",
+        "0",
+        "id",
+        "mobile",
+        "app",
+        "pain_point",
+        "phone_number"
+      ],
+      "expected": null
+    },
+    {
+      "name": "aid",
+      "known": [
+        "phone_number",
+        "mobile",
+        "last_name"
+      ],
+      "expected": null
+    },
+    {
+      "name": "d",
+      "known": [
+        "pain_point",
+        "id",
+        "point",
+        "paid",
+        "phone_number",
+        "last_name",
+        "apply",
+        "app",
+        "industry",
+        "apple"
+      ],
+      "expected": null
+    },
+    {
+      "name": "pple",
+      "known": [
+        "apple",
+        "0",
+        "app",
+        "phone_number",
+        "pain",
+        "industry",
+        "pain_point",
+        "paid",
+        "id",
+        "apply",
+        "mobile",
+        "first_name"
+      ],
+      "expected": "apple"
+    },
+    {
+      "name": "d",
+      "known": [
+        "industry",
+        "0",
+        "apply",
+        "app",
+        "pain_point"
+      ],
+      "expected": null
+    },
+    {
+      "name": "ain",
+      "known": [
+        "paid",
+        "last_name",
+        "industry",
+        "app",
+        "phone_number",
+        "point",
+        "apple"
+      ],
+      "expected": null
+    },
+    {
+      "name": "d",
+      "known": [
+        "first_name",
+        "apply",
+        "id",
+        "0",
+        "last_name"
+      ],
+      "expected": null
+    },
+    {
+      "name": "pple",
+      "known": [
+        "apple",
+        "first_name",
+        "point",
+        "id",
+        "mobile",
+        "app",
+        "industry",
+        "apply",
+        "last_name",
+        "phone_number"
+      ],
+      "expected": "apple"
+    },
+    {
+      "name": "hone_number",
+      "known": [
+        "id",
+        "point",
+        "app",
+        "mobile",
+        "last_name",
+        "pain_point",
+        "pain",
+        "paid",
+        "phone_number",
+        "first_name"
+      ],
+      "expected": "phone_number"
+    },
+    {
+      "name": "ix",
+      "known": [
+        "first_name",
+        "0",
+        "pain_point",
+        "id",
+        "phone_number",
+        "industry",
+        "pain",
+        "last_name",
+        "mobile",
+        "apply",
+        "paid",
+        "point"
+      ],
+      "expected": null
+    },
+    {
+      "name": "oint",
+      "known": [
+        "paid",
+        "app",
+        "mobile",
+        "last_name",
+        "first_name",
+        "pain",
+        "phone_number",
+        "0",
+        "industry",
+        "pain_point",
+        "apply",
+        "point"
+      ],
+      "expected": "point"
+    },
+    {
+      "name": "mobilx",
+      "known": [
+        "industry",
+        "pain_point",
+        "mobile",
+        "first_name",
+        "app",
+        "id",
+        "phone_number",
+        "paid",
+        "last_name",
+        "point",
+        "pain",
+        "apple"
+      ],
+      "expected": "mobile"
+    },
+    {
+      "name": "mobilx",
+      "known": [
+        "last_name",
+        "industry",
+        "paid",
+        "mobile",
+        "0"
+      ],
+      "expected": "mobile"
+    },
+    {
+      "name": "apx",
+      "known": [
+        "first_name",
+        "apply"
+      ],
+      "expected": null
+    },
+    {
+      "name": "applx",
+      "known": [
+        "pain_point",
+        "last_name",
+        "point"
+      ],
+      "expected": null
+    },
+    {
+      "name": "last_namx",
+      "known": [
+        "phone_number",
+        "id",
+        "point",
+        "paid",
+        "pain",
+        "apple"
+      ],
+      "expected": null
+    },
+    {
+      "name": "ndustry",
+      "known": [
+        "paid",
+        "pain",
+        "point",
+        "0",
+        "pain_point",
+        "app",
+        "industry",
+        "first_name",
+        "mobile",
+        "id",
+        "phone_number",
+        "apple",
+        "apply",
+        "last_name"
+      ],
+      "expected": "industry"
+    },
+    {
+      "name": "poinx",
+      "known": [
+        "id",
+        "apple",
+        "app",
+        "phone_number",
+        "0",
+        "last_name"
+      ],
+      "expected": null
+    },
+    {
+      "name": "ast_name",
+      "known": [
+        "app",
+        "0",
+        "first_name",
+        "paid",
+        "apply",
+        "apple",
+        "last_name",
+        "pain",
+        "point",
+        "pain_point"
+      ],
+      "expected": "last_name"
+    },
+    {
+      "name": "",
+      "known": [
+        "pain",
+        "0",
+        "point",
+        "industry",
+        "paid",
+        "apply",
+        "first_name",
+        "mobile",
+        "last_name"
+      ],
+      "expected": null
+    },
+    {
+      "name": "irst_name",
+      "known": [
+        "apply",
+        "0",
+        "id",
+        "app"
+      ],
+      "expected": null
+    },
+    {
+      "name": "",
+      "known": [
+        "mobile",
+        "last_name",
+        "pain",
+        "industry",
+        "phone_number",
+        "app"
+      ],
+      "expected": null
+    },
+    {
+      "name": "ix",
+      "known": [
+        "point",
+        "0",
+        "mobile",
+        "pain",
+        "id",
+        "apply",
+        "industry",
+        "paid",
+        "app",
+        "first_name"
+      ],
+      "expected": null
+    },
+    {
+      "name": "applx",
+      "known": [
+        "app",
+        "id"
+      ],
+      "expected": "app"
+    },
+    {
+      "name": "pply",
+      "known": [
+        "last_name",
+        "paid",
+        "app",
+        "first_name",
+        "mobile",
+        "pain",
+        "0",
+        "apply",
+        "point",
+        "phone_number",
+        "pain_point",
+        "industry",
+        "apple"
+      ],
+      "expected": "apply"
+    },
+    {
+      "name": "aid",
+      "known": [
+        "id",
+        "phone_number",
+        "first_name",
+        "last_name",
+        "point",
+        "mobile",
+        "app",
+        "pain",
+        "0",
+        "apple",
+        "apply"
+      ],
+      "expected": "id"
+    },
+    {
+      "name": "ndustry",
+      "known": [
+        "phone_number",
+        "app",
+        "apply",
+        "0",
+        "last_name",
+        "point",
+        "pain",
+        "first_name",
+        "apple"
+      ],
+      "expected": null
+    },
+    {
+      "name": "ix",
+      "known": [
+        "first_name",
+        "pain",
+        "0",
+        "paid",
+        "point",
+        "phone_number",
+        "pain_point",
+        "id",
+        "apply",
+        "apple",
+        "industry"
+      ],
+      "expected": null
+    },
+    {
+      "name": "paix",
+      "known": [
+        "phone_number",
+        "apply",
+        "first_name",
+        "0",
+        "last_name"
+      ],
+      "expected": null
+    },
+    {
+      "name": "irst_name",
+      "known": [
+        "point",
+        "apply",
+        "last_name",
+        "app",
+        "apple",
+        "pain",
+        "mobile",
+        "id",
+        "phone_number",
+        "first_name",
+        "industry"
+      ],
+      "expected": "first_name"
+    },
+    {
+      "name": "ain_point",
+      "known": [
+        "mobile",
+        "pain",
+        "apple",
+        "apply",
+        "app",
+        "first_name",
+        "pain_point",
+        "industry",
+        "id",
+        "phone_number",
+        "point"
+      ],
+      "expected": "pain_point"
+    },
+    {
+      "name": "pply",
+      "known": [
+        "apple",
+        "paid",
+        "0",
+        "point",
+        "mobile",
+        "first_name",
+        "apply",
+        "phone_number",
+        "pain_point"
+      ],
+      "expected": "apply"
+    },
+    {
+      "name": "hone_number",
+      "known": [
+        "first_name",
+        "point",
+        "id",
+        "app"
+      ],
+      "expected": null
+    },
+    {
+      "name": "ain",
+      "known": [
+        "pain_point",
+        "apple",
+        "point",
+        "apply",
+        "paid",
+        "phone_number",
+        "mobile",
+        "id",
+        "app",
+        "pain",
+        "last_name"
+      ],
+      "expected": "pain"
+    },
+    {
+      "name": "ain_point",
+      "known": [
+        "apply",
+        "id",
+        "last_name"
+      ],
+      "expected": null
+    },
+    {
+      "name": "mobilx",
+      "known": [
+        "pain_point",
+        "point",
+        "mobile",
+        "id",
+        "paid",
+        "last_name",
+        "first_name",
+        "apply",
+        "app",
+        "apple",
+        "0",
+        "pain",
+        "phone_number"
+      ],
+      "expected": "mobile"
+    },
+    {
+      "name": "ix",
+      "known": [
+        "id",
+        "mobile",
+        "last_name",
+        "app",
+        "pain",
+        "industry"
+      ],
+      "expected": null
+    },
+    {
+      "name": "obile",
+      "known": [
+        "apply",
+        "paid",
+        "id",
+        "point",
+        "0",
+        "pain",
+        "mobile"
+      ],
+      "expected": "mobile"
+    },
+    {
+      "name": "mobilx",
+      "known": [
+        "pain",
+        "point"
+      ],
+      "expected": null
+    },
+    {
+      "name": "last_namx",
+      "known": [
+        "point",
+        "phone_number",
+        "paid",
+        "0",
+        "last_name",
+        "mobile",
+        "app",
+        "apply",
+        "apple",
+        "id",
+        "first_name",
+        "industry",
+        "pain_point",
+        "pain"
+      ],
+      "expected": "last_name"
+    },
+    {
+      "name": "pply",
+      "known": [
+        "point",
+        "apply",
+        "last_name"
+      ],
+      "expected": "apply"
+    },
+    {
+      "name": "industrx",
+      "known": [
+        "0",
+        "pain_point",
+        "apply",
+        "point",
+        "apple",
+        "mobile",
+        "pain",
+        "app"
+      ],
+      "expected": null
+    },
+    {
+      "name": "applx",
+      "known": [
+        "0",
+        "mobile",
+        "apply",
+        "last_name",
+        "pain",
+        "phone_number",
+        "industry",
+        "id",
+        "pain_point",
+        "point",
+        "paid",
+        "app",
+        "first_name"
+      ],
+      "expected": "apply"
+    },
+    {
+      "name": "irst_name",
+      "known": [
+        "paid",
+        "apply",
+        "id",
+        "apple",
+        "0",
+        "mobile",
+        "industry",
+        "first_name",
+        "pain",
+        "last_name",
+        "point",
+        "pain_point",
+        "phone_number"
+      ],
+      "expected": "first_name"
+    },
+    {
+      "name": "phone_numbex",
+      "known": [
+        "mobile",
+        "id",
+        "pain_point",
+        "apple",
+        "last_name",
+        "phone_number",
+        "industry",
+        "pain"
+      ],
+      "expected": "phone_number"
+    },
+    {
+      "name": "hone_number",
+      "known": [
+        "mobile",
+        "app",
+        "id",
+        "pain",
+        "phone_number",
+        "0"
+      ],
+      "expected": "phone_number"
+    },
+    {
+      "name": "oint",
+      "known": [
+        "last_name",
+        "apply",
+        "pain",
+        "apple",
+        "app",
+        "pain_point",
+        "phone_number",
+        "id",
+        "mobile",
+        "industry",
+        "0"
+      ],
+      "expected": null
+    },
+    {
+      "name": "irst_name",
+      "known": [
+        "phone_number",
+        "paid",
+        "mobile",
+        "id",
+        "point",
+        "pain",
+        "apply",
+        "apple",
+        "0",
+        "app",
+        "first_name",
+        "pain_point",
+        "last_name",
+        "industry"
+      ],
+      "expected": "first_name"
+    },
+    {
+      "name": "pain_poinx",
+      "known": [
+        "first_name",
+        "last_name",
+        "mobile",
+        "pain",
+        "apple"
+      ],
+      "expected": null
+    },
+    {
+      "name": "last_namx",
+      "known": [
+        "first_name",
+        "id",
+        "pain_point",
+        "app",
+        "phone_number"
+      ],
+      "expected": null
+    },
+    {
+      "name": "applx",
+      "known": [
+        "industry",
+        "phone_number",
+        "last_name",
+        "pain",
+        "pain_point",
+        "app",
+        "apply",
+        "0",
+        "paid"
+      ],
+      "expected": "apply"
+    },
+    {
+      "name": "applx",
+      "known": [
+        "id",
+        "industry",
+        "first_name",
+        "0",
+        "pain",
+        "point",
+        "phone_number",
+        "paid",
+        "app",
+        "mobile",
+        "apple"
+      ],
+      "expected": "apple"
+    },
+    {
+      "name": "first_namx",
+      "known": [
+        "industry",
+        "0"
+      ],
+      "expected": null
+    },
+    {
+      "name": "pain_poinx",
+      "known": [
+        "0",
+        "phone_number",
+        "apple",
+        "pain_point",
+        "apply",
+        "id",
+        "mobile"
+      ],
+      "expected": "pain_point"
+    },
+    {
+      "name": "",
+      "known": [
+        "apply",
+        "id",
+        "apple",
+        "phone_number",
+        "first_name",
+        "paid",
+        "app",
+        "last_name",
+        "0"
+      ],
+      "expected": null
+    },
+    {
+      "name": "first_namx",
+      "known": [
+        "apply",
+        "point",
+        "id",
+        "phone_number",
+        "0",
+        "last_name",
+        "mobile",
+        "industry",
+        "paid",
+        "first_name",
+        "apple",
+        "app",
+        "pain_point"
+      ],
+      "expected": "first_name"
+    },
+    {
+      "name": "pp",
+      "known": [
+        "first_name",
+        "apply",
+        "id",
+        "last_name",
+        "app",
+        "industry",
+        "phone_number",
+        "pain_point",
+        "pain",
+        "point",
+        "paid",
+        "apple",
+        "0",
+        "mobile"
+      ],
+      "expected": "app"
+    },
+    {
+      "name": "mobilx",
+      "known": [
+        "last_name",
+        "apple"
+      ],
+      "expected": null
+    },
+    {
+      "name": "x",
+      "known": [
+        "apply",
+        "first_name",
+        "last_name",
+        "app",
+        "apple",
+        "point",
+        "pain_point",
+        "mobile",
+        "pain",
+        "id"
+      ],
+      "expected": null
+    },
+    {
+      "name": "paix",
+      "known": [
+        "pain_point",
+        "id"
+      ],
+      "expected": null
+    },
+    {
+      "name": "pain_poinx",
+      "known": [
+        "pain_point",
+        "apply"
+      ],
+      "expected": "pain_point"
+    },
+    {
+      "name": "industrx",
+      "known": [
+        "mobile",
+        "0",
+        "last_name",
+        "phone_number",
+        "apply",
+        "apple",
+        "industry",
+        "pain",
+        "point",
+        "app",
+        "id"
+      ],
+      "expected": "industry"
+    },
+    {
+      "name": "industrx",
+      "known": [
+        "pain_point",
+        "app",
+        "industry",
+        "phone_number",
+        "apply"
+      ],
+      "expected": "industry"
+    },
+    {
+      "name": "poinx",
+      "known": [
+        "pain_point",
+        "0",
+        "point",
+        "phone_number"
+      ],
+      "expected": "point"
+    },
+    {
+      "name": "x",
+      "known": [
+        "point",
+        "pain_point",
+        "app",
+        "0"
+      ],
+      "expected": null
+    },
+    {
+      "name": "aid",
+      "known": [
+        "industry",
+        "first_name",
+        "paid",
+        "phone_number",
+        "mobile",
+        "point",
+        "apple",
+        "pain",
+        "last_name",
+        "apply",
+        "app",
+        "0",
+        "pain_point",
+        "id"
+      ],
+      "expected": "paid"
+    },
+    {
+      "name": "last_namx",
+      "known": [
+        "app",
+        "industry",
+        "point",
+        "pain",
+        "paid",
+        "first_name"
+      ],
+      "expected": null
+    },
+    {
+      "name": "industrx",
+      "known": [
+        "mobile",
+        "pain",
+        "industry",
+        "apply",
+        "paid",
+        "last_name",
+        "pain_point",
+        "id",
+        "phone_number",
+        "app",
+        "first_name",
+        "0",
+        "apple",
+        "point"
+      ],
+      "expected": "industry"
+    },
+    {
+      "name": "applx",
+      "known": [
+        "pain_point",
+        "apple",
+        "phone_number",
+        "first_name"
+      ],
+      "expected": "apple"
+    },
+    {
+      "name": "mobilx",
+      "known": [
+        "paid",
+        "phone_number",
+        "apply",
+        "pain",
+        "app",
+        "id",
+        "first_name",
+        "industry",
+        "mobile"
+      ],
+      "expected": "mobile"
+    },
+    {
+      "name": "",
+      "known": [
+        "id",
+        "pain_point",
+        "app",
+        "pain",
+        "0"
+      ],
+      "expected": null
+    },
+    {
+      "name": "last_namx",
+      "known": [
+        "0",
+        "apply",
+        "mobile",
+        "paid",
+        "industry",
+        "first_name",
+        "point",
+        "pain",
+        "apple",
+        "app",
+        "id",
+        "phone_number",
+        "last_name",
+        "pain_point"
+      ],
+      "expected": "last_name"
+    },
+    {
+      "name": "industrx",
+      "known": [
+        "id",
+        "paid",
+        "first_name",
+        "pain_point",
+        "mobile",
+        "apple",
+        "industry",
+        "app"
+      ],
+      "expected": "industry"
+    },
+    {
+      "name": "aid",
+      "known": [
+        "mobile",
+        "last_name",
+        "pain_point",
+        "industry",
+        "paid",
+        "pain",
+        "first_name",
+        "app",
+        "apple",
+        "phone_number"
+      ],
+      "expected": "paid"
+    },
+    {
+      "name": "applx",
+      "known": [
+        "pain_point",
+        "industry",
+        "point",
+        "last_name",
+        "0"
+      ],
+      "expected": null
+    },
+    {
+      "name": "ndustry",
+      "known": [
+        "apply",
+        "app",
+        "last_name",
+        "mobile",
+        "apple",
+        "point",
+        "paid",
+        "first_name",
+        "pain"
+      ],
+      "expected": null
+    },
+    {
+      "name": "oint",
+      "known": [
+        "industry",
+        "id",
+        "pain",
+        "paid",
+        "pain_point",
+        "app",
+        "apply",
+        "last_name",
+        "point",
+        "phone_number",
+        "first_name",
+        "apple",
+        "0",
+        "mobile"
+      ],
+      "expected": "point"
+    },
+    {
+      "name": "aid",
+      "known": [
+        "first_name",
+        "pain",
+        "id",
+        "mobile",
+        "industry",
+        "last_name",
+        "app",
+        "0",
+        "pain_point",
+        "apple",
+        "apply"
+      ],
+      "expected": "id"
     }
   ],
   "scope": "Selected original template/attachment/preview AST; synthetic SQLite with explicit monotonic committed IDs, fixed clock and omitted relationships; not native DB/HTTP/WP/provider/HTML-safety certification"
