@@ -1,6 +1,6 @@
 # Remaining WordPress recreation work
 
-412 missing source handlers,96 partial health/auth/contact/list/variable/template/reply/classification/notification/import/analytics/sequence handlers,0 fully certified contracts. The administrator CSV diagnostic is not the original source import API.
+397 missing source handlers,111 partial health/auth/contact/list/variable/template/reply/classification/notification/import/analytics/sequence/settings/calendar handlers,0 fully certified contracts. The administrator CSV diagnostic is not the original source import API.
 
 Every row is outstanding, including all partial handlers until native HTTP certification. See README.md for actual implemented utilities and fresh test boundaries.
 
@@ -23,7 +23,7 @@ Every row is outstanding, including all partial handlers until native HTTP certi
 | DELETE | /api/v1/ai-agent/skills/{skill_id} | backend/app/api/v1/ai_agent.py:1043 | missing original application handler |
 | DELETE | /api/v1/automations/{automation_id} | backend/app/api/v1/automations.py:130 | partial handler; native WordPress/HTTP unverified |
 | DELETE | /api/v1/autoreply/{rule_id} | backend/app/api/v1/autoreply.py:134 | partial handler; native WordPress/HTTP unverified |
-| DELETE | /api/v1/calendar/{meeting_id} | backend/app/api/v1/calendar.py:535 | missing original application handler |
+| DELETE | /api/v1/calendar/{meeting_id} | backend/app/api/v1/calendar.py:535 | partial handler; native WordPress/HTTP unverified |
 | DELETE | /api/v1/calls/webhooks/{webhook_id} | backend/app/api/v1/calls.py:160 | missing original application handler |
 | DELETE | /api/v1/campaign-followups/{followup_id} | backend/app/api/v1/campaign_followups.py:247 | missing original application handler |
 | DELETE | /api/v1/campaigns/{campaign_id} | backend/app/api/v1/campaigns.py:596 | missing original application handler |
@@ -109,14 +109,14 @@ Every row is outstanding, including all partial handlers until native HTTP certi
 | GET | /api/v1/autoreply | backend/app/api/v1/autoreply.py:44 | partial handler; native WordPress/HTTP unverified |
 | GET | /api/v1/autoreply/ | backend/app/api/v1/autoreply.py:44 | partial handler; native WordPress/HTTP unverified |
 | GET | /api/v1/autoreply/{rule_id} | backend/app/api/v1/autoreply.py:87 | partial handler; native WordPress/HTTP unverified |
-| GET | /api/v1/calendar | backend/app/api/v1/calendar.py:164 | missing original application handler |
-| GET | /api/v1/calendar/ | backend/app/api/v1/calendar.py:164 | missing original application handler |
-| GET | /api/v1/calendar/day | backend/app/api/v1/calendar.py:251 | missing original application handler |
-| GET | /api/v1/calendar/tags | backend/app/api/v1/calendar.py:273 | missing original application handler |
-| GET | /api/v1/calendar/tags/all | backend/app/api/v1/calendar.py:634 | missing original application handler |
-| GET | /api/v1/calendar/upcoming | backend/app/api/v1/calendar.py:237 | missing original application handler |
-| GET | /api/v1/calendar/{meeting_id} | backend/app/api/v1/calendar.py:301 | missing original application handler |
-| GET | /api/v1/calendar/{meeting_id}/preview | backend/app/api/v1/calendar.py:315 | missing original application handler |
+| GET | /api/v1/calendar | backend/app/api/v1/calendar.py:164 | partial handler; native WordPress/HTTP unverified |
+| GET | /api/v1/calendar/ | backend/app/api/v1/calendar.py:164 | partial handler; native WordPress/HTTP unverified |
+| GET | /api/v1/calendar/day | backend/app/api/v1/calendar.py:251 | partial handler; native WordPress/HTTP unverified |
+| GET | /api/v1/calendar/tags | backend/app/api/v1/calendar.py:273 | partial handler; native WordPress/HTTP unverified |
+| GET | /api/v1/calendar/tags/all | backend/app/api/v1/calendar.py:634 | partial handler; native WordPress/HTTP unverified |
+| GET | /api/v1/calendar/upcoming | backend/app/api/v1/calendar.py:237 | partial handler; native WordPress/HTTP unverified |
+| GET | /api/v1/calendar/{meeting_id} | backend/app/api/v1/calendar.py:301 | partial handler; native WordPress/HTTP unverified |
+| GET | /api/v1/calendar/{meeting_id}/preview | backend/app/api/v1/calendar.py:315 | partial handler; native WordPress/HTTP unverified |
 | GET | /api/v1/calls/active | backend/app/api/v1/calls.py:328 | missing original application handler |
 | GET | /api/v1/calls/config | backend/app/api/v1/calls.py:59 | missing original application handler |
 | GET | /api/v1/calls/logs | backend/app/api/v1/calls.py:287 | missing original application handler |
@@ -332,11 +332,11 @@ Every row is outstanding, including all partial handlers until native HTTP certi
 | POST | /api/v1/automations/test | backend/app/api/v1/automations.py:144 | partial handler; native WordPress/HTTP unverified |
 | POST | /api/v1/autoreply/ | backend/app/api/v1/autoreply.py:67 | partial handler; native WordPress/HTTP unverified |
 | POST | /api/v1/autoreply/test | backend/app/api/v1/autoreply.py:148 | partial handler; native WordPress/HTTP unverified |
-| POST | /api/v1/calendar/ | backend/app/api/v1/calendar.py:361 | missing original application handler |
-| POST | /api/v1/calendar/{meeting_id}/cancel | backend/app/api/v1/calendar.py:587 | missing original application handler |
-| POST | /api/v1/calendar/{meeting_id}/complete | backend/app/api/v1/calendar.py:577 | missing original application handler |
-| POST | /api/v1/calendar/{meeting_id}/confirm | backend/app/api/v1/calendar.py:568 | missing original application handler |
-| POST | /api/v1/calendar/{meeting_id}/no-show | backend/app/api/v1/calendar.py:597 | missing original application handler |
+| POST | /api/v1/calendar/ | backend/app/api/v1/calendar.py:361 | partial handler; native WordPress/HTTP unverified |
+| POST | /api/v1/calendar/{meeting_id}/cancel | backend/app/api/v1/calendar.py:587 | partial handler; native WordPress/HTTP unverified |
+| POST | /api/v1/calendar/{meeting_id}/complete | backend/app/api/v1/calendar.py:577 | partial handler; native WordPress/HTTP unverified |
+| POST | /api/v1/calendar/{meeting_id}/confirm | backend/app/api/v1/calendar.py:568 | partial handler; native WordPress/HTTP unverified |
+| POST | /api/v1/calendar/{meeting_id}/no-show | backend/app/api/v1/calendar.py:597 | partial handler; native WordPress/HTTP unverified |
 | POST | /api/v1/calendar/{meeting_id}/send-invite | backend/app/api/v1/calendar.py:606 | missing original application handler |
 | POST | /api/v1/calendar/{meeting_id}/send-reminder | backend/app/api/v1/calendar.py:620 | missing original application handler |
 | POST | /api/v1/calls/end | backend/app/api/v1/calls.py:240 | missing original application handler |
@@ -494,7 +494,7 @@ Every row is outstanding, including all partial handlers until native HTTP certi
 | PUT | /api/v1/ai-agent/settings/voice | backend/app/api/v1/ai_agent.py:284 | missing original application handler |
 | PUT | /api/v1/automations/{automation_id} | backend/app/api/v1/automations.py:100 | partial handler; native WordPress/HTTP unverified |
 | PUT | /api/v1/autoreply/{rule_id} | backend/app/api/v1/autoreply.py:99 | partial handler; native WordPress/HTTP unverified |
-| PUT | /api/v1/calendar/{meeting_id} | backend/app/api/v1/calendar.py:457 | missing original application handler |
+| PUT | /api/v1/calendar/{meeting_id} | backend/app/api/v1/calendar.py:457 | partial handler; native WordPress/HTTP unverified |
 | PUT | /api/v1/calls/config | backend/app/api/v1/calls.py:78 | missing original application handler |
 | PUT | /api/v1/campaign-followups/{followup_id} | backend/app/api/v1/campaign_followups.py:212 | missing original application handler |
 | PUT | /api/v1/campaigns/{campaign_id} | backend/app/api/v1/campaigns.py:221 | missing original application handler |

@@ -2,9 +2,9 @@
 
 Build: **0.11.0-dev**. WordPress is the native application backend; no original Python service is the proposed runtime. Original repository application files remain unchanged.
 
-**412 missing handlers, 96 partially implemented handlers, zero native-certified contracts, 508 source method/path contracts in total.** A partial handler has actual implementation, but does not mean its complete workflow, UI, dependencies and native behavior are certified. Every endpoint remains in the release backlog until those gates pass. Raw handler counts are not a percent-complete estimate.
+**397 missing handlers, 111 partially implemented handlers, zero native-certified contracts, 508 source method/path contracts in total.** A partial handler has actual implementation, but does not mean its complete workflow, UI, dependencies and native behavior are certified. Every endpoint remains in the release backlog until those gates pass. Raw handler counts are not a percent-complete estimate.
 
-Fresh offline evidence: 38,736 functional PHP-WASM assertions, 76 first-party syntax checks, 165 unchanged original frontend hashes. Offline evidence is **not** real WordPress/MySQL/HTTP/provider/browser certification. This checklist is the full current implementation/release backlog, not a claim that software can be guaranteed to run perfectly on every host.
+Fresh offline evidence: 39,114 functional PHP-WASM assertions, 78 first-party syntax checks, 165 unchanged original frontend hashes. Offline evidence is **not** real WordPress/MySQL/HTTP/provider/browser certification. This checklist is the full current implementation/release backlog, not a claim that software can be guaranteed to run perfectly on every host.
 
 ## Implementation order and acceptance gates
 
@@ -30,7 +30,7 @@ Fresh offline evidence: 38,736 functional PHP-WASM assertions, 76 first-party sy
 - [ ] Implement calls/CallGate: configuration, handsets/devices, dial requests, call logs and authenticated event/webhook lifecycle. Call analytics alone is not calling.
 - [ ] Implement webhook registration/verification, exact raw-body signature handling, replay protection, deduplication, event ordering, rate limits, retries and redacted logs.
 - [ ] Wire auto-reply/If-Then rule execution, per-contact cooldowns, counters and supported actions into actual inbound events. Rule CRUD/classification/non-sending tests already exist; action execution does not.
-- [ ] Complete calendar scheduling/attendees/invitations, invoices/items/payments/PDF/email workflows and safe deletion semantics.
+- [ ] Qualify implemented calendar-only booking CRUD, attendee/conversation/pipeline effects, status actions, filters and previews on native hosts; complete calendar UI, invitations/reminder workers/retries and delivery-time policy. Complete invoices/items/payments/PDF/email workflows and safe deletion semantics.
 - [ ] Complete dashboards/overview/unified managers and reporting. Five analytics read APIs now exist; complete dashboard, email/manager analytics and native validation remain outstanding.
 - [ ] Complete notification delivery, browser push subscriptions, provider/browser permission handling, setup guide and live setup summaries. Notification read-state APIs alone do not deliver notifications.
 - [ ] Complete AI assistant/agent sessions, files/memory/skills/tools, external-provider configuration, explicit action permissions and safe tool execution; complete MCP endpoints and authentication, SSE/NDJSON streaming, disconnects, buffering/proxy timeouts and browser cancellation.
@@ -77,7 +77,7 @@ All counts below are derived from `docs/contracts.json`. Missing = no native han
 | auth | 0 | 5 | 0 |
 | automations | 0 | 7 | 0 |
 | autoreply | 0 | 7 | 0 |
-| calendar | 17 | 0 | 0 |
+| calendar | 2 | 15 | 0 |
 | calls | 11 | 0 | 0 |
 | campaign_followups | 9 | 0 | 0 |
 | campaigns | 18 | 0 | 0 |
@@ -127,7 +127,7 @@ This exhaustive list includes partially implemented routes because none is yet n
 | DELETE | `/api/v1/ai-agent/skills/{skill_id}` | Missing implementation |
 | DELETE | `/api/v1/automations/{automation_id}` | Implemented partially; native/full-workflow proof required |
 | DELETE | `/api/v1/autoreply/{rule_id}` | Implemented partially; native/full-workflow proof required |
-| DELETE | `/api/v1/calendar/{meeting_id}` | Missing implementation |
+| DELETE | `/api/v1/calendar/{meeting_id}` | Implemented partially; native/full-workflow proof required |
 | DELETE | `/api/v1/calls/webhooks/{webhook_id}` | Missing implementation |
 | DELETE | `/api/v1/campaign-followups/{followup_id}` | Missing implementation |
 | DELETE | `/api/v1/campaigns/{campaign_id}` | Missing implementation |
@@ -213,14 +213,14 @@ This exhaustive list includes partially implemented routes because none is yet n
 | GET | `/api/v1/autoreply` | Implemented partially; native/full-workflow proof required |
 | GET | `/api/v1/autoreply/` | Implemented partially; native/full-workflow proof required |
 | GET | `/api/v1/autoreply/{rule_id}` | Implemented partially; native/full-workflow proof required |
-| GET | `/api/v1/calendar` | Missing implementation |
-| GET | `/api/v1/calendar/` | Missing implementation |
-| GET | `/api/v1/calendar/day` | Missing implementation |
-| GET | `/api/v1/calendar/tags` | Missing implementation |
-| GET | `/api/v1/calendar/tags/all` | Missing implementation |
-| GET | `/api/v1/calendar/upcoming` | Missing implementation |
-| GET | `/api/v1/calendar/{meeting_id}` | Missing implementation |
-| GET | `/api/v1/calendar/{meeting_id}/preview` | Missing implementation |
+| GET | `/api/v1/calendar` | Implemented partially; native/full-workflow proof required |
+| GET | `/api/v1/calendar/` | Implemented partially; native/full-workflow proof required |
+| GET | `/api/v1/calendar/day` | Implemented partially; native/full-workflow proof required |
+| GET | `/api/v1/calendar/tags` | Implemented partially; native/full-workflow proof required |
+| GET | `/api/v1/calendar/tags/all` | Implemented partially; native/full-workflow proof required |
+| GET | `/api/v1/calendar/upcoming` | Implemented partially; native/full-workflow proof required |
+| GET | `/api/v1/calendar/{meeting_id}` | Implemented partially; native/full-workflow proof required |
+| GET | `/api/v1/calendar/{meeting_id}/preview` | Implemented partially; native/full-workflow proof required |
 | GET | `/api/v1/calls/active` | Missing implementation |
 | GET | `/api/v1/calls/config` | Missing implementation |
 | GET | `/api/v1/calls/logs` | Missing implementation |
@@ -436,11 +436,11 @@ This exhaustive list includes partially implemented routes because none is yet n
 | POST | `/api/v1/automations/test` | Implemented partially; native/full-workflow proof required |
 | POST | `/api/v1/autoreply/` | Implemented partially; native/full-workflow proof required |
 | POST | `/api/v1/autoreply/test` | Implemented partially; native/full-workflow proof required |
-| POST | `/api/v1/calendar/` | Missing implementation |
-| POST | `/api/v1/calendar/{meeting_id}/cancel` | Missing implementation |
-| POST | `/api/v1/calendar/{meeting_id}/complete` | Missing implementation |
-| POST | `/api/v1/calendar/{meeting_id}/confirm` | Missing implementation |
-| POST | `/api/v1/calendar/{meeting_id}/no-show` | Missing implementation |
+| POST | `/api/v1/calendar/` | Implemented partially; native/full-workflow proof required |
+| POST | `/api/v1/calendar/{meeting_id}/cancel` | Implemented partially; native/full-workflow proof required |
+| POST | `/api/v1/calendar/{meeting_id}/complete` | Implemented partially; native/full-workflow proof required |
+| POST | `/api/v1/calendar/{meeting_id}/confirm` | Implemented partially; native/full-workflow proof required |
+| POST | `/api/v1/calendar/{meeting_id}/no-show` | Implemented partially; native/full-workflow proof required |
 | POST | `/api/v1/calendar/{meeting_id}/send-invite` | Missing implementation |
 | POST | `/api/v1/calendar/{meeting_id}/send-reminder` | Missing implementation |
 | POST | `/api/v1/calls/end` | Missing implementation |
@@ -598,7 +598,7 @@ This exhaustive list includes partially implemented routes because none is yet n
 | PUT | `/api/v1/ai-agent/settings/voice` | Missing implementation |
 | PUT | `/api/v1/automations/{automation_id}` | Implemented partially; native/full-workflow proof required |
 | PUT | `/api/v1/autoreply/{rule_id}` | Implemented partially; native/full-workflow proof required |
-| PUT | `/api/v1/calendar/{meeting_id}` | Missing implementation |
+| PUT | `/api/v1/calendar/{meeting_id}` | Implemented partially; native/full-workflow proof required |
 | PUT | `/api/v1/calls/config` | Missing implementation |
 | PUT | `/api/v1/campaign-followups/{followup_id}` | Missing implementation |
 | PUT | `/api/v1/campaigns/{campaign_id}` | Missing implementation |
