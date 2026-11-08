@@ -15,13 +15,14 @@ partial.update({('POST','/api/v1/ai/classify'),('GET','/api/v1/notifications'),(
 partial.update({('POST','/api/v1/contacts/import/preview'),('POST','/api/v1/contacts/import/csv')})
 partial.update({('POST','/api/v1/contacts/import/jobs'),('GET','/api/v1/contacts/import/jobs/{job_id}'),('GET','/api/v1/contacts/import/jobs/{job_id}/errors.csv')})
 partial.add(('POST','/api/v1/contacts/import/url'))
+partial.update({('GET','/api/v1/analytics/'+path) for path in ('overview','timeseries','funnel','by-campaign','calls')})
 assert partial.issubset(pairs), 'A reported partial path is absent from the source inventory'
 
 contracts=[{'method':method,'path':path,'sources':[r['source'] for r in rows],'state':'partial handler; native WordPress/HTTP unverified' if (method,path) in partial else 'missing original application handler','certified':False} for (method,path),rows in sorted(pairs.items())]
 assert len(contracts)==508
-assert sum(c['state'].startswith('partial') for c in contracts)==64
+assert sum(c['state'].startswith('partial') for c in contracts)==69
 (D/'docs/contracts.json').write_text(json.dumps(contracts,indent=2)+'\n')
-text='# Remaining WordPress recreation work\n\n444 missing source handlers,64 partial health/auth/contact/list/variable/template/reply/classification/notification/import handlers,0 fully certified contracts. The administrator CSV diagnostic is not the original source import API.\n\nEvery row is outstanding, including all partial handlers until native HTTP certification. See README.md for actual implemented utilities and fresh test boundaries.\n\n| Method | Path | Source | State |\n|---|---|---|---|\n'
+text='# Remaining WordPress recreation work\n\n439 missing source handlers,69 partial health/auth/contact/list/variable/template/reply/classification/notification/import/analytics handlers,0 fully certified contracts. The administrator CSV diagnostic is not the original source import API.\n\nEvery row is outstanding, including all partial handlers until native HTTP certification. See README.md for actual implemented utilities and fresh test boundaries.\n\n| Method | Path | Source | State |\n|---|---|---|---|\n'
 for c in contracts:text+='| '+c['method']+' | '+c['path'].replace('|','\\|')+' | '+', '.join(c['sources'])+' | '+c['state']+' |\n'
 (D/'docs/REMAINING_WORK.md').write_text(text)
 log=D/'.cache/frontend-test.log'
@@ -31,4 +32,4 @@ if log.is_file():
  build=(D/'.cache/frontend-build.log').read_text();assert 'built in' in build
  record={'test_command':'npm test -- --reporter=dot','tests_passed':int(tests[1]),'test_files_passed':int(files[1]),'test_output_sha256':hashlib.sha256(raw).hexdigest(),'build_command':'npm run build -- --outDir ../wordpress/sender-suite/app','build_passed':True,'built_asset_files':sum(p.is_file() for p in (D/'sender-suite/app').rglob('*')),'original_frontend_modified':False,'native_wordpress_browser_verified':False,'note':'Fresh stdout from actual execution, not earlier conversation counts; jsdom navigation warning is not browser coverage'}
  (D/'tests/frontend-evidence.json').write_text(json.dumps(record,indent=2)+'\n')
-print(json.dumps({'source_contracts':len(contracts),'missing_handlers':444,'partial_handlers':64,'certified':0}))
+print(json.dumps({'source_contracts':len(contracts),'missing_handlers':439,'partial_handlers':69,'certified':0}))

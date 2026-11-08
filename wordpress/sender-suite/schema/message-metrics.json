@@ -1,0 +1,7 @@
+{
+  "sent": "outgoing messages created in the scope, including ones still queued or that failed",
+  "delivered": "outgoing messages that reached the recipient: status delivered, a delivery time, or an open",
+  "failed": "outgoing messages whose status is failed (a cancelled message is not a failure)",
+  "queued": "outgoing messages waiting to go (queued, sending or retrying)",
+  "replies": "incoming messages in the scope"
+}

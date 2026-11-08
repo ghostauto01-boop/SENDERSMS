@@ -815,7 +815,7 @@
     "sources": [
       "backend/app/api/v1/analytics.py:205"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -824,7 +824,7 @@
     "sources": [
       "backend/app/api/v1/analytics.py:251"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -833,7 +833,7 @@
     "sources": [
       "backend/app/api/v1/analytics.py:148"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -842,7 +842,7 @@
     "sources": [
       "backend/app/api/v1/analytics.py:24"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -851,7 +851,7 @@
     "sources": [
       "backend/app/api/v1/analytics.py:101"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {

@@ -1,6 +1,6 @@
 # Remaining WordPress recreation work
 
-444 missing source handlers,64 partial health/auth/contact/list/variable/template/reply/classification/notification/import handlers,0 fully certified contracts. The administrator CSV diagnostic is not the original source import API.
+439 missing source handlers,69 partial health/auth/contact/list/variable/template/reply/classification/notification/import/analytics handlers,0 fully certified contracts. The administrator CSV diagnostic is not the original source import API.
 
 Every row is outstanding, including all partial handlers until native HTTP certification. See README.md for actual implemented utilities and fresh test boundaries.
 
@@ -96,11 +96,11 @@ Every row is outstanding, including all partial handlers until native HTTP certi
 | GET | /api/v1/ai-agent/skills | backend/app/api/v1/ai_agent.py:959 | missing original application handler |
 | GET | /api/v1/ai-agent/skills/{skill_id} | backend/app/api/v1/ai_agent.py:1030 | missing original application handler |
 | GET | /api/v1/ai-agent/tools | backend/app/api/v1/ai_agent.py:1057 | missing original application handler |
-| GET | /api/v1/analytics/by-campaign | backend/app/api/v1/analytics.py:205 | missing original application handler |
-| GET | /api/v1/analytics/calls | backend/app/api/v1/analytics.py:251 | missing original application handler |
-| GET | /api/v1/analytics/funnel | backend/app/api/v1/analytics.py:148 | missing original application handler |
-| GET | /api/v1/analytics/overview | backend/app/api/v1/analytics.py:24 | missing original application handler |
-| GET | /api/v1/analytics/timeseries | backend/app/api/v1/analytics.py:101 | missing original application handler |
+| GET | /api/v1/analytics/by-campaign | backend/app/api/v1/analytics.py:205 | partial handler; native WordPress/HTTP unverified |
+| GET | /api/v1/analytics/calls | backend/app/api/v1/analytics.py:251 | partial handler; native WordPress/HTTP unverified |
+| GET | /api/v1/analytics/funnel | backend/app/api/v1/analytics.py:148 | partial handler; native WordPress/HTTP unverified |
+| GET | /api/v1/analytics/overview | backend/app/api/v1/analytics.py:24 | partial handler; native WordPress/HTTP unverified |
+| GET | /api/v1/analytics/timeseries | backend/app/api/v1/analytics.py:101 | partial handler; native WordPress/HTTP unverified |
 | GET | /api/v1/auth/access | backend/app/api/v1/auth.py:243 | partial handler; native WordPress/HTTP unverified |
 | GET | /api/v1/auth/me | backend/app/api/v1/auth.py:276 | partial handler; native WordPress/HTTP unverified |
 | GET | /api/v1/automations | backend/app/api/v1/automations.py:43 | partial handler; native WordPress/HTTP unverified |

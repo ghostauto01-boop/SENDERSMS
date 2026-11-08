@@ -1,0 +1,13 @@
+{
+  "ok": true,
+  "assertions": 111,
+  "diffs": [],
+  "php": "8.3.36",
+  "source_operations": 57,
+  "source_metric_scopes": 45,
+  "scope": "Actual selected analytics/metrics AST with fixed UTC clock, synthetic SQLite and omitted FKs/relationships. No native WordPress/MySQL/timezone/collation/HTTP/concurrency/provider or browser certification.",
+  "native_wordpress_verified": false,
+  "native_mysql_verified": false,
+  "provider_messages_sent": 0,
+  "suite": "analytics"
+}
