@@ -171,6 +171,8 @@ try:
  s,b,h=request('POST',f'settings/gateway/phones/{phone}/test',{});check('native gateway honors isolated network sink',s,503)
  s,b,h=request('PUT',f'settings/gateway/phones/{phone}',{'password':'synthetic-native-replacement','is_enabled':False});check('native gateway encrypted replacement',s,200);check('native gateway replacement redacted','synthetic-native-replacement' not in json.dumps(b))
  s,b,h=request('DELETE',f'settings/gateway/phones/{phone}');check('native gateway phone removal',s,200)
+ s,b,h=request('POST','send/',{'contact_id':contact,'gateway_setting_id':1,'body':'Never submit on default-off build'},headers={'Idempotency-Key':'native-default-off-send'});check('native experimental outbox remains default-off',s,503)
+ s,b,h=request('GET','send/messages/9223372036854775807');check('native missing outbox message',s,404)
  s,b,h=request('POST','auth/logout');check('native logout',s,200)
  s,b,h=request('GET','contacts');check('native logout clears browser cookie',s,401)
 except Exception as e:failures.append({'exception':type(e).__name__,'message':str(e)})

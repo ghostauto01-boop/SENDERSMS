@@ -1,6 +1,6 @@
 # Remaining WordPress recreation work
 
-354 missing source handlers,154 partial health/auth/contact/list/variable/template/reply/classification/notification/import/analytics/sequence/settings/calendar/invoice/inbox/status-webhook/follow-up-control/access/profile/dashboard/campaign-reporting/gateway-phone handlers,0 fully certified contracts. The administrator CSV diagnostic is not the original source import API.
+353 missing source handlers,155 partial health/auth/contact/list/variable/template/reply/classification/notification/import/analytics/sequence/settings/calendar/invoice/inbox/status-webhook/follow-up-control/access/profile/dashboard/campaign-reporting/gateway-phone/experimental-single-contact-send handlers,0 fully certified contracts. The administrator CSV diagnostic is not the original source import API.
 
 Every row is outstanding, including all partial handlers until native HTTP certification. See README.md for actual implemented utilities and fresh test boundaries.
 
@@ -444,7 +444,7 @@ Every row is outstanding, including all partial handlers until native HTTP certi
 | POST | /api/v1/notifications/push/unsubscribe | backend/app/api/v1/notifications.py:144 | missing original application handler |
 | POST | /api/v1/notifications/read-all | backend/app/api/v1/notifications.py:80 | partial handler; native WordPress/HTTP unverified |
 | POST | /api/v1/notifications/{event_id}/read | backend/app/api/v1/notifications.py:67 | partial handler; native WordPress/HTTP unverified |
-| POST | /api/v1/send/ | backend/app/api/v1/send.py:37 | missing original application handler |
+| POST | /api/v1/send/ | backend/app/api/v1/send.py:37 | partial handler; native WordPress/HTTP unverified |
 | POST | /api/v1/send/messages/{mid}/retry | backend/app/api/v1/send.py:468 | missing original application handler |
 | POST | /api/v1/send/scheduled/{sid}/cancel | backend/app/api/v1/send.py:440 | missing original application handler |
 | POST | /api/v1/send/scheduled/{sid}/retry | backend/app/api/v1/send.py:452 | missing original application handler |

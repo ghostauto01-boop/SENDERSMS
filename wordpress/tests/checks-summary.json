@@ -1,7 +1,7 @@
 {
   "ok": true,
-  "php_lint_checks": 98,
-  "php_assertions": 43174,
+  "php_lint_checks": 100,
+  "php_assertions": 43514,
   "vendor_parser_checks": 3075,
   "vendor_hash_checks": 1547,
   "unchanged_frontend_files": 165,
@@ -26,7 +26,7 @@
     },
     {
       "ok": true,
-      "assertions": 35,
+      "assertions": 36,
       "php": "7.4.34-dev",
       "scope": "WordPress hook mocks; not actual WordPress/upload/HTTP certification",
       "suite": "hooks"
@@ -69,7 +69,7 @@
     },
     {
       "ok": true,
-      "assertions": 774,
+      "assertions": 777,
       "diffs": [],
       "php": "7.4.34-dev",
       "scope": "Offline requests/responses with synthetic password codec, seventy-three synthetic SQLite application tables, fault-injected transaction failure; not real WP/HTTP/Argon2/native MySQL/concurrency proof",
@@ -345,6 +345,29 @@
       "provider_messages_sent": 0,
       "scope": "Selected actual source SMS-Gate payloads with fake httpx/pinned transport; encrypted native phone settings, CAS/fault/rollback and no-test-SMS checks. No live HTTP/SMS, outbox, workers, native DNS/TLS/cURL/MySQL/concurrency/browser certification",
       "suite": "sms-gateway"
+    },
+    {
+      "ok": true,
+      "assertions": 126,
+      "diffs": [],
+      "php": "7.4.34-dev",
+      "provider_messages_sent": 0,
+      "native_wordpress_verified": false,
+      "native_mysql_verified": false,
+      "native_concurrency_verified": false,
+      "scope": "Opt-in outbox state machine with fake pinned gateway, synthetic SQLite unique indexes/advisory lock, consent rechecks and commit-fault injection; not live HTTP/SMS, native cron, MySQL races, browser or full source send parity",
+      "suite": "sms-outbox"
+    },
+    {
+      "ok": true,
+      "assertions": 40,
+      "diffs": [],
+      "php": "7.4.34-dev",
+      "provider_messages_sent": 0,
+      "native_wordpress_verified": false,
+      "native_mysql_verified": false,
+      "scope": "Feature-enabled fake WordPress request/session/cron dispatch with synthetic SQLite and fake gateway. Not real HTTP, production credentials, actual WP cron, native concurrency or complete original send API parity",
+      "suite": "sms-outbox-routes"
     },
     {
       "ok": true,
@@ -373,7 +396,7 @@
     },
     {
       "ok": true,
-      "assertions": 35,
+      "assertions": 36,
       "php": "8.3.36",
       "scope": "WordPress hook mocks; not actual WordPress/upload/HTTP certification",
       "suite": "hooks"
@@ -416,7 +439,7 @@
     },
     {
       "ok": true,
-      "assertions": 774,
+      "assertions": 777,
       "diffs": [],
       "php": "8.3.36",
       "scope": "Offline requests/responses with synthetic password codec, seventy-three synthetic SQLite application tables, fault-injected transaction failure; not real WP/HTTP/Argon2/native MySQL/concurrency proof",
@@ -692,6 +715,29 @@
       "provider_messages_sent": 0,
       "scope": "Selected actual source SMS-Gate payloads with fake httpx/pinned transport; encrypted native phone settings, CAS/fault/rollback and no-test-SMS checks. No live HTTP/SMS, outbox, workers, native DNS/TLS/cURL/MySQL/concurrency/browser certification",
       "suite": "sms-gateway"
+    },
+    {
+      "ok": true,
+      "assertions": 126,
+      "diffs": [],
+      "php": "8.3.36",
+      "provider_messages_sent": 0,
+      "native_wordpress_verified": false,
+      "native_mysql_verified": false,
+      "native_concurrency_verified": false,
+      "scope": "Opt-in outbox state machine with fake pinned gateway, synthetic SQLite unique indexes/advisory lock, consent rechecks and commit-fault injection; not live HTTP/SMS, native cron, MySQL races, browser or full source send parity",
+      "suite": "sms-outbox"
+    },
+    {
+      "ok": true,
+      "assertions": 40,
+      "diffs": [],
+      "php": "8.3.36",
+      "provider_messages_sent": 0,
+      "native_wordpress_verified": false,
+      "native_mysql_verified": false,
+      "scope": "Feature-enabled fake WordPress request/session/cron dispatch with synthetic SQLite and fake gateway. Not real HTTP, production credentials, actual WP cron, native concurrency or complete original send API parity",
+      "suite": "sms-outbox-routes"
     },
     {
       "ok": true,

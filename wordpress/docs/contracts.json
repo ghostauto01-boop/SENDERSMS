@@ -3950,7 +3950,7 @@
     "sources": [
       "backend/app/api/v1/send.py:37"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {

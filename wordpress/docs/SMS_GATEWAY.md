@@ -24,17 +24,11 @@ The original provider could generate a random local ID after an apparently succe
 
 The original deployment's protected Render environment sender is not fabricated or imported from environment files. `render_sender_active` is false. Only native database phones are listed. Routing metadata identifies the intended default-phone selection; no routing engine or automatic SIM failover is implemented, and `sim_failover` is false. Stored daily limits and priorities are configuration only until the outbox/worker enforces them. Phone-specific stored webhook secrets are not yet connected to the separately implemented global status-receipt endpoint; webhook registration and phone-specific callbacks remain missing.
 
-## Not an operational send workflow yet
+## Experimental outbox added — default off
 
-**No public send/enqueue path or SMS delivery worker is enabled by these changes.** No provider was contacted and no SMS was sent during development. The transport alone must not be represented as a finished SMS application. Before exposing it to users, finish and qualify:
+The transport now connects to a **default-off, single-contact durable queue and worker**, described in `SMS_OUTBOX.md`. It includes explicit consent/suppression checks, post-commit POSTs, idempotency replay, conservative unknown-acknowledgement handling and bounded GET polling. This is a partial send workflow, not an operational full SMS application or a production-ready provider integration.
 
-1. Atomic enqueue, durable sender/recipient/message identity and idempotency replay.
-2. Consent, opt-out, suppression, number validity and limits at enqueue and immediately before delivery.
-3. Durable claims/leases, bounded retries only where safe, and an explicit unknown-acknowledgement recovery policy. Do not resend a potentially accepted POST after a crash or failed DB commit.
-4. Post-commit external effects, status callback/poll reconciliation and exactly-once counter effects.
-5. Sender routing, cancellation, scheduled/bulk sends, campaign/sequence integration and native concurrency/recovery tests.
-
-The existing original send endpoint remains unimplemented; there is no fake successful send response.
+Bulk/raw-number/scheduled sends, template-send rendering, daily-cap enforcement, routing/SIM failover, campaign/sequence integration, operator recovery UI and native concurrency/recovery/provider/browser qualification remain incomplete. Nonzero sender daily limits are explicitly rejected by the experimental worker instead of silently ignored. The original full send API contract is not complete, and delivery is never enabled simply by saving credentials.
 
 ## Fresh evidence
 

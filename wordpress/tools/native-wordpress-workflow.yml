@@ -49,6 +49,12 @@ jobs:
           SERVER_PID=$!
           trap 'kill "$SERVER_PID" || true' EXIT
           python3 wordpress/tools/native-http.py
+      - name: Native SMS outbox with external-network sink (never sends SMS)
+        env:
+          NATIVE_DB_PASSWORD: isolated-wordpress-test-only
+          NATIVE_WP_ROOT: ${{ runner.temp }}/wordpress
+          NATIVE_WP_EVIDENCE: ${{ runner.temp }}/native-wordpress
+        run: php wordpress/tools/native-sms-outbox.php
       - name: Store exact native results (never production credentials)
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -57,6 +63,7 @@ jobs:
           path: |
             ${{ runner.temp }}/native-wordpress/native-install.json
             ${{ runner.temp }}/native-wordpress/native-http.json
+            ${{ runner.temp }}/native-wordpress/native-sms-outbox.json
             ${{ runner.temp }}/native-wordpress/server.log
           if-no-files-found: error
           retention-days: 14

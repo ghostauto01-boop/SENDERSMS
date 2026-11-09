@@ -1,0 +1,22 @@
+<?php
+/** Proposed CI probe: real native commits, with hard external-network sink. Never sends an SMS. */
+$root=getenv('NATIVE_WP_ROOT');$evidence=getenv('NATIVE_WP_EVIDENCE');
+if(!$root||!$evidence||getenv('NATIVE_DB_PASSWORD')!=='isolated-wordpress-test-only'||!file_exists($root.'/wp-config.php')){throw new RuntimeException('Refusing non-isolated outbox test.');}
+define('SENDER_SUITE_ENABLE_SMS_OUTBOX',true);
+$_SERVER['HTTP_HOST']='127.0.0.1:8080';$_SERVER['SERVER_PROTOCOL']='HTTP/1.1';$_SERVER['REQUEST_URI']='/';require $root.'/wp-load.php';
+if(DB_NAME!=='sender_suite_wordpress_test'||!defined('WP_HTTP_BLOCK_EXTERNAL')||WP_HTTP_BLOCK_EXTERNAL!==true||!defined('DISABLE_WP_CRON')||DISABLE_WP_CRON!==true||!($GLOBALS['wpdb']->dbh instanceof mysqli)){throw new RuntimeException('Native outbox requires isolated mysqli and network/cron sinks.');}
+$checks=0;function native_outbox_check($condition,$label){global $checks;if(!$condition){throw new RuntimeException('Native outbox check failed: '.$label);}$checks++;}
+$c=\SenderSuite\AuthRoutes::context();$db=$c['db'];$cfg=$c['config'];$r=new \SenderSuite\Records($db);$g=new \SenderSuite\GatewayPhones($db,$cfg);$s=new \SenderSuite\SmsOutbox($db,$cfg);$user=$db->one('users',array('username'=>'native_operator'));
+native_outbox_check($cfg->ready()&&$user&&$user['role']==='admin','isolated application operator');
+$phone='+234803'.str_pad((string)random_int(1000000,9999999),7,'0',STR_PAD_LEFT);
+$contact=$db->transaction(function()use($r,$phone){return $r->create('contacts',array('phone_number'=>$phone,'has_consented'=>true,'consent_status'=>'opted_in','source'=>'isolated-native-outbox-test'));});
+$gateway=$db->transaction(function()use($g){return $g->create((object)array('name'=>'Isolated outbox network-sink sender','username'=>'synthetic-outbox-user','password'=>'synthetic-outbox-password'));})['phone']['db_id'];
+$key='native-outbox-'.bin2hex(random_bytes(12));$m=$db->transaction(function()use($s,$contact,$gateway,$key,$user){return $s->enqueue($contact['id'],$gateway,'Isolated network sink only',$key,$user);});
+native_outbox_check($m['status']==='queued'&&$m['provider_message_id']===null,'enqueue is queued, not a fictional delivery');
+$repeat=$db->transaction(function()use($s,$contact,$gateway,$key,$user){return $s->enqueue($contact['id'],$gateway,'Isolated network sink only',$key,$user);});native_outbox_check($repeat['message_id']===$m['message_id'],'native idempotency replay');
+$s->process();$after=$s->read($m['message_id'],$user);native_outbox_check($after['status']==='unknown'&&$after['provider_message_id']===null,'blocked submission remains conservatively unknown');native_outbox_check($after['needs_review'],'unknown is visible for manual review');
+$row=$db->one('messages',array('id'=>$m['message_id']));native_outbox_check($row['retry_count']===1,'one committed claim');native_outbox_check($db->one('contacts',array('id'=>$contact['id']))['messages_sent']===0,'no fabricated accepted-send counter');$s->process();native_outbox_check($db->one('messages',array('id'=>$m['message_id']))['retry_count']===1,'unknown never automatically resubmitted');
+$lost=$db->transaction(function()use($s,$contact,$gateway,$key,$user){return $s->enqueue($contact['id'],$gateway,'Simulated interrupted claim',$key.'-lost',$user);});$db->transaction(function()use($db,$lost){$db->update('messages',array('status'=>'sending','retry_count'=>1,'retry_at'=>'2020-01-01 00:00:00.000000'),array('id'=>$lost['message_id']));});$s->process();native_outbox_check($s->read($lost['message_id'],$user)['status']==='unknown','expired native claim never returns to queued');
+\SenderSuite\SmsOutbox::deactivate();
+$result=array('ok'=>true,'assertions'=>$checks,'native_driver'=>get_class($GLOBALS['wpdb']->dbh),'native_wordpress'=>get_bloginfo('version'),'native_mysql'=>$GLOBALS['wpdb']->get_var('SELECT VERSION()'),'external_http_blocked'=>true,'provider_messages_sent'=>0,'scope'=>'Isolated native outbox enqueue/idempotency/claim/blocked-network/expired-claim checks only; not actual WP cron execution, real gateway delivery, concurrent workers, full crash matrix or release certification','complete_application'=>false,'production_ready'=>false);
+file_put_contents($evidence.'/native-sms-outbox.json',json_encode($result,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES|JSON_THROW_ON_ERROR)."\n");echo json_encode($result,JSON_THROW_ON_ERROR)."\n";

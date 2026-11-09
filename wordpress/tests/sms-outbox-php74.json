@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "assertions": 126,
+  "diffs": [],
+  "php": "7.4.34-dev",
+  "provider_messages_sent": 0,
+  "native_wordpress_verified": false,
+  "native_mysql_verified": false,
+  "native_concurrency_verified": false,
+  "scope": "Opt-in outbox state machine with fake pinned gateway, synthetic SQLite unique indexes/advisory lock, consent rechecks and commit-fault injection; not live HTTP/SMS, native cron, MySQL races, browser or full source send parity",
+  "suite": "sms-outbox"
+}
