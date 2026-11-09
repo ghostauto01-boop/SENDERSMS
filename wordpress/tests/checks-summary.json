@@ -1,7 +1,7 @@
 {
   "ok": true,
-  "php_lint_checks": 100,
-  "php_assertions": 43514,
+  "php_lint_checks": 102,
+  "php_assertions": 43680,
   "vendor_parser_checks": 3075,
   "vendor_hash_checks": 1547,
   "unchanged_frontend_files": 165,
@@ -360,7 +360,7 @@
     },
     {
       "ok": true,
-      "assertions": 40,
+      "assertions": 52,
       "diffs": [],
       "php": "7.4.34-dev",
       "provider_messages_sent": 0,
@@ -368,6 +368,20 @@
       "native_mysql_verified": false,
       "scope": "Feature-enabled fake WordPress request/session/cron dispatch with synthetic SQLite and fake gateway. Not real HTTP, production credentials, actual WP cron, native concurrency or complete original send API parity",
       "suite": "sms-outbox-routes"
+    },
+    {
+      "ok": true,
+      "assertions": 71,
+      "diffs": [],
+      "php": "7.4.34-dev",
+      "source_operations": 15,
+      "source_date_cases": 6,
+      "provider_messages_sent": 0,
+      "native_wordpress_verified": false,
+      "native_mysql_verified": false,
+      "native_concurrency_verified": false,
+      "scope": "Actual selected scheduled source reads/cancel/date AST and synthetic unique-index SQLite/fake-gateway scheduled delivery/cancellation/commit-fault tests; not live SMS/HTTP, real cron, native races or complete original scheduled-send parity",
+      "suite": "scheduled-sms"
     },
     {
       "ok": true,
@@ -730,7 +744,7 @@
     },
     {
       "ok": true,
-      "assertions": 40,
+      "assertions": 52,
       "diffs": [],
       "php": "8.3.36",
       "provider_messages_sent": 0,
@@ -738,6 +752,20 @@
       "native_mysql_verified": false,
       "scope": "Feature-enabled fake WordPress request/session/cron dispatch with synthetic SQLite and fake gateway. Not real HTTP, production credentials, actual WP cron, native concurrency or complete original send API parity",
       "suite": "sms-outbox-routes"
+    },
+    {
+      "ok": true,
+      "assertions": 71,
+      "diffs": [],
+      "php": "8.3.36",
+      "source_operations": 15,
+      "source_date_cases": 6,
+      "provider_messages_sent": 0,
+      "native_wordpress_verified": false,
+      "native_mysql_verified": false,
+      "native_concurrency_verified": false,
+      "scope": "Actual selected scheduled source reads/cancel/date AST and synthetic unique-index SQLite/fake-gateway scheduled delivery/cancellation/commit-fault tests; not live SMS/HTTP, real cron, native races or complete original scheduled-send parity",
+      "suite": "scheduled-sms"
     },
     {
       "ok": true,

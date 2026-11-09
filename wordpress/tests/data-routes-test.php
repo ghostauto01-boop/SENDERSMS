@@ -1,7 +1,7 @@
 <?php
 /** Offline own-app dispatch. No real WordPress server, HTTP, Argon2 or MySQL. */
 define('ARRAY_A','ARRAY_A');
-foreach(array('schema','database','vault','compat','phone','number-filter','csv-reader','csv-preview','config','auth','auth-routes','records','access-settings','runtime-settings','contacts','contact-lists','contact-actions','contact-export','templating','suggestions','attachments','variables','contact-profile','variable-routes','templates','template-routes','reply-classifier','reply-rules','reply-routes','notification-center','csv-import','csv-url','import-jobs','import-routes','analytics','dashboard','campaign-reports','sequences','calendar','invoices','inbox','followups','sms-receipts','sms-gate','gateway-phones','sms-outbox','data-routes') as $n){require __DIR__.'/../sender-suite/includes/class-'.$n.'.php';}
+foreach(array('schema','database','vault','compat','phone','number-filter','csv-reader','csv-preview','config','auth','auth-routes','records','access-settings','runtime-settings','contacts','contact-lists','contact-actions','contact-export','templating','suggestions','attachments','variables','contact-profile','variable-routes','templates','template-routes','reply-classifier','reply-rules','reply-routes','notification-center','csv-import','csv-url','import-jobs','import-routes','analytics','dashboard','campaign-reports','sequences','calendar','invoices','inbox','followups','sms-receipts','sms-gate','gateway-phones','scheduled-sms','sms-outbox','data-routes') as $n){require __DIR__.'/../sender-suite/includes/class-'.$n.'.php';}
 require __DIR__.'/sqlite-auth-db.php';
 $cronEvent=false;$cronFails=false;$cronWrites=0;
 function wp_next_scheduled($hook){global $cronEvent;return $cronEvent;}

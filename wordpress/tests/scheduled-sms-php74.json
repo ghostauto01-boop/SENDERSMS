@@ -1,0 +1,14 @@
+{
+  "ok": true,
+  "assertions": 71,
+  "diffs": [],
+  "php": "7.4.34-dev",
+  "source_operations": 15,
+  "source_date_cases": 6,
+  "provider_messages_sent": 0,
+  "native_wordpress_verified": false,
+  "native_mysql_verified": false,
+  "native_concurrency_verified": false,
+  "scope": "Actual selected scheduled source reads/cancel/date AST and synthetic unique-index SQLite/fake-gateway scheduled delivery/cancellation/commit-fault tests; not live SMS/HTTP, real cron, native races or complete original scheduled-send parity",
+  "suite": "scheduled-sms"
+}

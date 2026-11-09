@@ -1,0 +1,997 @@
+{
+  "seeds": [
+    {
+      "table": "contacts",
+      "values": {
+        "id": 1,
+        "first_name": "Ada",
+        "last_name": "Obi",
+        "business_name": null,
+        "phone_number": "+2348031234567",
+        "email": null,
+        "city": null,
+        "state": null,
+        "country": null,
+        "website": null,
+        "industry": null,
+        "source": null,
+        "lead_status": "new",
+        "consent_status": "unknown",
+        "has_consented": false,
+        "is_opted_out": false,
+        "opted_out_at": null,
+        "opt_out_reason": null,
+        "is_undeliverable": false,
+        "undeliverable_reason": null,
+        "delivery_fail_count": 0,
+        "is_email_opted_out": false,
+        "email_opted_out_at": null,
+        "email_opt_out_reason": null,
+        "email_status": "active",
+        "is_email_undeliverable": false,
+        "email_fail_count": 0,
+        "email_last_error": null,
+        "email_source": null,
+        "email_verified": false,
+        "email_verified_at": null,
+        "email_confidence": null,
+        "email_verdict": null,
+        "email_enriched_at": null,
+        "email_enrichment_note": null,
+        "email_lower": null,
+        "notes": null,
+        "custom_fields": null,
+        "messages_sent": 0,
+        "messages_received": 0,
+        "emails_sent": 0,
+        "emails_received": 0,
+        "last_emailed_at": null,
+        "last_email_reply_at": null,
+        "last_contacted_at": null,
+        "last_reply_at": null,
+        "created_at": "2026-01-02T12:00:00.123456+00:00",
+        "updated_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "contacts",
+      "values": {
+        "id": 2,
+        "first_name": " ",
+        "last_name": null,
+        "business_name": "Shop",
+        "phone_number": "+2348032234567",
+        "email": null,
+        "city": null,
+        "state": null,
+        "country": null,
+        "website": null,
+        "industry": null,
+        "source": null,
+        "lead_status": "new",
+        "consent_status": "unknown",
+        "has_consented": false,
+        "is_opted_out": false,
+        "opted_out_at": null,
+        "opt_out_reason": null,
+        "is_undeliverable": false,
+        "undeliverable_reason": null,
+        "delivery_fail_count": 0,
+        "is_email_opted_out": false,
+        "email_opted_out_at": null,
+        "email_opt_out_reason": null,
+        "email_status": "active",
+        "is_email_undeliverable": false,
+        "email_fail_count": 0,
+        "email_last_error": null,
+        "email_source": null,
+        "email_verified": false,
+        "email_verified_at": null,
+        "email_confidence": null,
+        "email_verdict": null,
+        "email_enriched_at": null,
+        "email_enrichment_note": null,
+        "email_lower": null,
+        "notes": null,
+        "custom_fields": null,
+        "messages_sent": 0,
+        "messages_received": 0,
+        "emails_sent": 0,
+        "emails_received": 0,
+        "last_emailed_at": null,
+        "last_email_reply_at": null,
+        "last_contacted_at": null,
+        "last_reply_at": null,
+        "created_at": "2026-01-02T12:00:00.123456+00:00",
+        "updated_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "scheduled_messages",
+      "values": {
+        "id": 1,
+        "contact_id": 1,
+        "phone_number": "+2348031234567",
+        "to_address": null,
+        "cc_addresses": null,
+        "bcc_addresses": null,
+        "list_id": null,
+        "body": "Hello scheduled 0",
+        "channel": "sms",
+        "subject": null,
+        "html_body": null,
+        "email_account_id": null,
+        "attachments": null,
+        "schedule_at": "2026-01-02T13:00:00.123456+00:00",
+        "status": "pending",
+        "sim_number": 1,
+        "created_at": "2026-01-02T12:00:00.123456+00:00",
+        "executed_at": null,
+        "message_id": null,
+        "error": null
+      }
+    },
+    {
+      "table": "scheduled_messages",
+      "values": {
+        "id": 2,
+        "contact_id": 2,
+        "phone_number": null,
+        "to_address": null,
+        "cc_addresses": null,
+        "bcc_addresses": null,
+        "list_id": null,
+        "body": "Hello scheduled 1",
+        "channel": "sms",
+        "subject": null,
+        "html_body": null,
+        "email_account_id": null,
+        "attachments": null,
+        "schedule_at": "2026-01-02T14:00:00.123456+00:00",
+        "status": "sent",
+        "sim_number": 1,
+        "created_at": "2026-01-02T12:00:00.123456+00:00",
+        "executed_at": null,
+        "message_id": null,
+        "error": null
+      }
+    },
+    {
+      "table": "scheduled_messages",
+      "values": {
+        "id": 3,
+        "contact_id": 1,
+        "phone_number": "+2348031234567",
+        "to_address": null,
+        "cc_addresses": null,
+        "bcc_addresses": null,
+        "list_id": null,
+        "body": "Hello scheduled 2",
+        "channel": "sms",
+        "subject": null,
+        "html_body": null,
+        "email_account_id": null,
+        "attachments": null,
+        "schedule_at": "2026-01-02T15:00:00.123456+00:00",
+        "status": "failed",
+        "sim_number": 1,
+        "created_at": "2026-01-02T12:00:00.123456+00:00",
+        "executed_at": null,
+        "message_id": null,
+        "error": "private-provider-reason"
+      }
+    },
+    {
+      "table": "scheduled_messages",
+      "values": {
+        "id": 4,
+        "contact_id": null,
+        "phone_number": null,
+        "to_address": null,
+        "cc_addresses": null,
+        "bcc_addresses": null,
+        "list_id": null,
+        "body": "Hello scheduled 3",
+        "channel": "sms",
+        "subject": null,
+        "html_body": null,
+        "email_account_id": null,
+        "attachments": null,
+        "schedule_at": "2026-01-02T16:00:00.123456+00:00",
+        "status": "cancelled",
+        "sim_number": 1,
+        "created_at": "2026-01-02T12:00:00.123456+00:00",
+        "executed_at": null,
+        "message_id": null,
+        "error": null
+      }
+    },
+    {
+      "table": "scheduled_messages",
+      "values": {
+        "id": 5,
+        "contact_id": 1,
+        "phone_number": "+2348031234567",
+        "to_address": null,
+        "cc_addresses": null,
+        "bcc_addresses": null,
+        "list_id": null,
+        "body": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+        "channel": "sms",
+        "subject": null,
+        "html_body": null,
+        "email_account_id": null,
+        "attachments": null,
+        "schedule_at": "2026-01-02T17:00:00.123456+00:00",
+        "status": "pending",
+        "sim_number": 1,
+        "created_at": "2026-01-02T12:00:00.123456+00:00",
+        "executed_at": null,
+        "message_id": null,
+        "error": null
+      }
+    },
+    {
+      "table": "scheduled_messages",
+      "values": {
+        "id": 6,
+        "contact_id": null,
+        "phone_number": null,
+        "to_address": null,
+        "cc_addresses": null,
+        "bcc_addresses": null,
+        "list_id": null,
+        "body": "Hello scheduled 5",
+        "channel": "email",
+        "subject": null,
+        "html_body": null,
+        "email_account_id": null,
+        "attachments": null,
+        "schedule_at": "2026-01-02T18:00:00.123456+00:00",
+        "status": "pending",
+        "sim_number": 1,
+        "created_at": "2026-01-02T12:00:00.123456+00:00",
+        "executed_at": null,
+        "message_id": null,
+        "error": null
+      }
+    }
+  ],
+  "operations": [
+    {
+      "kind": "list",
+      "query": {},
+      "expected": {
+        "total": 6,
+        "page": 1,
+        "per_page": 50,
+        "items": [
+          {
+            "id": 6,
+            "contact_id": null,
+            "contact_name": null,
+            "phone": null,
+            "body": "Hello scheduled 5",
+            "body_preview": "Hello scheduled 5",
+            "schedule_at": "2026-01-02T18:00:00.123456",
+            "status": "pending",
+            "error": null,
+            "executed_at": null,
+            "message_id": null,
+            "list_id": null,
+            "sim_number": 1
+          },
+          {
+            "id": 5,
+            "contact_id": 1,
+            "contact_name": "Ada Obi",
+            "phone": "+2348031234567",
+            "body": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+            "body_preview": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+            "schedule_at": "2026-01-02T17:00:00.123456",
+            "status": "pending",
+            "error": null,
+            "executed_at": null,
+            "message_id": null,
+            "list_id": null,
+            "sim_number": 1
+          },
+          {
+            "id": 4,
+            "contact_id": null,
+            "contact_name": null,
+            "phone": null,
+            "body": "Hello scheduled 3",
+            "body_preview": "Hello scheduled 3",
+            "schedule_at": "2026-01-02T16:00:00.123456",
+            "status": "cancelled",
+            "error": null,
+            "executed_at": null,
+            "message_id": null,
+            "list_id": null,
+            "sim_number": 1
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "contact_name": "Ada Obi",
+            "phone": "+2348031234567",
+            "body": "Hello scheduled 2",
+            "body_preview": "Hello scheduled 2",
+            "schedule_at": "2026-01-02T15:00:00.123456",
+            "status": "failed",
+            "error": "private-provider-reason",
+            "executed_at": null,
+            "message_id": null,
+            "list_id": null,
+            "sim_number": 1
+          },
+          {
+            "id": 2,
+            "contact_id": 2,
+            "contact_name": "Shop",
+            "phone": null,
+            "body": "Hello scheduled 1",
+            "body_preview": "Hello scheduled 1",
+            "schedule_at": "2026-01-02T14:00:00.123456",
+            "status": "sent",
+            "error": null,
+            "executed_at": null,
+            "message_id": null,
+            "list_id": null,
+            "sim_number": 1
+          },
+          {
+            "id": 1,
+            "contact_id": 1,
+            "contact_name": "Ada Obi",
+            "phone": "+2348031234567",
+            "body": "Hello scheduled 0",
+            "body_preview": "Hello scheduled 0",
+            "schedule_at": "2026-01-02T13:00:00.123456",
+            "status": "pending",
+            "error": null,
+            "executed_at": null,
+            "message_id": null,
+            "list_id": null,
+            "sim_number": 1
+          }
+        ]
+      }
+    },
+    {
+      "kind": "list",
+      "query": {
+        "status": "pending"
+      },
+      "expected": {
+        "total": 3,
+        "page": 1,
+        "per_page": 50,
+        "items": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "contact_name": "Ada Obi",
+            "phone": "+2348031234567",
+            "body": "Hello scheduled 0",
+            "body_preview": "Hello scheduled 0",
+            "schedule_at": "2026-01-02T13:00:00.123456",
+            "status": "pending",
+            "error": null,
+            "executed_at": null,
+            "message_id": null,
+            "list_id": null,
+            "sim_number": 1
+          },
+          {
+            "id": 5,
+            "contact_id": 1,
+            "contact_name": "Ada Obi",
+            "phone": "+2348031234567",
+            "body": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+            "body_preview": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+            "schedule_at": "2026-01-02T17:00:00.123456",
+            "status": "pending",
+            "error": null,
+            "executed_at": null,
+            "message_id": null,
+            "list_id": null,
+            "sim_number": 1
+          },
+          {
+            "id": 6,
+            "contact_id": null,
+            "contact_name": null,
+            "phone": null,
+            "body": "Hello scheduled 5",
+            "body_preview": "Hello scheduled 5",
+            "schedule_at": "2026-01-02T18:00:00.123456",
+            "status": "pending",
+            "error": null,
+            "executed_at": null,
+            "message_id": null,
+            "list_id": null,
+            "sim_number": 1
+          }
+        ]
+      }
+    },
+    {
+      "kind": "list",
+      "query": {
+        "status": "all"
+      },
+      "expected": {
+        "total": 6,
+        "page": 1,
+        "per_page": 50,
+        "items": [
+          {
+            "id": 6,
+            "contact_id": null,
+            "contact_name": null,
+            "phone": null,
+            "body": "Hello scheduled 5",
+            "body_preview": "Hello scheduled 5",
+            "schedule_at": "2026-01-02T18:00:00.123456",
+            "status": "pending",
+            "error": null,
+            "executed_at": null,
+            "message_id": null,
+            "list_id": null,
+            "sim_number": 1
+          },
+          {
+            "id": 5,
+            "contact_id": 1,
+            "contact_name": "Ada Obi",
+            "phone": "+2348031234567",
+            "body": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+            "body_preview": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+            "schedule_at": "2026-01-02T17:00:00.123456",
+            "status": "pending",
+            "error": null,
+            "executed_at": null,
+            "message_id": null,
+            "list_id": null,
+            "sim_number": 1
+          },
+          {
+            "id": 4,
+            "contact_id": null,
+            "contact_name": null,
+            "phone": null,
+            "body": "Hello scheduled 3",
+            "body_preview": "Hello scheduled 3",
+            "schedule_at": "2026-01-02T16:00:00.123456",
+            "status": "cancelled",
+            "error": null,
+            "executed_at": null,
+            "message_id": null,
+            "list_id": null,
+            "sim_number": 1
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "contact_name": "Ada Obi",
+            "phone": "+2348031234567",
+            "body": "Hello scheduled 2",
+            "body_preview": "Hello scheduled 2",
+            "schedule_at": "2026-01-02T15:00:00.123456",
+            "status": "failed",
+            "error": "private-provider-reason",
+            "executed_at": null,
+            "message_id": null,
+            "list_id": null,
+            "sim_number": 1
+          },
+          {
+            "id": 2,
+            "contact_id": 2,
+            "contact_name": "Shop",
+            "phone": null,
+            "body": "Hello scheduled 1",
+            "body_preview": "Hello scheduled 1",
+            "schedule_at": "2026-01-02T14:00:00.123456",
+            "status": "sent",
+            "error": null,
+            "executed_at": null,
+            "message_id": null,
+            "list_id": null,
+            "sim_number": 1
+          },
+          {
+            "id": 1,
+            "contact_id": 1,
+            "contact_name": "Ada Obi",
+            "phone": "+2348031234567",
+            "body": "Hello scheduled 0",
+            "body_preview": "Hello scheduled 0",
+            "schedule_at": "2026-01-02T13:00:00.123456",
+            "status": "pending",
+            "error": null,
+            "executed_at": null,
+            "message_id": null,
+            "list_id": null,
+            "sim_number": 1
+          }
+        ]
+      }
+    },
+    {
+      "kind": "list",
+      "query": {
+        "status": "failed"
+      },
+      "expected": {
+        "total": 1,
+        "page": 1,
+        "per_page": 50,
+        "items": [
+          {
+            "id": 3,
+            "contact_id": 1,
+            "contact_name": "Ada Obi",
+            "phone": "+2348031234567",
+            "body": "Hello scheduled 2",
+            "body_preview": "Hello scheduled 2",
+            "schedule_at": "2026-01-02T15:00:00.123456",
+            "status": "failed",
+            "error": "private-provider-reason",
+            "executed_at": null,
+            "message_id": null,
+            "list_id": null,
+            "sim_number": 1
+          }
+        ]
+      }
+    },
+    {
+      "kind": "list",
+      "query": {
+        "search": "SCHEDULED"
+      },
+      "expected": {
+        "total": 5,
+        "page": 1,
+        "per_page": 50,
+        "items": [
+          {
+            "id": 6,
+            "contact_id": null,
+            "contact_name": null,
+            "phone": null,
+            "body": "Hello scheduled 5",
+            "body_preview": "Hello scheduled 5",
+            "schedule_at": "2026-01-02T18:00:00.123456",
+            "status": "pending",
+            "error": null,
+            "executed_at": null,
+            "message_id": null,
+            "list_id": null,
+            "sim_number": 1
+          },
+          {
+            "id": 4,
+            "contact_id": null,
+            "contact_name": null,
+            "phone": null,
+            "body": "Hello scheduled 3",
+            "body_preview": "Hello scheduled 3",
+            "schedule_at": "2026-01-02T16:00:00.123456",
+            "status": "cancelled",
+            "error": null,
+            "executed_at": null,
+            "message_id": null,
+            "list_id": null,
+            "sim_number": 1
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "contact_name": "Ada Obi",
+            "phone": "+2348031234567",
+            "body": "Hello scheduled 2",
+            "body_preview": "Hello scheduled 2",
+            "schedule_at": "2026-01-02T15:00:00.123456",
+            "status": "failed",
+            "error": "private-provider-reason",
+            "executed_at": null,
+            "message_id": null,
+            "list_id": null,
+            "sim_number": 1
+          },
+          {
+            "id": 2,
+            "contact_id": 2,
+            "contact_name": "Shop",
+            "phone": null,
+            "body": "Hello scheduled 1",
+            "body_preview": "Hello scheduled 1",
+            "schedule_at": "2026-01-02T14:00:00.123456",
+            "status": "sent",
+            "error": null,
+            "executed_at": null,
+            "message_id": null,
+            "list_id": null,
+            "sim_number": 1
+          },
+          {
+            "id": 1,
+            "contact_id": 1,
+            "contact_name": "Ada Obi",
+            "phone": "+2348031234567",
+            "body": "Hello scheduled 0",
+            "body_preview": "Hello scheduled 0",
+            "schedule_at": "2026-01-02T13:00:00.123456",
+            "status": "pending",
+            "error": null,
+            "executed_at": null,
+            "message_id": null,
+            "list_id": null,
+            "sim_number": 1
+          }
+        ]
+      }
+    },
+    {
+      "kind": "list",
+      "query": {
+        "search": "%"
+      },
+      "expected": {
+        "total": 6,
+        "page": 1,
+        "per_page": 50,
+        "items": [
+          {
+            "id": 6,
+            "contact_id": null,
+            "contact_name": null,
+            "phone": null,
+            "body": "Hello scheduled 5",
+            "body_preview": "Hello scheduled 5",
+            "schedule_at": "2026-01-02T18:00:00.123456",
+            "status": "pending",
+            "error": null,
+            "executed_at": null,
+            "message_id": null,
+            "list_id": null,
+            "sim_number": 1
+          },
+          {
+            "id": 5,
+            "contact_id": 1,
+            "contact_name": "Ada Obi",
+            "phone": "+2348031234567",
+            "body": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+            "body_preview": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+            "schedule_at": "2026-01-02T17:00:00.123456",
+            "status": "pending",
+            "error": null,
+            "executed_at": null,
+            "message_id": null,
+            "list_id": null,
+            "sim_number": 1
+          },
+          {
+            "id": 4,
+            "contact_id": null,
+            "contact_name": null,
+            "phone": null,
+            "body": "Hello scheduled 3",
+            "body_preview": "Hello scheduled 3",
+            "schedule_at": "2026-01-02T16:00:00.123456",
+            "status": "cancelled",
+            "error": null,
+            "executed_at": null,
+            "message_id": null,
+            "list_id": null,
+            "sim_number": 1
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "contact_name": "Ada Obi",
+            "phone": "+2348031234567",
+            "body": "Hello scheduled 2",
+            "body_preview": "Hello scheduled 2",
+            "schedule_at": "2026-01-02T15:00:00.123456",
+            "status": "failed",
+            "error": "private-provider-reason",
+            "executed_at": null,
+            "message_id": null,
+            "list_id": null,
+            "sim_number": 1
+          },
+          {
+            "id": 2,
+            "contact_id": 2,
+            "contact_name": "Shop",
+            "phone": null,
+            "body": "Hello scheduled 1",
+            "body_preview": "Hello scheduled 1",
+            "schedule_at": "2026-01-02T14:00:00.123456",
+            "status": "sent",
+            "error": null,
+            "executed_at": null,
+            "message_id": null,
+            "list_id": null,
+            "sim_number": 1
+          },
+          {
+            "id": 1,
+            "contact_id": 1,
+            "contact_name": "Ada Obi",
+            "phone": "+2348031234567",
+            "body": "Hello scheduled 0",
+            "body_preview": "Hello scheduled 0",
+            "schedule_at": "2026-01-02T13:00:00.123456",
+            "status": "pending",
+            "error": null,
+            "executed_at": null,
+            "message_id": null,
+            "list_id": null,
+            "sim_number": 1
+          }
+        ]
+      }
+    },
+    {
+      "kind": "list",
+      "query": {
+        "search": "😀"
+      },
+      "expected": {
+        "total": 1,
+        "page": 1,
+        "per_page": 50,
+        "items": [
+          {
+            "id": 5,
+            "contact_id": 1,
+            "contact_name": "Ada Obi",
+            "phone": "+2348031234567",
+            "body": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+            "body_preview": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+            "schedule_at": "2026-01-02T17:00:00.123456",
+            "status": "pending",
+            "error": null,
+            "executed_at": null,
+            "message_id": null,
+            "list_id": null,
+            "sim_number": 1
+          }
+        ]
+      }
+    },
+    {
+      "kind": "list",
+      "query": {
+        "page": 2,
+        "per_page": 2
+      },
+      "expected": {
+        "total": 6,
+        "page": 2,
+        "per_page": 2,
+        "items": [
+          {
+            "id": 4,
+            "contact_id": null,
+            "contact_name": null,
+            "phone": null,
+            "body": "Hello scheduled 3",
+            "body_preview": "Hello scheduled 3",
+            "schedule_at": "2026-01-02T16:00:00.123456",
+            "status": "cancelled",
+            "error": null,
+            "executed_at": null,
+            "message_id": null,
+            "list_id": null,
+            "sim_number": 1
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "contact_name": "Ada Obi",
+            "phone": "+2348031234567",
+            "body": "Hello scheduled 2",
+            "body_preview": "Hello scheduled 2",
+            "schedule_at": "2026-01-02T15:00:00.123456",
+            "status": "failed",
+            "error": "private-provider-reason",
+            "executed_at": null,
+            "message_id": null,
+            "list_id": null,
+            "sim_number": 1
+          }
+        ]
+      }
+    },
+    {
+      "kind": "list",
+      "query": {
+        "page": 99
+      },
+      "expected": {
+        "total": 6,
+        "page": 99,
+        "per_page": 50,
+        "items": []
+      }
+    },
+    {
+      "kind": "cancel",
+      "id": 1,
+      "status": 200,
+      "expected": {
+        "success": true,
+        "status": "cancelled"
+      }
+    },
+    {
+      "kind": "cancel",
+      "id": 1,
+      "status": 400,
+      "expected": "Cannot cancel a message that is cancelled"
+    },
+    {
+      "kind": "cancel",
+      "id": 2,
+      "status": 400,
+      "expected": "Cannot cancel a message that is sent"
+    },
+    {
+      "kind": "cancel",
+      "id": 9999,
+      "status": 404,
+      "expected": "Not found"
+    },
+    {
+      "kind": "cancel",
+      "id": 6,
+      "status": 200,
+      "expected": {
+        "success": true,
+        "status": "cancelled"
+      }
+    },
+    {
+      "kind": "list",
+      "query": {},
+      "expected": {
+        "total": 6,
+        "page": 1,
+        "per_page": 50,
+        "items": [
+          {
+            "id": 6,
+            "contact_id": null,
+            "contact_name": null,
+            "phone": null,
+            "body": "Hello scheduled 5",
+            "body_preview": "Hello scheduled 5",
+            "schedule_at": "2026-01-02T18:00:00.123456",
+            "status": "cancelled",
+            "error": null,
+            "executed_at": null,
+            "message_id": null,
+            "list_id": null,
+            "sim_number": 1
+          },
+          {
+            "id": 5,
+            "contact_id": 1,
+            "contact_name": "Ada Obi",
+            "phone": "+2348031234567",
+            "body": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+            "body_preview": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+            "schedule_at": "2026-01-02T17:00:00.123456",
+            "status": "pending",
+            "error": null,
+            "executed_at": null,
+            "message_id": null,
+            "list_id": null,
+            "sim_number": 1
+          },
+          {
+            "id": 4,
+            "contact_id": null,
+            "contact_name": null,
+            "phone": null,
+            "body": "Hello scheduled 3",
+            "body_preview": "Hello scheduled 3",
+            "schedule_at": "2026-01-02T16:00:00.123456",
+            "status": "cancelled",
+            "error": null,
+            "executed_at": null,
+            "message_id": null,
+            "list_id": null,
+            "sim_number": 1
+          },
+          {
+            "id": 3,
+            "contact_id": 1,
+            "contact_name": "Ada Obi",
+            "phone": "+2348031234567",
+            "body": "Hello scheduled 2",
+            "body_preview": "Hello scheduled 2",
+            "schedule_at": "2026-01-02T15:00:00.123456",
+            "status": "failed",
+            "error": "private-provider-reason",
+            "executed_at": null,
+            "message_id": null,
+            "list_id": null,
+            "sim_number": 1
+          },
+          {
+            "id": 2,
+            "contact_id": 2,
+            "contact_name": "Shop",
+            "phone": null,
+            "body": "Hello scheduled 1",
+            "body_preview": "Hello scheduled 1",
+            "schedule_at": "2026-01-02T14:00:00.123456",
+            "status": "sent",
+            "error": null,
+            "executed_at": null,
+            "message_id": null,
+            "list_id": null,
+            "sim_number": 1
+          },
+          {
+            "id": 1,
+            "contact_id": 1,
+            "contact_name": "Ada Obi",
+            "phone": "+2348031234567",
+            "body": "Hello scheduled 0",
+            "body_preview": "Hello scheduled 0",
+            "schedule_at": "2026-01-02T13:00:00.123456",
+            "status": "cancelled",
+            "error": null,
+            "executed_at": null,
+            "message_id": null,
+            "list_id": null,
+            "sim_number": 1
+          }
+        ]
+      }
+    }
+  ],
+  "dates": [
+    {
+      "input": "2026-01-03T09:00:00+01:00",
+      "status": 200,
+      "expected": "2026-01-03T08:00:00+00:00"
+    },
+    {
+      "input": "2026-01-03T08:00:00Z",
+      "status": 200,
+      "expected": "2026-01-03T08:00:00+00:00"
+    },
+    {
+      "input": "2026-01-03 08:00:00",
+      "status": 200,
+      "expected": "2026-01-03T08:00:00+00:00"
+    },
+    {
+      "input": "2026-01-02T12:00:00.123456Z",
+      "status": 400,
+      "expected": "schedule_at must be in the future"
+    },
+    {
+      "input": "2026-01-02T12:00:00.123457Z",
+      "status": 200,
+      "expected": "2026-01-02T12:00:00.123457+00:00"
+    },
+    {
+      "input": "bad",
+      "status": 400,
+      "expected": "Invalid schedule_at format. Use ISO8601 e.g. 2026-08-12T09:00:00+01:00 or UTC"
+    }
+  ],
+  "scope": "Actual selected source scheduled listing/cancel/date parser; fixed-clock synthetic SQLite, no ORM relationships/native FKs, HTTP, scheduling, concurrency or SMS evidence."
+}

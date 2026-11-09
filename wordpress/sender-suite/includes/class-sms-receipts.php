@@ -174,6 +174,7 @@ final class SmsReceipts {
         if($patch&&$this->db->update('messages',$patch,$where)!==1){
             throw new AuthFailure(409,'Message changed. Retry the receipt.');
         }
+        if(strpos($m['idempotency_key'],'native-sms:')===0){ScheduledSms::sync($this->db,$this->records,$m,array_replace($patch,array('status'=>$status)));}
         if(!$same&&in_array($status,array('failed','cancelled'),true)){
             $contact=$this->db->one('contacts',array('id'=>$m['contact_id']));
             if($contact){

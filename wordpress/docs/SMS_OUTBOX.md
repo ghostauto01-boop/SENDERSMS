@@ -1,3 +1,5 @@
+> Scheduled single-contact delivery and preclaim cancellation were subsequently added; see [SCHEDULED_SMS.md](SCHEDULED_SMS.md). The implementation remains default-off and unqualified for production. Schedule expiry uses due time, and bulk/raw-number/template send and retry parity remain absent.
+
 # Experimental single-contact SMS outbox — default OFF
 
 This stage connects the native SMS-Gate transport to persistent messages, a WordPress cron callback and delivery polling. It is **not native-certified or production-ready**, and does not complete the original send/campaign/bulk/scheduling workflows. No real HTTP request or SMS was sent during the offline checks.
