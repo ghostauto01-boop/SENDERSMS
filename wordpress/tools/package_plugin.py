@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Package a WordPress-upload layout, explicitly development-only; no execution/install claim."""
 import hashlib,json,re,zipfile
+from verify_native_ui import verify
 from pathlib import Path
 D=Path(__file__).resolve().parents[1];plugin=D/'sender-suite';folder=D/'artifacts';folder.mkdir(exist_ok=True);archive=folder/'sender-suite-development.zip'
+verify()
 summary=json.loads((D/'tests/checks-summary.json').read_text())
 if summary.get('ok') is not True:raise RuntimeError('Passing offline checks required before packaging')
 version=re.search(r'\* Version: ([^\n]+)',(plugin/'sender-suite.php').read_text())[1].strip()

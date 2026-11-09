@@ -1,7 +1,7 @@
 {
   "ok": true,
-  "php_lint_checks": 106,
-  "php_assertions": 44068,
+  "php_lint_checks": 108,
+  "php_assertions": 44190,
   "vendor_parser_checks": 3075,
   "vendor_hash_checks": 1547,
   "unchanged_frontend_files": 165,
@@ -405,6 +405,15 @@
       "native_mysql_verified": false,
       "scope": "Feature-enabled synthetic request/session/cron/SQLite integration: queued final-text SMS inbox replies, durable shared worker and private history. Not real HTTP, WP cron, MySQL concurrency, email/template replies or full source inbox parity.",
       "suite": "inbox-reply"
+    },
+    {
+      "ok": true,
+      "assertions": 61,
+      "php": "7.4.34-dev",
+      "native_wordpress_verified": false,
+      "native_mysql_verified": false,
+      "scope": "Pure PHP document/CSP/runtime/explicit launch-gate tests only. Not live WordPress activation, REST dispatch or browser workflow qualification.",
+      "suite": "app-shell"
     },
     {
       "ok": true,
@@ -815,12 +824,26 @@
     },
     {
       "ok": true,
+      "assertions": 61,
+      "php": "8.3.36",
+      "native_wordpress_verified": false,
+      "native_mysql_verified": false,
+      "scope": "Pure PHP document/CSP/runtime/explicit launch-gate tests only. Not live WordPress activation, REST dispatch or browser workflow qualification.",
+      "suite": "app-shell"
+    },
+    {
+      "ok": true,
       "assertions": 1538,
       "php": "8.3.36",
       "scope": "Vendor syntax TOKEN_PARSE only, not runtime/library functional coverage",
       "suite": "vendor-parse"
     }
   ],
+  "native_ui_build": {
+    "ok": true,
+    "checks": 141,
+    "scope": "SHA256 build-input/overlay/generated-asset provenance and no-original-service-worker checks only; not runtime or native workflow certification."
+  },
   "native_mysql_verified": false,
   "native_wordpress_install_verified": false,
   "original_app_http_contracts_verified": false,

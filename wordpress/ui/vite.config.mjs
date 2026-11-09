@@ -1,0 +1,10 @@
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import tailwindcss from 'tailwindcss';
+import autoprefixer from 'autoprefixer';
+import tailwind from '../../tailwind.config.js';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+const dir=path.dirname(fileURLToPath(import.meta.url));
+const root=path.resolve(dir,'../.cache/ui');
+export default defineConfig({root,base:'./',plugins:[react()],build:{outDir:path.resolve(dir,'../sender-suite/app'),emptyOutDir:true},resolve:{alias:{'@':path.join(root,'src')}},css:{postcss:{plugins:[tailwindcss({...tailwind,content:[path.join(root,'index.html'),path.join(root,'src/**/*.{js,ts,jsx,tsx}')]}),autoprefixer()]}}});

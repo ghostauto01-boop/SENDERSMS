@@ -42,6 +42,11 @@ try:
  for attempt in range(20):
   try:urllib.request.urlopen(BASE,timeout=2).read();break
   except urllib.error.URLError:time.sleep(.25)
+ # Actual native launch-page probes; never claim these ran unless this harness succeeds.
+ launch=client.open(BASE+'/?sender_suite_app=1',timeout=30);html=launch.read().decode();check('native app document HTTP',launch.status,200);check('native app marker','sender-suite-native-ui' in html);check('native app has runtime','window.SENDER_SUITE=' in html);check('native app private response','no-store' in launch.headers.get('Cache-Control',''));check('native app restrictive CSP',"worker-src 'none'" in launch.headers.get('Content-Security-Policy',''));check('native app never registers original SW','serviceWorker.register' not in html)
+ head=client.open(urllib.request.Request(BASE+'/?sender_suite_app=1',method='HEAD'),timeout=30);check('native app HEAD status',head.status,200);check('native app HEAD no body',head.read(),b'')
+ try:client.open(urllib.request.Request(BASE+'/?sender_suite_app=1',data=b'no',method='POST'),timeout=30);check('native app refuses document POST',False)
+ except urllib.error.HTTPError as e:check('native app refuses document POST',e.code,405)
  s,b,h=request('GET','health');check('native health',s,200);check('health payload',b,{'status':'ok','app':'Sendify','version':'1.0.0'})
  s,b,h=request('GET','contacts');check('anonymous own-app access denied',s,401)
  s,b,h=request('POST','templates/',{'name':'No session'},headers={'Cookie':private['name']+'='+private['value']},authenticated=False);check('real WordPress admin cookie cannot bypass app login',s,401)

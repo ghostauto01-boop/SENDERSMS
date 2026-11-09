@@ -1,0 +1,5 @@
+{
+  "ok": true,
+  "tests": 38,
+  "scope": "jsdom/Vitest same-origin native WordPress URL, plain and pretty permalink, navigation, traversal and reserved-query guards only. Not native HTTP/WordPress/MySQL/browser workflow qualification."
+}

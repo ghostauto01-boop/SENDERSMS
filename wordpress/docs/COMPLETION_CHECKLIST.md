@@ -1,10 +1,10 @@
 # Complete remaining-work checklist — INCOMPLETE
 
-Build: **0.11.0-dev**. WordPress is the native application backend; no original Python service is the proposed runtime. Original repository application files remain unchanged.
+Build: **0.12.0-dev**. WordPress is the native application backend; no original Python service is the proposed runtime. Original repository application files remain unchanged.
 
 **349 missing handlers, 159 partially implemented handlers, zero native-certified contracts, 508 source method/path contracts in total.** A partial handler has actual implementation, but does not mean its complete workflow, UI, dependencies and native behavior are certified. Every endpoint remains in the release backlog until those gates pass. Raw handler counts are not a percent-complete estimate.
 
-Fresh offline evidence: 44,068 functional PHP-WASM assertions, 106 first-party syntax checks, 165 unchanged original frontend hashes. Offline evidence is **not** real WordPress/MySQL/HTTP/provider/browser certification. This checklist is the full current implementation/release backlog, not a claim that software can be guaranteed to run perfectly on every host.
+Fresh offline evidence: 44,190 functional PHP-WASM assertions, 108 first-party syntax checks, 165 unchanged original frontend hashes. Offline evidence is **not** real WordPress/MySQL/HTTP/provider/browser certification. This checklist is the full current implementation/release backlog, not a claim that software can be guaranteed to run perfectly on every host.
 
 ## Implementation order and acceptance gates
 
@@ -46,8 +46,8 @@ Fresh offline evidence: 44,068 functional PHP-WASM assertions, 106 first-party s
 - [ ] Test with isolated fake provider servers first; perform authorized staging-provider delivery/reconciliation only with explicit test credentials/recipients. Never send unsolicited real messages as a development check.
 
 ### 4. Complete WordPress frontend integration
-- [ ] Adapt copied/build assets without modifying original frontend source; map every original API request to the native REST backend with correct base paths and deployment subdirectories.
-- [ ] Mount the complete application UI in WordPress with working routes/history, assets, deep links, authentication/roles, login/logout/cookie behavior, loading/error states and navigation.
+- [ ] **Partial implementation, not full acceptance:** Adapt copied/build assets without modifying original frontend source; map every original API request to the native REST backend with correct base paths and deployment subdirectories.
+- [ ] **Partial implementation, not full acceptance:** Mount the complete application UI in WordPress with working routes/history, assets, deep links, authentication/roles, login/logout/cookie behavior, loading/error states and navigation.
 - [ ] Wire every original page/wizard/control, including upload/URL imports, managers, inboxes, settings, analytics, calls, follow-ups, calendar, invoices, agents and diagnostics; hide/disable genuinely unsupported actions, not pretend they work.
 - [ ] Verify real browser multipart uploads, raw CSV/downloads, attachments, previews, pagination/filtering, mobile/responsive behavior, accessibility and permission boundaries.
 - [ ] Validate REST reserved-query hardening, JSONP/output flags, CSRF/origin checks and compatibility with relevant WordPress themes/plugins/cache/security policies.
@@ -58,7 +58,7 @@ Fresh offline evidence: 44,068 functional PHP-WASM assertions, 106 first-party s
 - [ ] Reconcile every source contract and substantive workflow against fresh native evidence; partial/mock tests cannot certify release readiness.
 - [ ] Confirm licenses/notices, dependency integrity, original-source preservation, security review, backup/rollback procedures and operator installation/configuration documentation.
 - [ ] Produce and verify the final reproducible WordPress upload ZIP **after** the gates pass; staging activation/update tests, checksums and release evidence must accompany it.
-- [ ] Deliver the completed plugin; upload to Google Drive if still requested at completion. No completed release or Drive upload has occurred.
+- [ ] Deliver the completed plugin; upload to Google Drive if still requested at completion. No completed release has been delivered. An earlier explicitly incomplete 0.11.0-dev archive was uploaded to Drive at the user's request; that was not a ready release.
 
 ## Current package meaning
 
@@ -622,3 +622,5 @@ This exhaustive list includes partially implemented routes because none is yet n
 Scheduled single-contact due-time queueing, history and preclaim cancellation now have offline implementation/evidence, still default-off; see SCHEDULED_SMS.md. Full scheduled retry/bulk/email/frontend and native concurrency/cron acceptance remain outstanding.
 
 Stored send-history and experimental queued final-text SMS inbox replies are implemented; see [SEND_HISTORY_INBOX_REPLY.md](SEND_HISTORY_INBOX_REPLY.md). Native CI execution was attempted but GitHub workflow-write permission is absent; no native qualification flags changed.
+
+Native UI launch/transport/auth/hash-routing and guarded composer now have copied-build integration and synthetic browser evidence. See NATIVE_UI.md: 38 runtime tests, 36 actual Chromium fixture assertions, 61 PHP shell assertions per runtime, 141 build-integrity checks. No actual WordPress/MySQL/browser/cron qualification is inferred, and frontend acceptance boxes remain open.

@@ -10,7 +10,7 @@ for version in ('7.4','8.3'):
   p=subprocess.run([str(cli),'-l',str(file)],cwd=ROOT,env=env,capture_output=True,text=True,timeout=30)
   if p.returncode or 'No syntax errors detected' not in p.stdout:raise RuntimeError('PHP syntax failed: '+str(file))
   lint+=1
- for suite in ('core','csv','hooks','auth','auth-routes','contacts','data-routes','variables','templates','reply','import','import-jobs','url-import','analytics','sequences','contact-actions','exports','runtime-settings','calendar','invoices','inbox','sms-receipts','followups','access-profile','dashboard','campaign-reports','sms-gateway','sms-outbox','sms-outbox-routes','scheduled-sms','send-history','inbox-reply','vendor-parse'):
+ for suite in ('core','csv','hooks','auth','auth-routes','contacts','data-routes','variables','templates','reply','import','import-jobs','url-import','analytics','sequences','contact-actions','exports','runtime-settings','calendar','invoices','inbox','sms-receipts','followups','access-profile','dashboard','campaign-reports','sms-gateway','sms-outbox','sms-outbox-routes','scheduled-sms','send-history','inbox-reply','app-shell','vendor-parse'):
   p=subprocess.run([str(cli),str(D/'tests'/f'{suite}-test.php')],cwd=ROOT,env=env,capture_output=True,text=True,timeout=90)
   try:record=json.loads(p.stdout)
   except json.JSONDecodeError:raise RuntimeError('No structured PHP success for '+suite+' '+version+'; stdout: '+p.stdout[:500])
@@ -21,5 +21,7 @@ manifest=json.loads((D/'sender-suite/schema/phone-vendor-manifest.json').read_te
 for package,folder in zip(manifest,('phone','locale','mbstring')):
  for file,digest in package['files'].items():
   assert hashlib.sha256((D/'sender-suite/vendor'/folder/file).read_bytes()).hexdigest()==digest,'Vendor file changed';vendor_checks+=1
-summary={'ok':True,'php_lint_checks':lint,'php_assertions':sum(r['assertions'] for r in records if r['suite']!='vendor-parse'),'vendor_parser_checks':sum(r['assertions'] for r in records if r['suite']=='vendor-parse'),'vendor_hash_checks':vendor_checks,'unchanged_frontend_files':len(hashes),'records':records,'native_mysql_verified':False,'native_wordpress_install_verified':False,'original_app_http_contracts_verified':False,'browser_workflows_verified':False}
+from verify_native_ui import verify
+ui_build=verify()
+summary={'ok':True,'php_lint_checks':lint,'php_assertions':sum(r['assertions'] for r in records if r['suite']!='vendor-parse'),'vendor_parser_checks':sum(r['assertions'] for r in records if r['suite']=='vendor-parse'),'vendor_hash_checks':vendor_checks,'unchanged_frontend_files':len(hashes),'records':records,'native_ui_build':ui_build,'native_mysql_verified':False,'native_wordpress_install_verified':False,'original_app_http_contracts_verified':False,'browser_workflows_verified':False}
 (D/'tests/checks-summary.json').write_text(json.dumps(summary,indent=2)+'\n');print(json.dumps(summary,indent=2))
