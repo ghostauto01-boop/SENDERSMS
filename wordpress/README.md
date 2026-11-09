@@ -46,7 +46,7 @@ The complete current task list, module counts and every outstanding method/path 
 
 See `tests/checks-summary.json` and `tests/frontend-evidence.json`.
 
--43,680 functional assertions across PHP WASM7.4.34-dev and8.3.36, including offline account/DTO and auth-dispatch tests.
+-44,068 functional assertions across PHP WASM7.4.34-dev and8.3.36, including offline account/DTO and auth-dispatch tests.
 -100 first-party PHP syntax checks.
 -3,075 vendor parser checks, **reported separately from functional coverage**. The PHP8-only guarded mbstring bootstrap is intentionally not parsed with PHP7.4. Parser memory is raised to512M only inside that test.
 -1,547 vendor file hashes and165 unchanged frontend source hashes verified.
@@ -153,7 +153,7 @@ These handlers have actual persistence logic, not placeholder successes. They re
 
 ## Remaining work
 
-`docs/contracts.json` and `docs/REMAINING_WORK.md` retain every source method/path. Current status: **351 missing handlers,157 partial health/auth/contact/list/variable/template/reply/classification/notification/import/analytics/sequence/settings/calendar/invoice/inbox/status-webhook/follow-up-control/access/profile/dashboard/campaign-reporting/gateway-phone/experimental-single-contact-send handlers,0 fully certified contracts**. The six actual preview/import/URL/job/status/error-report API handlers are included in the partial count; the separate administrator preview diagnostic is not counted.
+`docs/contracts.json` and `docs/REMAINING_WORK.md` retain every source method/path. Current status: **349 missing handlers,159 partial health/auth/contact/list/variable/template/reply/classification/notification/import/analytics/sequence/settings/calendar/invoice/inbox/status-webhook/follow-up-control/access/profile/dashboard/campaign-reporting/gateway-phone/experimental-single-contact-send handlers,0 fully certified contracts**. The six actual preview/import/URL/job/status/error-report API handlers are included in the partial count; the separate administrator preview diagnostic is not counted.
 
 Native auth/account/session/rate-limit certification and concurrency recovery, full settings/provider wiring, contact/list deletion and related-record cleanup, remaining bulk actions, native URL transport and queue/lock certification, email accounts/verification, campaigns/follow-ups, inbox/SMS/calls, scheduler, webhooks, invoices/calendar, remaining profile workflows, AI/MCP, analytics/notifications, complete migration, unchanged frontend integration and native release tests still need recreation/implementation. Do not expose the unchanged frontend as a working application until those routes and permissions exist.
 
@@ -166,3 +166,5 @@ This is a development checkpoint, not completion of the full migration request.
 ### Scheduled single-contact delivery
 
 Experimental due-time queueing, scheduled history and atomic preclaim cancellation are implemented behind the existing default-off outbox gate. See [SCHEDULED_SMS.md](docs/SCHEDULED_SMS.md) for exact scope, offline evidence and native qualification gaps. This is not full scheduled/bulk/template/email parity or a ready plugin.
+
+Stored send-history and experimental queued final-text SMS inbox replies are implemented; see [SEND_HISTORY_INBOX_REPLY.md](docs/SEND_HISTORY_INBOX_REPLY.md). Native CI execution was attempted but GitHub workflow-write permission is absent; no native qualification flags changed.

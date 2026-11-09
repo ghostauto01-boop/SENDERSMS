@@ -1,6 +1,6 @@
 # Remaining WordPress recreation work
 
-351 missing source handlers,157 partial health/auth/contact/list/variable/template/reply/classification/notification/import/analytics/sequence/settings/calendar/invoice/inbox/status-webhook/follow-up-control/access/profile/dashboard/campaign-reporting/gateway-phone/experimental-single-contact-send handlers,0 fully certified contracts. The administrator CSV diagnostic is not the original source import API.
+349 missing source handlers,159 partial health/auth/contact/list/variable/template/reply/classification/notification/import/analytics/sequence/settings/calendar/invoice/inbox/status-webhook/follow-up-control/access/profile/dashboard/campaign-reporting/gateway-phone/experimental-single-contact-send handlers,0 fully certified contracts. The administrator CSV diagnostic is not the original source import API.
 
 Every row is outstanding, including all partial handlers until native HTTP certification. See README.md for actual implemented utilities and fresh test boundaries.
 
@@ -214,7 +214,7 @@ Every row is outstanding, including all partial handlers until native HTTP certi
 | GET | /api/v1/overview/campaigns | backend/app/api/v1/overview.py:358 | missing original application handler |
 | GET | /api/v1/overview/campaigns/{campaign_id} | backend/app/api/v1/overview.py:478 | missing original application handler |
 | GET | /api/v1/overview/metrics | backend/app/api/v1/overview.py:574 | missing original application handler |
-| GET | /api/v1/send/history | backend/app/api/v1/send.py:374 | missing original application handler |
+| GET | /api/v1/send/history | backend/app/api/v1/send.py:374 | partial handler; native WordPress/HTTP unverified |
 | GET | /api/v1/send/scheduled | backend/app/api/v1/send.py:319 | partial handler; native WordPress/HTTP unverified |
 | GET | /api/v1/sequences | backend/app/api/v1/sequences.py:69 | partial handler; native WordPress/HTTP unverified |
 | GET | /api/v1/sequences/ | backend/app/api/v1/sequences.py:69 | partial handler; native WordPress/HTTP unverified |
@@ -395,7 +395,7 @@ Every row is outstanding, including all partial handlers until native HTTP certi
 | POST | /api/v1/inbox/conversations/{conversation_id}/mark-not-interested | backend/app/api/v1/inbox.py:397 | partial handler; native WordPress/HTTP unverified |
 | POST | /api/v1/inbox/conversations/{conversation_id}/mark-opportunity | backend/app/api/v1/inbox.py:405 | partial handler; native WordPress/HTTP unverified |
 | POST | /api/v1/inbox/conversations/{conversation_id}/mark-unread | backend/app/api/v1/inbox.py:426 | partial handler; native WordPress/HTTP unverified |
-| POST | /api/v1/inbox/conversations/{conversation_id}/reply | backend/app/api/v1/inbox.py:298 | missing original application handler |
+| POST | /api/v1/inbox/conversations/{conversation_id}/reply | backend/app/api/v1/inbox.py:298 | partial handler; native WordPress/HTTP unverified |
 | POST | /api/v1/inbox/conversations/{conversation_id}/resume-sequence | backend/app/api/v1/inbox.py:444 | partial handler; native WordPress/HTTP unverified |
 | POST | /api/v1/inbox/conversations/{conversation_id}/status | backend/app/api/v1/inbox.py:414 | partial handler; native WordPress/HTTP unverified |
 | POST | /api/v1/inbox/conversations/{conversation_id}/stop-sequence | backend/app/api/v1/inbox.py:435 | partial handler; native WordPress/HTTP unverified |

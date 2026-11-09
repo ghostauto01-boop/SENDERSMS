@@ -1,7 +1,7 @@
 {
   "ok": true,
-  "php_lint_checks": 102,
-  "php_assertions": 43680,
+  "php_lint_checks": 106,
+  "php_assertions": 44068,
   "vendor_parser_checks": 3075,
   "vendor_hash_checks": 1547,
   "unchanged_frontend_files": 165,
@@ -69,7 +69,7 @@
     },
     {
       "ok": true,
-      "assertions": 777,
+      "assertions": 784,
       "diffs": [],
       "php": "7.4.34-dev",
       "scope": "Offline requests/responses with synthetic password codec, seventy-three synthetic SQLite application tables, fault-injected transaction failure; not real WP/HTTP/Argon2/native MySQL/concurrency proof",
@@ -382,6 +382,29 @@
       "native_concurrency_verified": false,
       "scope": "Actual selected scheduled source reads/cancel/date AST and synthetic unique-index SQLite/fake-gateway scheduled delivery/cancellation/commit-fault tests; not live SMS/HTTP, real cron, native races or complete original scheduled-send parity",
       "suite": "scheduled-sms"
+    },
+    {
+      "ok": true,
+      "assertions": 137,
+      "diffs": [],
+      "php": "7.4.34-dev",
+      "source_operations": 42,
+      "provider_messages_sent": 0,
+      "native_wordpress_verified": false,
+      "native_mysql_verified": false,
+      "scope": "Selected actual source outgoing history/channel AST and synthetic SQLite projection/privacy/budget tests. No HTTP, native collation/transactions/WordPress or browser qualification.",
+      "suite": "send-history"
+    },
+    {
+      "ok": true,
+      "assertions": 50,
+      "diffs": [],
+      "php": "7.4.34-dev",
+      "provider_messages_sent": 0,
+      "native_wordpress_verified": false,
+      "native_mysql_verified": false,
+      "scope": "Feature-enabled synthetic request/session/cron/SQLite integration: queued final-text SMS inbox replies, durable shared worker and private history. Not real HTTP, WP cron, MySQL concurrency, email/template replies or full source inbox parity.",
+      "suite": "inbox-reply"
     },
     {
       "ok": true,
@@ -453,7 +476,7 @@
     },
     {
       "ok": true,
-      "assertions": 777,
+      "assertions": 784,
       "diffs": [],
       "php": "8.3.36",
       "scope": "Offline requests/responses with synthetic password codec, seventy-three synthetic SQLite application tables, fault-injected transaction failure; not real WP/HTTP/Argon2/native MySQL/concurrency proof",
@@ -766,6 +789,29 @@
       "native_concurrency_verified": false,
       "scope": "Actual selected scheduled source reads/cancel/date AST and synthetic unique-index SQLite/fake-gateway scheduled delivery/cancellation/commit-fault tests; not live SMS/HTTP, real cron, native races or complete original scheduled-send parity",
       "suite": "scheduled-sms"
+    },
+    {
+      "ok": true,
+      "assertions": 137,
+      "diffs": [],
+      "php": "8.3.36",
+      "source_operations": 42,
+      "provider_messages_sent": 0,
+      "native_wordpress_verified": false,
+      "native_mysql_verified": false,
+      "scope": "Selected actual source outgoing history/channel AST and synthetic SQLite projection/privacy/budget tests. No HTTP, native collation/transactions/WordPress or browser qualification.",
+      "suite": "send-history"
+    },
+    {
+      "ok": true,
+      "assertions": 50,
+      "diffs": [],
+      "php": "8.3.36",
+      "provider_messages_sent": 0,
+      "native_wordpress_verified": false,
+      "native_mysql_verified": false,
+      "scope": "Feature-enabled synthetic request/session/cron/SQLite integration: queued final-text SMS inbox replies, durable shared worker and private history. Not real HTTP, WP cron, MySQL concurrency, email/template replies or full source inbox parity.",
+      "suite": "inbox-reply"
     },
     {
       "ok": true,

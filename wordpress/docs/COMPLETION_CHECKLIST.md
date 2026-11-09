@@ -2,9 +2,9 @@
 
 Build: **0.11.0-dev**. WordPress is the native application backend; no original Python service is the proposed runtime. Original repository application files remain unchanged.
 
-**351 missing handlers, 157 partially implemented handlers, zero native-certified contracts, 508 source method/path contracts in total.** A partial handler has actual implementation, but does not mean its complete workflow, UI, dependencies and native behavior are certified. Every endpoint remains in the release backlog until those gates pass. Raw handler counts are not a percent-complete estimate.
+**349 missing handlers, 159 partially implemented handlers, zero native-certified contracts, 508 source method/path contracts in total.** A partial handler has actual implementation, but does not mean its complete workflow, UI, dependencies and native behavior are certified. Every endpoint remains in the release backlog until those gates pass. Raw handler counts are not a percent-complete estimate.
 
-Fresh offline evidence: 43,680 functional PHP-WASM assertions, 102 first-party syntax checks, 165 unchanged original frontend hashes. Offline evidence is **not** real WordPress/MySQL/HTTP/provider/browser certification. This checklist is the full current implementation/release backlog, not a claim that software can be guaranteed to run perfectly on every host.
+Fresh offline evidence: 44,068 functional PHP-WASM assertions, 106 first-party syntax checks, 165 unchanged original frontend hashes. Offline evidence is **not** real WordPress/MySQL/HTTP/provider/browser certification. This checklist is the full current implementation/release backlog, not a claim that software can be guaranteed to run perfectly on every host.
 
 ## Implementation order and acceptance gates
 
@@ -620,3 +620,5 @@ This exhaustive list includes partially implemented routes because none is yet n
 | PUT | `/api/v1/variables/{variable_id}` | Implemented partially; native/full-workflow proof required |
 
 Scheduled single-contact due-time queueing, history and preclaim cancellation now have offline implementation/evidence, still default-off; see SCHEDULED_SMS.md. Full scheduled retry/bulk/email/frontend and native concurrency/cron acceptance remain outstanding.
+
+Stored send-history and experimental queued final-text SMS inbox replies are implemented; see [SEND_HISTORY_INBOX_REPLY.md](SEND_HISTORY_INBOX_REPLY.md). Native CI execution was attempted but GitHub workflow-write permission is absent; no native qualification flags changed.

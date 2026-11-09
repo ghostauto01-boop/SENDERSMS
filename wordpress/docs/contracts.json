@@ -1879,7 +1879,7 @@
     "sources": [
       "backend/app/api/v1/send.py:374"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {
@@ -3509,7 +3509,7 @@
     "sources": [
       "backend/app/api/v1/inbox.py:298"
     ],
-    "state": "missing original application handler",
+    "state": "partial handler; native WordPress/HTTP unverified",
     "certified": false
   },
   {

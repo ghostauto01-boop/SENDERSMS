@@ -1,0 +1,11 @@
+{
+  "ok": true,
+  "assertions": 50,
+  "diffs": [],
+  "php": "8.3.36",
+  "provider_messages_sent": 0,
+  "native_wordpress_verified": false,
+  "native_mysql_verified": false,
+  "scope": "Feature-enabled synthetic request/session/cron/SQLite integration: queued final-text SMS inbox replies, durable shared worker and private history. Not real HTTP, WP cron, MySQL concurrency, email/template replies or full source inbox parity.",
+  "suite": "inbox-reply"
+}

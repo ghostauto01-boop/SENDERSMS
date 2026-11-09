@@ -1,7 +1,7 @@
 <?php
 /** Feature-enabled synthetic own-app requests; fake provider only. */
 define('ARRAY_A','ARRAY_A');define('SENDER_SUITE_ENABLE_SMS_OUTBOX',true);
-foreach(array('schema','database','vault','compat','phone','number-filter','config','auth','auth-routes','records','templating','calendar','contacts','contact-lists','contact-actions','csv-url','sms-gate','gateway-phones','sms-receipts','scheduled-sms','sms-outbox','data-routes') as $n){require __DIR__.'/../sender-suite/includes/class-'.$n.'.php';}require __DIR__.'/sqlite-auth-db.php';
+foreach(array('schema','database','vault','compat','phone','number-filter','config','auth','auth-routes','records','templating','calendar','contacts','contact-lists','contact-actions','csv-url','sms-gate','gateway-phones','sms-receipts','analytics','inbox-reply','send-history','scheduled-sms','sms-outbox','data-routes') as $n){require __DIR__.'/../sender-suite/includes/class-'.$n.'.php';}require __DIR__.'/sqlite-auth-db.php';
 function home_url($p){return 'https://app.example.test/';}function wp_parse_url($u){return parse_url($u);}function wp_unslash($v){return stripslashes($v);}
 $events=array();$scheduleFails=false;function wp_next_scheduled($hook){global $events;return $events[$hook]??false;}function wp_schedule_event($time,$period,$hook,$args=array(),$error=false){global $events,$scheduleFails;if($scheduleFails){return false;}$events[$hook]=$time;return true;}function wp_clear_scheduled_hook($hook){global $events;unset($events[$hook]);}
 $registeredActions=array();$deactivationHook=null;function add_action($name,$callback,$priority=10){global $registeredActions;$registeredActions[$name]=$callback;}function register_deactivation_hook($file,$callback){global $deactivationHook;$deactivationHook=$callback;}

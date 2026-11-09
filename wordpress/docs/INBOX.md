@@ -1,3 +1,5 @@
+> Follow-on addition: default-off queued final-text SMS inbox replies and stored outgoing history are now implemented; see [SEND_HISTORY_INBOX_REPLY.md](SEND_HISTORY_INBOX_REPLY.md). This does not implement email/template replies or certify native live delivery.
+
 # Native stored inbox and controls — unreleased
 
 The WordPress database now supplies stored conversation/message reads, labels/read state, campaign attribution/filter metadata, template previews and sequence-pause controls. This is **not** provider ingestion, a reply transport, a complete email mailbox or a completed native frontend. Original application files remain untouched; no release archive was produced.
