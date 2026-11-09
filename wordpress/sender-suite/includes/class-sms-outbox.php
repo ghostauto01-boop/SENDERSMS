@@ -6,7 +6,7 @@ final class SmsOutbox {
     const HOOK='sender_suite_sms_outbox';
     private $db;private $config;private $records;
     public function __construct(Database $db,Config $config,callable $clock=null){$this->db=$db;$this->config=$config;$this->records=new Records($db,$clock);}
-    public static function enabled(){return defined('SENDER_SUITE_ENABLE_SMS_OUTBOX')&&SENDER_SUITE_ENABLE_SMS_OUTBOX===true;}
+    public static function enabled(){return (defined('SENDER_SUITE_ENABLE_SMS_OUTBOX')&&SENDER_SUITE_ENABLE_SMS_OUTBOX===true)||(function_exists('get_option')&&get_option('sender_suite_live_workers')==='1');}
     public static function definitions(){return array_merge(ScheduledSms::definitions(),array('/send/?'=>array('POST'),'/send/messages/(?P<message_id>-?[0-9]+)'=>array('GET'),'/send/messages/(?P<message_id>-?[0-9]+)/cancel'=>array('POST')));}
     public static function schedule(){if(!self::enabled()){return false;}if(wp_next_scheduled(self::HOOK)!==false){return true;}return wp_schedule_event(time()+1,'sender_suite_five_minutes',self::HOOK,array(),true)===true;}
     public static function deactivate(){wp_clear_scheduled_hook(self::HOOK);}

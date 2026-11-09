@@ -1,5 +1,5 @@
 {
-  "version": "1.0.0-rc1",
+  "version": "1.0.0",
   "source_contracts": 508,
   "implemented_native_contracts": 499,
   "root_static_scoped_contracts": 9,

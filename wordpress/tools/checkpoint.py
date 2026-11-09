@@ -45,7 +45,7 @@ for c in contracts:
 
 summary=json.loads((D/'tests/checks-summary.json').read_text())
 status_obj={
- 'version':'1.0.0-rc1',
+ 'version':'1.0.0',
  'source_contracts':len(contracts),
  'implemented_native_contracts':impl_count,
  'root_static_scoped_contracts':root_count,

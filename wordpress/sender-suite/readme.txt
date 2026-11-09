@@ -3,7 +3,7 @@ Contributors: ghostauto01boop
 Requires at least: 6.4
 Tested up to: 6.7
 Requires PHP: 7.4
-Stable tag: 1.0.0-rc1
+Stable tag: 1.0.0
 License: Proprietary
 
 WordPress-native SMS, Email (Brevo + Gmail), Ads Manager, Invoices (Paystack), CallGate, OpenRouter AI Agent, and MCP / OAuth 2.1 platform.
@@ -21,7 +21,7 @@ Sender Suite brings the complete 73-table multi-channel messaging, CRM, invoicin
 
 == Installation ==
 
-1. Upload `sender-suite-development.zip` through **Plugins > Add New > Upload Plugin** in WordPress 6.4+ running on MySQL 8.0+ or MariaDB 10.6+ over HTTPS.
+1. Upload `sender-suite.zip` through **Plugins > Add New > Upload Plugin** in WordPress 6.4+ running on MySQL 8.0+ or MariaDB 10.6+ over HTTPS.
 2. Activate **Sender Suite** to create the 73 prefixed application tables.
 3. Open **Settings > Sender Suite** in `wp-admin` to initialize your operator username and password.
 4. Launch the full native application at `https://your-site.example/?sender_suite_app=1`.

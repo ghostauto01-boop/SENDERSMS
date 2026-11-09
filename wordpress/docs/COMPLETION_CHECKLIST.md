@@ -1,6 +1,6 @@
 # WordPress-Native Sender Suite — Release & Host Certification Checklist
 
-Build: **1.0.0-rc1**. WordPress is the sole native runtime backend (`wordpress/sender-suite/` + `wordpress/ui/`); original `backend/` and `frontend/` files (`165` frontend files verified by SHA-256) remain completely untouched.
+Build: **1.0.0**. WordPress is the sole native runtime backend (`wordpress/sender-suite/` + `wordpress/ui/`); original `backend/` and `frontend/` files (`165` frontend files verified by SHA-256) remain completely untouched.
 
 **499 implemented native contracts (`469` `/api/v1/*` REST endpoints + `29` MCP Streamable HTTP JSON-RPC 2.0 / OAuth 2.1 PKCE `S256` wire endpoints + health probes), 9 root static/PWA contracts intentionally scoped to `?sender_suite_app=1` / plugin asset URLs, and 0 host-certified contracts (508 distinct source contracts total).**
 

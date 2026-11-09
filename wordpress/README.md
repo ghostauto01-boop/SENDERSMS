@@ -1,4 +1,4 @@
-# Sender Suite — WordPress-Native Application (`1.0.0-rc1`)
+# Sender Suite — WordPress-Native Application (`1.0.0`)
 
 This directory contains the complete **WordPress-native** migration of Sender Suite (`wordpress/sender-suite/` and `wordpress/ui/`). WordPress and PHP 7.4–8.3 replace the FastAPI/Python backend at runtime with zero dependency on any external Python service, while leaving all original `backend/` and `frontend/` (`165` source files verified by SHA-256) completely untouched.
 
@@ -45,4 +45,4 @@ This directory contains the complete **WordPress-native** migration of Sender Su
    python3 wordpress/tools/write_remaining_checklist.py
    python3 wordpress/tools/package_plugin.py
    ```
-2. Upload `wordpress/artifacts/sender-suite-development.zip` in WordPress (**Plugins > Add New > Upload Plugin**), activate **Sender Suite**, configure operator credentials under **Settings > Sender Suite**, and launch the workspace via `?sender_suite_app=1`.
+2. Upload `wordpress/artifacts/sender-suite.zip` in WordPress (**Plugins > Add New > Upload Plugin**), activate **Sender Suite**, configure operator credentials & live workers under **Settings > Sender Suite**, and launch the workspace via `?sender_suite_app=1`.

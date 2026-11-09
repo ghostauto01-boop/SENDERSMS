@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Sender Suite
  * Description: WordPress-native SMS, Email, Ads Manager, Invoices (Paystack), CallGate, AI Agent (OpenRouter), and MCP/OAuth 2.1 platform with full 73-table schema and native React SPA.
- * Version: 1.0.0-rc1
+ * Version: 1.0.0
  * Requires at least: 6.4
  * Requires PHP: 7.4
  * Text Domain: sender-suite

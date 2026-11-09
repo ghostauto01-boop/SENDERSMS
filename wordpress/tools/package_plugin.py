@@ -3,7 +3,7 @@
 import hashlib,json,re,zipfile
 from verify_native_ui import verify
 from pathlib import Path
-D=Path(__file__).resolve().parents[1];plugin=D/'sender-suite';folder=D/'artifacts';folder.mkdir(exist_ok=True);archive=folder/'sender-suite-development.zip'
+D=Path(__file__).resolve().parents[1];plugin=D/'sender-suite';folder=D/'artifacts';folder.mkdir(exist_ok=True);archive=folder/'sender-suite.zip';dev_archive=folder/'sender-suite-development.zip'
 verify()
 summary=json.loads((D/'tests/checks-summary.json').read_text())
 if summary.get('ok') is not True:raise RuntimeError('Passing offline checks required before packaging')
@@ -25,5 +25,6 @@ with zipfile.ZipFile(archive,'w',zipfile.ZIP_DEFLATED,compresslevel=9) as z:
 with zipfile.ZipFile(archive) as z:
  if z.testzip() is not None:raise RuntimeError('Plugin archive CRC failure')
  names=z.namelist();assert 'sender-suite/sender-suite.php' in names and all(n.startswith('sender-suite/') and '..' not in Path(n).parts for n in names)
+dev_archive.write_bytes(archive.read_bytes())
 record={'file':archive.name,'version':version,'files':len(files),'bytes':archive.stat().st_size,'sha256':hashlib.sha256(archive.read_bytes()).hexdigest(),'wordpress_upload_layout_verified':True,'archive_crc_verified':True,'complete_application':True,'native_install_verified':False,'production_ready':False,'offline_php_assertions':summary['php_assertions'],'note':'Full WordPress-native application build verified offline across PHP 7.4/8.3 WASM, SQLite, Vite/TypeScript, and headless Chromium. Run staging WordPress/MySQL activation checks before production cutover.'}
 (folder/'plugin-info.json').write_text(json.dumps(record,indent=2)+'\n');print(json.dumps(record,indent=2))
