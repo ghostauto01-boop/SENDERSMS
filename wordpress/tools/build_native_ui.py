@@ -24,7 +24,7 @@ edit('pages/PhonePage.tsx','href="/settings"','href="#/settings"')
 edit('pages/ListsPage.tsx','href={`/validator?list_id=','href={`#/validator?list_id=')
 use_runtime('api/ads.ts','nativeApiUrl');edit('api/ads.ts','return `/api/v1/ads/export/${kind}${query ? `?${query}` : ""}`;','return nativeApiUrl(`/ads/export/${kind}${query ? `?${query}` : ""}`);')
 use_runtime('api/aiAgent.ts','nativeApiUrl');edit('api/aiAgent.ts','fetch(`/api/v1/ai-agent/sessions/${sessionId}/chat`,','fetch(nativeApiUrl(`/ai-agent/sessions/${sessionId}/chat`),')
-edit('api/mcp.ts','endpoint: () => `${window.location.origin}/mcp`,','endpoint: () => { throw new Error("Native MCP transport is not implemented yet."); },')
+use_runtime('api/mcp.ts','nativeApiUrl');edit('api/mcp.ts','endpoint: () => `${window.location.origin}/mcp`,','endpoint: () => nativeApiUrl("/mcp-wire/mcp"),')
 edit('utils/push.ts','return (\n    typeof window', 'return (\n    false && typeof window')
 # Keep inbox viewing/controls but direct reply operators to the safe explicit-sender native composer.
 use_runtime('pages/InboxPage.tsx','navigateNative');p=WORK/'src/pages/InboxPage.tsx';s=p.read_text();a=s.index('  const sendReply = async () => {');b=s.index('\n  };',a)+len('\n  };');s=s[:a]+'''  const sendReply = async () => {

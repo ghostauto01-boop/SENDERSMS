@@ -9,6 +9,8 @@ final class Database {
     public function execute($sql,array $args=array()) { $old=$this->wpdb->suppress_errors(true);try { $r=$this->wpdb->query($args?$this->wpdb->prepare($sql,$args):$sql); }finally { $this->wpdb->suppress_errors($old); }if ($r===false) { throw new DatabaseFailure(); }return $r; }
     public function rows($sql,array $args=array()) { $old=$this->wpdb->suppress_errors(true);try { $r=$this->wpdb->get_results($args?$this->wpdb->prepare($sql,$args):$sql,ARRAY_A);$error=$this->wpdb->last_error; }finally { $this->wpdb->suppress_errors($old); }if ($error || !is_array($r)) { throw new DatabaseFailure(); }return $r; }
     public function transaction(callable $work) { $level=$this->depth;$save='ss_save_'.$level;$this->execute($level?'SAVEPOINT '.$save:'START TRANSACTION');$this->depth++;try { $result=$work($this);$this->execute($level?'RELEASE SAVEPOINT '.$save:'COMMIT');return $result; }catch (\Throwable $e) { try { $this->execute($level?'ROLLBACK TO SAVEPOINT '.$save:'ROLLBACK'); }catch (\Throwable $ignored) {}throw $e; }finally { $this->depth--; } }
+    /** Mutation fences must remain owned by an explicit transaction. */
+    public function requireTransaction() { if($this->depth<1) { throw new \LogicException('Campaign mutations require an explicit transaction.'); } }
     /** A network worker must not inherit a caller transaction or savepoint. */
     public function requireOutsideTransaction() { if($this->depth!==0) { throw new \LogicException('Network worker requires an independent connection transaction boundary.'); } }
     /** Worker-only durable boundary. Never call inside nested/synchronous API transactions. */

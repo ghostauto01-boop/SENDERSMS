@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "assertions": 137,
+  "assertions": 144,
   "diffs": [],
   "php": "7.4.34-dev",
   "source_operations": 42,

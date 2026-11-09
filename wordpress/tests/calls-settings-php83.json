@@ -1,0 +1,9 @@
+{
+  "ok": true,
+  "assertions": 41,
+  "diffs": [],
+  "php": "8.3.36",
+  "native_wordpress_verified": false,
+  "native_mysql_verified": false,
+  "suite": "calls-settings"
+}

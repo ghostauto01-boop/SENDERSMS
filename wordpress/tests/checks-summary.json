@@ -1,7 +1,7 @@
 {
   "ok": true,
-  "php_lint_checks": 108,
-  "php_assertions": 44190,
+  "php_lint_checks": 138,
+  "php_assertions": 45038,
   "vendor_parser_checks": 3075,
   "vendor_hash_checks": 1547,
   "unchanged_frontend_files": 165,
@@ -26,7 +26,7 @@
     },
     {
       "ok": true,
-      "assertions": 36,
+      "assertions": 38,
       "php": "7.4.34-dev",
       "scope": "WordPress hook mocks; not actual WordPress/upload/HTTP certification",
       "suite": "hooks"
@@ -69,7 +69,7 @@
     },
     {
       "ok": true,
-      "assertions": 784,
+      "assertions": 818,
       "diffs": [],
       "php": "7.4.34-dev",
       "scope": "Offline requests/responses with synthetic password codec, seventy-three synthetic SQLite application tables, fault-injected transaction failure; not real WP/HTTP/Argon2/native MySQL/concurrency proof",
@@ -256,7 +256,7 @@
     },
     {
       "ok": true,
-      "assertions": 97,
+      "assertions": 102,
       "diffs": [],
       "php": "7.4.34-dev",
       "source_operations": 38,
@@ -322,15 +322,96 @@
     },
     {
       "ok": true,
-      "assertions": 116,
+      "assertions": 136,
       "diffs": [],
       "php": "7.4.34-dev",
-      "source_operations": 35,
+      "source_operations": 42,
       "native_wordpress_verified": false,
       "native_mysql_verified": false,
       "provider_messages_sent": 0,
       "scope": "Actual selected classic campaign read handlers/DTO/stats, synthetic SQLite snapshots and resource/validation guards. Not campaign creation/execution/reconciliation, native HTTP/MySQL/concurrency or browser proof",
       "suite": "campaign-reports"
+    },
+    {
+      "ok": true,
+      "assertions": 175,
+      "diffs": [],
+      "php": "7.4.34-dev",
+      "source_operations": 38,
+      "source_dto_cases": 11,
+      "provider_messages_sent": 0,
+      "native_wordpress_verified": false,
+      "native_mysql_verified": false,
+      "native_concurrency_verified": false,
+      "scope": "Selected actual campaign mutation AST/DTO and synthetic SQLite/fence/rollback/history safeguards. Native workers, email sender resolution, actual HTTP/FKs/locks/concurrency, live sends and complete campaign parity remain unqualified.",
+      "suite": "campaign-controls"
+    },
+    {
+      "ok": true,
+      "assertions": 15,
+      "diffs": [],
+      "php": "7.4.34-dev",
+      "native_wordpress_verified": false,
+      "native_mysql_verified": false,
+      "scope": "Campaign follow-up CRUD, idempotency, Lagos timezone preview, logs, history delete guard, and 503 execution gates.",
+      "suite": "campaign-followups"
+    },
+    {
+      "ok": true,
+      "assertions": 19,
+      "diffs": [],
+      "php": "7.4.34-dev",
+      "native_wordpress_verified": false,
+      "native_mysql_verified": false,
+      "scope": "Unified read-only overview directory, ambiguous ID 409 contract, classic detail and rolling metrics on synthetic SQLite.",
+      "suite": "overview"
+    },
+    {
+      "ok": true,
+      "assertions": 10,
+      "diffs": [],
+      "php": "7.4.34-dev",
+      "native_wordpress_verified": false,
+      "native_mysql_verified": false,
+      "scope": "Honest WordPress system health, dbProbe, scrubbed error log reads, and read-only setup guide.",
+      "suite": "system-guide"
+    },
+    {
+      "ok": true,
+      "assertions": 13,
+      "diffs": [],
+      "php": "7.4.34-dev",
+      "native_wordpress_verified": false,
+      "native_mysql_verified": false,
+      "scope": "Offline local email/phone validator, enrichment status, and contacts/lists email validation on synthetic SQLite.",
+      "suite": "validator"
+    },
+    {
+      "ok": true,
+      "assertions": 41,
+      "diffs": [],
+      "php": "7.4.34-dev",
+      "native_wordpress_verified": false,
+      "native_mysql_verified": false,
+      "suite": "calls-settings"
+    },
+    {
+      "ok": true,
+      "assertions": 32,
+      "diffs": [],
+      "php": "7.4.34-dev",
+      "native_wordpress_verified": false,
+      "native_mysql_verified": false,
+      "suite": "email-manager"
+    },
+    {
+      "ok": true,
+      "assertions": 47,
+      "diffs": [],
+      "php": "7.4.34-dev",
+      "native_wordpress_verified": false,
+      "native_mysql_verified": false,
+      "suite": "ads-ai"
     },
     {
       "ok": true,
@@ -348,7 +429,7 @@
     },
     {
       "ok": true,
-      "assertions": 126,
+      "assertions": 130,
       "diffs": [],
       "php": "7.4.34-dev",
       "provider_messages_sent": 0,
@@ -385,7 +466,7 @@
     },
     {
       "ok": true,
-      "assertions": 137,
+      "assertions": 144,
       "diffs": [],
       "php": "7.4.34-dev",
       "source_operations": 42,
@@ -442,7 +523,7 @@
     },
     {
       "ok": true,
-      "assertions": 36,
+      "assertions": 38,
       "php": "8.3.36",
       "scope": "WordPress hook mocks; not actual WordPress/upload/HTTP certification",
       "suite": "hooks"
@@ -485,7 +566,7 @@
     },
     {
       "ok": true,
-      "assertions": 784,
+      "assertions": 818,
       "diffs": [],
       "php": "8.3.36",
       "scope": "Offline requests/responses with synthetic password codec, seventy-three synthetic SQLite application tables, fault-injected transaction failure; not real WP/HTTP/Argon2/native MySQL/concurrency proof",
@@ -672,7 +753,7 @@
     },
     {
       "ok": true,
-      "assertions": 97,
+      "assertions": 102,
       "diffs": [],
       "php": "8.3.36",
       "source_operations": 38,
@@ -738,15 +819,96 @@
     },
     {
       "ok": true,
-      "assertions": 116,
+      "assertions": 136,
       "diffs": [],
       "php": "8.3.36",
-      "source_operations": 35,
+      "source_operations": 42,
       "native_wordpress_verified": false,
       "native_mysql_verified": false,
       "provider_messages_sent": 0,
       "scope": "Actual selected classic campaign read handlers/DTO/stats, synthetic SQLite snapshots and resource/validation guards. Not campaign creation/execution/reconciliation, native HTTP/MySQL/concurrency or browser proof",
       "suite": "campaign-reports"
+    },
+    {
+      "ok": true,
+      "assertions": 175,
+      "diffs": [],
+      "php": "8.3.36",
+      "source_operations": 38,
+      "source_dto_cases": 11,
+      "provider_messages_sent": 0,
+      "native_wordpress_verified": false,
+      "native_mysql_verified": false,
+      "native_concurrency_verified": false,
+      "scope": "Selected actual campaign mutation AST/DTO and synthetic SQLite/fence/rollback/history safeguards. Native workers, email sender resolution, actual HTTP/FKs/locks/concurrency, live sends and complete campaign parity remain unqualified.",
+      "suite": "campaign-controls"
+    },
+    {
+      "ok": true,
+      "assertions": 15,
+      "diffs": [],
+      "php": "8.3.36",
+      "native_wordpress_verified": false,
+      "native_mysql_verified": false,
+      "scope": "Campaign follow-up CRUD, idempotency, Lagos timezone preview, logs, history delete guard, and 503 execution gates.",
+      "suite": "campaign-followups"
+    },
+    {
+      "ok": true,
+      "assertions": 19,
+      "diffs": [],
+      "php": "8.3.36",
+      "native_wordpress_verified": false,
+      "native_mysql_verified": false,
+      "scope": "Unified read-only overview directory, ambiguous ID 409 contract, classic detail and rolling metrics on synthetic SQLite.",
+      "suite": "overview"
+    },
+    {
+      "ok": true,
+      "assertions": 10,
+      "diffs": [],
+      "php": "8.3.36",
+      "native_wordpress_verified": false,
+      "native_mysql_verified": false,
+      "scope": "Honest WordPress system health, dbProbe, scrubbed error log reads, and read-only setup guide.",
+      "suite": "system-guide"
+    },
+    {
+      "ok": true,
+      "assertions": 13,
+      "diffs": [],
+      "php": "8.3.36",
+      "native_wordpress_verified": false,
+      "native_mysql_verified": false,
+      "scope": "Offline local email/phone validator, enrichment status, and contacts/lists email validation on synthetic SQLite.",
+      "suite": "validator"
+    },
+    {
+      "ok": true,
+      "assertions": 41,
+      "diffs": [],
+      "php": "8.3.36",
+      "native_wordpress_verified": false,
+      "native_mysql_verified": false,
+      "suite": "calls-settings"
+    },
+    {
+      "ok": true,
+      "assertions": 32,
+      "diffs": [],
+      "php": "8.3.36",
+      "native_wordpress_verified": false,
+      "native_mysql_verified": false,
+      "suite": "email-manager"
+    },
+    {
+      "ok": true,
+      "assertions": 47,
+      "diffs": [],
+      "php": "8.3.36",
+      "native_wordpress_verified": false,
+      "native_mysql_verified": false,
+      "suite": "ads-ai"
     },
     {
       "ok": true,
@@ -764,7 +926,7 @@
     },
     {
       "ok": true,
-      "assertions": 126,
+      "assertions": 130,
       "diffs": [],
       "php": "8.3.36",
       "provider_messages_sent": 0,
@@ -801,7 +963,7 @@
     },
     {
       "ok": true,
-      "assertions": 137,
+      "assertions": 144,
       "diffs": [],
       "php": "8.3.36",
       "source_operations": 42,

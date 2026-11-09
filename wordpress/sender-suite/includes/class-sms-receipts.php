@@ -19,8 +19,11 @@ final class SmsReceipts {
         return array('/settings/gateway/webhook-signing'=>array('GET','PUT'));
     }
     public static function register(){
-        register_rest_route('sender-suite/v1','/webhooks/smsgateway',array('methods'=>'POST','permission_callback'=>'__return_true','callback'=>array(self::class,'dispatch')));
+        register_rest_route('sender-suite/v1','/webhooks/smsgateway',array(array('methods'=>'GET','permission_callback'=>'__return_true','callback'=>array(self::class,'probe')),array('methods'=>'POST','permission_callback'=>'__return_true','callback'=>array(self::class,'dispatch'))));
+        register_rest_route('sender-suite/v1','/webhooks/smsgateway/phone/(?P<phone_id>-?[0-9]+)',array('methods'=>'POST','permission_callback'=>'__return_true','callback'=>array(self::class,'dispatchPhone')));
+        register_rest_route('sender-suite/v1','/webhooks/smsgate/inbound',array('methods'=>'POST','permission_callback'=>'__return_true','callback'=>array(CampaignWorker::class,'dispatchInboundSms')));
     }
+    public static function probe(){return AuthRoutes::response(array('ok'=>true),200,bin2hex(random_bytes(16)));}
     private function scope($id){
         return $this->db->schema()->table('system_settings').'/'.$id.'/'.self::KEY;
     }
@@ -79,12 +82,13 @@ final class SmsReceipts {
         }
         return $v;
     }
-    public function receive($raw,$signature,$timestamp){
+    public function receive($raw,$signature,$timestamp,$secretOverride=null){
         if(!is_string($raw)||strlen($raw)>65536){
             throw new AuthFailure(413,'Callback is too large.');
         }
         $now=(int)(new \DateTimeImmutable($this->records->now(),new \DateTimeZone('UTC')))->format('U');
-        if(!self::verify($raw,$signature,$timestamp,$this->secret(),$now)){
+        $secret=$secretOverride!==null?$secretOverride:$this->secret();
+        if(!self::verify($raw,$signature,$timestamp,$secret,$now)){
             throw new AuthFailure(401,'Invalid webhook signature');
         }
         try{
@@ -248,5 +252,30 @@ final class SmsReceipts {
         catch(\Throwable $e){
             return AuthRoutes::response(AuthRoutes::error(503,'Receipt processing failed. Retry the delivery.',$id),503,$id);
         }
+    }
+    public function receivePhone($phoneId,$raw,$signature,$timestamp){
+        $pid=DataRoutes::integer($phoneId,'phone_id',1);
+        $rows=$this->db->rows('SELECT id,webhook_secret_encrypted FROM '.$this->table('gateway_settings').' WHERE id=%d',array($pid));
+        if(!$rows){throw new AuthFailure(404,'Sender phone not found');}
+        $r=$this->db->decode('gateway_settings',$rows[0]);
+        $sec=null;
+        if($r['webhook_secret_encrypted']!==null&&$r['webhook_secret_encrypted']!==''){
+            try{$v=$this->config->openRuntimeSecret($this->db->schema()->table('gateway_settings').'/'.$pid.'/webhook_secret',$r['webhook_secret_encrypted']);if(strlen($v)<16||strlen($v)>512){throw new \RuntimeException();}$sec=$v;}
+            catch(\Throwable $e){throw new AuthFailure(503,'Phone webhook signing configuration is unreadable.');}
+        }
+        return $this->receive($raw,$signature,$timestamp,$sec);
+    }
+    public static function dispatchPhone($request){
+        $id=bin2hex(random_bytes(16));
+        try{
+            $c=AuthRoutes::context();if(!$c['config']->ready()){throw new AuthFailure(503,'Application is not configured.');}
+            $s=new self($c['db'],$c['config']);
+            $path=trim(substr($request->get_route(),strlen('/sender-suite/v1/')),'/');
+            if(!preg_match('~^webhooks/smsgateway/phone/(-?[0-9]+)$~D',$path,$m)){throw new AuthFailure(404,'Not found');}
+            $out=$c['db']->transaction(function()use($s,$m,$request){return $s->receivePhone($m[1],$request->get_body(),$request->get_header('x-signature'),$request->get_header('x-timestamp'));});
+            return AuthRoutes::response($out,200,$id);
+        }catch(AuthFailure $e){return AuthRoutes::response(AuthRoutes::error($e->status,$e->getMessage(),$id),$e->status,$id);}
+        catch(ValidationFailure $e){return AuthRoutes::response(AuthRoutes::error(422,$e->getMessage(),$id),422,$id);}
+        catch(\Throwable $e){return AuthRoutes::response(AuthRoutes::error(503,'Receipt processing failed. Retry the delivery.',$id),503,$id);}
     }
 }

@@ -7,7 +7,7 @@ final class CampaignReports {
     public function __construct(Database $db,callable $clock=null){$this->db=$db;$this->records=new Records($db,$clock);}
     private function table($n){return Schema::identifier($this->db->schema()->table($n));}
     private static function fields(){return json_decode(file_get_contents(dirname(__DIR__).'/schema/campaign-out-fields.json'),true,32,JSON_THROW_ON_ERROR);}
-    public static function definitions(){return array('/campaigns/?'=>array('GET'),'/campaigns/(?P<campaign_id>-?[0-9]+)'=>array('GET'),'/campaigns/(?P<campaign_id>-?[0-9]+)/analytics'=>array('GET'),'/campaigns/(?P<campaign_id>-?[0-9]+)/conversations'=>array('GET'));}
+    public static function definitions(){return array('/campaigns/?'=>array('GET'),'/campaigns/reconcile'=>array('GET'),'/campaigns/(?P<campaign_id>-?[0-9]+)'=>array('GET'),'/campaigns/(?P<campaign_id>-?[0-9]+)/analytics'=>array('GET'),'/campaigns/(?P<campaign_id>-?[0-9]+)/conversations'=>array('GET'),'/campaigns/(?P<campaign_id>-?[0-9]+)/performance'=>array('GET'));}
     private function columns(){return array_values(array_diff(self::fields(),array('kind')));}
     private function checkedRows($where,array $args,$limit,$offset=0){
         $columns=$this->columns();$names=array_map(array(Schema::class,'identifier'),$columns);$from=' FROM '.$this->table('campaigns').' WHERE '.$where.' ORDER BY updated_at DESC,id ASC LIMIT %d OFFSET %d';$params=array_merge($args,array($limit,$offset));
@@ -37,6 +37,41 @@ final class CampaignReports {
         $r['delivery_rate']=Analytics::rate($r['messages_delivered'],max($r['messages_sent'],1));$r['reply_rate']=Analytics::rate($r['replies'],max($r['messages_sent'],1));foreach(array('started_at','completed_at') as $key){$r[$key]=Records::iso($r[$key]);}
         $statuses=$this->db->rows('SELECT status,COUNT(*) AS n FROM '.$this->table('campaign_contacts').' WHERE campaign_id=%d GROUP BY status LIMIT 1001',array($id));if(count($statuses)>1000){throw new AuthFailure(413,'Too many campaign contact statuses.');}$r['contact_statuses']=new \stdClass();foreach($statuses as $s){$key=$s['status']??'null';$r['contact_statuses']->$key=(int)$s['n'];}return $r;
     }
+    public function performance($id){
+        $rows=$this->db->rows('SELECT id,name,status,channel,total_contacts FROM '.$this->table('campaigns').' WHERE id=%d',array($id));if(!$rows){throw new AuthFailure(404,'Campaign not found');}$r=$this->db->decode('campaigns',$rows[0]);
+        $channel=Compat::lower(Compat::strip($r['channel']??'sms'))?:'sms';
+        $m=$this->db->rows("SELECT COALESCE(SUM(CASE WHEN status IN ('sent','delivered') THEN 1 ELSE 0 END),0) AS sent,COALESCE(SUM(CASE WHEN status='delivered' THEN 1 ELSE 0 END),0) AS delivered,COALESCE(SUM(CASE WHEN status IN ('failed','cancelled') THEN 1 ELSE 0 END),0) AS failed,COALESCE(SUM(CASE WHEN status IN ('queued','sending') THEN 1 ELSE 0 END),0) AS queued FROM ".$this->table('messages')." WHERE campaign_id=%d AND direction='outgoing'",array($id))[0];
+        $sent=(int)$m['sent'];$delivered=(int)$m['delivered'];$failed=(int)$m['failed'];$queued=(int)$m['queued'];
+        $convWhere="COALESCE(v.channel,'sms')=%s AND (v.campaign_id=%d OR v.last_campaign_id=%d)";$convArgs=array($channel,$id,$id);
+        $v=$this->db->rows("SELECT COUNT(*) AS leads,COALESCE(SUM(CASE WHEN v.unread_count>0 OR v.status='unread' THEN 1 ELSE 0 END),0) AS unread,COALESCE(SUM(CASE WHEN v.status='interested' THEN 1 ELSE 0 END),0) AS interested,COALESCE(SUM(CASE WHEN EXISTS (SELECT 1 FROM ".$this->table('messages')." r WHERE r.conversation_id=v.id AND r.direction='incoming') THEN 1 ELSE 0 END),0) AS replied FROM ".$this->table('conversations').' v WHERE '.$convWhere,$convArgs)[0];
+        $leads=(int)$v['leads'];$replied=(int)$v['replied'];$unread=(int)$v['unread'];$interested=(int)$v['interested'];
+        $sentiment=array('positive'=>0,'negative'=>0,'neutral'=>0);
+        foreach($this->db->rows("SELECT LOWER(COALESCE(m.ai_sentiment,'neutral')) AS s,COUNT(*) AS n FROM ".$this->table('messages').' m JOIN '.$this->table('conversations').' v ON v.id=m.conversation_id WHERE m.direction=%s AND '.$convWhere." GROUP BY LOWER(COALESCE(m.ai_sentiment,'neutral'))",array_merge(array('incoming'),$convArgs)) as $s){if(array_key_exists($s['s'],$sentiment)){$sentiment[$s['s']]+=(int)$s['n'];}}
+        $opted=(int)$this->db->rows('SELECT COUNT(*) AS n FROM '.$this->table('contacts').' WHERE is_opted_out=1 AND id IN (SELECT contact_id FROM '.$this->table('campaign_contacts').' WHERE campaign_id=%d)',array($id))[0]['n'];
+        return array('campaign_id'=>(int)$id,'name'=>$r['name'],'status'=>$r['status']??'draft','channel'=>$channel,'audience'=>(int)($r['total_contacts']??0),'sent'=>$sent,'delivered'=>$delivered,'failed'=>$failed,'queued'=>$queued,'leads'=>$leads,'replied'=>$replied,'unread'=>$unread,'interested'=>$interested,'opted_out'=>$opted,'sentiment'=>$sentiment,'delivery_rate'=>Analytics::rate($delivered,$sent),'reply_rate'=>Analytics::rate($replied,$sent),'positive_rate'=>Analytics::rate($sentiment['positive'],$replied),'failure_rate'=>Analytics::rate($failed,$sent+$failed),'opt_out_rate'=>Analytics::rate($opted,$sent));
+    }
+    public function reconcile(array $q){
+        $raw=DataRoutes::text($q,'campaign_ids',null,null,2000);$wanted=array();
+        if($raw!==null&&$raw!==''){foreach(explode(',',$raw) as $tok){$tok=Compat::strip($tok);if($tok!==''&&preg_match('/^[0-9]+$/D',$tok)){$n=DataRoutes::integer($tok,'campaign_ids',0);$wanted[]=$n;}}if(count($wanted)>100){throw new ValidationFailure('Supply at most 100 campaign_ids','campaign_ids');}}
+        $select='SELECT id,name,channel,status,total_contacts,messages_sent,messages_delivered,messages_failed,replies,scheduled_start_at,started_at,completed_at FROM '.$this->table('campaigns');
+        if($wanted){$rows=$this->db->rows($select.' WHERE id IN ('.implode(',',array_fill(0,count($wanted),'%d')).') ORDER BY id ASC',$wanted);}
+        else{$rows=$this->db->rows($select." WHERE status IN ('running','scheduled','paused','sending','draft') ORDER BY updated_at DESC,id DESC LIMIT 50");}
+        $found=array();$snapshots=array();$active=0;
+        foreach($rows as $rawRow){
+            $c=$this->db->decode('campaigns',$rawRow);$cid=(int)$c['id'];$found[$cid]=true;
+            $rc=$this->db->rows('SELECT COUNT(*) AS total,COALESCE(SUM(CASE WHEN is_active=1 THEN 1 ELSE 0 END),0) AS active FROM '.$this->table('campaign_followups').' WHERE campaign_id=%d',array($cid))[0];
+            $logs=new \stdClass();foreach($this->db->rows('SELECT status,COUNT(*) AS n FROM '.$this->table('campaign_followup_logs').' WHERE campaign_id=%d GROUP BY status LIMIT 101',array($cid)) as $lr){$k=(string)($lr['status']??'');$logs->$k=(int)$lr['n'];}
+            $status=$c['status']??'draft';$sent=(int)($c['messages_sent']??0);
+            $dispatched=in_array($status,array('running','sending','completed'),true)||$sent>0||($status==='scheduled'&&$c['scheduled_start_at']!==null);
+            if(in_array($status,array('running','sending','scheduled','paused'),true)){$active++;}
+            $snapshots[]=array('id'=>$cid,'name'=>$c['name'],'channel'=>$c['channel']?:'sms','status'=>$status,'total_contacts'=>(int)($c['total_contacts']??0),'messages_sent'=>$sent,'messages_delivered'=>(int)($c['messages_delivered']??0),'messages_failed'=>(int)($c['messages_failed']??0),'replies'=>(int)($c['replies']??0),'scheduled_start_at'=>Records::iso($c['scheduled_start_at']),'started_at'=>Records::iso($c['started_at']),'completed_at'=>Records::iso($c['completed_at']),'followup_rules_total'=>(int)$rc['total'],'followup_rules_active'=>(int)$rc['active'],'followup_logs'=>$logs,'already_active_or_sent'=>$dispatched,'safe_action'=>$dispatched?'DO_NOT_REPLAY_START — campaign already active/scheduled/sent; inspect status only':'SAFE_TO_VALIDATE_OR_SCHEDULE_WITH_IDEMPOTENCY_KEY');
+        }
+        $missing=array();foreach($wanted as $wid){if(!isset($found[$wid])){$missing[]=$wid;}}
+        $byStatus=new \stdClass();$pending=0;
+        foreach($this->db->rows('SELECT status,COUNT(*) AS n FROM '.$this->table('scheduled_messages').' GROUP BY status LIMIT 101') as $sr){$st=(string)($sr['status']??'');$byStatus->$st=(int)$sr['n'];if($st==='pending'){$pending=(int)$sr['n'];}}
+        $nextDue=$this->db->rows("SELECT MIN(schedule_at) AS due FROM ".$this->table('scheduled_messages')." WHERE status='pending'")[0]['due']??null;
+        return array('reconciled_at'=>Records::iso($this->records->now()),'requested_campaign_ids'=>$wanted,'missing_campaign_ids'=>$missing,'active_or_pending_campaigns'=>$active,'campaigns'=>$snapshots,'scheduled_messages'=>array('pending_count'=>$pending,'by_status'=>$byStatus,'next_due_at'=>Records::iso($nextDue)),'replay_protection_advice'=>"Always verify 'already_active_or_sent' and 'scheduled_messages.pending_count' before re-issuing create/start/schedule/follow-up mutations, and pass an X-Idempotency-Key.");
+    }
     public function conversations($id,array $q){
         $page=DataRoutes::integer($q['page']??1,'page',1,1000000);$per=DataRoutes::integer($q['per_page']??50,'per_page',1,200);$replied=isset($q['replied_only'])?DataRoutes::boolean($q['replied_only'],'replied_only'):false;
         $campaign=$this->db->rows('SELECT channel FROM '.$this->table('campaigns').' WHERE id=%d',array($id));if(!$campaign){throw new AuthFailure(404,'Campaign not found');}$channel=Compat::lower(Compat::strip($campaign[0]['channel']?:'sms'))?:'sms';
@@ -52,6 +87,10 @@ final class CampaignReports {
         }return array('total'=>$total,'items'=>$items,'page'=>$page,'per_page'=>$per,'channel'=>$channel);
     }
     public static function handle($request,array $c){
-        if($request->get_method()!=='GET'){throw new AuthFailure(404,'Not found');}$path=trim(substr($request->get_route(),strlen('/sender-suite/v1/')),'/');$s=new self($c['db']);if($path==='campaigns'){return $s->listing($request->get_query_params());}if(preg_match('~^campaigns/(-?[0-9]+)(/analytics|/conversations)?$~D',$path,$m)){$id=DataRoutes::integer($m[1],'campaign_id');if(($m[2]??'')==='/conversations'){return $s->conversations($id,$request->get_query_params());}return isset($m[2])?$s->analytics($id):$s->read($id);}throw new AuthFailure(404,'Not found');
+        if($request->get_method()!=='GET'){throw new AuthFailure(404,'Not found');}$path=trim(substr($request->get_route(),strlen('/sender-suite/v1/')),'/');$s=new self($c['db']);
+        if($path==='campaigns'){return $s->listing($request->get_query_params());}
+        if($path==='campaigns/reconcile'){return $s->reconcile($request->get_query_params());}
+        if(preg_match('~^campaigns/(-?[0-9]+)(/analytics|/conversations|/performance)?$~D',$path,$m)){$id=DataRoutes::integer($m[1],'campaign_id');$sub=$m[2]??'';if($sub==='/conversations'){return $s->conversations($id,$request->get_query_params());}if($sub==='/performance'){return $s->performance($id);}return $sub==='/analytics'?$s->analytics($id):$s->read($id);}
+        throw new AuthFailure(404,'Not found');
     }
 }

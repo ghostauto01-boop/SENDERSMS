@@ -1,9 +1,9 @@
 {
   "ok": true,
-  "assertions": 116,
+  "assertions": 136,
   "diffs": [],
   "php": "7.4.34-dev",
-  "source_operations": 35,
+  "source_operations": 42,
   "native_wordpress_verified": false,
   "native_mysql_verified": false,
   "provider_messages_sent": 0,

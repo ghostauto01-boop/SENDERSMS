@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "assertions": 36,
+  "assertions": 38,
   "php": "8.3.36",
   "scope": "WordPress hook mocks; not actual WordPress/upload/HTTP certification",
   "suite": "hooks"

@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "assertions": 126,
+  "assertions": 130,
   "diffs": [],
   "php": "7.4.34-dev",
   "provider_messages_sent": 0,

@@ -4,7 +4,7 @@ namespace SenderSuite;
 /** Explicit non-sending application endpoints. Never generic table exposure or successful stubs. */
 final class DataRoutes {
     public static function definitions() {
-        return array_merge(InboxReply::definitions(),SendHistory::definitions(),SmsOutbox::definitions(),GatewayPhones::definitions(),CampaignReports::definitions(),Dashboard::definitions(),AccessSettings::definitions(),Followups::definitions(),SmsReceipts::definitions(),Inbox::definitions(),Invoices::definitions(),Calendar::definitions(),RuntimeSettings::definitions(),ContactExport::definitions(),Sequences::definitions(),Analytics::definitions(),VariableRoutes::definitions(),TemplateRoutes::definitions(),ReplyRoutes::definitions(),NotificationCenter::definitions(),ImportRoutes::definitions(),array('/contacts/?'=>array('GET','POST'), '/contacts/tags/?'=>array('GET'), '/contacts/(?P<contact_id>-?[0-9]+)'=>array('GET','PUT','DELETE'), '/contacts/bulk'=>array('POST'), '/contacts/clean'=>array('POST'), '/contacts/quarantine/generated'=>array('POST'), '/contacts/(?P<contact_id>-?[0-9]+)/activity'=>array('GET'), '/contacts/(?P<contact_id>-?[0-9]+)/(?P<action>email-opt-in|email-opt-out|sms-opt-in)'=>array('POST'), '/lists/?'=>array('GET','POST'), '/lists/(?P<list_id>-?[0-9]+)'=>array('PUT','DELETE'), '/lists/(?P<list_id>-?[0-9]+)/contacts/delete'=>array('POST'), '/lists/(?P<list_id>-?[0-9]+)/clean'=>array('POST'), '/lists/(?P<list_id>-?[0-9]+)/contacts'=>array('GET','POST'), '/lists/(?P<list_id>-?[0-9]+)/contacts/add-all'=>array('POST'), '/lists/(?P<list_id>-?[0-9]+)/contacts/remove'=>array('POST'), '/lists/(?P<list_id>-?[0-9]+)/stats'=>array('GET')));
+        return array_merge(CallsSettings::definitions(),EmailManager::definitions(),AdsManager::definitions(),AiAgent::definitions(),McpSettings::definitions(),Validator::definitions(),SystemGuide::definitions(),Overview::definitions(),CampaignFollowups::definitions(),InboxReply::definitions(),SendHistory::definitions(),SmsOutbox::definitions(),GatewayPhones::definitions(),CampaignReports::definitions(),CampaignControls::definitions(),Dashboard::definitions(),AccessSettings::definitions(),Followups::definitions(),SmsReceipts::definitions(),Inbox::definitions(),Invoices::definitions(),Calendar::definitions(),RuntimeSettings::definitions(),ContactExport::definitions(),Sequences::definitions(),Analytics::definitions(),VariableRoutes::definitions(),TemplateRoutes::definitions(),ReplyRoutes::definitions(),NotificationCenter::definitions(),ImportRoutes::definitions(),array('/contacts/?'=>array('GET','POST'), '/contacts/tags/?'=>array('GET'), '/contacts/(?P<contact_id>-?[0-9]+)'=>array('GET','PUT','DELETE'), '/contacts/bulk'=>array('POST'), '/contacts/clean'=>array('POST'), '/contacts/quarantine/generated'=>array('POST'), '/contacts/(?P<contact_id>-?[0-9]+)/activity'=>array('GET'), '/contacts/(?P<contact_id>-?[0-9]+)/(?P<action>email-opt-in|email-opt-out|sms-opt-in)'=>array('POST'), '/lists/?'=>array('GET','POST'), '/lists/(?P<list_id>-?[0-9]+)'=>array('PUT','DELETE'), '/lists/(?P<list_id>-?[0-9]+)/contacts/delete'=>array('POST'), '/lists/(?P<list_id>-?[0-9]+)/clean'=>array('POST'), '/lists/(?P<list_id>-?[0-9]+)/contacts'=>array('GET','POST'), '/lists/(?P<list_id>-?[0-9]+)/contacts/add-all'=>array('POST'), '/lists/(?P<list_id>-?[0-9]+)/contacts/remove'=>array('POST'), '/lists/(?P<list_id>-?[0-9]+)/stats'=>array('GET')));
     }
     public static function register() {
         foreach (self::definitions() as $path=>$methods) {
@@ -47,6 +47,7 @@ final class DataRoutes {
         foreach (array('list_id','exclude_list_id') as $name) { if (array_key_exists($name,$q) && $q[$name]!==null) { $out[$name]=self::integer($q[$name],$name); } }
         return $out;
     }
+    public static function like($v){return strtr((string)$v,array('\\'=>'\\\\','%'=>'\\%','_'=>'\\_'));}
     public static function body($request) {
         $raw=$request->get_body();
         if ($raw==='') { throw new ValidationFailure('Field required'); }
@@ -67,20 +68,29 @@ final class DataRoutes {
             $contacts=new Contacts($c['db']); $lists=new ContactLists($c['db']); $actions=new ContactActions($c['db']); $status=200; $accessCookie=null;
             $data=$c['db']->transaction(function()use($path,$method,$q,$request,$contacts,$lists,$actions,$c,$user,$remote,&$status,&$accessCookie){
                 if ($remote!==null) { $status=202;return ImportJobs::out((new ImportJobs($c['db']))->create($remote['bytes'],$remote['filename'],$remote['options'],$user)); }
+                if (class_exists(CallsSettings::class) && CallsSettings::matches($path)) { return CallsSettings::handle($request,$c,$user); }
+                if (strpos($path,'email/')===0||$path==='mailbox'||strpos($path,'mailbox/')===0||strpos($path,'mail/')===0) { return EmailManager::handle($request,$c,$user,$status); }
+                if (strpos($path,'ads/')===0) { return AdsManager::handle($request,$c,$user,$status); }
+                if (strpos($path,'ai-agent/')===0) { return AiAgent::handle($request,$c,$user); }
+                if (strpos($path,'mcp/')===0) { return McpSettings::handle($request,$c,$user,$status); }
                 if (strpos($path,'contacts/import/')===0) { return ImportRoutes::handle($request,$c,$status,$user); }
                 if (preg_match('~^inbox/conversations/-?[0-9]+/reply$~D',$path)) { return InboxReply::handle($request,$c,$user,$status); }
-                if ($path==='send/history') { return SendHistory::handle($request,$c); }
+                if (in_array($path,array('send/history','send/validate'),true)) { return SendHistory::handle($request,$c); }
                 if ($path==='send'||strpos($path,'send/')===0) { return SmsOutbox::handle($request,$c,$user,$status); }
                 if ($path==='settings/gateway/phones'||strpos($path,'settings/gateway/phones/')===0) { return GatewayPhones::handle($request,$c,$user); }
                 if ($path==='settings/access') { return AccessSettings::handle($request,$c,$user,$accessCookie); }
                 if ($path==='settings/gateway/webhook-signing') { return SmsReceipts::settings($request,$c,$user); }
                 if (strpos($path,'settings/')===0) { return RuntimeSettings::handle($request,$c,$user); }
                 if ($path==='followups'||strpos($path,'followups/')===0) { return Followups::handle($request,$c,$status); }
-                if (strpos($path,'inbox/')===0) { return Inbox::handle($request,$c); }
+                if (strpos($path,'campaign-followups/')===0) { return CampaignFollowups::handle($request,$c,$user,$status); }
+                if (strpos($path,'overview/')===0) { return Overview::handle($request,$c); }
+                if (strpos($path,'system/')===0||$path==='guide'||strpos($path,'guide/')===0) { return SystemGuide::handle($request,$c,$user); }
+                if (strpos($path,'validator/')===0||in_array($path,array('contacts/enrich/status','contacts/enrich','contacts/validate-emails'),true)||preg_match('~^lists/-?[0-9]+/validate-emails$~D',$path)) { return Validator::handle($request,$c,$user,$status); }
+                if (strpos($path,'inbox/')===0) { return Inbox::handle($request,$c,$user); }
                 if ($path==='invoices'||strpos($path,'invoices/')===0) { return Invoices::handle($request,$c,$user,$status); }
                 if ($path==='calendar'||strpos($path,'calendar/')===0) { return Calendar::handle($request,$c,$user,$status); }
                 if ($path==='sequences'||strpos($path,'sequences/')===0) { return Sequences::handle($request,$c,$status); }
-                if ($path==='campaigns'||strpos($path,'campaigns/')===0) { return CampaignReports::handle($request,$c); }
+                if ($path==='campaigns'||strpos($path,'campaigns/')===0) { return CampaignControls::handle($request,$c,$user,$status); }
                 if (strpos($path,'dashboard/')===0) { return Dashboard::handle($request,$c); }
                 if (strpos($path,'analytics/')===0) { return Analytics::handle($request,$c); }
                 if ($path==='notifications'||strpos($path,'notifications/')===0) { return NotificationCenter::handle($request,$c); }

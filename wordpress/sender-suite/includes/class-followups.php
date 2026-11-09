@@ -202,6 +202,7 @@ final class Followups {
         if($request->get_method()!==($action==='delete'?'DELETE':'POST')) { throw new AuthFailure(404,'Not found'); }
         if($action==='reschedule') { $newTime=DataRoutes::text($q,'new_time',null,null,128);if($newTime===null) { throw new ValidationFailure('Field required','new_time'); } }
         else { $newTime=null; }
+        if($action==='send-now'&&class_exists(CampaignWorker::class)&&CampaignWorker::enabled()) { return (new CampaignWorker($c['db'],$c['config']??null))->sendFollowupNow($id); }
         $out=$s->action($id,$action,$newTime);if($action==='delete') { $status=204; }return $out;
     }
 }

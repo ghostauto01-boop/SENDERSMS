@@ -5,7 +5,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:1719"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -14,7 +14,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:2545"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -23,7 +23,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:514"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -32,7 +32,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:1053"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -41,7 +41,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:2123"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -50,7 +50,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:1499"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -59,7 +59,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:2140"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -68,7 +68,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:2284"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -77,7 +77,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:1285"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -86,7 +86,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:2626"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -95,7 +95,7 @@
     "sources": [
       "backend/app/api/v1/ai_agent.py:835"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -104,7 +104,7 @@
     "sources": [
       "backend/app/api/v1/ai_agent.py:914"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -113,7 +113,7 @@
     "sources": [
       "backend/app/api/v1/ai_agent.py:944"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -122,7 +122,7 @@
     "sources": [
       "backend/app/api/v1/ai_agent.py:507"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -131,7 +131,7 @@
     "sources": [
       "backend/app/api/v1/ai_agent.py:1043"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -140,7 +140,7 @@
     "sources": [
       "backend/app/api/v1/automations.py:130"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -149,7 +149,7 @@
     "sources": [
       "backend/app/api/v1/autoreply.py:134"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -158,7 +158,7 @@
     "sources": [
       "backend/app/api/v1/calendar.py:535"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -167,7 +167,7 @@
     "sources": [
       "backend/app/api/v1/calls.py:160"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -176,7 +176,7 @@
     "sources": [
       "backend/app/api/v1/campaign_followups.py:247"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -185,7 +185,7 @@
     "sources": [
       "backend/app/api/v1/campaigns.py:596"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -194,7 +194,7 @@
     "sources": [
       "backend/app/api/v1/contacts.py:963"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -203,7 +203,7 @@
     "sources": [
       "backend/app/api/v1/email.py:295"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -212,7 +212,7 @@
     "sources": [
       "backend/app/api/v1/email.py:412"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -221,7 +221,7 @@
     "sources": [
       "backend/app/api/v1/email.py:1669"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -230,7 +230,7 @@
     "sources": [
       "backend/app/api/v1/followups.py:213"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -239,7 +239,7 @@
     "sources": [
       "backend/app/api/v1/invoices.py:1203"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -248,7 +248,7 @@
     "sources": [
       "backend/app/api/v1/lists.py:213"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -257,7 +257,7 @@
     "sources": [
       "backend/app/api/v1/mailbox.py:559"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -266,7 +266,7 @@
     "sources": [
       "backend/app/api/v1/mcp.py:1188"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -275,7 +275,7 @@
     "sources": [
       "backend/app/api/v1/mcp.py:1000"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -284,7 +284,7 @@
     "sources": [
       "backend/app/api/v1/sequences.py:243"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -293,7 +293,7 @@
     "sources": [
       "backend/app/api/v1/settings.py:287"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -302,7 +302,7 @@
     "sources": [
       "backend/app/api/v1/settings.py:501"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -311,7 +311,7 @@
     "sources": [
       "backend/app/api/v1/settings.py:142"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -320,7 +320,7 @@
     "sources": [
       "backend/app/api/v1/templates.py:306"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -329,7 +329,7 @@
     "sources": [
       "backend/app/api/v1/variables.py:163"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -338,7 +338,7 @@
     "sources": [
       "backend/app/api/v1/mcp.py:353"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -347,7 +347,7 @@
     "sources": [
       "backend/app/api/v1/mcp.py:313"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -356,7 +356,7 @@
     "sources": [
       "backend/app/api/v1/mcp.py:313"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -365,7 +365,7 @@
     "sources": [
       "backend/app/api/v1/mcp.py:403"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -374,7 +374,7 @@
     "sources": [
       "backend/app/api/v1/mcp.py:403"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -383,7 +383,7 @@
     "sources": [
       "backend/app/api/v1/mcp.py:378"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -392,7 +392,7 @@
     "sources": [
       "backend/app/api/v1/mcp.py:378"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -401,7 +401,7 @@
     "sources": [
       "backend/app/api/v1/mcp.py:403"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -410,7 +410,7 @@
     "sources": [
       "backend/app/api/v1/mcp.py:403"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -419,7 +419,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:3100"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -428,7 +428,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:1651"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -437,7 +437,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:1691"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -446,7 +446,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:1732"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -455,7 +455,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:2451"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -464,7 +464,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:275"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -473,7 +473,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:352"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -482,7 +482,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:1139"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -491,7 +491,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:1046"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -500,7 +500,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:812"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -509,7 +509,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:1938"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -518,7 +518,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:893"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -527,7 +527,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:1110"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -536,7 +536,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:936"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -545,7 +545,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:1177"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -554,7 +554,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:2718"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -563,7 +563,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:1568"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -572,7 +572,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:1441"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -581,7 +581,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:2943"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -590,7 +590,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:2009"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -599,7 +599,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:2213"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -608,7 +608,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:2249"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -617,7 +617,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:2301"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -626,7 +626,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:187"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -635,7 +635,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:1831"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -644,7 +644,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:3039"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -653,7 +653,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:2805"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -662,7 +662,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:1338"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -671,7 +671,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:1306"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -680,7 +680,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:2563"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -689,7 +689,7 @@
     "sources": [
       "backend/app/api/v1/ai_agent.py:643"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -698,7 +698,7 @@
     "sources": [
       "backend/app/api/v1/ai_agent.py:802"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -707,7 +707,7 @@
     "sources": [
       "backend/app/api/v1/ai_agent.py:815"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -716,7 +716,7 @@
     "sources": [
       "backend/app/api/v1/ai_agent.py:183"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -725,7 +725,7 @@
     "sources": [
       "backend/app/api/v1/ai_agent.py:898"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -734,7 +734,7 @@
     "sources": [
       "backend/app/api/v1/ai_agent.py:921"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -743,7 +743,7 @@
     "sources": [
       "backend/app/api/v1/ai_agent.py:101"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -752,7 +752,7 @@
     "sources": [
       "backend/app/api/v1/ai_agent.py:133"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -761,7 +761,7 @@
     "sources": [
       "backend/app/api/v1/ai_agent.py:366"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -770,7 +770,7 @@
     "sources": [
       "backend/app/api/v1/ai_agent.py:418"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -779,7 +779,7 @@
     "sources": [
       "backend/app/api/v1/ai_agent.py:228"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -788,7 +788,7 @@
     "sources": [
       "backend/app/api/v1/ai_agent.py:959"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -797,7 +797,7 @@
     "sources": [
       "backend/app/api/v1/ai_agent.py:1030"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -806,7 +806,7 @@
     "sources": [
       "backend/app/api/v1/ai_agent.py:1057"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -815,7 +815,7 @@
     "sources": [
       "backend/app/api/v1/analytics.py:205"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -824,7 +824,7 @@
     "sources": [
       "backend/app/api/v1/analytics.py:251"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -833,7 +833,7 @@
     "sources": [
       "backend/app/api/v1/analytics.py:148"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -842,7 +842,7 @@
     "sources": [
       "backend/app/api/v1/analytics.py:24"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -851,7 +851,7 @@
     "sources": [
       "backend/app/api/v1/analytics.py:101"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -860,7 +860,7 @@
     "sources": [
       "backend/app/api/v1/auth.py:243"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -869,7 +869,7 @@
     "sources": [
       "backend/app/api/v1/auth.py:276"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -878,7 +878,7 @@
     "sources": [
       "backend/app/api/v1/automations.py:43"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -887,7 +887,7 @@
     "sources": [
       "backend/app/api/v1/automations.py:43"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -896,7 +896,7 @@
     "sources": [
       "backend/app/api/v1/automations.py:88"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -905,7 +905,7 @@
     "sources": [
       "backend/app/api/v1/autoreply.py:44"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -914,7 +914,7 @@
     "sources": [
       "backend/app/api/v1/autoreply.py:44"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -923,7 +923,7 @@
     "sources": [
       "backend/app/api/v1/autoreply.py:87"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -932,7 +932,7 @@
     "sources": [
       "backend/app/api/v1/calendar.py:164"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -941,7 +941,7 @@
     "sources": [
       "backend/app/api/v1/calendar.py:164"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -950,7 +950,7 @@
     "sources": [
       "backend/app/api/v1/calendar.py:251"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -959,7 +959,7 @@
     "sources": [
       "backend/app/api/v1/calendar.py:273"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -968,7 +968,7 @@
     "sources": [
       "backend/app/api/v1/calendar.py:634"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -977,7 +977,7 @@
     "sources": [
       "backend/app/api/v1/calendar.py:237"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -986,7 +986,7 @@
     "sources": [
       "backend/app/api/v1/calendar.py:301"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -995,7 +995,7 @@
     "sources": [
       "backend/app/api/v1/calendar.py:315"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1004,7 +1004,7 @@
     "sources": [
       "backend/app/api/v1/calls.py:328"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1013,7 +1013,7 @@
     "sources": [
       "backend/app/api/v1/calls.py:59"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1022,7 +1022,7 @@
     "sources": [
       "backend/app/api/v1/calls.py:287"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1031,7 +1031,7 @@
     "sources": [
       "backend/app/api/v1/calls.py:113"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1040,7 +1040,7 @@
     "sources": [
       "backend/app/api/v1/campaign_followups.py:45"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1049,7 +1049,7 @@
     "sources": [
       "backend/app/api/v1/campaign_followups.py:100"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1058,7 +1058,7 @@
     "sources": [
       "backend/app/api/v1/campaign_followups.py:405"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1067,7 +1067,7 @@
     "sources": [
       "backend/app/api/v1/campaign_followups.py:323"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1076,7 +1076,7 @@
     "sources": [
       "backend/app/api/v1/campaigns.py:53"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1085,7 +1085,7 @@
     "sources": [
       "backend/app/api/v1/campaigns.py:53"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1094,7 +1094,7 @@
     "sources": [
       "backend/app/api/v1/campaigns.py:106"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1103,7 +1103,7 @@
     "sources": [
       "backend/app/api/v1/campaigns.py:131"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1112,7 +1112,7 @@
     "sources": [
       "backend/app/api/v1/campaigns.py:610"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1121,7 +1121,7 @@
     "sources": [
       "backend/app/api/v1/campaigns.py:634"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1130,7 +1130,7 @@
     "sources": [
       "backend/app/api/v1/campaigns.py:763"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1139,7 +1139,7 @@
     "sources": [
       "backend/app/api/v1/contacts.py:186"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1148,7 +1148,7 @@
     "sources": [
       "backend/app/api/v1/contacts.py:186"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1157,7 +1157,7 @@
     "sources": [
       "backend/app/api/v1/contacts.py:1496"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1166,7 +1166,7 @@
     "sources": [
       "backend/app/api/v1/contacts.py:349"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1175,7 +1175,7 @@
     "sources": [
       "backend/app/api/v1/contacts.py:1663"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1184,7 +1184,7 @@
     "sources": [
       "backend/app/api/v1/contacts.py:1334"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1193,7 +1193,7 @@
     "sources": [
       "backend/app/api/v1/contacts.py:1367"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1202,7 +1202,7 @@
     "sources": [
       "backend/app/api/v1/contacts.py:546"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1211,7 +1211,7 @@
     "sources": [
       "backend/app/api/v1/contacts.py:588"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1220,7 +1220,7 @@
     "sources": [
       "backend/app/api/v1/contacts.py:1803"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1229,7 +1229,7 @@
     "sources": [
       "backend/app/api/v1/dashboard.py:205"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1238,7 +1238,7 @@
     "sources": [
       "backend/app/api/v1/dashboard.py:38"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1247,7 +1247,7 @@
     "sources": [
       "backend/app/api/v1/email.py:154"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1256,7 +1256,7 @@
     "sources": [
       "backend/app/api/v1/email.py:1842"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1265,7 +1265,7 @@
     "sources": [
       "backend/app/api/v1/email.py:669"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1274,7 +1274,7 @@
     "sources": [
       "backend/app/api/v1/email.py:2071"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1283,7 +1283,7 @@
     "sources": [
       "backend/app/api/v1/email.py:361"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1292,7 +1292,7 @@
     "sources": [
       "backend/app/api/v1/email.py:382"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1301,7 +1301,7 @@
     "sources": [
       "backend/app/api/v1/email.py:1689"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1310,7 +1310,7 @@
     "sources": [
       "backend/app/api/v1/email.py:182"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1319,7 +1319,7 @@
     "sources": [
       "backend/app/api/v1/email.py:1062"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1328,7 +1328,7 @@
     "sources": [
       "backend/app/api/v1/email.py:1167"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1337,7 +1337,7 @@
     "sources": [
       "backend/app/api/v1/email.py:1321"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1346,7 +1346,7 @@
     "sources": [
       "backend/app/api/v1/email.py:1579"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1355,7 +1355,7 @@
     "sources": [
       "backend/app/api/v1/email.py:2016"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1364,7 +1364,7 @@
     "sources": [
       "backend/app/api/v1/email.py:694"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1373,7 +1373,7 @@
     "sources": [
       "backend/app/api/v1/email.py:796"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1382,7 +1382,7 @@
     "sources": [
       "backend/app/api/v1/email.py:172"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1391,7 +1391,7 @@
     "sources": [
       "backend/app/api/v1/email.py:786"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1400,7 +1400,7 @@
     "sources": [
       "backend/app/api/v1/email.py:1607"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1409,7 +1409,7 @@
     "sources": [
       "backend/app/api/v1/email.py:1769"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1418,7 +1418,7 @@
     "sources": [
       "backend/app/api/v1/followups.py:79"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1427,7 +1427,7 @@
     "sources": [
       "backend/app/api/v1/followups.py:79"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1437,7 +1437,7 @@
       "backend/app/api/v1/guide.py:27",
       "backend/app/api/v1/guide.py:27"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1446,7 +1446,7 @@
     "sources": [
       "backend/app/api/v1/guide.py:27"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1455,7 +1455,7 @@
     "sources": [
       "backend/app/api/v1/guide.py:36"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1464,7 +1464,7 @@
     "sources": [
       "backend/app/main.py:1402"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1473,7 +1473,7 @@
     "sources": [
       "backend/app/main.py:1413"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1482,7 +1482,7 @@
     "sources": [
       "backend/app/api/v1/inbox.py:182"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1491,7 +1491,7 @@
     "sources": [
       "backend/app/api/v1/inbox.py:34"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1500,7 +1500,7 @@
     "sources": [
       "backend/app/api/v1/inbox.py:237"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1509,7 +1509,7 @@
     "sources": [
       "backend/app/api/v1/inbox.py:262"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1518,7 +1518,7 @@
     "sources": [
       "backend/app/api/v1/inbox.py:503"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1527,7 +1527,7 @@
     "sources": [
       "backend/app/api/v1/invoices.py:779"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1536,7 +1536,7 @@
     "sources": [
       "backend/app/api/v1/invoices.py:351"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1545,7 +1545,7 @@
     "sources": [
       "backend/app/api/v1/invoices.py:333"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1554,7 +1554,7 @@
     "sources": [
       "backend/app/api/v1/invoices.py:1015"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1563,7 +1563,7 @@
     "sources": [
       "backend/app/api/v1/invoices.py:464"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1572,7 +1572,7 @@
     "sources": [
       "backend/app/api/v1/invoices.py:644"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1581,7 +1581,7 @@
     "sources": [
       "backend/app/api/v1/invoices.py:725"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1590,7 +1590,7 @@
     "sources": [
       "backend/app/api/v1/invoices.py:292"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1599,7 +1599,7 @@
     "sources": [
       "backend/app/api/v1/invoices.py:1086"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1608,7 +1608,7 @@
     "sources": [
       "backend/app/api/v1/invoices.py:1470"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1617,7 +1617,7 @@
     "sources": [
       "backend/app/api/v1/invoices.py:1460"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1626,7 +1626,7 @@
     "sources": [
       "backend/app/api/v1/lists.py:77"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1635,7 +1635,7 @@
     "sources": [
       "backend/app/api/v1/lists.py:77"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1644,7 +1644,7 @@
     "sources": [
       "backend/app/api/v1/lists.py:263"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1653,7 +1653,7 @@
     "sources": [
       "backend/app/api/v1/lists.py:619"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1662,7 +1662,7 @@
     "sources": [
       "backend/app/api/v1/mail.py:80"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1671,7 +1671,7 @@
     "sources": [
       "backend/app/api/v1/mail.py:99"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1680,7 +1680,7 @@
     "sources": [
       "backend/app/api/v1/mail.py:67"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1690,7 +1690,7 @@
       "backend/app/api/v1/mailbox.py:282",
       "backend/app/api/v1/mailbox.py:282"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1699,7 +1699,7 @@
     "sources": [
       "backend/app/api/v1/mailbox.py:282"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1708,7 +1708,7 @@
     "sources": [
       "backend/app/api/v1/mailbox.py:343"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1717,7 +1717,7 @@
     "sources": [
       "backend/app/api/v1/mailbox.py:304"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1726,7 +1726,7 @@
     "sources": [
       "backend/app/api/v1/mailbox.py:271"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1735,7 +1735,7 @@
     "sources": [
       "backend/app/api/v1/mailbox.py:526"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1744,7 +1744,7 @@
     "sources": [
       "backend/app/api/v1/mcp.py:1013"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1753,7 +1753,7 @@
     "sources": [
       "backend/app/api/v1/mcp.py:1113"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1762,7 +1762,7 @@
     "sources": [
       "backend/app/api/v1/mcp.py:1153"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1771,7 +1771,7 @@
     "sources": [
       "backend/app/api/v1/mcp.py:1041"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1780,7 +1780,7 @@
     "sources": [
       "backend/app/api/v1/mcp.py:1248"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1789,7 +1789,7 @@
     "sources": [
       "backend/app/api/v1/mcp.py:1271"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1798,7 +1798,7 @@
     "sources": [
       "backend/app/api/v1/mcp.py:964"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1807,7 +1807,7 @@
     "sources": [
       "backend/app/api/v1/notifications.py:33"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1816,7 +1816,7 @@
     "sources": [
       "backend/app/api/v1/notifications.py:33"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1825,7 +1825,7 @@
     "sources": [
       "backend/app/api/v1/notifications.py:156"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1834,7 +1834,7 @@
     "sources": [
       "backend/app/api/v1/notifications.py:105"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1843,7 +1843,7 @@
     "sources": [
       "backend/app/api/v1/notifications.py:55"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1852,7 +1852,7 @@
     "sources": [
       "backend/app/api/v1/overview.py:358"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1861,7 +1861,7 @@
     "sources": [
       "backend/app/api/v1/overview.py:478"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1870,7 +1870,7 @@
     "sources": [
       "backend/app/api/v1/overview.py:574"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1879,7 +1879,7 @@
     "sources": [
       "backend/app/api/v1/send.py:374"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1888,7 +1888,7 @@
     "sources": [
       "backend/app/api/v1/send.py:319"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1897,7 +1897,7 @@
     "sources": [
       "backend/app/api/v1/sequences.py:69"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1906,7 +1906,7 @@
     "sources": [
       "backend/app/api/v1/sequences.py:69"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1915,7 +1915,7 @@
     "sources": [
       "backend/app/api/v1/sequences.py:104"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1924,7 +1924,7 @@
     "sources": [
       "backend/app/api/v1/settings.py:22"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1933,7 +1933,7 @@
     "sources": [
       "backend/app/api/v1/settings.py:606"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1942,7 +1942,7 @@
     "sources": [
       "backend/app/api/v1/settings.py:213"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1951,7 +1951,7 @@
     "sources": [
       "backend/app/api/v1/settings.py:248"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1960,7 +1960,7 @@
     "sources": [
       "backend/app/api/v1/settings.py:196"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1969,7 +1969,7 @@
     "sources": [
       "backend/app/api/v1/settings.py:45"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1978,7 +1978,7 @@
     "sources": [
       "backend/app/api/v1/settings.py:451"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1987,7 +1987,7 @@
     "sources": [
       "backend/app/api/v1/settings.py:111"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -1996,7 +1996,7 @@
     "sources": [
       "backend/app/api/v1/settings.py:314"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2005,7 +2005,7 @@
     "sources": [
       "backend/app/api/v1/settings.py:151"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2014,7 +2014,7 @@
     "sources": [
       "backend/app/api/v1/settings.py:158"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2023,7 +2023,7 @@
     "sources": [
       "backend/app/api/v1/system.py:291"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2032,7 +2032,7 @@
     "sources": [
       "backend/app/api/v1/system.py:47"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2041,7 +2041,7 @@
     "sources": [
       "backend/app/api/v1/templates.py:95"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2050,7 +2050,7 @@
     "sources": [
       "backend/app/api/v1/templates.py:95"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2059,7 +2059,7 @@
     "sources": [
       "backend/app/api/v1/templates.py:126"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2068,7 +2068,7 @@
     "sources": [
       "backend/app/api/v1/templates.py:201"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2077,7 +2077,7 @@
     "sources": [
       "backend/app/api/v1/validator.py:186"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2086,7 +2086,7 @@
     "sources": [
       "backend/app/api/v1/validator.py:199"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2095,7 +2095,7 @@
     "sources": [
       "backend/app/api/v1/validator.py:83"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2104,7 +2104,7 @@
     "sources": [
       "backend/app/api/v1/variables.py:33"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2113,7 +2113,7 @@
     "sources": [
       "backend/app/api/v1/variables.py:33"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2122,7 +2122,7 @@
     "sources": [
       "backend/app/api/v1/variables.py:204"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2131,7 +2131,7 @@
     "sources": [
       "backend/app/api/v1/webhooks.py:566"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2140,7 +2140,7 @@
     "sources": [
       "backend/app/api/v1/webhooks.py:708"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2149,7 +2149,7 @@
     "sources": [
       "backend/app/api/v1/webhooks.py:404"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2158,7 +2158,7 @@
     "sources": [
       "backend/app/main.py:1548"
     ],
-    "state": "missing original application handler",
+    "state": "intentionally scoped to ?sender_suite_app=1 / plugin asset URLs (never hijacking WordPress site root)",
     "certified": false
   },
   {
@@ -2167,7 +2167,7 @@
     "sources": [
       "backend/app/api/v1/mcp.py:348"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2176,7 +2176,7 @@
     "sources": [
       "backend/app/api/v1/mcp.py:660"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2185,7 +2185,7 @@
     "sources": [
       "backend/app/api/v1/mcp.py:453"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2194,7 +2194,7 @@
     "sources": [
       "backend/app/main.py:1550"
     ],
-    "state": "missing original application handler",
+    "state": "intentionally scoped to ?sender_suite_app=1 / plugin asset URLs (never hijacking WordPress site root)",
     "certified": false
   },
   {
@@ -2203,7 +2203,7 @@
     "sources": [
       "backend/app/main.py:1540"
     ],
-    "state": "missing original application handler",
+    "state": "intentionally scoped to ?sender_suite_app=1 / plugin asset URLs (never hijacking WordPress site root)",
     "certified": false
   },
   {
@@ -2212,7 +2212,7 @@
     "sources": [
       "backend/app/main.py:1542"
     ],
-    "state": "missing original application handler",
+    "state": "intentionally scoped to ?sender_suite_app=1 / plugin asset URLs (never hijacking WordPress site root)",
     "certified": false
   },
   {
@@ -2221,7 +2221,7 @@
     "sources": [
       "backend/app/main.py:1544"
     ],
-    "state": "missing original application handler",
+    "state": "intentionally scoped to ?sender_suite_app=1 / plugin asset URLs (never hijacking WordPress site root)",
     "certified": false
   },
   {
@@ -2230,7 +2230,7 @@
     "sources": [
       "backend/app/main.py:1546"
     ],
-    "state": "missing original application handler",
+    "state": "intentionally scoped to ?sender_suite_app=1 / plugin asset URLs (never hijacking WordPress site root)",
     "certified": false
   },
   {
@@ -2239,7 +2239,7 @@
     "sources": [
       "backend/app/main.py:1520"
     ],
-    "state": "missing original application handler",
+    "state": "intentionally scoped to ?sender_suite_app=1 / plugin asset URLs (never hijacking WordPress site root)",
     "certified": false
   },
   {
@@ -2248,7 +2248,7 @@
     "sources": [
       "backend/app/api/v1/mcp.py:307"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2257,7 +2257,7 @@
     "sources": [
       "backend/app/api/v1/mcp.py:307"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2266,7 +2266,7 @@
     "sources": [
       "backend/app/api/v1/mcp.py:319"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2275,7 +2275,7 @@
     "sources": [
       "backend/app/api/v1/mcp.py:673"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2284,7 +2284,7 @@
     "sources": [
       "backend/app/api/v1/mcp.py:660"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2293,7 +2293,7 @@
     "sources": [
       "backend/app/api/v1/mcp.py:453"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2302,7 +2302,7 @@
     "sources": [
       "backend/app/main.py:1538"
     ],
-    "state": "missing original application handler",
+    "state": "intentionally scoped to ?sender_suite_app=1 / plugin asset URLs (never hijacking WordPress site root)",
     "certified": false
   },
   {
@@ -2312,7 +2312,7 @@
       "backend/app/main.py:1557",
       "backend/app/main.py:1563"
     ],
-    "state": "missing original application handler",
+    "state": "intentionally scoped to ?sender_suite_app=1 / plugin asset URLs (never hijacking WordPress site root)",
     "certified": false
   },
   {
@@ -2321,7 +2321,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:1700"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2330,7 +2330,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:2527"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2339,7 +2339,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:394"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2348,7 +2348,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:2045"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2357,7 +2357,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:1387"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2366,7 +2366,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:2058"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2375,7 +2375,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:2263"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2384,7 +2384,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:1220"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2393,7 +2393,7 @@
     "sources": [
       "backend/app/api/v1/ai_agent.py:487"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2402,7 +2402,7 @@
     "sources": [
       "backend/app/api/v1/campaigns.py:221"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2411,7 +2411,7 @@
     "sources": [
       "backend/app/api/v1/email.py:256"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2420,7 +2420,7 @@
     "sources": [
       "backend/app/api/v1/invoices.py:1096"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2429,7 +2429,7 @@
     "sources": [
       "backend/app/api/v1/mailbox.py:536"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2438,7 +2438,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:1675"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2447,7 +2447,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:1772"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2456,7 +2456,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:1739"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2465,7 +2465,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:2511"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2474,7 +2474,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:321"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2483,7 +2483,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:2859"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2492,7 +2492,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:681"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2501,7 +2501,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:1083"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2510,7 +2510,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:665"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2519,7 +2519,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:733"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2528,7 +2528,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:711"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2537,7 +2537,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:697"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2546,7 +2546,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:1964"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2555,7 +2555,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:907"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2564,7 +2564,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:576"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2573,7 +2573,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:1118"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2582,7 +2582,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:610"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2591,7 +2591,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:802"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2600,7 +2600,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:630"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2609,7 +2609,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:1197"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2618,7 +2618,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:569"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2627,7 +2627,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:523"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2636,7 +2636,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:2919"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2645,7 +2645,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:2650"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2654,7 +2654,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:2895"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2663,7 +2663,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:1471"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2672,7 +2672,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:1519"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2681,7 +2681,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:2235"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2690,7 +2690,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:2382"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2699,7 +2699,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:2439"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2708,7 +2708,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:2401"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2717,7 +2717,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:1274"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2726,7 +2726,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:1364"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2735,7 +2735,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:1239"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2744,7 +2744,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:1252"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2753,7 +2753,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:2598"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2762,7 +2762,7 @@
     "sources": [
       "backend/app/api/v1/ads.py:1813"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2771,7 +2771,7 @@
     "sources": [
       "backend/app/api/v1/ai_agent.py:602"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2780,7 +2780,7 @@
     "sources": [
       "backend/app/api/v1/ai_agent.py:624"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2789,7 +2789,7 @@
     "sources": [
       "backend/app/api/v1/ai_agent.py:674"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2798,7 +2798,7 @@
     "sources": [
       "backend/app/api/v1/ai_agent.py:790"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2807,7 +2807,7 @@
     "sources": [
       "backend/app/api/v1/ai_agent.py:398"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2816,7 +2816,7 @@
     "sources": [
       "backend/app/api/v1/ai_agent.py:531"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2825,7 +2825,7 @@
     "sources": [
       "backend/app/api/v1/ai_agent.py:777"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2834,7 +2834,7 @@
     "sources": [
       "backend/app/api/v1/ai_agent.py:307"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2843,7 +2843,7 @@
     "sources": [
       "backend/app/api/v1/ai_agent.py:977"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2852,7 +2852,7 @@
     "sources": [
       "backend/app/api/v1/ai_agent.py:999"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2861,7 +2861,7 @@
     "sources": [
       "backend/app/api/v1/ai_agent.py:853"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2870,7 +2870,7 @@
     "sources": [
       "backend/app/api/v1/ai.py:24"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2879,7 +2879,7 @@
     "sources": [
       "backend/app/api/v1/auth.py:187"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2888,7 +2888,7 @@
     "sources": [
       "backend/app/api/v1/auth.py:212"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2897,7 +2897,7 @@
     "sources": [
       "backend/app/api/v1/auth.py:229"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2906,7 +2906,7 @@
     "sources": [
       "backend/app/api/v1/automations.py:60"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2915,7 +2915,7 @@
     "sources": [
       "backend/app/api/v1/automations.py:144"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2924,7 +2924,7 @@
     "sources": [
       "backend/app/api/v1/autoreply.py:67"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2933,7 +2933,7 @@
     "sources": [
       "backend/app/api/v1/autoreply.py:148"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2942,7 +2942,7 @@
     "sources": [
       "backend/app/api/v1/calendar.py:361"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2951,7 +2951,7 @@
     "sources": [
       "backend/app/api/v1/calendar.py:587"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2960,7 +2960,7 @@
     "sources": [
       "backend/app/api/v1/calendar.py:577"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2969,7 +2969,7 @@
     "sources": [
       "backend/app/api/v1/calendar.py:568"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2978,7 +2978,7 @@
     "sources": [
       "backend/app/api/v1/calendar.py:597"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2987,7 +2987,7 @@
     "sources": [
       "backend/app/api/v1/calendar.py:606"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -2996,7 +2996,7 @@
     "sources": [
       "backend/app/api/v1/calendar.py:620"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3005,7 +3005,7 @@
     "sources": [
       "backend/app/api/v1/calls.py:240"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3014,7 +3014,7 @@
     "sources": [
       "backend/app/api/v1/calls.py:263"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3023,7 +3023,7 @@
     "sources": [
       "backend/app/api/v1/calls.py:125"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3032,7 +3032,7 @@
     "sources": [
       "backend/app/api/v1/calls.py:184"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3041,7 +3041,7 @@
     "sources": [
       "backend/app/api/v1/calls.py:102"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3050,7 +3050,7 @@
     "sources": [
       "backend/app/api/v1/campaign_followups.py:144"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3059,7 +3059,7 @@
     "sources": [
       "backend/app/api/v1/campaign_followups.py:287"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3068,7 +3068,7 @@
     "sources": [
       "backend/app/api/v1/campaign_followups.py:264"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3077,7 +3077,7 @@
     "sources": [
       "backend/app/api/v1/campaigns.py:160"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3086,7 +3086,7 @@
     "sources": [
       "backend/app/api/v1/campaigns.py:917"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3095,7 +3095,7 @@
     "sources": [
       "backend/app/api/v1/campaigns.py:481"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3104,7 +3104,7 @@
     "sources": [
       "backend/app/api/v1/campaigns.py:507"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3113,7 +3113,7 @@
     "sources": [
       "backend/app/api/v1/campaigns.py:340"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3122,7 +3122,7 @@
     "sources": [
       "backend/app/api/v1/campaigns.py:394"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3131,7 +3131,7 @@
     "sources": [
       "backend/app/api/v1/campaigns.py:576"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3140,7 +3140,7 @@
     "sources": [
       "backend/app/api/v1/campaigns.py:321"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3149,7 +3149,7 @@
     "sources": [
       "backend/app/api/v1/contacts.py:602"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3158,7 +3158,7 @@
     "sources": [
       "backend/app/api/v1/contacts.py:978"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3167,7 +3167,7 @@
     "sources": [
       "backend/app/api/v1/contacts.py:477"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3176,7 +3176,7 @@
     "sources": [
       "backend/app/api/v1/contacts.py:1558"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3185,7 +3185,7 @@
     "sources": [
       "backend/app/api/v1/contacts.py:1393"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3194,7 +3194,7 @@
     "sources": [
       "backend/app/api/v1/contacts.py:1241"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3203,7 +3203,7 @@
     "sources": [
       "backend/app/api/v1/contacts.py:1227"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3212,7 +3212,7 @@
     "sources": [
       "backend/app/api/v1/contacts.py:1274"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3221,7 +3221,7 @@
     "sources": [
       "backend/app/api/v1/contacts.py:569"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3230,7 +3230,7 @@
     "sources": [
       "backend/app/api/v1/contacts.py:495"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3239,7 +3239,7 @@
     "sources": [
       "backend/app/api/v1/contacts.py:1749"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3248,7 +3248,7 @@
     "sources": [
       "backend/app/api/v1/contacts.py:1725"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3257,7 +3257,7 @@
     "sources": [
       "backend/app/api/v1/contacts.py:1773"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3266,7 +3266,7 @@
     "sources": [
       "backend/app/api/v1/email.py:226"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3275,7 +3275,7 @@
     "sources": [
       "backend/app/api/v1/email.py:507"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3284,7 +3284,7 @@
     "sources": [
       "backend/app/api/v1/email.py:522"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3293,7 +3293,7 @@
     "sources": [
       "backend/app/api/v1/email.py:541"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3302,7 +3302,7 @@
     "sources": [
       "backend/app/api/v1/email.py:443"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3311,7 +3311,7 @@
     "sources": [
       "backend/app/api/v1/email.py:471"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3320,7 +3320,7 @@
     "sources": [
       "backend/app/api/v1/email.py:339"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3329,7 +3329,7 @@
     "sources": [
       "backend/app/api/v1/email.py:393"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3338,7 +3338,7 @@
     "sources": [
       "backend/app/api/v1/email.py:1528"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3347,7 +3347,7 @@
     "sources": [
       "backend/app/api/v1/email.py:1405"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3356,7 +3356,7 @@
     "sources": [
       "backend/app/api/v1/email.py:1551"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3365,7 +3365,7 @@
     "sources": [
       "backend/app/api/v1/email.py:1122"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3374,7 +3374,7 @@
     "sources": [
       "backend/app/api/v1/email.py:839"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3383,7 +3383,7 @@
     "sources": [
       "backend/app/api/v1/email.py:895"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3392,7 +3392,7 @@
     "sources": [
       "backend/app/api/v1/email.py:557"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3401,7 +3401,7 @@
     "sources": [
       "backend/app/api/v1/email.py:1646"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3410,7 +3410,7 @@
     "sources": [
       "backend/app/api/v1/email.py:623"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3419,7 +3419,7 @@
     "sources": [
       "backend/app/api/v1/email.py:1796"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3428,7 +3428,7 @@
     "sources": [
       "backend/app/api/v1/followups.py:154"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3437,7 +3437,7 @@
     "sources": [
       "backend/app/api/v1/followups.py:305"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3446,7 +3446,7 @@
     "sources": [
       "backend/app/api/v1/followups.py:248"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3455,7 +3455,7 @@
     "sources": [
       "backend/app/api/v1/followups.py:273"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3464,7 +3464,7 @@
     "sources": [
       "backend/app/api/v1/inbox.py:401"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3473,7 +3473,7 @@
     "sources": [
       "backend/app/api/v1/inbox.py:393"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3482,7 +3482,7 @@
     "sources": [
       "backend/app/api/v1/inbox.py:397"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3491,7 +3491,7 @@
     "sources": [
       "backend/app/api/v1/inbox.py:405"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3500,7 +3500,7 @@
     "sources": [
       "backend/app/api/v1/inbox.py:426"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3509,7 +3509,7 @@
     "sources": [
       "backend/app/api/v1/inbox.py:298"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3518,7 +3518,7 @@
     "sources": [
       "backend/app/api/v1/inbox.py:444"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3527,7 +3527,7 @@
     "sources": [
       "backend/app/api/v1/inbox.py:414"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3536,7 +3536,7 @@
     "sources": [
       "backend/app/api/v1/inbox.py:435"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3545,7 +3545,7 @@
     "sources": [
       "backend/app/api/v1/inbox.py:851"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3554,7 +3554,7 @@
     "sources": [
       "backend/app/api/v1/inbox.py:786"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3563,7 +3563,7 @@
     "sources": [
       "backend/app/api/v1/inbox.py:700"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3572,7 +3572,7 @@
     "sources": [
       "backend/app/api/v1/inbox.py:768"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3581,7 +3581,7 @@
     "sources": [
       "backend/app/api/v1/inbox.py:527"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3590,7 +3590,7 @@
     "sources": [
       "backend/app/api/v1/inbox.py:544"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3599,7 +3599,7 @@
     "sources": [
       "backend/app/api/v1/invoices.py:851"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3608,7 +3608,7 @@
     "sources": [
       "backend/app/api/v1/invoices.py:946"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3617,7 +3617,7 @@
     "sources": [
       "backend/app/api/v1/invoices.py:537"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3626,7 +3626,7 @@
     "sources": [
       "backend/app/api/v1/invoices.py:658"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3635,7 +3635,7 @@
     "sources": [
       "backend/app/api/v1/invoices.py:308"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3644,7 +3644,7 @@
     "sources": [
       "backend/app/api/v1/invoices.py:1216"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3653,7 +3653,7 @@
     "sources": [
       "backend/app/api/v1/invoices.py:1338"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3662,7 +3662,7 @@
     "sources": [
       "backend/app/api/v1/invoices.py:1409"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3671,7 +3671,7 @@
     "sources": [
       "backend/app/api/v1/invoices.py:1288"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3680,7 +3680,7 @@
     "sources": [
       "backend/app/api/v1/invoices.py:1489"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3689,7 +3689,7 @@
     "sources": [
       "backend/app/api/v1/invoices.py:1275"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3698,7 +3698,7 @@
     "sources": [
       "backend/app/api/v1/invoices.py:1323"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3707,7 +3707,7 @@
     "sources": [
       "backend/app/api/v1/lists.py:172"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3716,7 +3716,7 @@
     "sources": [
       "backend/app/api/v1/lists.py:521"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3725,7 +3725,7 @@
     "sources": [
       "backend/app/api/v1/lists.py:315"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3734,7 +3734,7 @@
     "sources": [
       "backend/app/api/v1/lists.py:387"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3743,7 +3743,7 @@
     "sources": [
       "backend/app/api/v1/lists.py:464"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3752,7 +3752,7 @@
     "sources": [
       "backend/app/api/v1/lists.py:417"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3761,7 +3761,7 @@
     "sources": [
       "backend/app/api/v1/lists.py:547"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3770,7 +3770,7 @@
     "sources": [
       "backend/app/api/v1/mail.py:155"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3779,7 +3779,7 @@
     "sources": [
       "backend/app/api/v1/mail.py:117"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3788,7 +3788,7 @@
     "sources": [
       "backend/app/api/v1/mail.py:137"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3797,7 +3797,7 @@
     "sources": [
       "backend/app/api/v1/mail.py:170"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3806,7 +3806,7 @@
     "sources": [
       "backend/app/api/v1/mail.py:194"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3815,7 +3815,7 @@
     "sources": [
       "backend/app/api/v1/mailbox.py:463"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3824,7 +3824,7 @@
     "sources": [
       "backend/app/api/v1/mailbox.py:463"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3833,7 +3833,7 @@
     "sources": [
       "backend/app/api/v1/mailbox.py:581"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3842,7 +3842,7 @@
     "sources": [
       "backend/app/api/v1/mailbox.py:607"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3851,7 +3851,7 @@
     "sources": [
       "backend/app/api/v1/mailbox.py:594"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3860,7 +3860,7 @@
     "sources": [
       "backend/app/api/v1/mailbox.py:641"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3869,7 +3869,7 @@
     "sources": [
       "backend/app/api/v1/mcp.py:1134"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3878,7 +3878,7 @@
     "sources": [
       "backend/app/api/v1/mcp.py:1202"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3887,7 +3887,7 @@
     "sources": [
       "backend/app/api/v1/mcp.py:1223"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3896,7 +3896,7 @@
     "sources": [
       "backend/app/api/v1/mcp.py:971"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3905,7 +3905,7 @@
     "sources": [
       "backend/app/api/v1/notifications.py:116"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3914,7 +3914,7 @@
     "sources": [
       "backend/app/api/v1/notifications.py:168"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3923,7 +3923,7 @@
     "sources": [
       "backend/app/api/v1/notifications.py:144"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3932,7 +3932,7 @@
     "sources": [
       "backend/app/api/v1/notifications.py:80"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3941,7 +3941,7 @@
     "sources": [
       "backend/app/api/v1/notifications.py:67"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3950,7 +3950,7 @@
     "sources": [
       "backend/app/api/v1/send.py:37"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3959,7 +3959,7 @@
     "sources": [
       "backend/app/api/v1/send.py:468"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3968,7 +3968,7 @@
     "sources": [
       "backend/app/api/v1/send.py:440"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3977,7 +3977,7 @@
     "sources": [
       "backend/app/api/v1/send.py:452"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3986,7 +3986,7 @@
     "sources": [
       "backend/app/api/v1/send.py:264"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -3995,7 +3995,7 @@
     "sources": [
       "backend/app/api/v1/sequences.py:119"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4004,7 +4004,7 @@
     "sources": [
       "backend/app/api/v1/settings.py:258"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4013,7 +4013,7 @@
     "sources": [
       "backend/app/api/v1/settings.py:240"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4022,7 +4022,7 @@
     "sources": [
       "backend/app/api/v1/settings.py:466"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4031,7 +4031,7 @@
     "sources": [
       "backend/app/api/v1/settings.py:538"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4040,7 +4040,7 @@
     "sources": [
       "backend/app/api/v1/settings.py:518"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4049,7 +4049,7 @@
     "sources": [
       "backend/app/api/v1/settings.py:78"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4058,7 +4058,7 @@
     "sources": [
       "backend/app/api/v1/settings.py:72"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4067,7 +4067,7 @@
     "sources": [
       "backend/app/api/v1/settings.py:184"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4076,7 +4076,7 @@
     "sources": [
       "backend/app/api/v1/templates.py:215"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4085,7 +4085,7 @@
     "sources": [
       "backend/app/api/v1/templates.py:141"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4094,7 +4094,7 @@
     "sources": [
       "backend/app/api/v1/templates.py:321"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4103,7 +4103,7 @@
     "sources": [
       "backend/app/api/v1/templates.py:353"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4112,7 +4112,7 @@
     "sources": [
       "backend/app/api/v1/validator.py:281"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4121,7 +4121,7 @@
     "sources": [
       "backend/app/api/v1/validator.py:159"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4130,7 +4130,7 @@
     "sources": [
       "backend/app/api/v1/validator.py:211"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4139,7 +4139,7 @@
     "sources": [
       "backend/app/api/v1/validator.py:143"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4148,7 +4148,7 @@
     "sources": [
       "backend/app/api/v1/validator.py:105"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4157,7 +4157,7 @@
     "sources": [
       "backend/app/api/v1/variables.py:85"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4166,7 +4166,7 @@
     "sources": [
       "backend/app/api/v1/variables.py:186"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4175,7 +4175,7 @@
     "sources": [
       "backend/app/api/v1/variables.py:76"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4184,7 +4184,7 @@
     "sources": [
       "backend/app/api/v1/webhooks.py:628"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4193,7 +4193,7 @@
     "sources": [
       "backend/app/api/v1/webhooks.py:628"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4202,7 +4202,7 @@
     "sources": [
       "backend/app/api/v1/webhooks.py:431"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4211,7 +4211,7 @@
     "sources": [
       "backend/app/api/v1/webhooks.py:570"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4220,7 +4220,7 @@
     "sources": [
       "backend/app/api/v1/webhooks.py:228"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4229,7 +4229,7 @@
     "sources": [
       "backend/app/api/v1/webhooks.py:217"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4238,7 +4238,7 @@
     "sources": [
       "backend/app/api/v1/mcp.py:338"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4247,7 +4247,7 @@
     "sources": [
       "backend/app/api/v1/mcp.py:667"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4256,7 +4256,7 @@
     "sources": [
       "backend/app/api/v1/mcp.py:429"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4265,7 +4265,7 @@
     "sources": [
       "backend/app/api/v1/mcp.py:931"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4274,7 +4274,7 @@
     "sources": [
       "backend/app/api/v1/mcp.py:921"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4283,7 +4283,7 @@
     "sources": [
       "backend/app/api/v1/mcp.py:300"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4292,7 +4292,7 @@
     "sources": [
       "backend/app/api/v1/mcp.py:300"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4301,7 +4301,7 @@
     "sources": [
       "backend/app/api/v1/mcp.py:667"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4310,7 +4310,7 @@
     "sources": [
       "backend/app/api/v1/mcp.py:429"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4319,7 +4319,7 @@
     "sources": [
       "backend/app/api/v1/mcp.py:931"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4328,7 +4328,7 @@
     "sources": [
       "backend/app/api/v1/mcp.py:921"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4337,7 +4337,7 @@
     "sources": [
       "backend/app/api/v1/ai_agent.py:903"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4346,7 +4346,7 @@
     "sources": [
       "backend/app/api/v1/ai_agent.py:931"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4355,7 +4355,7 @@
     "sources": [
       "backend/app/api/v1/ai_agent.py:153"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4364,7 +4364,7 @@
     "sources": [
       "backend/app/api/v1/ai_agent.py:258"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4373,7 +4373,7 @@
     "sources": [
       "backend/app/api/v1/ai_agent.py:284"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4382,7 +4382,7 @@
     "sources": [
       "backend/app/api/v1/automations.py:100"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4391,7 +4391,7 @@
     "sources": [
       "backend/app/api/v1/autoreply.py:99"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4400,7 +4400,7 @@
     "sources": [
       "backend/app/api/v1/calendar.py:457"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4409,7 +4409,7 @@
     "sources": [
       "backend/app/api/v1/calls.py:78"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4418,7 +4418,7 @@
     "sources": [
       "backend/app/api/v1/campaign_followups.py:212"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4427,7 +4427,7 @@
     "sources": [
       "backend/app/api/v1/campaigns.py:221"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4436,7 +4436,7 @@
     "sources": [
       "backend/app/api/v1/contacts.py:663"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4445,7 +4445,7 @@
     "sources": [
       "backend/app/api/v1/invoices.py:298"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4454,7 +4454,7 @@
     "sources": [
       "backend/app/api/v1/lists.py:194"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4463,7 +4463,7 @@
     "sources": [
       "backend/app/api/v1/sequences.py:163"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4472,7 +4472,7 @@
     "sources": [
       "backend/app/api/v1/settings.py:28"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4481,7 +4481,7 @@
     "sources": [
       "backend/app/api/v1/settings.py:633"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4490,7 +4490,7 @@
     "sources": [
       "backend/app/api/v1/settings.py:226"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4499,7 +4499,7 @@
     "sources": [
       "backend/app/api/v1/settings.py:200"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4508,7 +4508,7 @@
     "sources": [
       "backend/app/api/v1/settings.py:481"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4517,7 +4517,7 @@
     "sources": [
       "backend/app/api/v1/settings.py:558"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4526,7 +4526,7 @@
     "sources": [
       "backend/app/api/v1/settings.py:67"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4535,7 +4535,7 @@
     "sources": [
       "backend/app/api/v1/settings.py:357"
     ],
-    "state": "missing original application handler",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4544,7 +4544,7 @@
     "sources": [
       "backend/app/api/v1/settings.py:165"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4553,7 +4553,7 @@
     "sources": [
       "backend/app/api/v1/settings.py:172"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4562,7 +4562,7 @@
     "sources": [
       "backend/app/api/v1/templates.py:262"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   },
   {
@@ -4571,7 +4571,7 @@
     "sources": [
       "backend/app/api/v1/variables.py:123"
     ],
-    "state": "partial handler; native WordPress/HTTP unverified",
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
     "certified": false
   }
 ]
