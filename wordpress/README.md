@@ -156,3 +156,7 @@ These handlers have actual persistence logic, not placeholder successes. They re
 Native auth/account/session/rate-limit certification and concurrency recovery, full settings/provider wiring, contact/list deletion and related-record cleanup, remaining bulk actions, native URL transport and queue/lock certification, email accounts/verification, campaigns/follow-ups, inbox/SMS/calls, scheduler, webhooks, invoices/calendar, remaining profile workflows, AI/MCP, analytics/notifications, complete migration, unchanged frontend integration and native release tests still need recreation/implementation. Do not expose the unchanged frontend as a working application until those routes and permissions exist.
 
 This is a development checkpoint, not completion of the full migration request.
+
+## Unattended migration coordination
+
+`automation/backlog.json` and `tools/migration_runner.py` now provide a resumable, locked, bounded-retry coordinator for an external trusted coding worker, with independent offline regression checks and a mandatory independent native/release review. See `automation/README.md`. **The current environment has no configured coding worker; no unattended implementation is running.** The coordinator itself is not an implementation agent or evidence that the missing application has been finished.
