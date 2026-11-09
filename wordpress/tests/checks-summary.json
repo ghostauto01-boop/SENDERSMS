@@ -1,7 +1,7 @@
 {
   "ok": true,
-  "php_lint_checks": 94,
-  "php_assertions": 42818,
+  "php_lint_checks": 98,
+  "php_assertions": 43174,
   "vendor_parser_checks": 3075,
   "vendor_hash_checks": 1547,
   "unchanged_frontend_files": 165,
@@ -69,7 +69,7 @@
     },
     {
       "ok": true,
-      "assertions": 743,
+      "assertions": 774,
       "diffs": [],
       "php": "7.4.34-dev",
       "scope": "Offline requests/responses with synthetic password codec, seventy-three synthetic SQLite application tables, fault-injected transaction failure; not real WP/HTTP/Argon2/native MySQL/concurrency proof",
@@ -331,6 +331,20 @@
       "provider_messages_sent": 0,
       "scope": "Actual selected classic campaign read handlers/DTO/stats, synthetic SQLite snapshots and resource/validation guards. Not campaign creation/execution/reconciliation, native HTTP/MySQL/concurrency or browser proof",
       "suite": "campaign-reports"
+    },
+    {
+      "ok": true,
+      "assertions": 147,
+      "diffs": [],
+      "php": "7.4.34-dev",
+      "source_send_cases": 10,
+      "source_poll_cases": 8,
+      "native_wordpress_verified": false,
+      "native_mysql_verified": false,
+      "real_http_verified": false,
+      "provider_messages_sent": 0,
+      "scope": "Selected actual source SMS-Gate payloads with fake httpx/pinned transport; encrypted native phone settings, CAS/fault/rollback and no-test-SMS checks. No live HTTP/SMS, outbox, workers, native DNS/TLS/cURL/MySQL/concurrency/browser certification",
+      "suite": "sms-gateway"
     },
     {
       "ok": true,
@@ -402,7 +416,7 @@
     },
     {
       "ok": true,
-      "assertions": 743,
+      "assertions": 774,
       "diffs": [],
       "php": "8.3.36",
       "scope": "Offline requests/responses with synthetic password codec, seventy-three synthetic SQLite application tables, fault-injected transaction failure; not real WP/HTTP/Argon2/native MySQL/concurrency proof",
@@ -664,6 +678,20 @@
       "provider_messages_sent": 0,
       "scope": "Actual selected classic campaign read handlers/DTO/stats, synthetic SQLite snapshots and resource/validation guards. Not campaign creation/execution/reconciliation, native HTTP/MySQL/concurrency or browser proof",
       "suite": "campaign-reports"
+    },
+    {
+      "ok": true,
+      "assertions": 147,
+      "diffs": [],
+      "php": "8.3.36",
+      "source_send_cases": 10,
+      "source_poll_cases": 8,
+      "native_wordpress_verified": false,
+      "native_mysql_verified": false,
+      "real_http_verified": false,
+      "provider_messages_sent": 0,
+      "scope": "Selected actual source SMS-Gate payloads with fake httpx/pinned transport; encrypted native phone settings, CAS/fault/rollback and no-test-SMS checks. No live HTTP/SMS, outbox, workers, native DNS/TLS/cURL/MySQL/concurrency/browser certification",
+      "suite": "sms-gateway"
     },
     {
       "ok": true,

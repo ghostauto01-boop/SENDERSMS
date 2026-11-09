@@ -1,6 +1,6 @@
 # Remaining WordPress recreation work
 
-359 missing source handlers,149 partial health/auth/contact/list/variable/template/reply/classification/notification/import/analytics/sequence/settings/calendar/invoice/inbox/status-webhook/follow-up-control/access/profile/dashboard/campaign-reporting handlers,0 fully certified contracts. The administrator CSV diagnostic is not the original source import API.
+354 missing source handlers,154 partial health/auth/contact/list/variable/template/reply/classification/notification/import/analytics/sequence/settings/calendar/invoice/inbox/status-webhook/follow-up-control/access/profile/dashboard/campaign-reporting/gateway-phone handlers,0 fully certified contracts. The administrator CSV diagnostic is not the original source import API.
 
 Every row is outstanding, including all partial handlers until native HTTP certification. See README.md for actual implemented utilities and fresh test boundaries.
 
@@ -39,7 +39,7 @@ Every row is outstanding, including all partial handlers until native HTTP certi
 | DELETE | /api/v1/mcp/tokens/{token_id} | backend/app/api/v1/mcp.py:1000 | missing original application handler |
 | DELETE | /api/v1/sequences/{sequence_id} | backend/app/api/v1/sequences.py:243 | partial handler; native WordPress/HTTP unverified |
 | DELETE | /api/v1/settings/callgate/webhooks/{webhook_id} | backend/app/api/v1/settings.py:287 | missing original application handler |
-| DELETE | /api/v1/settings/gateway/phones/{phone_id} | backend/app/api/v1/settings.py:501 | missing original application handler |
+| DELETE | /api/v1/settings/gateway/phones/{phone_id} | backend/app/api/v1/settings.py:501 | partial handler; native WordPress/HTTP unverified |
 | DELETE | /api/v1/settings/gateway/webhooks/{webhook_id} | backend/app/api/v1/settings.py:142 | missing original application handler |
 | DELETE | /api/v1/templates/{template_id} | backend/app/api/v1/templates.py:306 | partial handler; native WordPress/HTTP unverified |
 | DELETE | /api/v1/variables/{variable_id} | backend/app/api/v1/variables.py:163 | partial handler; native WordPress/HTTP unverified |
@@ -225,7 +225,7 @@ Every row is outstanding, including all partial handlers until native HTTP certi
 | GET | /api/v1/settings/callgate/webhooks | backend/app/api/v1/settings.py:248 | missing original application handler |
 | GET | /api/v1/settings/compliance | backend/app/api/v1/settings.py:196 | partial handler; native WordPress/HTTP unverified |
 | GET | /api/v1/settings/gateway | backend/app/api/v1/settings.py:45 | missing original application handler |
-| GET | /api/v1/settings/gateway/phones | backend/app/api/v1/settings.py:451 | missing original application handler |
+| GET | /api/v1/settings/gateway/phones | backend/app/api/v1/settings.py:451 | partial handler; native WordPress/HTTP unverified |
 | GET | /api/v1/settings/gateway/webhooks | backend/app/api/v1/settings.py:111 | missing original application handler |
 | GET | /api/v1/settings/google-oauth | backend/app/api/v1/settings.py:314 | missing original application handler |
 | GET | /api/v1/settings/notifications | backend/app/api/v1/settings.py:151 | partial handler; native WordPress/HTTP unverified |
@@ -452,9 +452,9 @@ Every row is outstanding, including all partial handlers until native HTTP certi
 | POST | /api/v1/sequences/ | backend/app/api/v1/sequences.py:119 | partial handler; native WordPress/HTTP unverified |
 | POST | /api/v1/settings/callgate/register-webhook | backend/app/api/v1/settings.py:258 | missing original application handler |
 | POST | /api/v1/settings/callgate/test | backend/app/api/v1/settings.py:240 | missing original application handler |
-| POST | /api/v1/settings/gateway/phones | backend/app/api/v1/settings.py:466 | missing original application handler |
+| POST | /api/v1/settings/gateway/phones | backend/app/api/v1/settings.py:466 | partial handler; native WordPress/HTTP unverified |
 | POST | /api/v1/settings/gateway/phones/{phone_id}/register-webhook | backend/app/api/v1/settings.py:538 | missing original application handler |
-| POST | /api/v1/settings/gateway/phones/{phone_id}/test | backend/app/api/v1/settings.py:518 | missing original application handler |
+| POST | /api/v1/settings/gateway/phones/{phone_id}/test | backend/app/api/v1/settings.py:518 | partial handler; native WordPress/HTTP unverified |
 | POST | /api/v1/settings/gateway/register-webhook | backend/app/api/v1/settings.py:78 | missing original application handler |
 | POST | /api/v1/settings/gateway/test | backend/app/api/v1/settings.py:72 | missing original application handler |
 | POST | /api/v1/settings/notifications/{provider}/test | backend/app/api/v1/settings.py:184 | missing original application handler |
@@ -506,7 +506,7 @@ Every row is outstanding, including all partial handlers until native HTTP certi
 | PUT | /api/v1/settings/appearance | backend/app/api/v1/settings.py:633 | partial handler; native WordPress/HTTP unverified |
 | PUT | /api/v1/settings/callgate | backend/app/api/v1/settings.py:226 | missing original application handler |
 | PUT | /api/v1/settings/compliance | backend/app/api/v1/settings.py:200 | partial handler; native WordPress/HTTP unverified |
-| PUT | /api/v1/settings/gateway/phones/{phone_id} | backend/app/api/v1/settings.py:481 | missing original application handler |
+| PUT | /api/v1/settings/gateway/phones/{phone_id} | backend/app/api/v1/settings.py:481 | partial handler; native WordPress/HTTP unverified |
 | PUT | /api/v1/settings/gateway/routing | backend/app/api/v1/settings.py:558 | missing original application handler |
 | PUT | /api/v1/settings/gateway/sim | backend/app/api/v1/settings.py:67 | missing original application handler |
 | PUT | /api/v1/settings/google-oauth | backend/app/api/v1/settings.py:357 | missing original application handler |

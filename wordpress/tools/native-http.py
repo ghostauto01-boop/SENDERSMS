@@ -165,6 +165,12 @@ try:
  s,b,h=request('GET','campaigns',query={'channel':'typo'});check('native campaign channel typo refused',s,422)
  for tail in ('','/analytics','/conversations'):
   s,b,h=request('GET','campaigns/9223372036854775807'+tail);check('native missing classic campaign '+tail,s,404)
+ # Native gateway storage only; the installation's network sink forbids provider calls.
+ s,b,h=request('GET','settings/gateway/phones',authenticated=False);check('native gateway settings private',s,401)
+ s,b,h=request('POST','settings/gateway/phones',{'name':'Isolated native sender','username':'synthetic-native-user','password':'synthetic-native-password','is_enabled':True});check('native gateway phone create',s,200);phone=b.get('phone',{}).get('db_id');check('native gateway ciphertext redacted','synthetic-native-password' not in json.dumps(b));check('native gateway unknown before probe',b.get('phone',{}).get('connection_status'),'unknown')
+ s,b,h=request('POST',f'settings/gateway/phones/{phone}/test',{});check('native gateway honors isolated network sink',s,503)
+ s,b,h=request('PUT',f'settings/gateway/phones/{phone}',{'password':'synthetic-native-replacement','is_enabled':False});check('native gateway encrypted replacement',s,200);check('native gateway replacement redacted','synthetic-native-replacement' not in json.dumps(b))
+ s,b,h=request('DELETE',f'settings/gateway/phones/{phone}');check('native gateway phone removal',s,200)
  s,b,h=request('POST','auth/logout');check('native logout',s,200)
  s,b,h=request('GET','contacts');check('native logout clears browser cookie',s,401)
 except Exception as e:failures.append({'exception':type(e).__name__,'message':str(e)})
