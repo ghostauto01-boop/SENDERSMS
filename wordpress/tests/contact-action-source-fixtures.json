@@ -1,0 +1,5050 @@
+{
+  "seeds": [
+    {
+      "table": "contacts",
+      "values": {
+        "id": 1,
+        "first_name": null,
+        "last_name": null,
+        "business_name": null,
+        "phone_number": "+2348031112222",
+        "email": "first@business.ng",
+        "city": null,
+        "state": null,
+        "country": null,
+        "website": null,
+        "industry": null,
+        "source": null,
+        "lead_status": "new",
+        "consent_status": "opted_out",
+        "has_consented": false,
+        "is_opted_out": true,
+        "opted_out_at": null,
+        "opt_out_reason": null,
+        "is_undeliverable": false,
+        "undeliverable_reason": null,
+        "delivery_fail_count": 0,
+        "is_email_opted_out": false,
+        "email_opted_out_at": null,
+        "email_opt_out_reason": null,
+        "email_status": "active",
+        "is_email_undeliverable": false,
+        "email_fail_count": 0,
+        "email_last_error": null,
+        "email_source": null,
+        "email_verified": false,
+        "email_verified_at": null,
+        "email_confidence": null,
+        "email_verdict": null,
+        "email_enriched_at": null,
+        "email_enrichment_note": null,
+        "email_lower": null,
+        "notes": null,
+        "custom_fields": null,
+        "messages_sent": 0,
+        "messages_received": 0,
+        "emails_sent": 0,
+        "emails_received": 0,
+        "last_emailed_at": null,
+        "last_email_reply_at": null,
+        "last_contacted_at": null,
+        "last_reply_at": null,
+        "created_at": "2026-01-02T12:00:00.123456+00:00",
+        "updated_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "contacts",
+      "values": {
+        "id": 2,
+        "first_name": null,
+        "last_name": null,
+        "business_name": null,
+        "phone_number": null,
+        "email": "second@business.ng",
+        "city": null,
+        "state": null,
+        "country": null,
+        "website": null,
+        "industry": null,
+        "source": null,
+        "lead_status": "new",
+        "consent_status": "unknown",
+        "has_consented": false,
+        "is_opted_out": false,
+        "opted_out_at": null,
+        "opt_out_reason": null,
+        "is_undeliverable": false,
+        "undeliverable_reason": null,
+        "delivery_fail_count": 0,
+        "is_email_opted_out": false,
+        "email_opted_out_at": null,
+        "email_opt_out_reason": null,
+        "email_status": "active",
+        "is_email_undeliverable": false,
+        "email_fail_count": 0,
+        "email_last_error": null,
+        "email_source": null,
+        "email_verified": false,
+        "email_verified_at": null,
+        "email_confidence": null,
+        "email_verdict": null,
+        "email_enriched_at": null,
+        "email_enrichment_note": null,
+        "email_lower": null,
+        "notes": null,
+        "custom_fields": null,
+        "messages_sent": 0,
+        "messages_received": 0,
+        "emails_sent": 0,
+        "emails_received": 0,
+        "last_emailed_at": null,
+        "last_email_reply_at": null,
+        "last_contacted_at": null,
+        "last_reply_at": null,
+        "created_at": "2026-01-02T12:00:00.123456+00:00",
+        "updated_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "contacts",
+      "values": {
+        "id": 3,
+        "first_name": null,
+        "last_name": null,
+        "business_name": null,
+        "phone_number": "123",
+        "email": null,
+        "city": null,
+        "state": null,
+        "country": null,
+        "website": null,
+        "industry": null,
+        "source": null,
+        "lead_status": "new",
+        "consent_status": "unknown",
+        "has_consented": false,
+        "is_opted_out": false,
+        "opted_out_at": null,
+        "opt_out_reason": null,
+        "is_undeliverable": false,
+        "undeliverable_reason": null,
+        "delivery_fail_count": 0,
+        "is_email_opted_out": false,
+        "email_opted_out_at": null,
+        "email_opt_out_reason": null,
+        "email_status": "active",
+        "is_email_undeliverable": false,
+        "email_fail_count": 0,
+        "email_last_error": null,
+        "email_source": null,
+        "email_verified": false,
+        "email_verified_at": null,
+        "email_confidence": null,
+        "email_verdict": null,
+        "email_enriched_at": null,
+        "email_enrichment_note": null,
+        "email_lower": null,
+        "notes": null,
+        "custom_fields": null,
+        "messages_sent": 0,
+        "messages_received": 0,
+        "emails_sent": 0,
+        "emails_received": 0,
+        "last_emailed_at": null,
+        "last_email_reply_at": null,
+        "last_contacted_at": null,
+        "last_reply_at": null,
+        "created_at": "2026-01-02T12:00:00.123456+00:00",
+        "updated_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "contacts",
+      "values": {
+        "id": 4,
+        "first_name": null,
+        "last_name": null,
+        "business_name": null,
+        "phone_number": null,
+        "email": "info@business.ng",
+        "city": null,
+        "state": null,
+        "country": null,
+        "website": null,
+        "industry": null,
+        "source": null,
+        "lead_status": "new",
+        "consent_status": "unknown",
+        "has_consented": false,
+        "is_opted_out": false,
+        "opted_out_at": null,
+        "opt_out_reason": null,
+        "is_undeliverable": false,
+        "undeliverable_reason": null,
+        "delivery_fail_count": 0,
+        "is_email_opted_out": false,
+        "email_opted_out_at": null,
+        "email_opt_out_reason": null,
+        "email_status": "active",
+        "is_email_undeliverable": false,
+        "email_fail_count": 0,
+        "email_last_error": null,
+        "email_source": "inferred",
+        "email_verified": false,
+        "email_verified_at": null,
+        "email_confidence": null,
+        "email_verdict": null,
+        "email_enriched_at": null,
+        "email_enrichment_note": null,
+        "email_lower": null,
+        "notes": null,
+        "custom_fields": null,
+        "messages_sent": 0,
+        "messages_received": 0,
+        "emails_sent": 0,
+        "emails_received": 0,
+        "last_emailed_at": null,
+        "last_email_reply_at": null,
+        "last_contacted_at": null,
+        "last_reply_at": null,
+        "created_at": "2026-01-02T12:00:00.123456+00:00",
+        "updated_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "contacts",
+      "values": {
+        "id": 5,
+        "first_name": null,
+        "last_name": null,
+        "business_name": null,
+        "phone_number": "+2348123456789",
+        "email": null,
+        "city": null,
+        "state": null,
+        "country": null,
+        "website": null,
+        "industry": null,
+        "source": null,
+        "lead_status": "new",
+        "consent_status": "unknown",
+        "has_consented": false,
+        "is_opted_out": false,
+        "opted_out_at": null,
+        "opt_out_reason": null,
+        "is_undeliverable": false,
+        "undeliverable_reason": null,
+        "delivery_fail_count": 0,
+        "is_email_opted_out": false,
+        "email_opted_out_at": null,
+        "email_opt_out_reason": null,
+        "email_status": "active",
+        "is_email_undeliverable": false,
+        "email_fail_count": 0,
+        "email_last_error": null,
+        "email_source": null,
+        "email_verified": false,
+        "email_verified_at": null,
+        "email_confidence": null,
+        "email_verdict": null,
+        "email_enriched_at": null,
+        "email_enrichment_note": null,
+        "email_lower": null,
+        "notes": null,
+        "custom_fields": null,
+        "messages_sent": 0,
+        "messages_received": 0,
+        "emails_sent": 0,
+        "emails_received": 0,
+        "last_emailed_at": null,
+        "last_email_reply_at": null,
+        "last_contacted_at": null,
+        "last_reply_at": null,
+        "created_at": "2026-01-02T12:00:00.123456+00:00",
+        "updated_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "contacts",
+      "values": {
+        "id": 6,
+        "first_name": null,
+        "last_name": null,
+        "business_name": null,
+        "phone_number": "+2348031111111",
+        "email": null,
+        "city": null,
+        "state": null,
+        "country": null,
+        "website": null,
+        "industry": null,
+        "source": null,
+        "lead_status": "new",
+        "consent_status": "unknown",
+        "has_consented": false,
+        "is_opted_out": false,
+        "opted_out_at": null,
+        "opt_out_reason": null,
+        "is_undeliverable": false,
+        "undeliverable_reason": null,
+        "delivery_fail_count": 0,
+        "is_email_opted_out": false,
+        "email_opted_out_at": null,
+        "email_opt_out_reason": null,
+        "email_status": "active",
+        "is_email_undeliverable": false,
+        "email_fail_count": 0,
+        "email_last_error": null,
+        "email_source": null,
+        "email_verified": false,
+        "email_verified_at": null,
+        "email_confidence": null,
+        "email_verdict": null,
+        "email_enriched_at": null,
+        "email_enrichment_note": null,
+        "email_lower": null,
+        "notes": null,
+        "custom_fields": null,
+        "messages_sent": 0,
+        "messages_received": 0,
+        "emails_sent": 0,
+        "emails_received": 0,
+        "last_emailed_at": null,
+        "last_email_reply_at": null,
+        "last_contacted_at": null,
+        "last_reply_at": null,
+        "created_at": "2026-01-02T12:00:00.123456+00:00",
+        "updated_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "contact_lists",
+      "values": {
+        "id": 1,
+        "name": "First",
+        "description": null,
+        "contact_count": 0,
+        "created_at": "2026-01-02T12:00:00.123456+00:00",
+        "updated_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "contact_lists",
+      "values": {
+        "id": 2,
+        "name": "Second",
+        "description": null,
+        "contact_count": 0,
+        "created_at": "2026-01-02T12:00:00.123456+00:00",
+        "updated_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "contact_list_members",
+      "values": {
+        "id": 1,
+        "list_id": 1,
+        "contact_id": 1,
+        "added_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "contact_list_members",
+      "values": {
+        "id": 2,
+        "list_id": 1,
+        "contact_id": 2,
+        "added_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "contact_list_members",
+      "values": {
+        "id": 3,
+        "list_id": 1,
+        "contact_id": 3,
+        "added_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "contact_list_members",
+      "values": {
+        "id": 4,
+        "list_id": 1,
+        "contact_id": 5,
+        "added_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "contact_list_members",
+      "values": {
+        "id": 5,
+        "list_id": 1,
+        "contact_id": 6,
+        "added_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "contact_list_members",
+      "values": {
+        "id": 6,
+        "list_id": 2,
+        "contact_id": 1,
+        "added_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "contact_list_members",
+      "values": {
+        "id": 7,
+        "list_id": 2,
+        "contact_id": 3,
+        "added_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "suppression_entries",
+      "values": {
+        "id": 1,
+        "phone_number": "+2348031112222",
+        "contact_id": 1,
+        "campaign_id": null,
+        "reason": null,
+        "source": "manual",
+        "opt_out_keyword": null,
+        "suppressed_at": "2026-01-02T12:00:00.123456+00:00",
+        "created_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    }
+  ],
+  "operations": [
+    {
+      "kind": "sms_in",
+      "id": 1,
+      "body": {},
+      "expected": {
+        "status": 400,
+        "message": "Confirm that the contact has explicitly consented before restoring SMS"
+      },
+      "snapshot": {
+        "contacts": [
+          {
+            "id": 1,
+            "email": "first@business.ng",
+            "phone_number": "+2348031112222",
+            "lead_status": "new",
+            "is_opted_out": true,
+            "has_consented": false,
+            "consent_status": "opted_out",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 4,
+            "email": "info@business.ng",
+            "phone_number": null,
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": "inferred",
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 2,
+            "email": "second@business.ng",
+            "phone_number": null,
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 3,
+            "email": null,
+            "phone_number": "123",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 5,
+            "email": null,
+            "phone_number": "+2348123456789",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 6,
+            "email": null,
+            "phone_number": "+2348031111111",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          }
+        ],
+        "contact_lists": [
+          {
+            "id": 1,
+            "name": "First",
+            "contact_count": 0
+          },
+          {
+            "id": 2,
+            "name": "Second",
+            "contact_count": 0
+          }
+        ],
+        "contact_list_members": [
+          {
+            "list_id": 1,
+            "contact_id": 1
+          },
+          {
+            "list_id": 2,
+            "contact_id": 1
+          },
+          {
+            "list_id": 1,
+            "contact_id": 2
+          },
+          {
+            "list_id": 1,
+            "contact_id": 3
+          },
+          {
+            "list_id": 2,
+            "contact_id": 3
+          },
+          {
+            "list_id": 1,
+            "contact_id": 5
+          },
+          {
+            "list_id": 1,
+            "contact_id": 6
+          }
+        ],
+        "tags": [],
+        "contact_tags": [],
+        "suppression_entries": [
+          {
+            "phone_number": "+2348031112222",
+            "contact_id": 1
+          }
+        ],
+        "email_suppressions": []
+      }
+    },
+    {
+      "kind": "sms_in",
+      "id": 1,
+      "body": {
+        "consent_confirmed": "true"
+      },
+      "expected": {
+        "status": 400,
+        "message": "Confirm that the contact has explicitly consented before restoring SMS"
+      },
+      "snapshot": {
+        "contacts": [
+          {
+            "id": 1,
+            "email": "first@business.ng",
+            "phone_number": "+2348031112222",
+            "lead_status": "new",
+            "is_opted_out": true,
+            "has_consented": false,
+            "consent_status": "opted_out",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 4,
+            "email": "info@business.ng",
+            "phone_number": null,
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": "inferred",
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 2,
+            "email": "second@business.ng",
+            "phone_number": null,
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 3,
+            "email": null,
+            "phone_number": "123",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 5,
+            "email": null,
+            "phone_number": "+2348123456789",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 6,
+            "email": null,
+            "phone_number": "+2348031111111",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          }
+        ],
+        "contact_lists": [
+          {
+            "id": 1,
+            "name": "First",
+            "contact_count": 0
+          },
+          {
+            "id": 2,
+            "name": "Second",
+            "contact_count": 0
+          }
+        ],
+        "contact_list_members": [
+          {
+            "list_id": 1,
+            "contact_id": 1
+          },
+          {
+            "list_id": 2,
+            "contact_id": 1
+          },
+          {
+            "list_id": 1,
+            "contact_id": 2
+          },
+          {
+            "list_id": 1,
+            "contact_id": 3
+          },
+          {
+            "list_id": 2,
+            "contact_id": 3
+          },
+          {
+            "list_id": 1,
+            "contact_id": 5
+          },
+          {
+            "list_id": 1,
+            "contact_id": 6
+          }
+        ],
+        "tags": [],
+        "contact_tags": [],
+        "suppression_entries": [
+          {
+            "phone_number": "+2348031112222",
+            "contact_id": 1
+          }
+        ],
+        "email_suppressions": []
+      }
+    },
+    {
+      "kind": "sms_in",
+      "id": 404,
+      "body": {
+        "consent_confirmed": true
+      },
+      "expected": {
+        "status": 404,
+        "message": "Contact not found"
+      },
+      "snapshot": {
+        "contacts": [
+          {
+            "id": 1,
+            "email": "first@business.ng",
+            "phone_number": "+2348031112222",
+            "lead_status": "new",
+            "is_opted_out": true,
+            "has_consented": false,
+            "consent_status": "opted_out",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 4,
+            "email": "info@business.ng",
+            "phone_number": null,
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": "inferred",
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 2,
+            "email": "second@business.ng",
+            "phone_number": null,
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 3,
+            "email": null,
+            "phone_number": "123",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 5,
+            "email": null,
+            "phone_number": "+2348123456789",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 6,
+            "email": null,
+            "phone_number": "+2348031111111",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          }
+        ],
+        "contact_lists": [
+          {
+            "id": 1,
+            "name": "First",
+            "contact_count": 0
+          },
+          {
+            "id": 2,
+            "name": "Second",
+            "contact_count": 0
+          }
+        ],
+        "contact_list_members": [
+          {
+            "list_id": 1,
+            "contact_id": 1
+          },
+          {
+            "list_id": 2,
+            "contact_id": 1
+          },
+          {
+            "list_id": 1,
+            "contact_id": 2
+          },
+          {
+            "list_id": 1,
+            "contact_id": 3
+          },
+          {
+            "list_id": 2,
+            "contact_id": 3
+          },
+          {
+            "list_id": 1,
+            "contact_id": 5
+          },
+          {
+            "list_id": 1,
+            "contact_id": 6
+          }
+        ],
+        "tags": [],
+        "contact_tags": [],
+        "suppression_entries": [
+          {
+            "phone_number": "+2348031112222",
+            "contact_id": 1
+          }
+        ],
+        "email_suppressions": []
+      }
+    },
+    {
+      "kind": "sms_in",
+      "id": 2,
+      "body": {
+        "consent_confirmed": true
+      },
+      "expected": {
+        "status": 400,
+        "message": "Contact has no phone number"
+      },
+      "snapshot": {
+        "contacts": [
+          {
+            "id": 1,
+            "email": "first@business.ng",
+            "phone_number": "+2348031112222",
+            "lead_status": "new",
+            "is_opted_out": true,
+            "has_consented": false,
+            "consent_status": "opted_out",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 4,
+            "email": "info@business.ng",
+            "phone_number": null,
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": "inferred",
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 2,
+            "email": "second@business.ng",
+            "phone_number": null,
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 3,
+            "email": null,
+            "phone_number": "123",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 5,
+            "email": null,
+            "phone_number": "+2348123456789",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 6,
+            "email": null,
+            "phone_number": "+2348031111111",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          }
+        ],
+        "contact_lists": [
+          {
+            "id": 1,
+            "name": "First",
+            "contact_count": 0
+          },
+          {
+            "id": 2,
+            "name": "Second",
+            "contact_count": 0
+          }
+        ],
+        "contact_list_members": [
+          {
+            "list_id": 1,
+            "contact_id": 1
+          },
+          {
+            "list_id": 2,
+            "contact_id": 1
+          },
+          {
+            "list_id": 1,
+            "contact_id": 2
+          },
+          {
+            "list_id": 1,
+            "contact_id": 3
+          },
+          {
+            "list_id": 2,
+            "contact_id": 3
+          },
+          {
+            "list_id": 1,
+            "contact_id": 5
+          },
+          {
+            "list_id": 1,
+            "contact_id": 6
+          }
+        ],
+        "tags": [],
+        "contact_tags": [],
+        "suppression_entries": [
+          {
+            "phone_number": "+2348031112222",
+            "contact_id": 1
+          }
+        ],
+        "email_suppressions": []
+      }
+    },
+    {
+      "kind": "sms_in",
+      "id": 1,
+      "body": {
+        "consent_confirmed": true
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "is_opted_out": false,
+          "consent_status": "opted_in"
+        }
+      },
+      "snapshot": {
+        "contacts": [
+          {
+            "id": 1,
+            "email": "first@business.ng",
+            "phone_number": "+2348031112222",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": true,
+            "consent_status": "opted_in",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 4,
+            "email": "info@business.ng",
+            "phone_number": null,
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": "inferred",
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 2,
+            "email": "second@business.ng",
+            "phone_number": null,
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 3,
+            "email": null,
+            "phone_number": "123",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 5,
+            "email": null,
+            "phone_number": "+2348123456789",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 6,
+            "email": null,
+            "phone_number": "+2348031111111",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          }
+        ],
+        "contact_lists": [
+          {
+            "id": 1,
+            "name": "First",
+            "contact_count": 0
+          },
+          {
+            "id": 2,
+            "name": "Second",
+            "contact_count": 0
+          }
+        ],
+        "contact_list_members": [
+          {
+            "list_id": 1,
+            "contact_id": 1
+          },
+          {
+            "list_id": 2,
+            "contact_id": 1
+          },
+          {
+            "list_id": 1,
+            "contact_id": 2
+          },
+          {
+            "list_id": 1,
+            "contact_id": 3
+          },
+          {
+            "list_id": 2,
+            "contact_id": 3
+          },
+          {
+            "list_id": 1,
+            "contact_id": 5
+          },
+          {
+            "list_id": 1,
+            "contact_id": 6
+          }
+        ],
+        "tags": [],
+        "contact_tags": [],
+        "suppression_entries": [],
+        "email_suppressions": []
+      }
+    },
+    {
+      "kind": "email_out",
+      "id": 1,
+      "reason": "Stop please",
+      "expected": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "is_email_opted_out": true,
+          "email_status": "unsubscribed"
+        }
+      },
+      "snapshot": {
+        "contacts": [
+          {
+            "id": 1,
+            "email": "first@business.ng",
+            "phone_number": "+2348031112222",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": true,
+            "consent_status": "opted_in",
+            "is_email_opted_out": true,
+            "email_status": "unsubscribed",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 4,
+            "email": "info@business.ng",
+            "phone_number": null,
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": "inferred",
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 2,
+            "email": "second@business.ng",
+            "phone_number": null,
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 3,
+            "email": null,
+            "phone_number": "123",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 5,
+            "email": null,
+            "phone_number": "+2348123456789",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 6,
+            "email": null,
+            "phone_number": "+2348031111111",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          }
+        ],
+        "contact_lists": [
+          {
+            "id": 1,
+            "name": "First",
+            "contact_count": 0
+          },
+          {
+            "id": 2,
+            "name": "Second",
+            "contact_count": 0
+          }
+        ],
+        "contact_list_members": [
+          {
+            "list_id": 1,
+            "contact_id": 1
+          },
+          {
+            "list_id": 2,
+            "contact_id": 1
+          },
+          {
+            "list_id": 1,
+            "contact_id": 2
+          },
+          {
+            "list_id": 1,
+            "contact_id": 3
+          },
+          {
+            "list_id": 2,
+            "contact_id": 3
+          },
+          {
+            "list_id": 1,
+            "contact_id": 5
+          },
+          {
+            "list_id": 1,
+            "contact_id": 6
+          }
+        ],
+        "tags": [],
+        "contact_tags": [],
+        "suppression_entries": [],
+        "email_suppressions": [
+          {
+            "email_address": "first@business.ng",
+            "contact_id": 1,
+            "source": "manual",
+            "reason": "Stop please",
+            "hard_bounce": false
+          }
+        ]
+      }
+    },
+    {
+      "kind": "email_out",
+      "id": 1,
+      "reason": "Again",
+      "expected": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "is_email_opted_out": true,
+          "email_status": "unsubscribed"
+        }
+      },
+      "snapshot": {
+        "contacts": [
+          {
+            "id": 1,
+            "email": "first@business.ng",
+            "phone_number": "+2348031112222",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": true,
+            "consent_status": "opted_in",
+            "is_email_opted_out": true,
+            "email_status": "unsubscribed",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 4,
+            "email": "info@business.ng",
+            "phone_number": null,
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": "inferred",
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 2,
+            "email": "second@business.ng",
+            "phone_number": null,
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 3,
+            "email": null,
+            "phone_number": "123",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 5,
+            "email": null,
+            "phone_number": "+2348123456789",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 6,
+            "email": null,
+            "phone_number": "+2348031111111",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          }
+        ],
+        "contact_lists": [
+          {
+            "id": 1,
+            "name": "First",
+            "contact_count": 0
+          },
+          {
+            "id": 2,
+            "name": "Second",
+            "contact_count": 0
+          }
+        ],
+        "contact_list_members": [
+          {
+            "list_id": 1,
+            "contact_id": 1
+          },
+          {
+            "list_id": 2,
+            "contact_id": 1
+          },
+          {
+            "list_id": 1,
+            "contact_id": 2
+          },
+          {
+            "list_id": 1,
+            "contact_id": 3
+          },
+          {
+            "list_id": 2,
+            "contact_id": 3
+          },
+          {
+            "list_id": 1,
+            "contact_id": 5
+          },
+          {
+            "list_id": 1,
+            "contact_id": 6
+          }
+        ],
+        "tags": [],
+        "contact_tags": [],
+        "suppression_entries": [],
+        "email_suppressions": [
+          {
+            "email_address": "first@business.ng",
+            "contact_id": 1,
+            "source": "manual",
+            "reason": "Stop please",
+            "hard_bounce": false
+          }
+        ]
+      }
+    },
+    {
+      "kind": "email_out",
+      "id": 404,
+      "expected": {
+        "status": 404,
+        "message": "Contact not found"
+      },
+      "snapshot": {
+        "contacts": [
+          {
+            "id": 1,
+            "email": "first@business.ng",
+            "phone_number": "+2348031112222",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": true,
+            "consent_status": "opted_in",
+            "is_email_opted_out": true,
+            "email_status": "unsubscribed",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 4,
+            "email": "info@business.ng",
+            "phone_number": null,
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": "inferred",
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 2,
+            "email": "second@business.ng",
+            "phone_number": null,
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 3,
+            "email": null,
+            "phone_number": "123",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 5,
+            "email": null,
+            "phone_number": "+2348123456789",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 6,
+            "email": null,
+            "phone_number": "+2348031111111",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          }
+        ],
+        "contact_lists": [
+          {
+            "id": 1,
+            "name": "First",
+            "contact_count": 0
+          },
+          {
+            "id": 2,
+            "name": "Second",
+            "contact_count": 0
+          }
+        ],
+        "contact_list_members": [
+          {
+            "list_id": 1,
+            "contact_id": 1
+          },
+          {
+            "list_id": 2,
+            "contact_id": 1
+          },
+          {
+            "list_id": 1,
+            "contact_id": 2
+          },
+          {
+            "list_id": 1,
+            "contact_id": 3
+          },
+          {
+            "list_id": 2,
+            "contact_id": 3
+          },
+          {
+            "list_id": 1,
+            "contact_id": 5
+          },
+          {
+            "list_id": 1,
+            "contact_id": 6
+          }
+        ],
+        "tags": [],
+        "contact_tags": [],
+        "suppression_entries": [],
+        "email_suppressions": [
+          {
+            "email_address": "first@business.ng",
+            "contact_id": 1,
+            "source": "manual",
+            "reason": "Stop please",
+            "hard_bounce": false
+          }
+        ]
+      }
+    },
+    {
+      "kind": "email_in",
+      "id": 1,
+      "expected": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "is_email_opted_out": false,
+          "email_status": "active"
+        }
+      },
+      "snapshot": {
+        "contacts": [
+          {
+            "id": 1,
+            "email": "first@business.ng",
+            "phone_number": "+2348031112222",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": true,
+            "consent_status": "opted_in",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 4,
+            "email": "info@business.ng",
+            "phone_number": null,
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": "inferred",
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 2,
+            "email": "second@business.ng",
+            "phone_number": null,
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 3,
+            "email": null,
+            "phone_number": "123",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 5,
+            "email": null,
+            "phone_number": "+2348123456789",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 6,
+            "email": null,
+            "phone_number": "+2348031111111",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          }
+        ],
+        "contact_lists": [
+          {
+            "id": 1,
+            "name": "First",
+            "contact_count": 0
+          },
+          {
+            "id": 2,
+            "name": "Second",
+            "contact_count": 0
+          }
+        ],
+        "contact_list_members": [
+          {
+            "list_id": 1,
+            "contact_id": 1
+          },
+          {
+            "list_id": 2,
+            "contact_id": 1
+          },
+          {
+            "list_id": 1,
+            "contact_id": 2
+          },
+          {
+            "list_id": 1,
+            "contact_id": 3
+          },
+          {
+            "list_id": 2,
+            "contact_id": 3
+          },
+          {
+            "list_id": 1,
+            "contact_id": 5
+          },
+          {
+            "list_id": 1,
+            "contact_id": 6
+          }
+        ],
+        "tags": [],
+        "contact_tags": [],
+        "suppression_entries": [],
+        "email_suppressions": []
+      }
+    },
+    {
+      "kind": "email_in",
+      "id": 404,
+      "expected": {
+        "status": 404,
+        "message": "Contact not found"
+      },
+      "snapshot": {
+        "contacts": [
+          {
+            "id": 1,
+            "email": "first@business.ng",
+            "phone_number": "+2348031112222",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": true,
+            "consent_status": "opted_in",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 4,
+            "email": "info@business.ng",
+            "phone_number": null,
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": "inferred",
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 2,
+            "email": "second@business.ng",
+            "phone_number": null,
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 3,
+            "email": null,
+            "phone_number": "123",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 5,
+            "email": null,
+            "phone_number": "+2348123456789",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 6,
+            "email": null,
+            "phone_number": "+2348031111111",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          }
+        ],
+        "contact_lists": [
+          {
+            "id": 1,
+            "name": "First",
+            "contact_count": 0
+          },
+          {
+            "id": 2,
+            "name": "Second",
+            "contact_count": 0
+          }
+        ],
+        "contact_list_members": [
+          {
+            "list_id": 1,
+            "contact_id": 1
+          },
+          {
+            "list_id": 2,
+            "contact_id": 1
+          },
+          {
+            "list_id": 1,
+            "contact_id": 2
+          },
+          {
+            "list_id": 1,
+            "contact_id": 3
+          },
+          {
+            "list_id": 2,
+            "contact_id": 3
+          },
+          {
+            "list_id": 1,
+            "contact_id": 5
+          },
+          {
+            "list_id": 1,
+            "contact_id": 6
+          }
+        ],
+        "tags": [],
+        "contact_tags": [],
+        "suppression_entries": [],
+        "email_suppressions": []
+      }
+    },
+    {
+      "kind": "clean",
+      "list_id": 1,
+      "expected": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "scanned": 5,
+          "sendable": 2,
+          "invalid_format": 2,
+          "previous_failures": 0,
+          "already_undeliverable": 0,
+          "no_phone_number": 1,
+          "quarantined": 2,
+          "by_reason": {
+            "no_phone_number": 1,
+            "short_code": 1,
+            "test_data_suspected": 1
+          },
+          "removed_from_list": 0,
+          "deleted": 0
+        }
+      },
+      "snapshot": {
+        "contacts": [
+          {
+            "id": 1,
+            "email": "first@business.ng",
+            "phone_number": "+2348031112222",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": true,
+            "consent_status": "opted_in",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 4,
+            "email": "info@business.ng",
+            "phone_number": null,
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": "inferred",
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 2,
+            "email": "second@business.ng",
+            "phone_number": null,
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 6,
+            "email": null,
+            "phone_number": "+2348031111111",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 3,
+            "email": null,
+            "phone_number": "123",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": true,
+            "undeliverable_reason": "short_code",
+            "delivery_fail_count": 1
+          },
+          {
+            "id": 5,
+            "email": null,
+            "phone_number": "+2348123456789",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": true,
+            "undeliverable_reason": "test_data_suspected",
+            "delivery_fail_count": 1
+          }
+        ],
+        "contact_lists": [
+          {
+            "id": 1,
+            "name": "First",
+            "contact_count": 0
+          },
+          {
+            "id": 2,
+            "name": "Second",
+            "contact_count": 0
+          }
+        ],
+        "contact_list_members": [
+          {
+            "list_id": 1,
+            "contact_id": 1
+          },
+          {
+            "list_id": 2,
+            "contact_id": 1
+          },
+          {
+            "list_id": 1,
+            "contact_id": 2
+          },
+          {
+            "list_id": 1,
+            "contact_id": 3
+          },
+          {
+            "list_id": 2,
+            "contact_id": 3
+          },
+          {
+            "list_id": 1,
+            "contact_id": 5
+          },
+          {
+            "list_id": 1,
+            "contact_id": 6
+          }
+        ],
+        "tags": [],
+        "contact_tags": [],
+        "suppression_entries": [],
+        "email_suppressions": []
+      }
+    },
+    {
+      "kind": "clean",
+      "list_id": 1,
+      "remove": true,
+      "expected": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "scanned": 5,
+          "sendable": 2,
+          "invalid_format": 0,
+          "previous_failures": 0,
+          "already_undeliverable": 2,
+          "no_phone_number": 1,
+          "quarantined": 0,
+          "by_reason": {
+            "no_phone_number": 1,
+            "already_undeliverable": 2
+          },
+          "removed_from_list": 2,
+          "deleted": 0
+        }
+      },
+      "snapshot": {
+        "contacts": [
+          {
+            "id": 1,
+            "email": "first@business.ng",
+            "phone_number": "+2348031112222",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": true,
+            "consent_status": "opted_in",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 4,
+            "email": "info@business.ng",
+            "phone_number": null,
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": "inferred",
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 2,
+            "email": "second@business.ng",
+            "phone_number": null,
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 6,
+            "email": null,
+            "phone_number": "+2348031111111",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 3,
+            "email": null,
+            "phone_number": "123",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": true,
+            "undeliverable_reason": "short_code",
+            "delivery_fail_count": 1
+          },
+          {
+            "id": 5,
+            "email": null,
+            "phone_number": "+2348123456789",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": true,
+            "undeliverable_reason": "test_data_suspected",
+            "delivery_fail_count": 1
+          }
+        ],
+        "contact_lists": [
+          {
+            "id": 2,
+            "name": "Second",
+            "contact_count": 0
+          },
+          {
+            "id": 1,
+            "name": "First",
+            "contact_count": 3
+          }
+        ],
+        "contact_list_members": [
+          {
+            "list_id": 1,
+            "contact_id": 1
+          },
+          {
+            "list_id": 2,
+            "contact_id": 1
+          },
+          {
+            "list_id": 1,
+            "contact_id": 2
+          },
+          {
+            "list_id": 2,
+            "contact_id": 3
+          },
+          {
+            "list_id": 1,
+            "contact_id": 6
+          }
+        ],
+        "tags": [],
+        "contact_tags": [],
+        "suppression_entries": [],
+        "email_suppressions": []
+      }
+    },
+    {
+      "kind": "quarantine",
+      "expected": {
+        "status": 200,
+        "body": {
+          "dry_run": true,
+          "matched": 1,
+          "tagged": 0,
+          "already_tagged": 0,
+          "tags": [
+            "pattern_generated",
+            "sendable:false"
+          ],
+          "role_mailboxes_unverified": 1,
+          "examples": [
+            "info@business.ng"
+          ],
+          "note": "Dry run: nothing was changed. Repeat with dry_run=false to tag them."
+        }
+      },
+      "snapshot": {
+        "contacts": [
+          {
+            "id": 1,
+            "email": "first@business.ng",
+            "phone_number": "+2348031112222",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": true,
+            "consent_status": "opted_in",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 4,
+            "email": "info@business.ng",
+            "phone_number": null,
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": "inferred",
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 2,
+            "email": "second@business.ng",
+            "phone_number": null,
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 6,
+            "email": null,
+            "phone_number": "+2348031111111",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 3,
+            "email": null,
+            "phone_number": "123",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": true,
+            "undeliverable_reason": "short_code",
+            "delivery_fail_count": 1
+          },
+          {
+            "id": 5,
+            "email": null,
+            "phone_number": "+2348123456789",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": true,
+            "undeliverable_reason": "test_data_suspected",
+            "delivery_fail_count": 1
+          }
+        ],
+        "contact_lists": [
+          {
+            "id": 2,
+            "name": "Second",
+            "contact_count": 0
+          },
+          {
+            "id": 1,
+            "name": "First",
+            "contact_count": 3
+          }
+        ],
+        "contact_list_members": [
+          {
+            "list_id": 1,
+            "contact_id": 1
+          },
+          {
+            "list_id": 2,
+            "contact_id": 1
+          },
+          {
+            "list_id": 1,
+            "contact_id": 2
+          },
+          {
+            "list_id": 2,
+            "contact_id": 3
+          },
+          {
+            "list_id": 1,
+            "contact_id": 6
+          }
+        ],
+        "tags": [],
+        "contact_tags": [],
+        "suppression_entries": [],
+        "email_suppressions": []
+      }
+    },
+    {
+      "kind": "quarantine",
+      "dry_run": false,
+      "expected": {
+        "status": 200,
+        "body": {
+          "dry_run": false,
+          "matched": 1,
+          "tagged": 1,
+          "already_tagged": 0,
+          "tags": [
+            "pattern_generated",
+            "sendable:false"
+          ],
+          "role_mailboxes_unverified": 1,
+          "examples": [
+            "info@business.ng"
+          ],
+          "note": "Tagged; no contact was deleted. Legacy tags do not block sending. Review and suppress unwanted addresses on the Validator page."
+        }
+      },
+      "snapshot": {
+        "contacts": [
+          {
+            "id": 1,
+            "email": "first@business.ng",
+            "phone_number": "+2348031112222",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": true,
+            "consent_status": "opted_in",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 4,
+            "email": "info@business.ng",
+            "phone_number": null,
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": "inferred",
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 2,
+            "email": "second@business.ng",
+            "phone_number": null,
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 6,
+            "email": null,
+            "phone_number": "+2348031111111",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 3,
+            "email": null,
+            "phone_number": "123",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": true,
+            "undeliverable_reason": "short_code",
+            "delivery_fail_count": 1
+          },
+          {
+            "id": 5,
+            "email": null,
+            "phone_number": "+2348123456789",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": true,
+            "undeliverable_reason": "test_data_suspected",
+            "delivery_fail_count": 1
+          }
+        ],
+        "contact_lists": [
+          {
+            "id": 2,
+            "name": "Second",
+            "contact_count": 0
+          },
+          {
+            "id": 1,
+            "name": "First",
+            "contact_count": 3
+          }
+        ],
+        "contact_list_members": [
+          {
+            "list_id": 1,
+            "contact_id": 1
+          },
+          {
+            "list_id": 2,
+            "contact_id": 1
+          },
+          {
+            "list_id": 1,
+            "contact_id": 2
+          },
+          {
+            "list_id": 2,
+            "contact_id": 3
+          },
+          {
+            "list_id": 1,
+            "contact_id": 6
+          }
+        ],
+        "tags": [
+          {
+            "id": 1,
+            "name": "pattern_generated"
+          },
+          {
+            "id": 2,
+            "name": "sendable:false"
+          }
+        ],
+        "contact_tags": [
+          {
+            "contact_id": 4,
+            "tag_id": 1
+          },
+          {
+            "contact_id": 4,
+            "tag_id": 2
+          }
+        ],
+        "suppression_entries": [],
+        "email_suppressions": []
+      }
+    },
+    {
+      "kind": "quarantine",
+      "dry_run": false,
+      "expected": {
+        "status": 200,
+        "body": {
+          "dry_run": false,
+          "matched": 1,
+          "tagged": 0,
+          "already_tagged": 1,
+          "tags": [
+            "pattern_generated",
+            "sendable:false"
+          ],
+          "role_mailboxes_unverified": 1,
+          "examples": [
+            "info@business.ng"
+          ],
+          "note": "Tagged; no contact was deleted. Legacy tags do not block sending. Review and suppress unwanted addresses on the Validator page."
+        }
+      },
+      "snapshot": {
+        "contacts": [
+          {
+            "id": 1,
+            "email": "first@business.ng",
+            "phone_number": "+2348031112222",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": true,
+            "consent_status": "opted_in",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 4,
+            "email": "info@business.ng",
+            "phone_number": null,
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": "inferred",
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 2,
+            "email": "second@business.ng",
+            "phone_number": null,
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 6,
+            "email": null,
+            "phone_number": "+2348031111111",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 3,
+            "email": null,
+            "phone_number": "123",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": true,
+            "undeliverable_reason": "short_code",
+            "delivery_fail_count": 1
+          },
+          {
+            "id": 5,
+            "email": null,
+            "phone_number": "+2348123456789",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": true,
+            "undeliverable_reason": "test_data_suspected",
+            "delivery_fail_count": 1
+          }
+        ],
+        "contact_lists": [
+          {
+            "id": 2,
+            "name": "Second",
+            "contact_count": 0
+          },
+          {
+            "id": 1,
+            "name": "First",
+            "contact_count": 3
+          }
+        ],
+        "contact_list_members": [
+          {
+            "list_id": 1,
+            "contact_id": 1
+          },
+          {
+            "list_id": 2,
+            "contact_id": 1
+          },
+          {
+            "list_id": 1,
+            "contact_id": 2
+          },
+          {
+            "list_id": 2,
+            "contact_id": 3
+          },
+          {
+            "list_id": 1,
+            "contact_id": 6
+          }
+        ],
+        "tags": [
+          {
+            "id": 1,
+            "name": "pattern_generated"
+          },
+          {
+            "id": 2,
+            "name": "sendable:false"
+          }
+        ],
+        "contact_tags": [
+          {
+            "contact_id": 4,
+            "tag_id": 1
+          },
+          {
+            "contact_id": 4,
+            "tag_id": 2
+          }
+        ],
+        "suppression_entries": [],
+        "email_suppressions": []
+      }
+    },
+    {
+      "kind": "bulk",
+      "body": {
+        "action": "status",
+        "contact_ids": [
+          1,
+          1,
+          2,
+          404
+        ],
+        "value": "interested"
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "affected": 2
+        }
+      },
+      "snapshot": {
+        "contacts": [
+          {
+            "id": 1,
+            "email": "first@business.ng",
+            "phone_number": "+2348031112222",
+            "lead_status": "interested",
+            "is_opted_out": false,
+            "has_consented": true,
+            "consent_status": "opted_in",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 4,
+            "email": "info@business.ng",
+            "phone_number": null,
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": "inferred",
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 2,
+            "email": "second@business.ng",
+            "phone_number": null,
+            "lead_status": "interested",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 6,
+            "email": null,
+            "phone_number": "+2348031111111",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 3,
+            "email": null,
+            "phone_number": "123",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": true,
+            "undeliverable_reason": "short_code",
+            "delivery_fail_count": 1
+          },
+          {
+            "id": 5,
+            "email": null,
+            "phone_number": "+2348123456789",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": true,
+            "undeliverable_reason": "test_data_suspected",
+            "delivery_fail_count": 1
+          }
+        ],
+        "contact_lists": [
+          {
+            "id": 2,
+            "name": "Second",
+            "contact_count": 0
+          },
+          {
+            "id": 1,
+            "name": "First",
+            "contact_count": 3
+          }
+        ],
+        "contact_list_members": [
+          {
+            "list_id": 1,
+            "contact_id": 1
+          },
+          {
+            "list_id": 2,
+            "contact_id": 1
+          },
+          {
+            "list_id": 1,
+            "contact_id": 2
+          },
+          {
+            "list_id": 2,
+            "contact_id": 3
+          },
+          {
+            "list_id": 1,
+            "contact_id": 6
+          }
+        ],
+        "tags": [
+          {
+            "id": 1,
+            "name": "pattern_generated"
+          },
+          {
+            "id": 2,
+            "name": "sendable:false"
+          }
+        ],
+        "contact_tags": [
+          {
+            "contact_id": 4,
+            "tag_id": 1
+          },
+          {
+            "contact_id": 4,
+            "tag_id": 2
+          }
+        ],
+        "suppression_entries": [],
+        "email_suppressions": []
+      }
+    },
+    {
+      "kind": "bulk",
+      "body": {
+        "action": "tag",
+        "contact_ids": [
+          1,
+          2
+        ],
+        "value": "Batch"
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "affected": 2
+        }
+      },
+      "snapshot": {
+        "contacts": [
+          {
+            "id": 1,
+            "email": "first@business.ng",
+            "phone_number": "+2348031112222",
+            "lead_status": "interested",
+            "is_opted_out": false,
+            "has_consented": true,
+            "consent_status": "opted_in",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 4,
+            "email": "info@business.ng",
+            "phone_number": null,
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": "inferred",
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 2,
+            "email": "second@business.ng",
+            "phone_number": null,
+            "lead_status": "interested",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 6,
+            "email": null,
+            "phone_number": "+2348031111111",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 3,
+            "email": null,
+            "phone_number": "123",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": true,
+            "undeliverable_reason": "short_code",
+            "delivery_fail_count": 1
+          },
+          {
+            "id": 5,
+            "email": null,
+            "phone_number": "+2348123456789",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": true,
+            "undeliverable_reason": "test_data_suspected",
+            "delivery_fail_count": 1
+          }
+        ],
+        "contact_lists": [
+          {
+            "id": 2,
+            "name": "Second",
+            "contact_count": 0
+          },
+          {
+            "id": 1,
+            "name": "First",
+            "contact_count": 3
+          }
+        ],
+        "contact_list_members": [
+          {
+            "list_id": 1,
+            "contact_id": 1
+          },
+          {
+            "list_id": 2,
+            "contact_id": 1
+          },
+          {
+            "list_id": 1,
+            "contact_id": 2
+          },
+          {
+            "list_id": 2,
+            "contact_id": 3
+          },
+          {
+            "list_id": 1,
+            "contact_id": 6
+          }
+        ],
+        "tags": [
+          {
+            "id": 1,
+            "name": "pattern_generated"
+          },
+          {
+            "id": 2,
+            "name": "sendable:false"
+          },
+          {
+            "id": 3,
+            "name": "Batch"
+          }
+        ],
+        "contact_tags": [
+          {
+            "contact_id": 1,
+            "tag_id": 3
+          },
+          {
+            "contact_id": 2,
+            "tag_id": 3
+          },
+          {
+            "contact_id": 4,
+            "tag_id": 1
+          },
+          {
+            "contact_id": 4,
+            "tag_id": 2
+          }
+        ],
+        "suppression_entries": [],
+        "email_suppressions": []
+      }
+    },
+    {
+      "kind": "bulk",
+      "body": {
+        "action": "tag",
+        "contact_ids": [
+          1,
+          2
+        ],
+        "value": "Batch"
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "affected": 2
+        }
+      },
+      "snapshot": {
+        "contacts": [
+          {
+            "id": 1,
+            "email": "first@business.ng",
+            "phone_number": "+2348031112222",
+            "lead_status": "interested",
+            "is_opted_out": false,
+            "has_consented": true,
+            "consent_status": "opted_in",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 4,
+            "email": "info@business.ng",
+            "phone_number": null,
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": "inferred",
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 2,
+            "email": "second@business.ng",
+            "phone_number": null,
+            "lead_status": "interested",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 6,
+            "email": null,
+            "phone_number": "+2348031111111",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 3,
+            "email": null,
+            "phone_number": "123",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": true,
+            "undeliverable_reason": "short_code",
+            "delivery_fail_count": 1
+          },
+          {
+            "id": 5,
+            "email": null,
+            "phone_number": "+2348123456789",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": true,
+            "undeliverable_reason": "test_data_suspected",
+            "delivery_fail_count": 1
+          }
+        ],
+        "contact_lists": [
+          {
+            "id": 2,
+            "name": "Second",
+            "contact_count": 0
+          },
+          {
+            "id": 1,
+            "name": "First",
+            "contact_count": 3
+          }
+        ],
+        "contact_list_members": [
+          {
+            "list_id": 1,
+            "contact_id": 1
+          },
+          {
+            "list_id": 2,
+            "contact_id": 1
+          },
+          {
+            "list_id": 1,
+            "contact_id": 2
+          },
+          {
+            "list_id": 2,
+            "contact_id": 3
+          },
+          {
+            "list_id": 1,
+            "contact_id": 6
+          }
+        ],
+        "tags": [
+          {
+            "id": 1,
+            "name": "pattern_generated"
+          },
+          {
+            "id": 2,
+            "name": "sendable:false"
+          },
+          {
+            "id": 3,
+            "name": "Batch"
+          }
+        ],
+        "contact_tags": [
+          {
+            "contact_id": 1,
+            "tag_id": 3
+          },
+          {
+            "contact_id": 2,
+            "tag_id": 3
+          },
+          {
+            "contact_id": 4,
+            "tag_id": 1
+          },
+          {
+            "contact_id": 4,
+            "tag_id": 2
+          }
+        ],
+        "suppression_entries": [],
+        "email_suppressions": []
+      }
+    },
+    {
+      "kind": "bulk",
+      "body": {
+        "action": "delete",
+        "contact_ids": []
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "affected": 0
+        }
+      },
+      "snapshot": {
+        "contacts": [
+          {
+            "id": 1,
+            "email": "first@business.ng",
+            "phone_number": "+2348031112222",
+            "lead_status": "interested",
+            "is_opted_out": false,
+            "has_consented": true,
+            "consent_status": "opted_in",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 4,
+            "email": "info@business.ng",
+            "phone_number": null,
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": "inferred",
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 2,
+            "email": "second@business.ng",
+            "phone_number": null,
+            "lead_status": "interested",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 6,
+            "email": null,
+            "phone_number": "+2348031111111",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 3,
+            "email": null,
+            "phone_number": "123",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": true,
+            "undeliverable_reason": "short_code",
+            "delivery_fail_count": 1
+          },
+          {
+            "id": 5,
+            "email": null,
+            "phone_number": "+2348123456789",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": true,
+            "undeliverable_reason": "test_data_suspected",
+            "delivery_fail_count": 1
+          }
+        ],
+        "contact_lists": [
+          {
+            "id": 2,
+            "name": "Second",
+            "contact_count": 0
+          },
+          {
+            "id": 1,
+            "name": "First",
+            "contact_count": 3
+          }
+        ],
+        "contact_list_members": [
+          {
+            "list_id": 1,
+            "contact_id": 1
+          },
+          {
+            "list_id": 2,
+            "contact_id": 1
+          },
+          {
+            "list_id": 1,
+            "contact_id": 2
+          },
+          {
+            "list_id": 2,
+            "contact_id": 3
+          },
+          {
+            "list_id": 1,
+            "contact_id": 6
+          }
+        ],
+        "tags": [
+          {
+            "id": 1,
+            "name": "pattern_generated"
+          },
+          {
+            "id": 2,
+            "name": "sendable:false"
+          },
+          {
+            "id": 3,
+            "name": "Batch"
+          }
+        ],
+        "contact_tags": [
+          {
+            "contact_id": 1,
+            "tag_id": 3
+          },
+          {
+            "contact_id": 2,
+            "tag_id": 3
+          },
+          {
+            "contact_id": 4,
+            "tag_id": 1
+          },
+          {
+            "contact_id": 4,
+            "tag_id": 2
+          }
+        ],
+        "suppression_entries": [],
+        "email_suppressions": []
+      }
+    },
+    {
+      "kind": "bulk",
+      "body": {
+        "action": "delete",
+        "contact_ids": [
+          3,
+          3,
+          404
+        ]
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "affected": 1
+        }
+      },
+      "snapshot": {
+        "contacts": [
+          {
+            "id": 1,
+            "email": "first@business.ng",
+            "phone_number": "+2348031112222",
+            "lead_status": "interested",
+            "is_opted_out": false,
+            "has_consented": true,
+            "consent_status": "opted_in",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 4,
+            "email": "info@business.ng",
+            "phone_number": null,
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": "inferred",
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 2,
+            "email": "second@business.ng",
+            "phone_number": null,
+            "lead_status": "interested",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 6,
+            "email": null,
+            "phone_number": "+2348031111111",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 5,
+            "email": null,
+            "phone_number": "+2348123456789",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": true,
+            "undeliverable_reason": "test_data_suspected",
+            "delivery_fail_count": 1
+          }
+        ],
+        "contact_lists": [
+          {
+            "id": 2,
+            "name": "Second",
+            "contact_count": 1
+          },
+          {
+            "id": 1,
+            "name": "First",
+            "contact_count": 3
+          }
+        ],
+        "contact_list_members": [
+          {
+            "list_id": 1,
+            "contact_id": 1
+          },
+          {
+            "list_id": 2,
+            "contact_id": 1
+          },
+          {
+            "list_id": 1,
+            "contact_id": 2
+          },
+          {
+            "list_id": 1,
+            "contact_id": 6
+          }
+        ],
+        "tags": [
+          {
+            "id": 1,
+            "name": "pattern_generated"
+          },
+          {
+            "id": 2,
+            "name": "sendable:false"
+          },
+          {
+            "id": 3,
+            "name": "Batch"
+          }
+        ],
+        "contact_tags": [
+          {
+            "contact_id": 1,
+            "tag_id": 3
+          },
+          {
+            "contact_id": 2,
+            "tag_id": 3
+          },
+          {
+            "contact_id": 4,
+            "tag_id": 1
+          },
+          {
+            "contact_id": 4,
+            "tag_id": 2
+          }
+        ],
+        "suppression_entries": [],
+        "email_suppressions": []
+      }
+    },
+    {
+      "kind": "bulk",
+      "body": {
+        "action": "status",
+        "scope": "all",
+        "value": "new"
+      },
+      "expected": {
+        "status": 400,
+        "message": "scope='all' is only supported for action='delete'"
+      },
+      "snapshot": {
+        "contacts": [
+          {
+            "id": 1,
+            "email": "first@business.ng",
+            "phone_number": "+2348031112222",
+            "lead_status": "interested",
+            "is_opted_out": false,
+            "has_consented": true,
+            "consent_status": "opted_in",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 4,
+            "email": "info@business.ng",
+            "phone_number": null,
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": "inferred",
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 2,
+            "email": "second@business.ng",
+            "phone_number": null,
+            "lead_status": "interested",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 6,
+            "email": null,
+            "phone_number": "+2348031111111",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 5,
+            "email": null,
+            "phone_number": "+2348123456789",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": true,
+            "undeliverable_reason": "test_data_suspected",
+            "delivery_fail_count": 1
+          }
+        ],
+        "contact_lists": [
+          {
+            "id": 2,
+            "name": "Second",
+            "contact_count": 1
+          },
+          {
+            "id": 1,
+            "name": "First",
+            "contact_count": 3
+          }
+        ],
+        "contact_list_members": [
+          {
+            "list_id": 1,
+            "contact_id": 1
+          },
+          {
+            "list_id": 2,
+            "contact_id": 1
+          },
+          {
+            "list_id": 1,
+            "contact_id": 2
+          },
+          {
+            "list_id": 1,
+            "contact_id": 6
+          }
+        ],
+        "tags": [
+          {
+            "id": 1,
+            "name": "pattern_generated"
+          },
+          {
+            "id": 2,
+            "name": "sendable:false"
+          },
+          {
+            "id": 3,
+            "name": "Batch"
+          }
+        ],
+        "contact_tags": [
+          {
+            "contact_id": 1,
+            "tag_id": 3
+          },
+          {
+            "contact_id": 2,
+            "tag_id": 3
+          },
+          {
+            "contact_id": 4,
+            "tag_id": 1
+          },
+          {
+            "contact_id": 4,
+            "tag_id": 2
+          }
+        ],
+        "suppression_entries": [],
+        "email_suppressions": []
+      }
+    },
+    {
+      "kind": "member_delete",
+      "id": 1,
+      "body": {
+        "contact_ids": [
+          4
+        ]
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "deleted": 0,
+          "contact_count": 3
+        }
+      },
+      "snapshot": {
+        "contacts": [
+          {
+            "id": 1,
+            "email": "first@business.ng",
+            "phone_number": "+2348031112222",
+            "lead_status": "interested",
+            "is_opted_out": false,
+            "has_consented": true,
+            "consent_status": "opted_in",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 4,
+            "email": "info@business.ng",
+            "phone_number": null,
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": "inferred",
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 2,
+            "email": "second@business.ng",
+            "phone_number": null,
+            "lead_status": "interested",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 6,
+            "email": null,
+            "phone_number": "+2348031111111",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 5,
+            "email": null,
+            "phone_number": "+2348123456789",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": true,
+            "undeliverable_reason": "test_data_suspected",
+            "delivery_fail_count": 1
+          }
+        ],
+        "contact_lists": [
+          {
+            "id": 2,
+            "name": "Second",
+            "contact_count": 1
+          },
+          {
+            "id": 1,
+            "name": "First",
+            "contact_count": 3
+          }
+        ],
+        "contact_list_members": [
+          {
+            "list_id": 1,
+            "contact_id": 1
+          },
+          {
+            "list_id": 2,
+            "contact_id": 1
+          },
+          {
+            "list_id": 1,
+            "contact_id": 2
+          },
+          {
+            "list_id": 1,
+            "contact_id": 6
+          }
+        ],
+        "tags": [
+          {
+            "id": 1,
+            "name": "pattern_generated"
+          },
+          {
+            "id": 2,
+            "name": "sendable:false"
+          },
+          {
+            "id": 3,
+            "name": "Batch"
+          }
+        ],
+        "contact_tags": [
+          {
+            "contact_id": 1,
+            "tag_id": 3
+          },
+          {
+            "contact_id": 2,
+            "tag_id": 3
+          },
+          {
+            "contact_id": 4,
+            "tag_id": 1
+          },
+          {
+            "contact_id": 4,
+            "tag_id": 2
+          }
+        ],
+        "suppression_entries": [],
+        "email_suppressions": []
+      }
+    },
+    {
+      "kind": "member_delete",
+      "id": 1,
+      "body": {
+        "contact_ids": [
+          2,
+          2,
+          4
+        ]
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "deleted": 1,
+          "contact_count": 2
+        }
+      },
+      "snapshot": {
+        "contacts": [
+          {
+            "id": 1,
+            "email": "first@business.ng",
+            "phone_number": "+2348031112222",
+            "lead_status": "interested",
+            "is_opted_out": false,
+            "has_consented": true,
+            "consent_status": "opted_in",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 4,
+            "email": "info@business.ng",
+            "phone_number": null,
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": "inferred",
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 6,
+            "email": null,
+            "phone_number": "+2348031111111",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 5,
+            "email": null,
+            "phone_number": "+2348123456789",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": true,
+            "undeliverable_reason": "test_data_suspected",
+            "delivery_fail_count": 1
+          }
+        ],
+        "contact_lists": [
+          {
+            "id": 2,
+            "name": "Second",
+            "contact_count": 1
+          },
+          {
+            "id": 1,
+            "name": "First",
+            "contact_count": 2
+          }
+        ],
+        "contact_list_members": [
+          {
+            "list_id": 1,
+            "contact_id": 1
+          },
+          {
+            "list_id": 2,
+            "contact_id": 1
+          },
+          {
+            "list_id": 1,
+            "contact_id": 6
+          }
+        ],
+        "tags": [
+          {
+            "id": 1,
+            "name": "pattern_generated"
+          },
+          {
+            "id": 2,
+            "name": "sendable:false"
+          },
+          {
+            "id": 3,
+            "name": "Batch"
+          }
+        ],
+        "contact_tags": [
+          {
+            "contact_id": 1,
+            "tag_id": 3
+          },
+          {
+            "contact_id": 4,
+            "tag_id": 1
+          },
+          {
+            "contact_id": 4,
+            "tag_id": 2
+          }
+        ],
+        "suppression_entries": [],
+        "email_suppressions": []
+      }
+    },
+    {
+      "kind": "member_delete",
+      "id": 404,
+      "body": {
+        "scope": "all"
+      },
+      "expected": {
+        "status": 404,
+        "message": "List not found"
+      },
+      "snapshot": {
+        "contacts": [
+          {
+            "id": 1,
+            "email": "first@business.ng",
+            "phone_number": "+2348031112222",
+            "lead_status": "interested",
+            "is_opted_out": false,
+            "has_consented": true,
+            "consent_status": "opted_in",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 4,
+            "email": "info@business.ng",
+            "phone_number": null,
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": "inferred",
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 6,
+            "email": null,
+            "phone_number": "+2348031111111",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 5,
+            "email": null,
+            "phone_number": "+2348123456789",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": true,
+            "undeliverable_reason": "test_data_suspected",
+            "delivery_fail_count": 1
+          }
+        ],
+        "contact_lists": [
+          {
+            "id": 2,
+            "name": "Second",
+            "contact_count": 1
+          },
+          {
+            "id": 1,
+            "name": "First",
+            "contact_count": 2
+          }
+        ],
+        "contact_list_members": [
+          {
+            "list_id": 1,
+            "contact_id": 1
+          },
+          {
+            "list_id": 2,
+            "contact_id": 1
+          },
+          {
+            "list_id": 1,
+            "contact_id": 6
+          }
+        ],
+        "tags": [
+          {
+            "id": 1,
+            "name": "pattern_generated"
+          },
+          {
+            "id": 2,
+            "name": "sendable:false"
+          },
+          {
+            "id": 3,
+            "name": "Batch"
+          }
+        ],
+        "contact_tags": [
+          {
+            "contact_id": 1,
+            "tag_id": 3
+          },
+          {
+            "contact_id": 4,
+            "tag_id": 1
+          },
+          {
+            "contact_id": 4,
+            "tag_id": 2
+          }
+        ],
+        "suppression_entries": [],
+        "email_suppressions": []
+      }
+    },
+    {
+      "kind": "member_delete",
+      "id": 2,
+      "body": {
+        "scope": "all",
+        "search": "missing"
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "deleted": 0,
+          "contact_count": 1
+        }
+      },
+      "snapshot": {
+        "contacts": [
+          {
+            "id": 1,
+            "email": "first@business.ng",
+            "phone_number": "+2348031112222",
+            "lead_status": "interested",
+            "is_opted_out": false,
+            "has_consented": true,
+            "consent_status": "opted_in",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 4,
+            "email": "info@business.ng",
+            "phone_number": null,
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": "inferred",
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 6,
+            "email": null,
+            "phone_number": "+2348031111111",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 5,
+            "email": null,
+            "phone_number": "+2348123456789",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": true,
+            "undeliverable_reason": "test_data_suspected",
+            "delivery_fail_count": 1
+          }
+        ],
+        "contact_lists": [
+          {
+            "id": 2,
+            "name": "Second",
+            "contact_count": 1
+          },
+          {
+            "id": 1,
+            "name": "First",
+            "contact_count": 2
+          }
+        ],
+        "contact_list_members": [
+          {
+            "list_id": 1,
+            "contact_id": 1
+          },
+          {
+            "list_id": 2,
+            "contact_id": 1
+          },
+          {
+            "list_id": 1,
+            "contact_id": 6
+          }
+        ],
+        "tags": [
+          {
+            "id": 1,
+            "name": "pattern_generated"
+          },
+          {
+            "id": 2,
+            "name": "sendable:false"
+          },
+          {
+            "id": 3,
+            "name": "Batch"
+          }
+        ],
+        "contact_tags": [
+          {
+            "contact_id": 1,
+            "tag_id": 3
+          },
+          {
+            "contact_id": 4,
+            "tag_id": 1
+          },
+          {
+            "contact_id": 4,
+            "tag_id": 2
+          }
+        ],
+        "suppression_entries": [],
+        "email_suppressions": []
+      }
+    },
+    {
+      "kind": "activity",
+      "id": 404,
+      "expected": {
+        "status": 200,
+        "body": {
+          "total": 0,
+          "items": []
+        }
+      },
+      "snapshot": {
+        "contacts": [
+          {
+            "id": 1,
+            "email": "first@business.ng",
+            "phone_number": "+2348031112222",
+            "lead_status": "interested",
+            "is_opted_out": false,
+            "has_consented": true,
+            "consent_status": "opted_in",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 4,
+            "email": "info@business.ng",
+            "phone_number": null,
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": "inferred",
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 6,
+            "email": null,
+            "phone_number": "+2348031111111",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 5,
+            "email": null,
+            "phone_number": "+2348123456789",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": true,
+            "undeliverable_reason": "test_data_suspected",
+            "delivery_fail_count": 1
+          }
+        ],
+        "contact_lists": [
+          {
+            "id": 2,
+            "name": "Second",
+            "contact_count": 1
+          },
+          {
+            "id": 1,
+            "name": "First",
+            "contact_count": 2
+          }
+        ],
+        "contact_list_members": [
+          {
+            "list_id": 1,
+            "contact_id": 1
+          },
+          {
+            "list_id": 2,
+            "contact_id": 1
+          },
+          {
+            "list_id": 1,
+            "contact_id": 6
+          }
+        ],
+        "tags": [
+          {
+            "id": 1,
+            "name": "pattern_generated"
+          },
+          {
+            "id": 2,
+            "name": "sendable:false"
+          },
+          {
+            "id": 3,
+            "name": "Batch"
+          }
+        ],
+        "contact_tags": [
+          {
+            "contact_id": 1,
+            "tag_id": 3
+          },
+          {
+            "contact_id": 4,
+            "tag_id": 1
+          },
+          {
+            "contact_id": 4,
+            "tag_id": 2
+          }
+        ],
+        "suppression_entries": [],
+        "email_suppressions": []
+      }
+    },
+    {
+      "kind": "delete",
+      "id": 404,
+      "expected": {
+        "status": 404,
+        "message": "Contact not found"
+      },
+      "snapshot": {
+        "contacts": [
+          {
+            "id": 1,
+            "email": "first@business.ng",
+            "phone_number": "+2348031112222",
+            "lead_status": "interested",
+            "is_opted_out": false,
+            "has_consented": true,
+            "consent_status": "opted_in",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 4,
+            "email": "info@business.ng",
+            "phone_number": null,
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": "inferred",
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 6,
+            "email": null,
+            "phone_number": "+2348031111111",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 5,
+            "email": null,
+            "phone_number": "+2348123456789",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": true,
+            "undeliverable_reason": "test_data_suspected",
+            "delivery_fail_count": 1
+          }
+        ],
+        "contact_lists": [
+          {
+            "id": 2,
+            "name": "Second",
+            "contact_count": 1
+          },
+          {
+            "id": 1,
+            "name": "First",
+            "contact_count": 2
+          }
+        ],
+        "contact_list_members": [
+          {
+            "list_id": 1,
+            "contact_id": 1
+          },
+          {
+            "list_id": 2,
+            "contact_id": 1
+          },
+          {
+            "list_id": 1,
+            "contact_id": 6
+          }
+        ],
+        "tags": [
+          {
+            "id": 1,
+            "name": "pattern_generated"
+          },
+          {
+            "id": 2,
+            "name": "sendable:false"
+          },
+          {
+            "id": 3,
+            "name": "Batch"
+          }
+        ],
+        "contact_tags": [
+          {
+            "contact_id": 1,
+            "tag_id": 3
+          },
+          {
+            "contact_id": 4,
+            "tag_id": 1
+          },
+          {
+            "contact_id": 4,
+            "tag_id": 2
+          }
+        ],
+        "suppression_entries": [],
+        "email_suppressions": []
+      }
+    },
+    {
+      "kind": "list_delete",
+      "id": 1,
+      "expected": {
+        "status": 204,
+        "body": null
+      },
+      "snapshot": {
+        "contacts": [
+          {
+            "id": 1,
+            "email": "first@business.ng",
+            "phone_number": "+2348031112222",
+            "lead_status": "interested",
+            "is_opted_out": false,
+            "has_consented": true,
+            "consent_status": "opted_in",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 4,
+            "email": "info@business.ng",
+            "phone_number": null,
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": "inferred",
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 6,
+            "email": null,
+            "phone_number": "+2348031111111",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 5,
+            "email": null,
+            "phone_number": "+2348123456789",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": true,
+            "undeliverable_reason": "test_data_suspected",
+            "delivery_fail_count": 1
+          }
+        ],
+        "contact_lists": [
+          {
+            "id": 2,
+            "name": "Second",
+            "contact_count": 1
+          }
+        ],
+        "contact_list_members": [
+          {
+            "list_id": 2,
+            "contact_id": 1
+          }
+        ],
+        "tags": [
+          {
+            "id": 1,
+            "name": "pattern_generated"
+          },
+          {
+            "id": 2,
+            "name": "sendable:false"
+          },
+          {
+            "id": 3,
+            "name": "Batch"
+          }
+        ],
+        "contact_tags": [
+          {
+            "contact_id": 1,
+            "tag_id": 3
+          },
+          {
+            "contact_id": 4,
+            "tag_id": 1
+          },
+          {
+            "contact_id": 4,
+            "tag_id": 2
+          }
+        ],
+        "suppression_entries": [],
+        "email_suppressions": []
+      }
+    },
+    {
+      "kind": "bulk",
+      "body": {
+        "action": "delete",
+        "scope": "all",
+        "channel": "email",
+        "list_id": 2
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "affected": 1,
+          "scope": "all"
+        }
+      },
+      "snapshot": {
+        "contacts": [
+          {
+            "id": 4,
+            "email": "info@business.ng",
+            "phone_number": null,
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": "inferred",
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 6,
+            "email": null,
+            "phone_number": "+2348031111111",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 5,
+            "email": null,
+            "phone_number": "+2348123456789",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": true,
+            "undeliverable_reason": "test_data_suspected",
+            "delivery_fail_count": 1
+          }
+        ],
+        "contact_lists": [
+          {
+            "id": 2,
+            "name": "Second",
+            "contact_count": 0
+          }
+        ],
+        "contact_list_members": [],
+        "tags": [
+          {
+            "id": 1,
+            "name": "pattern_generated"
+          },
+          {
+            "id": 2,
+            "name": "sendable:false"
+          },
+          {
+            "id": 3,
+            "name": "Batch"
+          }
+        ],
+        "contact_tags": [
+          {
+            "contact_id": 4,
+            "tag_id": 1
+          },
+          {
+            "contact_id": 4,
+            "tag_id": 2
+          }
+        ],
+        "suppression_entries": [],
+        "email_suppressions": []
+      }
+    },
+    {
+      "kind": "list_delete",
+      "id": 2,
+      "delete_contacts": true,
+      "expected": {
+        "status": 204,
+        "body": null
+      },
+      "snapshot": {
+        "contacts": [
+          {
+            "id": 4,
+            "email": "info@business.ng",
+            "phone_number": null,
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": "inferred",
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 6,
+            "email": null,
+            "phone_number": "+2348031111111",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 5,
+            "email": null,
+            "phone_number": "+2348123456789",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": true,
+            "undeliverable_reason": "test_data_suspected",
+            "delivery_fail_count": 1
+          }
+        ],
+        "contact_lists": [],
+        "contact_list_members": [],
+        "tags": [
+          {
+            "id": 1,
+            "name": "pattern_generated"
+          },
+          {
+            "id": 2,
+            "name": "sendable:false"
+          },
+          {
+            "id": 3,
+            "name": "Batch"
+          }
+        ],
+        "contact_tags": [
+          {
+            "contact_id": 4,
+            "tag_id": 1
+          },
+          {
+            "contact_id": 4,
+            "tag_id": 2
+          }
+        ],
+        "suppression_entries": [],
+        "email_suppressions": []
+      }
+    },
+    {
+      "kind": "delete",
+      "id": 4,
+      "expected": {
+        "status": 204,
+        "body": null
+      },
+      "snapshot": {
+        "contacts": [
+          {
+            "id": 6,
+            "email": null,
+            "phone_number": "+2348031111111",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": false,
+            "undeliverable_reason": null,
+            "delivery_fail_count": 0
+          },
+          {
+            "id": 5,
+            "email": null,
+            "phone_number": "+2348123456789",
+            "lead_status": "new",
+            "is_opted_out": false,
+            "has_consented": false,
+            "consent_status": "unknown",
+            "is_email_opted_out": false,
+            "email_status": "active",
+            "email_source": null,
+            "is_undeliverable": true,
+            "undeliverable_reason": "test_data_suspected",
+            "delivery_fail_count": 1
+          }
+        ],
+        "contact_lists": [],
+        "contact_list_members": [],
+        "tags": [
+          {
+            "id": 1,
+            "name": "pattern_generated"
+          },
+          {
+            "id": 2,
+            "name": "sendable:false"
+          },
+          {
+            "id": 3,
+            "name": "Batch"
+          }
+        ],
+        "contact_tags": [],
+        "suppression_entries": [],
+        "email_suppressions": []
+      }
+    }
+  ],
+  "fields": {
+    "Contact": [
+      "id",
+      "email",
+      "phone_number",
+      "lead_status",
+      "is_opted_out",
+      "has_consented",
+      "consent_status",
+      "is_email_opted_out",
+      "email_status",
+      "email_source",
+      "is_undeliverable",
+      "undeliverable_reason",
+      "delivery_fail_count"
+    ],
+    "ContactList": [
+      "id",
+      "name",
+      "contact_count"
+    ],
+    "ContactListMember": [
+      "list_id",
+      "contact_id"
+    ],
+    "Tag": [
+      "id",
+      "name"
+    ],
+    "ContactTag": [
+      "contact_id",
+      "tag_id"
+    ],
+    "SuppressionEntry": [
+      "phone_number",
+      "contact_id"
+    ],
+    "EmailSuppression": [
+      "email_address",
+      "contact_id",
+      "source",
+      "reason",
+      "hard_bounce"
+    ]
+  },
+  "scope": "Actual selected source lifecycle functions; fixed clock, omitted FKs and only one reconstructed ORM cascade. Cases deliberately avoid source destructive shared-calendar and suppression-erasure bugs; native hardening has separate tests. Not native install/HTTP/concurrency/provider/browser proof."
+}

@@ -1,0 +1,4577 @@
+[
+  {
+    "method": "DELETE",
+    "path": "/api/v1/ads/audiences/{audience_id}",
+    "sources": [
+      "backend/app/api/v1/ads.py:1719"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/ads/calendar/{event_id}",
+    "sources": [
+      "backend/app/api/v1/ads.py:2545"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/ads/campaigns/{campaign_id}",
+    "sources": [
+      "backend/app/api/v1/ads.py:514"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/audience/{assignment_id}",
+    "sources": [
+      "backend/app/api/v1/ads.py:1053"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/followup-steps/{step_id}",
+    "sources": [
+      "backend/app/api/v1/ads.py:2123"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/ads/creatives/{creative_id}",
+    "sources": [
+      "backend/app/api/v1/ads.py:1499"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/ads/followup-steps/{step_id}",
+    "sources": [
+      "backend/app/api/v1/ads.py:2140"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/ads/followup-templates/{template_id}",
+    "sources": [
+      "backend/app/api/v1/ads.py:2284"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/ads/sets/{set_id}",
+    "sources": [
+      "backend/app/api/v1/ads.py:1285"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/ads/suppression/{entry_id}",
+    "sources": [
+      "backend/app/api/v1/ads.py:2626"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/ai-agent/files/{file_id}",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:835"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/ai-agent/memory/global",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:914"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/ai-agent/memory/{session_id}",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:944"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/ai-agent/sessions/{session_id}",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:507"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/ai-agent/skills/{skill_id}",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:1043"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/automations/{automation_id}",
+    "sources": [
+      "backend/app/api/v1/automations.py:130"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/autoreply/{rule_id}",
+    "sources": [
+      "backend/app/api/v1/autoreply.py:134"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/calendar/{meeting_id}",
+    "sources": [
+      "backend/app/api/v1/calendar.py:535"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/calls/webhooks/{webhook_id}",
+    "sources": [
+      "backend/app/api/v1/calls.py:160"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/campaign-followups/{followup_id}",
+    "sources": [
+      "backend/app/api/v1/campaign_followups.py:247"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/campaigns/{campaign_id}",
+    "sources": [
+      "backend/app/api/v1/campaigns.py:596"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/contacts/{contact_id}",
+    "sources": [
+      "backend/app/api/v1/contacts.py:963"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/email/accounts/{account_id}",
+    "sources": [
+      "backend/app/api/v1/email.py:295"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/email/domains/{domain_id}",
+    "sources": [
+      "backend/app/api/v1/email.py:412"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/email/suppression/{entry_id}",
+    "sources": [
+      "backend/app/api/v1/email.py:1669"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/followups/{followup_id}",
+    "sources": [
+      "backend/app/api/v1/followups.py:213"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/invoices/{invoice_id}",
+    "sources": [
+      "backend/app/api/v1/invoices.py:1203"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/lists/{list_id}",
+    "sources": [
+      "backend/app/api/v1/lists.py:213"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/mailbox/{mailbox_id}",
+    "sources": [
+      "backend/app/api/v1/mailbox.py:559"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/mcp/clients/{client_pk}",
+    "sources": [
+      "backend/app/api/v1/mcp.py:1188"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/mcp/tokens/{token_id}",
+    "sources": [
+      "backend/app/api/v1/mcp.py:1000"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/sequences/{sequence_id}",
+    "sources": [
+      "backend/app/api/v1/sequences.py:243"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/settings/callgate/webhooks/{webhook_id}",
+    "sources": [
+      "backend/app/api/v1/settings.py:287"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/settings/gateway/phones/{phone_id}",
+    "sources": [
+      "backend/app/api/v1/settings.py:501"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/settings/gateway/webhooks/{webhook_id}",
+    "sources": [
+      "backend/app/api/v1/settings.py:142"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/templates/{template_id}",
+    "sources": [
+      "backend/app/api/v1/templates.py:306"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/variables/{variable_id}",
+    "sources": [
+      "backend/app/api/v1/variables.py:163"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/connectors/{key}/mcp",
+    "sources": [
+      "backend/app/api/v1/mcp.py:353"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/mcp",
+    "sources": [
+      "backend/app/api/v1/mcp.py:313"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "DELETE",
+    "path": "/mcp/",
+    "sources": [
+      "backend/app/api/v1/mcp.py:313"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/.well-known/oauth-authorization-server",
+    "sources": [
+      "backend/app/api/v1/mcp.py:403"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/.well-known/oauth-authorization-server/{path:path}",
+    "sources": [
+      "backend/app/api/v1/mcp.py:403"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/.well-known/oauth-protected-resource",
+    "sources": [
+      "backend/app/api/v1/mcp.py:378"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/.well-known/oauth-protected-resource/{path:path}",
+    "sources": [
+      "backend/app/api/v1/mcp.py:378"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/.well-known/openid-configuration",
+    "sources": [
+      "backend/app/api/v1/mcp.py:403"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/.well-known/openid-configuration/{path:path}",
+    "sources": [
+      "backend/app/api/v1/mcp.py:403"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/activity",
+    "sources": [
+      "backend/app/api/v1/ads.py:3100"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/audiences",
+    "sources": [
+      "backend/app/api/v1/ads.py:1651"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/audiences/{audience_id}",
+    "sources": [
+      "backend/app/api/v1/ads.py:1691"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/audiences/{audience_id}/preview",
+    "sources": [
+      "backend/app/api/v1/ads.py:1732"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/calendar",
+    "sources": [
+      "backend/app/api/v1/ads.py:2451"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/campaigns",
+    "sources": [
+      "backend/app/api/v1/ads.py:275"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/campaigns/{campaign_id}",
+    "sources": [
+      "backend/app/api/v1/ads.py:352"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/activity",
+    "sources": [
+      "backend/app/api/v1/ads.py:1139"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/analytics",
+    "sources": [
+      "backend/app/api/v1/ads.py:1046"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/audience",
+    "sources": [
+      "backend/app/api/v1/ads.py:812"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/followup-steps",
+    "sources": [
+      "backend/app/api/v1/ads.py:1938"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/jobs",
+    "sources": [
+      "backend/app/api/v1/ads.py:893"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/optimization",
+    "sources": [
+      "backend/app/api/v1/ads.py:1110"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/send-logs",
+    "sources": [
+      "backend/app/api/v1/ads.py:936"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/sets",
+    "sources": [
+      "backend/app/api/v1/ads.py:1177"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/contacts/{contact_id}/timeline",
+    "sources": [
+      "backend/app/api/v1/ads.py:2718"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/creatives/{creative_id}/analytics",
+    "sources": [
+      "backend/app/api/v1/ads.py:1568"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/creatives/{creative_id}/versions",
+    "sources": [
+      "backend/app/api/v1/ads.py:1441"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/export/{kind}",
+    "sources": [
+      "backend/app/api/v1/ads.py:2943"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/followup-steps/{step_id}",
+    "sources": [
+      "backend/app/api/v1/ads.py:2009"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/followup-templates",
+    "sources": [
+      "backend/app/api/v1/ads.py:2213"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/followup-templates/{template_id}",
+    "sources": [
+      "backend/app/api/v1/ads.py:2249"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/followups",
+    "sources": [
+      "backend/app/api/v1/ads.py:2301"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/overview",
+    "sources": [
+      "backend/app/api/v1/ads.py:187"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/r/{assignment_id}",
+    "sources": [
+      "backend/app/api/v1/ads.py:1831"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/reference",
+    "sources": [
+      "backend/app/api/v1/ads.py:3039"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/search",
+    "sources": [
+      "backend/app/api/v1/ads.py:2805"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/sets/{set_id}/creatives",
+    "sources": [
+      "backend/app/api/v1/ads.py:1338"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/sets/{set_id}/preview",
+    "sources": [
+      "backend/app/api/v1/ads.py:1306"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/suppression",
+    "sources": [
+      "backend/app/api/v1/ads.py:2563"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ai-agent/activity",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:643"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ai-agent/files",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:802"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ai-agent/files/{file_id}",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:815"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ai-agent/health",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:183"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ai-agent/memory/global",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:898"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ai-agent/memory/{session_id}",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:921"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ai-agent/models",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:101"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ai-agent/presets",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:133"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ai-agent/sessions",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:366"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ai-agent/sessions/{session_id}",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:418"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ai-agent/settings",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:228"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ai-agent/skills",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:959"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ai-agent/skills/{skill_id}",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:1030"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ai-agent/tools",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:1057"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/analytics/by-campaign",
+    "sources": [
+      "backend/app/api/v1/analytics.py:205"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/analytics/calls",
+    "sources": [
+      "backend/app/api/v1/analytics.py:251"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/analytics/funnel",
+    "sources": [
+      "backend/app/api/v1/analytics.py:148"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/analytics/overview",
+    "sources": [
+      "backend/app/api/v1/analytics.py:24"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/analytics/timeseries",
+    "sources": [
+      "backend/app/api/v1/analytics.py:101"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/auth/access",
+    "sources": [
+      "backend/app/api/v1/auth.py:243"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/auth/me",
+    "sources": [
+      "backend/app/api/v1/auth.py:276"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/automations",
+    "sources": [
+      "backend/app/api/v1/automations.py:43"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/automations/",
+    "sources": [
+      "backend/app/api/v1/automations.py:43"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/automations/{automation_id}",
+    "sources": [
+      "backend/app/api/v1/automations.py:88"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/autoreply",
+    "sources": [
+      "backend/app/api/v1/autoreply.py:44"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/autoreply/",
+    "sources": [
+      "backend/app/api/v1/autoreply.py:44"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/autoreply/{rule_id}",
+    "sources": [
+      "backend/app/api/v1/autoreply.py:87"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/calendar",
+    "sources": [
+      "backend/app/api/v1/calendar.py:164"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/calendar/",
+    "sources": [
+      "backend/app/api/v1/calendar.py:164"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/calendar/day",
+    "sources": [
+      "backend/app/api/v1/calendar.py:251"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/calendar/tags",
+    "sources": [
+      "backend/app/api/v1/calendar.py:273"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/calendar/tags/all",
+    "sources": [
+      "backend/app/api/v1/calendar.py:634"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/calendar/upcoming",
+    "sources": [
+      "backend/app/api/v1/calendar.py:237"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/calendar/{meeting_id}",
+    "sources": [
+      "backend/app/api/v1/calendar.py:301"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/calendar/{meeting_id}/preview",
+    "sources": [
+      "backend/app/api/v1/calendar.py:315"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/calls/active",
+    "sources": [
+      "backend/app/api/v1/calls.py:328"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/calls/config",
+    "sources": [
+      "backend/app/api/v1/calls.py:59"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/calls/logs",
+    "sources": [
+      "backend/app/api/v1/calls.py:287"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/calls/webhooks",
+    "sources": [
+      "backend/app/api/v1/calls.py:113"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/campaign-followups/campaigns",
+    "sources": [
+      "backend/app/api/v1/campaign_followups.py:45"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/campaign-followups/campaigns/{campaign_id}",
+    "sources": [
+      "backend/app/api/v1/campaign_followups.py:100"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/campaign-followups/{followup_id}/log",
+    "sources": [
+      "backend/app/api/v1/campaign_followups.py:405"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/campaign-followups/{followup_id}/preview",
+    "sources": [
+      "backend/app/api/v1/campaign_followups.py:323"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/campaigns",
+    "sources": [
+      "backend/app/api/v1/campaigns.py:53"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/campaigns/",
+    "sources": [
+      "backend/app/api/v1/campaigns.py:53"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/campaigns/reconcile",
+    "sources": [
+      "backend/app/api/v1/campaigns.py:106"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/campaigns/{campaign_id}",
+    "sources": [
+      "backend/app/api/v1/campaigns.py:131"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/campaigns/{campaign_id}/analytics",
+    "sources": [
+      "backend/app/api/v1/campaigns.py:610"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/campaigns/{campaign_id}/conversations",
+    "sources": [
+      "backend/app/api/v1/campaigns.py:634"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/campaigns/{campaign_id}/performance",
+    "sources": [
+      "backend/app/api/v1/campaigns.py:763"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/contacts",
+    "sources": [
+      "backend/app/api/v1/contacts.py:186"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/contacts/",
+    "sources": [
+      "backend/app/api/v1/contacts.py:186"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/contacts/enrich/status",
+    "sources": [
+      "backend/app/api/v1/contacts.py:1496"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/contacts/export",
+    "sources": [
+      "backend/app/api/v1/contacts.py:349"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/contacts/export/csv",
+    "sources": [
+      "backend/app/api/v1/contacts.py:1663"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/contacts/import/jobs/{job_id}",
+    "sources": [
+      "backend/app/api/v1/contacts.py:1334"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/contacts/import/jobs/{job_id}/errors.csv",
+    "sources": [
+      "backend/app/api/v1/contacts.py:1367"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/contacts/tags/",
+    "sources": [
+      "backend/app/api/v1/contacts.py:546"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/contacts/{contact_id}",
+    "sources": [
+      "backend/app/api/v1/contacts.py:588"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/contacts/{contact_id}/activity",
+    "sources": [
+      "backend/app/api/v1/contacts.py:1803"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/dashboard/charts",
+    "sources": [
+      "backend/app/api/v1/dashboard.py:205"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/dashboard/stats",
+    "sources": [
+      "backend/app/api/v1/dashboard.py:38"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/accounts",
+    "sources": [
+      "backend/app/api/v1/email.py:154"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/accounts/{account_id}/deliverability",
+    "sources": [
+      "backend/app/api/v1/email.py:1842"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/accounts/{account_id}/senders",
+    "sources": [
+      "backend/app/api/v1/email.py:669"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/contacts/{contact_id}/engagement",
+    "sources": [
+      "backend/app/api/v1/email.py:2071"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/domains",
+    "sources": [
+      "backend/app/api/v1/email.py:361"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/domains/{domain_id}",
+    "sources": [
+      "backend/app/api/v1/email.py:382"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/events",
+    "sources": [
+      "backend/app/api/v1/email.py:1689"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/health",
+    "sources": [
+      "backend/app/api/v1/email.py:182"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/history",
+    "sources": [
+      "backend/app/api/v1/email.py:1062"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/inbox/conversations",
+    "sources": [
+      "backend/app/api/v1/email.py:1167"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/inbox/conversations/{conversation_id}",
+    "sources": [
+      "backend/app/api/v1/email.py:1321"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/inbox/unread-count",
+    "sources": [
+      "backend/app/api/v1/email.py:1579"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/messages/{message_id}/events",
+    "sources": [
+      "backend/app/api/v1/email.py:2016"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/overview",
+    "sources": [
+      "backend/app/api/v1/email.py:694"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/reference",
+    "sources": [
+      "backend/app/api/v1/email.py:796"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/senders",
+    "sources": [
+      "backend/app/api/v1/email.py:172"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/stats",
+    "sources": [
+      "backend/app/api/v1/email.py:786"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/suppression",
+    "sources": [
+      "backend/app/api/v1/email.py:1607"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/unsubscribe",
+    "sources": [
+      "backend/app/api/v1/email.py:1769"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/followups",
+    "sources": [
+      "backend/app/api/v1/followups.py:79"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/followups/",
+    "sources": [
+      "backend/app/api/v1/followups.py:79"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/guide",
+    "sources": [
+      "backend/app/api/v1/guide.py:27",
+      "backend/app/api/v1/guide.py:27"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/guide/",
+    "sources": [
+      "backend/app/api/v1/guide.py:27"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/guide/summary",
+    "sources": [
+      "backend/app/api/v1/guide.py:36"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/health",
+    "sources": [
+      "backend/app/main.py:1402"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/health/db",
+    "sources": [
+      "backend/app/main.py:1413"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/inbox/campaign-filters",
+    "sources": [
+      "backend/app/api/v1/inbox.py:182"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/inbox/conversations",
+    "sources": [
+      "backend/app/api/v1/inbox.py:34"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/inbox/conversations/{conversation_id}",
+    "sources": [
+      "backend/app/api/v1/inbox.py:237"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/inbox/conversations/{conversation_id}/templates/{template_id}/preview",
+    "sources": [
+      "backend/app/api/v1/inbox.py:262"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/inbox/device-info",
+    "sources": [
+      "backend/app/api/v1/inbox.py:503"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/invoices",
+    "sources": [
+      "backend/app/api/v1/invoices.py:779"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/invoices/analytics",
+    "sources": [
+      "backend/app/api/v1/invoices.py:351"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/invoices/currencies",
+    "sources": [
+      "backend/app/api/v1/invoices.py:333"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/invoices/links",
+    "sources": [
+      "backend/app/api/v1/invoices.py:1015"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/invoices/payments",
+    "sources": [
+      "backend/app/api/v1/invoices.py:464"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/invoices/public/{token}",
+    "sources": [
+      "backend/app/api/v1/invoices.py:644"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/invoices/public/{token}/verify",
+    "sources": [
+      "backend/app/api/v1/invoices.py:725"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/invoices/settings",
+    "sources": [
+      "backend/app/api/v1/invoices.py:292"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/invoices/{invoice_id}",
+    "sources": [
+      "backend/app/api/v1/invoices.py:1086"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/invoices/{invoice_id}/events",
+    "sources": [
+      "backend/app/api/v1/invoices.py:1470"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/invoices/{invoice_id}/payments",
+    "sources": [
+      "backend/app/api/v1/invoices.py:1460"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/lists",
+    "sources": [
+      "backend/app/api/v1/lists.py:77"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/lists/",
+    "sources": [
+      "backend/app/api/v1/lists.py:77"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/lists/{list_id}/contacts",
+    "sources": [
+      "backend/app/api/v1/lists.py:263"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/lists/{list_id}/stats",
+    "sources": [
+      "backend/app/api/v1/lists.py:619"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/mail/messages",
+    "sources": [
+      "backend/app/api/v1/mail.py:80"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/mail/messages/{mailbox_id}/{provider_message_id}",
+    "sources": [
+      "backend/app/api/v1/mail.py:99"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/mail/overview",
+    "sources": [
+      "backend/app/api/v1/mail.py:67"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/mailbox",
+    "sources": [
+      "backend/app/api/v1/mailbox.py:282",
+      "backend/app/api/v1/mailbox.py:282"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/mailbox/",
+    "sources": [
+      "backend/app/api/v1/mailbox.py:282"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/mailbox/google/callback",
+    "sources": [
+      "backend/app/api/v1/mailbox.py:343"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/mailbox/google/start",
+    "sources": [
+      "backend/app/api/v1/mailbox.py:304"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/mailbox/report",
+    "sources": [
+      "backend/app/api/v1/mailbox.py:271"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/mailbox/{mailbox_id}",
+    "sources": [
+      "backend/app/api/v1/mailbox.py:526"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/mcp/activity",
+    "sources": [
+      "backend/app/api/v1/mcp.py:1013"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/mcp/bridge",
+    "sources": [
+      "backend/app/api/v1/mcp.py:1113"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/mcp/clients",
+    "sources": [
+      "backend/app/api/v1/mcp.py:1153"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/mcp/connectors",
+    "sources": [
+      "backend/app/api/v1/mcp.py:1041"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/mcp/endpoints",
+    "sources": [
+      "backend/app/api/v1/mcp.py:1248"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/mcp/execution-health",
+    "sources": [
+      "backend/app/api/v1/mcp.py:1271"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/mcp/tokens",
+    "sources": [
+      "backend/app/api/v1/mcp.py:964"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/notifications",
+    "sources": [
+      "backend/app/api/v1/notifications.py:33"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/notifications/",
+    "sources": [
+      "backend/app/api/v1/notifications.py:33"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/notifications/push/subscriptions",
+    "sources": [
+      "backend/app/api/v1/notifications.py:156"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/notifications/push/vapid-key",
+    "sources": [
+      "backend/app/api/v1/notifications.py:105"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/notifications/unread-count",
+    "sources": [
+      "backend/app/api/v1/notifications.py:55"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/overview/campaigns",
+    "sources": [
+      "backend/app/api/v1/overview.py:358"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/overview/campaigns/{campaign_id}",
+    "sources": [
+      "backend/app/api/v1/overview.py:478"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/overview/metrics",
+    "sources": [
+      "backend/app/api/v1/overview.py:574"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/send/history",
+    "sources": [
+      "backend/app/api/v1/send.py:374"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/send/scheduled",
+    "sources": [
+      "backend/app/api/v1/send.py:319"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/sequences",
+    "sources": [
+      "backend/app/api/v1/sequences.py:69"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/sequences/",
+    "sources": [
+      "backend/app/api/v1/sequences.py:69"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/sequences/{sequence_id}",
+    "sources": [
+      "backend/app/api/v1/sequences.py:104"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/settings/access",
+    "sources": [
+      "backend/app/api/v1/settings.py:22"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/settings/appearance",
+    "sources": [
+      "backend/app/api/v1/settings.py:606"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/settings/callgate",
+    "sources": [
+      "backend/app/api/v1/settings.py:213"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/settings/callgate/webhooks",
+    "sources": [
+      "backend/app/api/v1/settings.py:248"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/settings/compliance",
+    "sources": [
+      "backend/app/api/v1/settings.py:196"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/settings/gateway",
+    "sources": [
+      "backend/app/api/v1/settings.py:45"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/settings/gateway/phones",
+    "sources": [
+      "backend/app/api/v1/settings.py:451"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/settings/gateway/webhooks",
+    "sources": [
+      "backend/app/api/v1/settings.py:111"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/settings/google-oauth",
+    "sources": [
+      "backend/app/api/v1/settings.py:314"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/settings/notifications",
+    "sources": [
+      "backend/app/api/v1/settings.py:151"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/settings/notifications/muted-senders",
+    "sources": [
+      "backend/app/api/v1/settings.py:158"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/system/errors",
+    "sources": [
+      "backend/app/api/v1/system.py:291"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/system/health",
+    "sources": [
+      "backend/app/api/v1/system.py:47"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/templates",
+    "sources": [
+      "backend/app/api/v1/templates.py:95"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/templates/",
+    "sources": [
+      "backend/app/api/v1/templates.py:95"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/templates/categories",
+    "sources": [
+      "backend/app/api/v1/templates.py:126"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/templates/{template_id}",
+    "sources": [
+      "backend/app/api/v1/templates.py:201"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/validator/jobs",
+    "sources": [
+      "backend/app/api/v1/validator.py:186"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/validator/jobs/{job_id}",
+    "sources": [
+      "backend/app/api/v1/validator.py:199"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/validator/status",
+    "sources": [
+      "backend/app/api/v1/validator.py:83"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/variables",
+    "sources": [
+      "backend/app/api/v1/variables.py:33"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/variables/",
+    "sources": [
+      "backend/app/api/v1/variables.py:33"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/variables/contact/{contact_id}/profile",
+    "sources": [
+      "backend/app/api/v1/variables.py:204"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/webhooks/callgate",
+    "sources": [
+      "backend/app/api/v1/webhooks.py:566"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/webhooks/logs",
+    "sources": [
+      "backend/app/api/v1/webhooks.py:708"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/webhooks/smsgateway",
+    "sources": [
+      "backend/app/api/v1/webhooks.py:404"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/apple-touch-icon.png",
+    "sources": [
+      "backend/app/main.py:1548"
+    ],
+    "state": "intentionally scoped to ?sender_suite_app=1 / plugin asset URLs (never hijacking WordPress site root)",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/connectors/{key}/mcp",
+    "sources": [
+      "backend/app/api/v1/mcp.py:348"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/connectors/{key}/oauth/authorize",
+    "sources": [
+      "backend/app/api/v1/mcp.py:660"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/connectors/{key}/oauth/register/{client_id}",
+    "sources": [
+      "backend/app/api/v1/mcp.py:453"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/favicon.svg",
+    "sources": [
+      "backend/app/main.py:1550"
+    ],
+    "state": "intentionally scoped to ?sender_suite_app=1 / plugin asset URLs (never hijacking WordPress site root)",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/icon-192.png",
+    "sources": [
+      "backend/app/main.py:1540"
+    ],
+    "state": "intentionally scoped to ?sender_suite_app=1 / plugin asset URLs (never hijacking WordPress site root)",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/icon-512.png",
+    "sources": [
+      "backend/app/main.py:1542"
+    ],
+    "state": "intentionally scoped to ?sender_suite_app=1 / plugin asset URLs (never hijacking WordPress site root)",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/icon-maskable-192.png",
+    "sources": [
+      "backend/app/main.py:1544"
+    ],
+    "state": "intentionally scoped to ?sender_suite_app=1 / plugin asset URLs (never hijacking WordPress site root)",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/icon-maskable-512.png",
+    "sources": [
+      "backend/app/main.py:1546"
+    ],
+    "state": "intentionally scoped to ?sender_suite_app=1 / plugin asset URLs (never hijacking WordPress site root)",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/manifest.json",
+    "sources": [
+      "backend/app/main.py:1520"
+    ],
+    "state": "intentionally scoped to ?sender_suite_app=1 / plugin asset URLs (never hijacking WordPress site root)",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/mcp",
+    "sources": [
+      "backend/app/api/v1/mcp.py:307"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/mcp/",
+    "sources": [
+      "backend/app/api/v1/mcp.py:307"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/mcp/health",
+    "sources": [
+      "backend/app/api/v1/mcp.py:319"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/oauth/approved",
+    "sources": [
+      "backend/app/api/v1/mcp.py:673"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/oauth/authorize",
+    "sources": [
+      "backend/app/api/v1/mcp.py:660"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/oauth/register/{client_id}",
+    "sources": [
+      "backend/app/api/v1/mcp.py:453"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/sw.js",
+    "sources": [
+      "backend/app/main.py:1538"
+    ],
+    "state": "intentionally scoped to ?sender_suite_app=1 / plugin asset URLs (never hijacking WordPress site root)",
+    "certified": false
+  },
+  {
+    "method": "GET",
+    "path": "/{fp:path}",
+    "sources": [
+      "backend/app/main.py:1557",
+      "backend/app/main.py:1563"
+    ],
+    "state": "intentionally scoped to ?sender_suite_app=1 / plugin asset URLs (never hijacking WordPress site root)",
+    "certified": false
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/ads/audiences/{audience_id}",
+    "sources": [
+      "backend/app/api/v1/ads.py:1700"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/ads/calendar/{event_id}",
+    "sources": [
+      "backend/app/api/v1/ads.py:2527"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/ads/campaigns/{campaign_id}",
+    "sources": [
+      "backend/app/api/v1/ads.py:394"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/followup-steps/{step_id}",
+    "sources": [
+      "backend/app/api/v1/ads.py:2045"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/ads/creatives/{creative_id}",
+    "sources": [
+      "backend/app/api/v1/ads.py:1387"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/ads/followup-steps/{step_id}",
+    "sources": [
+      "backend/app/api/v1/ads.py:2058"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/ads/followup-templates/{template_id}",
+    "sources": [
+      "backend/app/api/v1/ads.py:2263"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/ads/sets/{set_id}",
+    "sources": [
+      "backend/app/api/v1/ads.py:1220"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/ai-agent/sessions/{session_id}",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:487"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/campaigns/{campaign_id}",
+    "sources": [
+      "backend/app/api/v1/campaigns.py:221"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/email/accounts/{account_id}",
+    "sources": [
+      "backend/app/api/v1/email.py:256"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/invoices/{invoice_id}",
+    "sources": [
+      "backend/app/api/v1/invoices.py:1096"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/mailbox/{mailbox_id}",
+    "sources": [
+      "backend/app/api/v1/mailbox.py:536"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/audiences",
+    "sources": [
+      "backend/app/api/v1/ads.py:1675"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/audiences/{audience_id}/attach",
+    "sources": [
+      "backend/app/api/v1/ads.py:1772"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/audiences/{audience_id}/duplicate",
+    "sources": [
+      "backend/app/api/v1/ads.py:1739"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/calendar",
+    "sources": [
+      "backend/app/api/v1/ads.py:2511"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns",
+    "sources": [
+      "backend/app/api/v1/ads.py:321"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns/bulk",
+    "sources": [
+      "backend/app/api/v1/ads.py:2859"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/archive",
+    "sources": [
+      "backend/app/api/v1/ads.py:681"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/audience/bulk-remove",
+    "sources": [
+      "backend/app/api/v1/ads.py:1083"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/complete",
+    "sources": [
+      "backend/app/api/v1/ads.py:665"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/contacts",
+    "sources": [
+      "backend/app/api/v1/ads.py:733"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/dispatch",
+    "sources": [
+      "backend/app/api/v1/ads.py:711"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/duplicate",
+    "sources": [
+      "backend/app/api/v1/ads.py:697"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/followup-steps",
+    "sources": [
+      "backend/app/api/v1/ads.py:1964"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/jobs/retry",
+    "sources": [
+      "backend/app/api/v1/ads.py:907"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/launch",
+    "sources": [
+      "backend/app/api/v1/ads.py:576"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/optimize",
+    "sources": [
+      "backend/app/api/v1/ads.py:1118"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/pause",
+    "sources": [
+      "backend/app/api/v1/ads.py:610"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/rebuild-audience",
+    "sources": [
+      "backend/app/api/v1/ads.py:802"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/resume",
+    "sources": [
+      "backend/app/api/v1/ads.py:630"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/sets",
+    "sources": [
+      "backend/app/api/v1/ads.py:1197"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/simulate",
+    "sources": [
+      "backend/app/api/v1/ads.py:569"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/validate",
+    "sources": [
+      "backend/app/api/v1/ads.py:523"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/contacts/bulk",
+    "sources": [
+      "backend/app/api/v1/ads.py:2919"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/contacts/{contact_id}/action",
+    "sources": [
+      "backend/app/api/v1/ads.py:2650"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/creatives/bulk",
+    "sources": [
+      "backend/app/api/v1/ads.py:2895"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/creatives/{creative_id}/duplicate",
+    "sources": [
+      "backend/app/api/v1/ads.py:1471"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/creatives/{creative_id}/promote",
+    "sources": [
+      "backend/app/api/v1/ads.py:1519"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/followup-templates",
+    "sources": [
+      "backend/app/api/v1/ads.py:2235"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/followups",
+    "sources": [
+      "backend/app/api/v1/ads.py:2382"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/followups/process",
+    "sources": [
+      "backend/app/api/v1/ads.py:2439"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/followups/{task_id}/{action}",
+    "sources": [
+      "backend/app/api/v1/ads.py:2401"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/sets/preview",
+    "sources": [
+      "backend/app/api/v1/ads.py:1274"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/sets/{set_id}/creatives",
+    "sources": [
+      "backend/app/api/v1/ads.py:1364"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/sets/{set_id}/duplicate",
+    "sources": [
+      "backend/app/api/v1/ads.py:1239"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/sets/{set_id}/pause-losers",
+    "sources": [
+      "backend/app/api/v1/ads.py:1252"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/suppression",
+    "sources": [
+      "backend/app/api/v1/ads.py:2598"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/track/click",
+    "sources": [
+      "backend/app/api/v1/ads.py:1813"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ai-agent/actions/{action_id}/approve",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:602"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ai-agent/actions/{action_id}/cancel",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:624"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ai-agent/activity/{action_id}/undo",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:674"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ai-agent/files",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:790"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ai-agent/sessions",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:398"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ai-agent/sessions/{session_id}/chat",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:531"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ai-agent/sessions/{session_id}/files",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:777"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ai-agent/settings/test",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:307"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ai-agent/skills",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:977"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ai-agent/skills/json",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:999"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ai-agent/transcribe",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:853"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ai/classify",
+    "sources": [
+      "backend/app/api/v1/ai.py:24"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/auth/admin",
+    "sources": [
+      "backend/app/api/v1/auth.py:187"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/auth/login",
+    "sources": [
+      "backend/app/api/v1/auth.py:212"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/auth/logout",
+    "sources": [
+      "backend/app/api/v1/auth.py:229"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/automations/",
+    "sources": [
+      "backend/app/api/v1/automations.py:60"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/automations/test",
+    "sources": [
+      "backend/app/api/v1/automations.py:144"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/autoreply/",
+    "sources": [
+      "backend/app/api/v1/autoreply.py:67"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/autoreply/test",
+    "sources": [
+      "backend/app/api/v1/autoreply.py:148"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/calendar/",
+    "sources": [
+      "backend/app/api/v1/calendar.py:361"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/calendar/{meeting_id}/cancel",
+    "sources": [
+      "backend/app/api/v1/calendar.py:587"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/calendar/{meeting_id}/complete",
+    "sources": [
+      "backend/app/api/v1/calendar.py:577"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/calendar/{meeting_id}/confirm",
+    "sources": [
+      "backend/app/api/v1/calendar.py:568"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/calendar/{meeting_id}/no-show",
+    "sources": [
+      "backend/app/api/v1/calendar.py:597"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/calendar/{meeting_id}/send-invite",
+    "sources": [
+      "backend/app/api/v1/calendar.py:606"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/calendar/{meeting_id}/send-reminder",
+    "sources": [
+      "backend/app/api/v1/calendar.py:620"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/calls/end",
+    "sources": [
+      "backend/app/api/v1/calls.py:240"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/calls/log-direct",
+    "sources": [
+      "backend/app/api/v1/calls.py:263"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/calls/register-webhook",
+    "sources": [
+      "backend/app/api/v1/calls.py:125"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/calls/start",
+    "sources": [
+      "backend/app/api/v1/calls.py:184"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/calls/test",
+    "sources": [
+      "backend/app/api/v1/calls.py:102"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/campaign-followups/campaigns/{campaign_id}",
+    "sources": [
+      "backend/app/api/v1/campaign_followups.py:144"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/campaign-followups/campaigns/{campaign_id}/process-now",
+    "sources": [
+      "backend/app/api/v1/campaign_followups.py:287"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/campaign-followups/{followup_id}/run",
+    "sources": [
+      "backend/app/api/v1/campaign_followups.py:264"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/campaigns/",
+    "sources": [
+      "backend/app/api/v1/campaigns.py:160"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/campaigns/{campaign_id}/duplicate",
+    "sources": [
+      "backend/app/api/v1/campaigns.py:917"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/campaigns/{campaign_id}/pause",
+    "sources": [
+      "backend/app/api/v1/campaigns.py:481"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/campaigns/{campaign_id}/resume",
+    "sources": [
+      "backend/app/api/v1/campaigns.py:507"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/campaigns/{campaign_id}/schedule",
+    "sources": [
+      "backend/app/api/v1/campaigns.py:340"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/campaigns/{campaign_id}/start",
+    "sources": [
+      "backend/app/api/v1/campaigns.py:394"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/campaigns/{campaign_id}/stop",
+    "sources": [
+      "backend/app/api/v1/campaigns.py:576"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/campaigns/{campaign_id}/validate",
+    "sources": [
+      "backend/app/api/v1/campaigns.py:321"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/contacts/",
+    "sources": [
+      "backend/app/api/v1/contacts.py:602"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/contacts/bulk",
+    "sources": [
+      "backend/app/api/v1/contacts.py:978"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/contacts/clean",
+    "sources": [
+      "backend/app/api/v1/contacts.py:477"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/contacts/enrich",
+    "sources": [
+      "backend/app/api/v1/contacts.py:1558"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/contacts/import/csv",
+    "sources": [
+      "backend/app/api/v1/contacts.py:1393"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/contacts/import/jobs",
+    "sources": [
+      "backend/app/api/v1/contacts.py:1241"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/contacts/import/preview",
+    "sources": [
+      "backend/app/api/v1/contacts.py:1227"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/contacts/import/url",
+    "sources": [
+      "backend/app/api/v1/contacts.py:1274"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/contacts/quarantine/generated",
+    "sources": [
+      "backend/app/api/v1/contacts.py:569"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/contacts/validate-emails",
+    "sources": [
+      "backend/app/api/v1/contacts.py:495"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/contacts/{contact_id}/email-opt-in",
+    "sources": [
+      "backend/app/api/v1/contacts.py:1749"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/contacts/{contact_id}/email-opt-out",
+    "sources": [
+      "backend/app/api/v1/contacts.py:1725"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/contacts/{contact_id}/sms-opt-in",
+    "sources": [
+      "backend/app/api/v1/contacts.py:1773"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/accounts",
+    "sources": [
+      "backend/app/api/v1/email.py:226"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/accounts/{account_id}/default",
+    "sources": [
+      "backend/app/api/v1/email.py:507"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/accounts/{account_id}/test",
+    "sources": [
+      "backend/app/api/v1/email.py:522"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/accounts/{account_id}/test-send",
+    "sources": [
+      "backend/app/api/v1/email.py:541"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/accounts/{account_id}/webhook/reveal",
+    "sources": [
+      "backend/app/api/v1/email.py:443"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/accounts/{account_id}/webhook/rotate",
+    "sources": [
+      "backend/app/api/v1/email.py:471"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/domains",
+    "sources": [
+      "backend/app/api/v1/email.py:339"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/domains/{domain_id}/verify",
+    "sources": [
+      "backend/app/api/v1/email.py:393"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/inbox/conversations/{conversation_id}/read",
+    "sources": [
+      "backend/app/api/v1/email.py:1528"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/inbox/conversations/{conversation_id}/reply",
+    "sources": [
+      "backend/app/api/v1/email.py:1405"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/inbox/conversations/{conversation_id}/status",
+    "sources": [
+      "backend/app/api/v1/email.py:1551"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/messages/{message_id}/retry",
+    "sources": [
+      "backend/app/api/v1/email.py:1122"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/preview",
+    "sources": [
+      "backend/app/api/v1/email.py:839"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/send",
+    "sources": [
+      "backend/app/api/v1/email.py:895"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/senders-preview",
+    "sources": [
+      "backend/app/api/v1/email.py:557"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/suppression",
+    "sources": [
+      "backend/app/api/v1/email.py:1646"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/test-send",
+    "sources": [
+      "backend/app/api/v1/email.py:623"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/unsubscribe",
+    "sources": [
+      "backend/app/api/v1/email.py:1796"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/followups/",
+    "sources": [
+      "backend/app/api/v1/followups.py:154"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/followups/{followup_id}/reschedule",
+    "sources": [
+      "backend/app/api/v1/followups.py:305"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/followups/{followup_id}/send-now",
+    "sources": [
+      "backend/app/api/v1/followups.py:248"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/followups/{followup_id}/skip",
+    "sources": [
+      "backend/app/api/v1/followups.py:273"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/inbox/conversations/{conversation_id}/mark-close",
+    "sources": [
+      "backend/app/api/v1/inbox.py:401"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/inbox/conversations/{conversation_id}/mark-interested",
+    "sources": [
+      "backend/app/api/v1/inbox.py:393"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/inbox/conversations/{conversation_id}/mark-not-interested",
+    "sources": [
+      "backend/app/api/v1/inbox.py:397"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/inbox/conversations/{conversation_id}/mark-opportunity",
+    "sources": [
+      "backend/app/api/v1/inbox.py:405"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/inbox/conversations/{conversation_id}/mark-unread",
+    "sources": [
+      "backend/app/api/v1/inbox.py:426"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/inbox/conversations/{conversation_id}/reply",
+    "sources": [
+      "backend/app/api/v1/inbox.py:298"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/inbox/conversations/{conversation_id}/resume-sequence",
+    "sources": [
+      "backend/app/api/v1/inbox.py:444"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/inbox/conversations/{conversation_id}/status",
+    "sources": [
+      "backend/app/api/v1/inbox.py:414"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/inbox/conversations/{conversation_id}/stop-sequence",
+    "sources": [
+      "backend/app/api/v1/inbox.py:435"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/inbox/conversations/{conversation_id}/{mark}",
+    "sources": [
+      "backend/app/api/v1/inbox.py:851"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/inbox/messages/{message_id}/feedback",
+    "sources": [
+      "backend/app/api/v1/inbox.py:786"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/inbox/poll-debug",
+    "sources": [
+      "backend/app/api/v1/inbox.py:700"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/inbox/poll-now",
+    "sources": [
+      "backend/app/api/v1/inbox.py:768"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/inbox/register-webhook",
+    "sources": [
+      "backend/app/api/v1/inbox.py:527"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/inbox/sync-full",
+    "sources": [
+      "backend/app/api/v1/inbox.py:544"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/invoices",
+    "sources": [
+      "backend/app/api/v1/invoices.py:851"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/invoices/links",
+    "sources": [
+      "backend/app/api/v1/invoices.py:946"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/invoices/paystack/webhook",
+    "sources": [
+      "backend/app/api/v1/invoices.py:537"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/invoices/public/{token}/pay",
+    "sources": [
+      "backend/app/api/v1/invoices.py:658"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/invoices/settings/test",
+    "sources": [
+      "backend/app/api/v1/invoices.py:308"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/invoices/{invoice_id}/duplicate",
+    "sources": [
+      "backend/app/api/v1/invoices.py:1216"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/invoices/{invoice_id}/pay",
+    "sources": [
+      "backend/app/api/v1/invoices.py:1338"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/invoices/{invoice_id}/payments",
+    "sources": [
+      "backend/app/api/v1/invoices.py:1409"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/invoices/{invoice_id}/remind",
+    "sources": [
+      "backend/app/api/v1/invoices.py:1288"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/invoices/{invoice_id}/rotate-link",
+    "sources": [
+      "backend/app/api/v1/invoices.py:1489"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/invoices/{invoice_id}/send",
+    "sources": [
+      "backend/app/api/v1/invoices.py:1275"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/invoices/{invoice_id}/void",
+    "sources": [
+      "backend/app/api/v1/invoices.py:1323"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/lists/",
+    "sources": [
+      "backend/app/api/v1/lists.py:172"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/lists/{list_id}/clean",
+    "sources": [
+      "backend/app/api/v1/lists.py:521"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/lists/{list_id}/contacts",
+    "sources": [
+      "backend/app/api/v1/lists.py:315"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/lists/{list_id}/contacts/add-all",
+    "sources": [
+      "backend/app/api/v1/lists.py:387"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/lists/{list_id}/contacts/delete",
+    "sources": [
+      "backend/app/api/v1/lists.py:464"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/lists/{list_id}/contacts/remove",
+    "sources": [
+      "backend/app/api/v1/lists.py:417"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/lists/{list_id}/validate-emails",
+    "sources": [
+      "backend/app/api/v1/lists.py:547"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/mail/messages/{mailbox_id}/{provider_message_id}/delete",
+    "sources": [
+      "backend/app/api/v1/mail.py:155"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/mail/messages/{mailbox_id}/{provider_message_id}/flags",
+    "sources": [
+      "backend/app/api/v1/mail.py:117"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/mail/messages/{mailbox_id}/{provider_message_id}/move",
+    "sources": [
+      "backend/app/api/v1/mail.py:137"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/mail/messages/{mailbox_id}/{provider_message_id}/reply",
+    "sources": [
+      "backend/app/api/v1/mail.py:170"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/mail/refresh",
+    "sources": [
+      "backend/app/api/v1/mail.py:194"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/mailbox",
+    "sources": [
+      "backend/app/api/v1/mailbox.py:463"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/mailbox/",
+    "sources": [
+      "backend/app/api/v1/mailbox.py:463"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/mailbox/{mailbox_id}/check",
+    "sources": [
+      "backend/app/api/v1/mailbox.py:581"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/mailbox/{mailbox_id}/filters",
+    "sources": [
+      "backend/app/api/v1/mailbox.py:607"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/mailbox/{mailbox_id}/sync",
+    "sources": [
+      "backend/app/api/v1/mailbox.py:594"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/mailbox/{mailbox_id}/test-send",
+    "sources": [
+      "backend/app/api/v1/mailbox.py:641"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/mcp/connectors/{key}",
+    "sources": [
+      "backend/app/api/v1/mcp.py:1134"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/mcp/connectors/{key}/revoke",
+    "sources": [
+      "backend/app/api/v1/mcp.py:1202"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/mcp/connectors/{key}/test",
+    "sources": [
+      "backend/app/api/v1/mcp.py:1223"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/mcp/tokens",
+    "sources": [
+      "backend/app/api/v1/mcp.py:971"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/notifications/push/subscribe",
+    "sources": [
+      "backend/app/api/v1/notifications.py:116"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/notifications/push/test",
+    "sources": [
+      "backend/app/api/v1/notifications.py:168"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/notifications/push/unsubscribe",
+    "sources": [
+      "backend/app/api/v1/notifications.py:144"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/notifications/read-all",
+    "sources": [
+      "backend/app/api/v1/notifications.py:80"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/notifications/{event_id}/read",
+    "sources": [
+      "backend/app/api/v1/notifications.py:67"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/send/",
+    "sources": [
+      "backend/app/api/v1/send.py:37"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/send/messages/{mid}/retry",
+    "sources": [
+      "backend/app/api/v1/send.py:468"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/send/scheduled/{sid}/cancel",
+    "sources": [
+      "backend/app/api/v1/send.py:440"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/send/scheduled/{sid}/retry",
+    "sources": [
+      "backend/app/api/v1/send.py:452"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/send/validate",
+    "sources": [
+      "backend/app/api/v1/send.py:264"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/sequences/",
+    "sources": [
+      "backend/app/api/v1/sequences.py:119"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/settings/callgate/register-webhook",
+    "sources": [
+      "backend/app/api/v1/settings.py:258"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/settings/callgate/test",
+    "sources": [
+      "backend/app/api/v1/settings.py:240"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/settings/gateway/phones",
+    "sources": [
+      "backend/app/api/v1/settings.py:466"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/settings/gateway/phones/{phone_id}/register-webhook",
+    "sources": [
+      "backend/app/api/v1/settings.py:538"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/settings/gateway/phones/{phone_id}/test",
+    "sources": [
+      "backend/app/api/v1/settings.py:518"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/settings/gateway/register-webhook",
+    "sources": [
+      "backend/app/api/v1/settings.py:78"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/settings/gateway/test",
+    "sources": [
+      "backend/app/api/v1/settings.py:72"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/settings/notifications/{provider}/test",
+    "sources": [
+      "backend/app/api/v1/settings.py:184"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/templates/",
+    "sources": [
+      "backend/app/api/v1/templates.py:215"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/templates/preview",
+    "sources": [
+      "backend/app/api/v1/templates.py:141"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/templates/{template_id}/duplicate",
+    "sources": [
+      "backend/app/api/v1/templates.py:321"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/templates/{template_id}/to-email",
+    "sources": [
+      "backend/app/api/v1/templates.py:353"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/validator/batch",
+    "sources": [
+      "backend/app/api/v1/validator.py:281"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/validator/jobs",
+    "sources": [
+      "backend/app/api/v1/validator.py:159"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/validator/jobs/{job_id}/cancel",
+    "sources": [
+      "backend/app/api/v1/validator.py:211"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/validator/selection",
+    "sources": [
+      "backend/app/api/v1/validator.py:143"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/validator/self-test",
+    "sources": [
+      "backend/app/api/v1/validator.py:105"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/variables/",
+    "sources": [
+      "backend/app/api/v1/variables.py:85"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/variables/preview",
+    "sources": [
+      "backend/app/api/v1/variables.py:186"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/variables/sync",
+    "sources": [
+      "backend/app/api/v1/variables.py:76"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/webhooks/brevo",
+    "sources": [
+      "backend/app/api/v1/webhooks.py:628"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/webhooks/brevo/{account_id}",
+    "sources": [
+      "backend/app/api/v1/webhooks.py:628"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/webhooks/callgate",
+    "sources": [
+      "backend/app/api/v1/webhooks.py:431"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/webhooks/smsgate/inbound",
+    "sources": [
+      "backend/app/api/v1/webhooks.py:570"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/webhooks/smsgateway",
+    "sources": [
+      "backend/app/api/v1/webhooks.py:228"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/webhooks/smsgateway/phone/{phone_id}",
+    "sources": [
+      "backend/app/api/v1/webhooks.py:217"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/connectors/{key}/mcp",
+    "sources": [
+      "backend/app/api/v1/mcp.py:338"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/connectors/{key}/oauth/authorize",
+    "sources": [
+      "backend/app/api/v1/mcp.py:667"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/connectors/{key}/oauth/register",
+    "sources": [
+      "backend/app/api/v1/mcp.py:429"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/connectors/{key}/oauth/revoke",
+    "sources": [
+      "backend/app/api/v1/mcp.py:931"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/connectors/{key}/oauth/token",
+    "sources": [
+      "backend/app/api/v1/mcp.py:921"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/mcp",
+    "sources": [
+      "backend/app/api/v1/mcp.py:300"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/mcp/",
+    "sources": [
+      "backend/app/api/v1/mcp.py:300"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/oauth/authorize",
+    "sources": [
+      "backend/app/api/v1/mcp.py:667"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/oauth/register",
+    "sources": [
+      "backend/app/api/v1/mcp.py:429"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/oauth/revoke",
+    "sources": [
+      "backend/app/api/v1/mcp.py:931"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "POST",
+    "path": "/oauth/token",
+    "sources": [
+      "backend/app/api/v1/mcp.py:921"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/ai-agent/memory/global",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:903"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/ai-agent/memory/{session_id}",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:931"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/ai-agent/presets",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:153"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/ai-agent/settings",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:258"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/ai-agent/settings/voice",
+    "sources": [
+      "backend/app/api/v1/ai_agent.py:284"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/automations/{automation_id}",
+    "sources": [
+      "backend/app/api/v1/automations.py:100"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/autoreply/{rule_id}",
+    "sources": [
+      "backend/app/api/v1/autoreply.py:99"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/calendar/{meeting_id}",
+    "sources": [
+      "backend/app/api/v1/calendar.py:457"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/calls/config",
+    "sources": [
+      "backend/app/api/v1/calls.py:78"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/campaign-followups/{followup_id}",
+    "sources": [
+      "backend/app/api/v1/campaign_followups.py:212"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/campaigns/{campaign_id}",
+    "sources": [
+      "backend/app/api/v1/campaigns.py:221"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/contacts/{contact_id}",
+    "sources": [
+      "backend/app/api/v1/contacts.py:663"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/invoices/settings",
+    "sources": [
+      "backend/app/api/v1/invoices.py:298"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/lists/{list_id}",
+    "sources": [
+      "backend/app/api/v1/lists.py:194"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/sequences/{sequence_id}",
+    "sources": [
+      "backend/app/api/v1/sequences.py:163"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/settings/access",
+    "sources": [
+      "backend/app/api/v1/settings.py:28"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/settings/appearance",
+    "sources": [
+      "backend/app/api/v1/settings.py:633"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/settings/callgate",
+    "sources": [
+      "backend/app/api/v1/settings.py:226"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/settings/compliance",
+    "sources": [
+      "backend/app/api/v1/settings.py:200"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/settings/gateway/phones/{phone_id}",
+    "sources": [
+      "backend/app/api/v1/settings.py:481"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/settings/gateway/routing",
+    "sources": [
+      "backend/app/api/v1/settings.py:558"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/settings/gateway/sim",
+    "sources": [
+      "backend/app/api/v1/settings.py:67"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/settings/google-oauth",
+    "sources": [
+      "backend/app/api/v1/settings.py:357"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/settings/notifications/muted-senders",
+    "sources": [
+      "backend/app/api/v1/settings.py:165"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/settings/notifications/{provider}",
+    "sources": [
+      "backend/app/api/v1/settings.py:172"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/templates/{template_id}",
+    "sources": [
+      "backend/app/api/v1/templates.py:262"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/variables/{variable_id}",
+    "sources": [
+      "backend/app/api/v1/variables.py:123"
+    ],
+    "state": "implemented natively; native WordPress/MySQL HTTP unverified",
+    "certified": false
+  }
+]

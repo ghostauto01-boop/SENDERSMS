@@ -1,0 +1,10 @@
+{
+  "ok": true,
+  "assertions": 15,
+  "diffs": [],
+  "php": "8.3.36",
+  "native_wordpress_verified": false,
+  "native_mysql_verified": false,
+  "scope": "Campaign follow-up CRUD, idempotency, Lagos timezone preview, logs, history delete guard, and 503 execution gates.",
+  "suite": "campaign-followups"
+}

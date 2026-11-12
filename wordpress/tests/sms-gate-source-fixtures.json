@@ -1,0 +1,591 @@
+{
+  "cases": [
+    {
+      "response": {
+        "http": 201,
+        "json": {
+          "id": "provider-1",
+          "state": "Pending"
+        }
+      },
+      "source_expected": {
+        "success": true,
+        "provider_message_id": "provider-1",
+        "status": "Pending",
+        "raw": {
+          "id": "provider-1",
+          "state": "Pending"
+        }
+      },
+      "source_request": [
+        {
+          "method": "POST",
+          "url": "https://api.sms-gate.app/3rdparty/v1/messages",
+          "headers": {
+            "Content-Type": "application/json",
+            "Authorization": "Basic c3ludGhldGljLXVzZXI6c3ludGhldGljLXBhc3M="
+          },
+          "json": {
+            "textMessage": {
+              "text": "Hello Ada"
+            },
+            "phoneNumbers": [
+              "+2348031234567"
+            ],
+            "simNumber": 2,
+            "ttl": 3600,
+            "deviceId": "device-1"
+          }
+        }
+      ]
+    },
+    {
+      "response": {
+        "http": 200,
+        "json": {
+          "messageId": "provider-2",
+          "state": "Sent"
+        }
+      },
+      "source_expected": {
+        "success": true,
+        "provider_message_id": "provider-2",
+        "status": "Sent",
+        "raw": {
+          "messageId": "provider-2",
+          "state": "Sent"
+        }
+      },
+      "source_request": [
+        {
+          "method": "POST",
+          "url": "https://api.sms-gate.app/3rdparty/v1/messages",
+          "headers": {
+            "Content-Type": "application/json",
+            "Authorization": "Basic c3ludGhldGljLXVzZXI6c3ludGhldGljLXBhc3M="
+          },
+          "json": {
+            "textMessage": {
+              "text": "Hello Ada"
+            },
+            "phoneNumbers": [
+              "+2348031234567"
+            ],
+            "simNumber": 2,
+            "ttl": 3600,
+            "deviceId": "device-1"
+          }
+        }
+      ]
+    },
+    {
+      "response": {
+        "http": 202,
+        "json": {
+          "id": "provider-3",
+          "state": "Delivered"
+        }
+      },
+      "source_expected": {
+        "success": true,
+        "provider_message_id": "provider-3",
+        "status": "Delivered",
+        "raw": {
+          "id": "provider-3",
+          "state": "Delivered"
+        }
+      },
+      "source_request": [
+        {
+          "method": "POST",
+          "url": "https://api.sms-gate.app/3rdparty/v1/messages",
+          "headers": {
+            "Content-Type": "application/json",
+            "Authorization": "Basic c3ludGhldGljLXVzZXI6c3ludGhldGljLXBhc3M="
+          },
+          "json": {
+            "textMessage": {
+              "text": "Hello Ada"
+            },
+            "phoneNumbers": [
+              "+2348031234567"
+            ],
+            "simNumber": 2,
+            "ttl": 3600,
+            "deviceId": "device-1"
+          }
+        }
+      ]
+    },
+    {
+      "response": {
+        "http": 200,
+        "json": {}
+      },
+      "source_expected": {
+        "success": true,
+        "provider_message_id": "synthetic-missing-provider-id",
+        "status": "sent",
+        "raw": {}
+      },
+      "source_request": [
+        {
+          "method": "POST",
+          "url": "https://api.sms-gate.app/3rdparty/v1/messages",
+          "headers": {
+            "Content-Type": "application/json",
+            "Authorization": "Basic c3ludGhldGljLXVzZXI6c3ludGhldGljLXBhc3M="
+          },
+          "json": {
+            "textMessage": {
+              "text": "Hello Ada"
+            },
+            "phoneNumbers": [
+              "+2348031234567"
+            ],
+            "simNumber": 2,
+            "ttl": 3600,
+            "deviceId": "device-1"
+          }
+        }
+      ]
+    },
+    {
+      "response": {
+        "http": 302,
+        "json": {
+          "id": "redirect-not-trusted"
+        }
+      },
+      "source_expected": {
+        "success": true,
+        "provider_message_id": "redirect-not-trusted",
+        "status": "sent",
+        "raw": {
+          "id": "redirect-not-trusted"
+        }
+      },
+      "source_request": [
+        {
+          "method": "POST",
+          "url": "https://api.sms-gate.app/3rdparty/v1/messages",
+          "headers": {
+            "Content-Type": "application/json",
+            "Authorization": "Basic c3ludGhldGljLXVzZXI6c3ludGhldGljLXBhc3M="
+          },
+          "json": {
+            "textMessage": {
+              "text": "Hello Ada"
+            },
+            "phoneNumbers": [
+              "+2348031234567"
+            ],
+            "simNumber": 2,
+            "ttl": 3600,
+            "deviceId": "device-1"
+          }
+        }
+      ]
+    },
+    {
+      "response": {
+        "http": 401,
+        "json": {
+          "message": "synthetic-private-error"
+        }
+      },
+      "source_expected": {
+        "success": false,
+        "error": "synthetic-private-error",
+        "raw": {
+          "message": "synthetic-private-error"
+        }
+      },
+      "source_request": [
+        {
+          "method": "POST",
+          "url": "https://api.sms-gate.app/3rdparty/v1/messages",
+          "headers": {
+            "Content-Type": "application/json",
+            "Authorization": "Basic c3ludGhldGljLXVzZXI6c3ludGhldGljLXBhc3M="
+          },
+          "json": {
+            "textMessage": {
+              "text": "Hello Ada"
+            },
+            "phoneNumbers": [
+              "+2348031234567"
+            ],
+            "simNumber": 2,
+            "ttl": 3600,
+            "deviceId": "device-1"
+          }
+        }
+      ]
+    },
+    {
+      "response": {
+        "http": 429,
+        "json": {
+          "error": "synthetic-private-error"
+        }
+      },
+      "source_expected": {
+        "success": false,
+        "error": "synthetic-private-error",
+        "raw": {
+          "error": "synthetic-private-error"
+        }
+      },
+      "source_request": [
+        {
+          "method": "POST",
+          "url": "https://api.sms-gate.app/3rdparty/v1/messages",
+          "headers": {
+            "Content-Type": "application/json",
+            "Authorization": "Basic c3ludGhldGljLXVzZXI6c3ludGhldGljLXBhc3M="
+          },
+          "json": {
+            "textMessage": {
+              "text": "Hello Ada"
+            },
+            "phoneNumbers": [
+              "+2348031234567"
+            ],
+            "simNumber": 2,
+            "ttl": 3600,
+            "deviceId": "device-1"
+          }
+        }
+      ]
+    },
+    {
+      "response": {
+        "http": 500,
+        "json": {
+          "id": "maybe-accepted"
+        }
+      },
+      "source_expected": {
+        "success": false,
+        "error": "HTTP 500",
+        "raw": {
+          "id": "maybe-accepted"
+        }
+      },
+      "source_request": [
+        {
+          "method": "POST",
+          "url": "https://api.sms-gate.app/3rdparty/v1/messages",
+          "headers": {
+            "Content-Type": "application/json",
+            "Authorization": "Basic c3ludGhldGljLXVzZXI6c3ludGhldGljLXBhc3M="
+          },
+          "json": {
+            "textMessage": {
+              "text": "Hello Ada"
+            },
+            "phoneNumbers": [
+              "+2348031234567"
+            ],
+            "simNumber": 2,
+            "ttl": 3600,
+            "deviceId": "device-1"
+          }
+        }
+      ]
+    },
+    {
+      "response": {
+        "http": 200,
+        "raw": "not-json"
+      },
+      "source_expected": {
+        "success": false,
+        "error": "Expecting value: line 1 column 1 (char 0)"
+      },
+      "source_request": [
+        {
+          "method": "POST",
+          "url": "https://api.sms-gate.app/3rdparty/v1/messages",
+          "headers": {
+            "Content-Type": "application/json",
+            "Authorization": "Basic c3ludGhldGljLXVzZXI6c3ludGhldGljLXBhc3M="
+          },
+          "json": {
+            "textMessage": {
+              "text": "Hello Ada"
+            },
+            "phoneNumbers": [
+              "+2348031234567"
+            ],
+            "simNumber": 2,
+            "ttl": 3600,
+            "deviceId": "device-1"
+          }
+        }
+      ]
+    },
+    {
+      "response": {
+        "http": 0,
+        "timeout": true
+      },
+      "source_expected": {
+        "success": false,
+        "error": "Timed out"
+      },
+      "source_request": [
+        {
+          "method": "POST",
+          "url": "https://api.sms-gate.app/3rdparty/v1/messages",
+          "headers": {
+            "Content-Type": "application/json",
+            "Authorization": "Basic c3ludGhldGljLXVzZXI6c3ludGhldGljLXBhc3M="
+          },
+          "json": {
+            "textMessage": {
+              "text": "Hello Ada"
+            },
+            "phoneNumbers": [
+              "+2348031234567"
+            ],
+            "simNumber": 2,
+            "ttl": 3600,
+            "deviceId": "device-1"
+          }
+        }
+      ]
+    }
+  ],
+  "polls": [
+    {
+      "response": {
+        "http": 200,
+        "json": {
+          "id": "provider-1",
+          "state": "Pending"
+        }
+      },
+      "source_expected": [
+        {
+          "provider_message_id": "provider-1",
+          "status": "pending"
+        }
+      ],
+      "source_request": [
+        {
+          "method": "GET",
+          "url": "https://api.sms-gate.app/3rdparty/v1/messages/provider-1",
+          "headers": {
+            "Content-Type": "application/json",
+            "Authorization": "Basic c3ludGhldGljLXVzZXI6c3ludGhldGljLXBhc3M="
+          }
+        }
+      ]
+    },
+    {
+      "response": {
+        "http": 200,
+        "json": {
+          "id": "provider-1",
+          "state": "Processing"
+        }
+      },
+      "source_expected": [
+        {
+          "provider_message_id": "provider-1",
+          "status": "sent"
+        }
+      ],
+      "source_request": [
+        {
+          "method": "GET",
+          "url": "https://api.sms-gate.app/3rdparty/v1/messages/provider-1",
+          "headers": {
+            "Content-Type": "application/json",
+            "Authorization": "Basic c3ludGhldGljLXVzZXI6c3ludGhldGljLXBhc3M="
+          }
+        }
+      ]
+    },
+    {
+      "response": {
+        "http": 200,
+        "json": {
+          "id": "provider-1",
+          "state": "Sent"
+        }
+      },
+      "source_expected": [
+        {
+          "provider_message_id": "provider-1",
+          "status": "sent"
+        }
+      ],
+      "source_request": [
+        {
+          "method": "GET",
+          "url": "https://api.sms-gate.app/3rdparty/v1/messages/provider-1",
+          "headers": {
+            "Content-Type": "application/json",
+            "Authorization": "Basic c3ludGhldGljLXVzZXI6c3ludGhldGljLXBhc3M="
+          }
+        }
+      ]
+    },
+    {
+      "response": {
+        "http": 200,
+        "json": {
+          "id": "provider-1",
+          "state": "Delivered"
+        }
+      },
+      "source_expected": [
+        {
+          "provider_message_id": "provider-1",
+          "status": "delivered"
+        }
+      ],
+      "source_request": [
+        {
+          "method": "GET",
+          "url": "https://api.sms-gate.app/3rdparty/v1/messages/provider-1",
+          "headers": {
+            "Content-Type": "application/json",
+            "Authorization": "Basic c3ludGhldGljLXVzZXI6c3ludGhldGljLXBhc3M="
+          }
+        }
+      ]
+    },
+    {
+      "response": {
+        "http": 200,
+        "json": {
+          "id": "provider-1",
+          "state": "Failed"
+        }
+      },
+      "source_expected": [
+        {
+          "provider_message_id": "provider-1",
+          "status": "failed"
+        }
+      ],
+      "source_request": [
+        {
+          "method": "GET",
+          "url": "https://api.sms-gate.app/3rdparty/v1/messages/provider-1",
+          "headers": {
+            "Content-Type": "application/json",
+            "Authorization": "Basic c3ludGhldGljLXVzZXI6c3ludGhldGljLXBhc3M="
+          }
+        }
+      ]
+    },
+    {
+      "response": {
+        "http": 200,
+        "json": {
+          "id": "provider-1",
+          "state": "Cancelled"
+        }
+      },
+      "source_expected": [
+        {
+          "provider_message_id": "provider-1",
+          "status": "cancelled"
+        }
+      ],
+      "source_request": [
+        {
+          "method": "GET",
+          "url": "https://api.sms-gate.app/3rdparty/v1/messages/provider-1",
+          "headers": {
+            "Content-Type": "application/json",
+            "Authorization": "Basic c3ludGhldGljLXVzZXI6c3ludGhldGljLXBhc3M="
+          }
+        }
+      ]
+    },
+    {
+      "response": {
+        "http": 200,
+        "json": {
+          "id": "provider-1",
+          "state": "Undelivered"
+        }
+      },
+      "source_expected": [
+        {
+          "provider_message_id": "provider-1",
+          "status": "delivered"
+        }
+      ],
+      "source_request": [
+        {
+          "method": "GET",
+          "url": "https://api.sms-gate.app/3rdparty/v1/messages/provider-1",
+          "headers": {
+            "Content-Type": "application/json",
+            "Authorization": "Basic c3ludGhldGljLXVzZXI6c3ludGhldGljLXBhc3M="
+          }
+        }
+      ]
+    },
+    {
+      "response": {
+        "http": 200,
+        "json": {
+          "id": "provider-1",
+          "state": "unknown"
+        }
+      },
+      "source_expected": [
+        {
+          "provider_message_id": "provider-1",
+          "status": "unknown"
+        }
+      ],
+      "source_request": [
+        {
+          "method": "GET",
+          "url": "https://api.sms-gate.app/3rdparty/v1/messages/provider-1",
+          "headers": {
+            "Content-Type": "application/json",
+            "Authorization": "Basic c3ludGhldGljLXVzZXI6c3ludGhldGljLXBhc3M="
+          }
+        }
+      ]
+    }
+  ],
+  "source_probe": {
+    "result": {
+      "success": true,
+      "online": true,
+      "http": 400
+    },
+    "requests": [
+      {
+        "method": "POST",
+        "url": "https://api.sms-gate.app/3rdparty/v1/messages?skipPhoneValidation=true",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "Basic c3ludGhldGljLXVzZXI6c3ludGhldGljLXBhc3M="
+        },
+        "json": {
+          "textMessage": {
+            "text": "test"
+          },
+          "phoneNumbers": [
+            "+2348000000000"
+          ],
+          "simNumber": 1,
+          "ttl": 60
+        }
+      }
+    ]
+  },
+  "scope": "Actual selected SMS-Gate provider AST with fake httpx, synthetic credentials and fixed UUID. No application imports or HTTP/SMS. Native deliberately never invents IDs, trusts redirects/5xx, calls undelivered delivered, or sends a diagnostic SMS."
+}

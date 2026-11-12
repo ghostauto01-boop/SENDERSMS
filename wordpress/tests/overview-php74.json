@@ -1,0 +1,10 @@
+{
+  "ok": true,
+  "assertions": 19,
+  "diffs": [],
+  "php": "7.4.34-dev",
+  "native_wordpress_verified": false,
+  "native_mysql_verified": false,
+  "scope": "Unified read-only overview directory, ambiguous ID 409 contract, classic detail and rolling metrics on synthetic SQLite.",
+  "suite": "overview"
+}

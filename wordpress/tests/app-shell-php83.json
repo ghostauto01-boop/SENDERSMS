@@ -1,0 +1,9 @@
+{
+  "ok": true,
+  "assertions": 61,
+  "php": "8.3.36",
+  "native_wordpress_verified": false,
+  "native_mysql_verified": false,
+  "scope": "Pure PHP document/CSP/runtime/explicit launch-gate tests only. Not live WordPress activation, REST dispatch or browser workflow qualification.",
+  "suite": "app-shell"
+}

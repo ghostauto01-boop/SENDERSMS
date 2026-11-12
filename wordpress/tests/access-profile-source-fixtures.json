@@ -1,0 +1,2484 @@
+{
+  "access": [
+    {
+      "initial": null,
+      "body": null,
+      "source_expected": {
+        "status": 200,
+        "body": {
+          "password_required": false,
+          "password_set": false
+        }
+      },
+      "source_state": {},
+      "native_divergence": false
+    },
+    {
+      "initial": null,
+      "body": {
+        "password_required": true
+      },
+      "source_expected": {
+        "status": 400
+      },
+      "source_state": {},
+      "native_divergence": false
+    },
+    {
+      "initial": null,
+      "body": {
+        "password_required": true,
+        "password": "abc"
+      },
+      "source_expected": {
+        "status": 400
+      },
+      "source_state": {},
+      "native_divergence": false
+    },
+    {
+      "initial": null,
+      "body": {
+        "password_required": true,
+        "password": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      },
+      "source_expected": {
+        "status": 400
+      },
+      "source_state": {},
+      "native_divergence": false
+    },
+    {
+      "initial": null,
+      "body": {
+        "password_required": true,
+        "password": "  source-pass  "
+      },
+      "source_expected": {
+        "status": 200,
+        "body": {
+          "password_required": true,
+          "password_set": true
+        }
+      },
+      "source_state": {
+        "auth.password_hash": "synthetic:cc30dd1ef5c850053b5121e4a84412f05d74ce1a5eeaac27224a3382b6f5e3ff",
+        "auth.password_required": "true"
+      },
+      "native_divergence": false
+    },
+    {
+      "initial": "source-pass",
+      "body": {
+        "password_required": true
+      },
+      "source_expected": {
+        "status": 200,
+        "body": {
+          "password_required": true,
+          "password_set": true
+        }
+      },
+      "source_state": {
+        "auth.password_hash": "synthetic:cc30dd1ef5c850053b5121e4a84412f05d74ce1a5eeaac27224a3382b6f5e3ff",
+        "auth.password_required": "true"
+      },
+      "native_divergence": false
+    },
+    {
+      "initial": "source-pass",
+      "body": {
+        "password_required": true,
+        "password": "rotated-pass"
+      },
+      "source_expected": {
+        "status": 200,
+        "body": {
+          "password_required": true,
+          "password_set": true
+        }
+      },
+      "source_state": {
+        "auth.password_hash": "synthetic:b352fcd08c5e117633970faf471abd96d9aa9ecf34b1aff8fce7104d31fd562a",
+        "auth.password_required": "true"
+      },
+      "native_divergence": false
+    },
+    {
+      "initial": "source-pass",
+      "body": {
+        "password_required": false
+      },
+      "source_expected": {
+        "status": 200,
+        "body": {
+          "password_required": false,
+          "password_set": true
+        }
+      },
+      "source_state": {
+        "auth.password_hash": "synthetic:cc30dd1ef5c850053b5121e4a84412f05d74ce1a5eeaac27224a3382b6f5e3ff",
+        "auth.password_required": "false"
+      },
+      "native_divergence": true
+    }
+  ],
+  "dto": [
+    {
+      "input": {},
+      "ok": false
+    },
+    {
+      "input": {
+        "password_required": null
+      },
+      "ok": false
+    },
+    {
+      "input": {
+        "password_required": "yes"
+      },
+      "ok": true,
+      "expected": {
+        "password_required": true,
+        "password": null
+      }
+    },
+    {
+      "input": {
+        "password_required": false,
+        "password": null
+      },
+      "ok": true,
+      "expected": {
+        "password_required": false,
+        "password": null
+      }
+    },
+    {
+      "input": {
+        "password_required": true,
+        "password": 1
+      },
+      "ok": false
+    },
+    {
+      "input": {
+        "password_required": true,
+        "password": "abc"
+      },
+      "ok": true,
+      "expected": {
+        "password_required": true,
+        "password": "abc"
+      }
+    },
+    {
+      "input": {
+        "password_required": false,
+        "extra": "ignored"
+      },
+      "ok": true,
+      "expected": {
+        "password_required": false,
+        "password": null
+      }
+    }
+  ],
+  "seeds": [
+    {
+      "table": "contacts",
+      "values": {
+        "id": 1,
+        "first_name": "Ada",
+        "last_name": "Obi",
+        "business_name": null,
+        "phone_number": "+2348031112222",
+        "email": "ada@business.ng",
+        "city": null,
+        "state": null,
+        "country": null,
+        "website": null,
+        "industry": null,
+        "source": null,
+        "lead_status": "new",
+        "consent_status": "unknown",
+        "has_consented": false,
+        "is_opted_out": false,
+        "opted_out_at": null,
+        "opt_out_reason": null,
+        "is_undeliverable": false,
+        "undeliverable_reason": null,
+        "delivery_fail_count": 0,
+        "is_email_opted_out": false,
+        "email_opted_out_at": null,
+        "email_opt_out_reason": null,
+        "email_status": "active",
+        "is_email_undeliverable": false,
+        "email_fail_count": 0,
+        "email_last_error": null,
+        "email_source": null,
+        "email_verified": false,
+        "email_verified_at": null,
+        "email_confidence": null,
+        "email_verdict": null,
+        "email_enriched_at": null,
+        "email_enrichment_note": null,
+        "email_lower": null,
+        "notes": "Private note",
+        "custom_fields": "{\"Project Name\": \"Skyline\", \"flag\": false, \"yes\": true, \"amount\": 1.0, \"empty\": null, \"0\": \"zero\", \"list\": [\"a\", false, null], \"object\": {\"x\": \"Ada\"}, \"State\": \"Custom FCT\", \"notes\": \"Imported note\"}",
+        "messages_sent": 4,
+        "messages_received": 2,
+        "emails_sent": 0,
+        "emails_received": 0,
+        "last_emailed_at": null,
+        "last_email_reply_at": null,
+        "last_contacted_at": "2026-01-02T12:00:00.123456+00:00",
+        "last_reply_at": "2026-01-02T12:00:00.123456+00:00",
+        "created_at": "2026-01-02T12:00:00.123456+00:00",
+        "updated_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "contacts",
+      "values": {
+        "id": 2,
+        "first_name": null,
+        "last_name": null,
+        "business_name": "Bola Ltd",
+        "phone_number": null,
+        "email": "bola@business.ng",
+        "city": null,
+        "state": null,
+        "country": null,
+        "website": null,
+        "industry": null,
+        "source": null,
+        "lead_status": "new",
+        "consent_status": "unknown",
+        "has_consented": false,
+        "is_opted_out": false,
+        "opted_out_at": null,
+        "opt_out_reason": null,
+        "is_undeliverable": false,
+        "undeliverable_reason": null,
+        "delivery_fail_count": 0,
+        "is_email_opted_out": false,
+        "email_opted_out_at": null,
+        "email_opt_out_reason": null,
+        "email_status": "active",
+        "is_email_undeliverable": false,
+        "email_fail_count": 0,
+        "email_last_error": null,
+        "email_source": null,
+        "email_verified": false,
+        "email_verified_at": null,
+        "email_confidence": null,
+        "email_verdict": null,
+        "email_enriched_at": null,
+        "email_enrichment_note": null,
+        "email_lower": null,
+        "notes": null,
+        "custom_fields": "{\"Only Second\":\"not discovered by first-contact sync\"}",
+        "messages_sent": 0,
+        "messages_received": 0,
+        "emails_sent": 0,
+        "emails_received": 0,
+        "last_emailed_at": null,
+        "last_email_reply_at": null,
+        "last_contacted_at": null,
+        "last_reply_at": null,
+        "created_at": "2026-01-02T12:00:00.123456+00:00",
+        "updated_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "contacts",
+      "values": {
+        "id": 3,
+        "first_name": null,
+        "last_name": null,
+        "business_name": null,
+        "phone_number": null,
+        "email": "broken@business.ng",
+        "city": null,
+        "state": null,
+        "country": null,
+        "website": null,
+        "industry": null,
+        "source": null,
+        "lead_status": "new",
+        "consent_status": "unknown",
+        "has_consented": false,
+        "is_opted_out": false,
+        "opted_out_at": null,
+        "opt_out_reason": null,
+        "is_undeliverable": false,
+        "undeliverable_reason": null,
+        "delivery_fail_count": 0,
+        "is_email_opted_out": false,
+        "email_opted_out_at": null,
+        "email_opt_out_reason": null,
+        "email_status": "active",
+        "is_email_undeliverable": false,
+        "email_fail_count": 0,
+        "email_last_error": null,
+        "email_source": null,
+        "email_verified": false,
+        "email_verified_at": null,
+        "email_confidence": null,
+        "email_verdict": null,
+        "email_enriched_at": null,
+        "email_enrichment_note": null,
+        "email_lower": null,
+        "notes": null,
+        "custom_fields": "{bad",
+        "messages_sent": 0,
+        "messages_received": 0,
+        "emails_sent": 0,
+        "emails_received": 0,
+        "last_emailed_at": null,
+        "last_email_reply_at": null,
+        "last_contacted_at": null,
+        "last_reply_at": null,
+        "created_at": "2026-01-02T12:00:00.123456+00:00",
+        "updated_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "contacts",
+      "values": {
+        "id": 4,
+        "first_name": null,
+        "last_name": null,
+        "business_name": null,
+        "phone_number": null,
+        "email": null,
+        "city": null,
+        "state": null,
+        "country": null,
+        "website": null,
+        "industry": null,
+        "source": null,
+        "lead_status": "new",
+        "consent_status": "unknown",
+        "has_consented": false,
+        "is_opted_out": false,
+        "opted_out_at": null,
+        "opt_out_reason": null,
+        "is_undeliverable": false,
+        "undeliverable_reason": null,
+        "delivery_fail_count": 0,
+        "is_email_opted_out": false,
+        "email_opted_out_at": null,
+        "email_opt_out_reason": null,
+        "email_status": "active",
+        "is_email_undeliverable": false,
+        "email_fail_count": 0,
+        "email_last_error": null,
+        "email_source": null,
+        "email_verified": false,
+        "email_verified_at": null,
+        "email_confidence": null,
+        "email_verdict": null,
+        "email_enriched_at": null,
+        "email_enrichment_note": null,
+        "email_lower": null,
+        "notes": null,
+        "custom_fields": "[]",
+        "messages_sent": 0,
+        "messages_received": 0,
+        "emails_sent": 0,
+        "emails_received": 0,
+        "last_emailed_at": null,
+        "last_email_reply_at": null,
+        "last_contacted_at": null,
+        "last_reply_at": null,
+        "created_at": "2026-01-02T12:00:00.123456+00:00",
+        "updated_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "contacts",
+      "values": {
+        "id": 5,
+        "first_name": " ",
+        "last_name": " Name ",
+        "business_name": null,
+        "phone_number": null,
+        "email": null,
+        "city": null,
+        "state": null,
+        "country": null,
+        "website": null,
+        "industry": null,
+        "source": null,
+        "lead_status": "new",
+        "consent_status": "unknown",
+        "has_consented": false,
+        "is_opted_out": false,
+        "opted_out_at": null,
+        "opt_out_reason": null,
+        "is_undeliverable": false,
+        "undeliverable_reason": null,
+        "delivery_fail_count": 0,
+        "is_email_opted_out": false,
+        "email_opted_out_at": null,
+        "email_opt_out_reason": null,
+        "email_status": "active",
+        "is_email_undeliverable": false,
+        "email_fail_count": 0,
+        "email_last_error": null,
+        "email_source": null,
+        "email_verified": false,
+        "email_verified_at": null,
+        "email_confidence": null,
+        "email_verdict": null,
+        "email_enriched_at": null,
+        "email_enrichment_note": null,
+        "email_lower": null,
+        "notes": null,
+        "custom_fields": "{}",
+        "messages_sent": 0,
+        "messages_received": 0,
+        "emails_sent": 0,
+        "emails_received": 0,
+        "last_emailed_at": null,
+        "last_email_reply_at": null,
+        "last_contacted_at": null,
+        "last_reply_at": null,
+        "created_at": "2026-01-02T12:00:00.123456+00:00",
+        "updated_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "tags",
+      "values": {
+        "id": 1,
+        "name": "VIP",
+        "color": null,
+        "created_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "tags",
+      "values": {
+        "id": 2,
+        "name": "Buyer",
+        "color": null,
+        "created_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "contact_tags",
+      "values": {
+        "id": 1,
+        "contact_id": 1,
+        "tag_id": 1,
+        "created_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "contact_tags",
+      "values": {
+        "id": 2,
+        "contact_id": 1,
+        "tag_id": 2,
+        "created_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "contact_variables",
+      "values": {
+        "id": 1,
+        "field_key": "project_name",
+        "label": "Project label",
+        "shortcode": "project",
+        "fallback_text": null,
+        "description": null,
+        "source": "imported",
+        "is_active": false,
+        "contact_count": 0,
+        "sample_value": null,
+        "created_at": "2026-01-02T12:00:00.123456+00:00",
+        "updated_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    }
+  ],
+  "profiles": [
+    {
+      "id": 1,
+      "expected": {
+        "status": 200,
+        "body": {
+          "contact_id": 1,
+          "display_name": "Ada Obi",
+          "phone_number": "+2348031112222",
+          "lead_status": "new",
+          "is_opted_out": false,
+          "notes": "Private note",
+          "tags": [
+            "Buyer",
+            "VIP"
+          ],
+          "messages_sent": 4,
+          "messages_received": 2,
+          "last_contacted_at": "2026-01-02T12:00:00.123456",
+          "last_reply_at": "2026-01-02T12:00:00.123456",
+          "created_at": "2026-01-02T12:00:00.123456",
+          "fields": [
+            {
+              "field_key": "first_name",
+              "label": "First Name",
+              "shortcode": "first_name",
+              "value": "Ada",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "last_name",
+              "label": "Last Name",
+              "shortcode": "last_name",
+              "value": "Obi",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "business_name",
+              "label": "Business Name",
+              "shortcode": "business_name",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "phone_number",
+              "label": "Phone Number",
+              "shortcode": "phone_number",
+              "value": "+2348031112222",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "email",
+              "label": "Email",
+              "shortcode": "email",
+              "value": "ada@business.ng",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "city",
+              "label": "City",
+              "shortcode": "city",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "state",
+              "label": "State",
+              "shortcode": "state",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "country",
+              "label": "Country",
+              "shortcode": "country",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "website",
+              "label": "Website",
+              "shortcode": "website",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "industry",
+              "label": "Industry",
+              "shortcode": "industry",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "source",
+              "label": "Source",
+              "shortcode": "source",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "lead_status",
+              "label": "Lead Status",
+              "shortcode": "lead_status",
+              "value": "new",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "project_name",
+              "label": "Project label",
+              "shortcode": "project",
+              "value": "Skyline",
+              "source": "imported",
+              "is_active": false
+            },
+            {
+              "field_key": "flag",
+              "label": "Flag",
+              "shortcode": "flag",
+              "value": "False",
+              "source": "imported",
+              "is_active": true
+            },
+            {
+              "field_key": "yes",
+              "label": "Yes",
+              "shortcode": "yes",
+              "value": "True",
+              "source": "imported",
+              "is_active": true
+            },
+            {
+              "field_key": "amount",
+              "label": "Amount",
+              "shortcode": "amount",
+              "value": "1.0",
+              "source": "imported",
+              "is_active": true
+            },
+            {
+              "field_key": "empty",
+              "label": "Empty",
+              "shortcode": "empty",
+              "value": "",
+              "source": "imported",
+              "is_active": true
+            },
+            {
+              "field_key": "0",
+              "label": "0",
+              "shortcode": "0",
+              "value": "zero",
+              "source": "imported",
+              "is_active": true
+            },
+            {
+              "field_key": "list",
+              "label": "List",
+              "shortcode": "list",
+              "value": "['a', False, None]",
+              "source": "imported",
+              "is_active": true
+            },
+            {
+              "field_key": "object",
+              "label": "Object",
+              "shortcode": "object",
+              "value": "{'x': 'Ada'}",
+              "source": "imported",
+              "is_active": true
+            },
+            {
+              "field_key": "state",
+              "label": "State",
+              "shortcode": "state",
+              "value": "Custom FCT",
+              "source": "imported",
+              "is_active": true
+            },
+            {
+              "field_key": "notes",
+              "label": "Notes",
+              "shortcode": "notes",
+              "value": "Imported note",
+              "source": "imported",
+              "is_active": true
+            }
+          ]
+        }
+      },
+      "variables": [
+        {
+          "field_key": "project_name",
+          "label": "Project label",
+          "shortcode": "project",
+          "source": "imported",
+          "is_active": false,
+          "contact_count": 1,
+          "sample_value": "Skyline"
+        },
+        {
+          "field_key": "first_name",
+          "label": "First Name",
+          "shortcode": "first_name",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "Ada"
+        },
+        {
+          "field_key": "last_name",
+          "label": "Last Name",
+          "shortcode": "last_name",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "Obi"
+        },
+        {
+          "field_key": "full_name",
+          "label": "Full Name",
+          "shortcode": "full_name",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "Ada Obi"
+        },
+        {
+          "field_key": "business_name",
+          "label": "Business Name",
+          "shortcode": "business_name",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 0,
+          "sample_value": null
+        },
+        {
+          "field_key": "phone_number",
+          "label": "Phone Number",
+          "shortcode": "phone_number",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "+2348031112222"
+        },
+        {
+          "field_key": "email",
+          "label": "Email",
+          "shortcode": "email",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "ada@business.ng"
+        },
+        {
+          "field_key": "city",
+          "label": "City",
+          "shortcode": "city",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 0,
+          "sample_value": null
+        },
+        {
+          "field_key": "state",
+          "label": "State",
+          "shortcode": "state",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "Custom FCT"
+        },
+        {
+          "field_key": "country",
+          "label": "Country",
+          "shortcode": "country",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 0,
+          "sample_value": null
+        },
+        {
+          "field_key": "website",
+          "label": "Website",
+          "shortcode": "website",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 0,
+          "sample_value": null
+        },
+        {
+          "field_key": "industry",
+          "label": "Industry",
+          "shortcode": "industry",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 0,
+          "sample_value": null
+        },
+        {
+          "field_key": "flag",
+          "label": "Flag",
+          "shortcode": "flag",
+          "source": "imported",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "False"
+        },
+        {
+          "field_key": "yes",
+          "label": "Yes",
+          "shortcode": "yes",
+          "source": "imported",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "True"
+        },
+        {
+          "field_key": "amount",
+          "label": "Amount",
+          "shortcode": "amount",
+          "source": "imported",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "1.0"
+        },
+        {
+          "field_key": "empty",
+          "label": "Empty",
+          "shortcode": "empty",
+          "source": "imported",
+          "is_active": true,
+          "contact_count": 0,
+          "sample_value": null
+        },
+        {
+          "field_key": "0",
+          "label": "0",
+          "shortcode": "0",
+          "source": "imported",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "zero"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "expected": {
+        "status": 200,
+        "body": {
+          "contact_id": 2,
+          "display_name": "Bola Ltd",
+          "phone_number": null,
+          "lead_status": "new",
+          "is_opted_out": false,
+          "notes": null,
+          "tags": [],
+          "messages_sent": 0,
+          "messages_received": 0,
+          "last_contacted_at": null,
+          "last_reply_at": null,
+          "created_at": "2026-01-02T12:00:00.123456",
+          "fields": [
+            {
+              "field_key": "first_name",
+              "label": "First Name",
+              "shortcode": "first_name",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "last_name",
+              "label": "Last Name",
+              "shortcode": "last_name",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "business_name",
+              "label": "Business Name",
+              "shortcode": "business_name",
+              "value": "Bola Ltd",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "phone_number",
+              "label": "Phone Number",
+              "shortcode": "phone_number",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "email",
+              "label": "Email",
+              "shortcode": "email",
+              "value": "bola@business.ng",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "city",
+              "label": "City",
+              "shortcode": "city",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "state",
+              "label": "State",
+              "shortcode": "state",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "country",
+              "label": "Country",
+              "shortcode": "country",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "website",
+              "label": "Website",
+              "shortcode": "website",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "industry",
+              "label": "Industry",
+              "shortcode": "industry",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "source",
+              "label": "Source",
+              "shortcode": "source",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "lead_status",
+              "label": "Lead Status",
+              "shortcode": "lead_status",
+              "value": "new",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "only_second",
+              "label": "Only Second",
+              "shortcode": "only_second",
+              "value": "not discovered by first-contact sync",
+              "source": "imported",
+              "is_active": true
+            }
+          ]
+        }
+      },
+      "variables": [
+        {
+          "field_key": "project_name",
+          "label": "Project label",
+          "shortcode": "project",
+          "source": "imported",
+          "is_active": false,
+          "contact_count": 1,
+          "sample_value": "Skyline"
+        },
+        {
+          "field_key": "first_name",
+          "label": "First Name",
+          "shortcode": "first_name",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "Ada"
+        },
+        {
+          "field_key": "last_name",
+          "label": "Last Name",
+          "shortcode": "last_name",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "Obi"
+        },
+        {
+          "field_key": "full_name",
+          "label": "Full Name",
+          "shortcode": "full_name",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "Ada Obi"
+        },
+        {
+          "field_key": "business_name",
+          "label": "Business Name",
+          "shortcode": "business_name",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 0,
+          "sample_value": null
+        },
+        {
+          "field_key": "phone_number",
+          "label": "Phone Number",
+          "shortcode": "phone_number",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "+2348031112222"
+        },
+        {
+          "field_key": "email",
+          "label": "Email",
+          "shortcode": "email",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "ada@business.ng"
+        },
+        {
+          "field_key": "city",
+          "label": "City",
+          "shortcode": "city",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 0,
+          "sample_value": null
+        },
+        {
+          "field_key": "state",
+          "label": "State",
+          "shortcode": "state",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "Custom FCT"
+        },
+        {
+          "field_key": "country",
+          "label": "Country",
+          "shortcode": "country",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 0,
+          "sample_value": null
+        },
+        {
+          "field_key": "website",
+          "label": "Website",
+          "shortcode": "website",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 0,
+          "sample_value": null
+        },
+        {
+          "field_key": "industry",
+          "label": "Industry",
+          "shortcode": "industry",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 0,
+          "sample_value": null
+        },
+        {
+          "field_key": "flag",
+          "label": "Flag",
+          "shortcode": "flag",
+          "source": "imported",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "False"
+        },
+        {
+          "field_key": "yes",
+          "label": "Yes",
+          "shortcode": "yes",
+          "source": "imported",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "True"
+        },
+        {
+          "field_key": "amount",
+          "label": "Amount",
+          "shortcode": "amount",
+          "source": "imported",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "1.0"
+        },
+        {
+          "field_key": "empty",
+          "label": "Empty",
+          "shortcode": "empty",
+          "source": "imported",
+          "is_active": true,
+          "contact_count": 0,
+          "sample_value": null
+        },
+        {
+          "field_key": "0",
+          "label": "0",
+          "shortcode": "0",
+          "source": "imported",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "zero"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "expected": {
+        "status": 200,
+        "body": {
+          "contact_id": 3,
+          "display_name": null,
+          "phone_number": null,
+          "lead_status": "new",
+          "is_opted_out": false,
+          "notes": null,
+          "tags": [],
+          "messages_sent": 0,
+          "messages_received": 0,
+          "last_contacted_at": null,
+          "last_reply_at": null,
+          "created_at": "2026-01-02T12:00:00.123456",
+          "fields": [
+            {
+              "field_key": "first_name",
+              "label": "First Name",
+              "shortcode": "first_name",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "last_name",
+              "label": "Last Name",
+              "shortcode": "last_name",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "business_name",
+              "label": "Business Name",
+              "shortcode": "business_name",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "phone_number",
+              "label": "Phone Number",
+              "shortcode": "phone_number",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "email",
+              "label": "Email",
+              "shortcode": "email",
+              "value": "broken@business.ng",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "city",
+              "label": "City",
+              "shortcode": "city",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "state",
+              "label": "State",
+              "shortcode": "state",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "country",
+              "label": "Country",
+              "shortcode": "country",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "website",
+              "label": "Website",
+              "shortcode": "website",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "industry",
+              "label": "Industry",
+              "shortcode": "industry",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "source",
+              "label": "Source",
+              "shortcode": "source",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "lead_status",
+              "label": "Lead Status",
+              "shortcode": "lead_status",
+              "value": "new",
+              "source": "standard",
+              "is_active": true
+            }
+          ]
+        }
+      },
+      "variables": [
+        {
+          "field_key": "project_name",
+          "label": "Project label",
+          "shortcode": "project",
+          "source": "imported",
+          "is_active": false,
+          "contact_count": 1,
+          "sample_value": "Skyline"
+        },
+        {
+          "field_key": "first_name",
+          "label": "First Name",
+          "shortcode": "first_name",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "Ada"
+        },
+        {
+          "field_key": "last_name",
+          "label": "Last Name",
+          "shortcode": "last_name",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "Obi"
+        },
+        {
+          "field_key": "full_name",
+          "label": "Full Name",
+          "shortcode": "full_name",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "Ada Obi"
+        },
+        {
+          "field_key": "business_name",
+          "label": "Business Name",
+          "shortcode": "business_name",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 0,
+          "sample_value": null
+        },
+        {
+          "field_key": "phone_number",
+          "label": "Phone Number",
+          "shortcode": "phone_number",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "+2348031112222"
+        },
+        {
+          "field_key": "email",
+          "label": "Email",
+          "shortcode": "email",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "ada@business.ng"
+        },
+        {
+          "field_key": "city",
+          "label": "City",
+          "shortcode": "city",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 0,
+          "sample_value": null
+        },
+        {
+          "field_key": "state",
+          "label": "State",
+          "shortcode": "state",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "Custom FCT"
+        },
+        {
+          "field_key": "country",
+          "label": "Country",
+          "shortcode": "country",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 0,
+          "sample_value": null
+        },
+        {
+          "field_key": "website",
+          "label": "Website",
+          "shortcode": "website",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 0,
+          "sample_value": null
+        },
+        {
+          "field_key": "industry",
+          "label": "Industry",
+          "shortcode": "industry",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 0,
+          "sample_value": null
+        },
+        {
+          "field_key": "flag",
+          "label": "Flag",
+          "shortcode": "flag",
+          "source": "imported",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "False"
+        },
+        {
+          "field_key": "yes",
+          "label": "Yes",
+          "shortcode": "yes",
+          "source": "imported",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "True"
+        },
+        {
+          "field_key": "amount",
+          "label": "Amount",
+          "shortcode": "amount",
+          "source": "imported",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "1.0"
+        },
+        {
+          "field_key": "empty",
+          "label": "Empty",
+          "shortcode": "empty",
+          "source": "imported",
+          "is_active": true,
+          "contact_count": 0,
+          "sample_value": null
+        },
+        {
+          "field_key": "0",
+          "label": "0",
+          "shortcode": "0",
+          "source": "imported",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "zero"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "expected": {
+        "status": 200,
+        "body": {
+          "contact_id": 4,
+          "display_name": null,
+          "phone_number": null,
+          "lead_status": "new",
+          "is_opted_out": false,
+          "notes": null,
+          "tags": [],
+          "messages_sent": 0,
+          "messages_received": 0,
+          "last_contacted_at": null,
+          "last_reply_at": null,
+          "created_at": "2026-01-02T12:00:00.123456",
+          "fields": [
+            {
+              "field_key": "first_name",
+              "label": "First Name",
+              "shortcode": "first_name",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "last_name",
+              "label": "Last Name",
+              "shortcode": "last_name",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "business_name",
+              "label": "Business Name",
+              "shortcode": "business_name",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "phone_number",
+              "label": "Phone Number",
+              "shortcode": "phone_number",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "email",
+              "label": "Email",
+              "shortcode": "email",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "city",
+              "label": "City",
+              "shortcode": "city",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "state",
+              "label": "State",
+              "shortcode": "state",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "country",
+              "label": "Country",
+              "shortcode": "country",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "website",
+              "label": "Website",
+              "shortcode": "website",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "industry",
+              "label": "Industry",
+              "shortcode": "industry",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "source",
+              "label": "Source",
+              "shortcode": "source",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "lead_status",
+              "label": "Lead Status",
+              "shortcode": "lead_status",
+              "value": "new",
+              "source": "standard",
+              "is_active": true
+            }
+          ]
+        }
+      },
+      "variables": [
+        {
+          "field_key": "project_name",
+          "label": "Project label",
+          "shortcode": "project",
+          "source": "imported",
+          "is_active": false,
+          "contact_count": 1,
+          "sample_value": "Skyline"
+        },
+        {
+          "field_key": "first_name",
+          "label": "First Name",
+          "shortcode": "first_name",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "Ada"
+        },
+        {
+          "field_key": "last_name",
+          "label": "Last Name",
+          "shortcode": "last_name",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "Obi"
+        },
+        {
+          "field_key": "full_name",
+          "label": "Full Name",
+          "shortcode": "full_name",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "Ada Obi"
+        },
+        {
+          "field_key": "business_name",
+          "label": "Business Name",
+          "shortcode": "business_name",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 0,
+          "sample_value": null
+        },
+        {
+          "field_key": "phone_number",
+          "label": "Phone Number",
+          "shortcode": "phone_number",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "+2348031112222"
+        },
+        {
+          "field_key": "email",
+          "label": "Email",
+          "shortcode": "email",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "ada@business.ng"
+        },
+        {
+          "field_key": "city",
+          "label": "City",
+          "shortcode": "city",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 0,
+          "sample_value": null
+        },
+        {
+          "field_key": "state",
+          "label": "State",
+          "shortcode": "state",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "Custom FCT"
+        },
+        {
+          "field_key": "country",
+          "label": "Country",
+          "shortcode": "country",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 0,
+          "sample_value": null
+        },
+        {
+          "field_key": "website",
+          "label": "Website",
+          "shortcode": "website",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 0,
+          "sample_value": null
+        },
+        {
+          "field_key": "industry",
+          "label": "Industry",
+          "shortcode": "industry",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 0,
+          "sample_value": null
+        },
+        {
+          "field_key": "flag",
+          "label": "Flag",
+          "shortcode": "flag",
+          "source": "imported",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "False"
+        },
+        {
+          "field_key": "yes",
+          "label": "Yes",
+          "shortcode": "yes",
+          "source": "imported",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "True"
+        },
+        {
+          "field_key": "amount",
+          "label": "Amount",
+          "shortcode": "amount",
+          "source": "imported",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "1.0"
+        },
+        {
+          "field_key": "empty",
+          "label": "Empty",
+          "shortcode": "empty",
+          "source": "imported",
+          "is_active": true,
+          "contact_count": 0,
+          "sample_value": null
+        },
+        {
+          "field_key": "0",
+          "label": "0",
+          "shortcode": "0",
+          "source": "imported",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "zero"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "expected": {
+        "status": 200,
+        "body": {
+          "contact_id": 5,
+          "display_name": "   Name ",
+          "phone_number": null,
+          "lead_status": "new",
+          "is_opted_out": false,
+          "notes": null,
+          "tags": [],
+          "messages_sent": 0,
+          "messages_received": 0,
+          "last_contacted_at": null,
+          "last_reply_at": null,
+          "created_at": "2026-01-02T12:00:00.123456",
+          "fields": [
+            {
+              "field_key": "first_name",
+              "label": "First Name",
+              "shortcode": "first_name",
+              "value": " ",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "last_name",
+              "label": "Last Name",
+              "shortcode": "last_name",
+              "value": " Name ",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "business_name",
+              "label": "Business Name",
+              "shortcode": "business_name",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "phone_number",
+              "label": "Phone Number",
+              "shortcode": "phone_number",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "email",
+              "label": "Email",
+              "shortcode": "email",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "city",
+              "label": "City",
+              "shortcode": "city",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "state",
+              "label": "State",
+              "shortcode": "state",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "country",
+              "label": "Country",
+              "shortcode": "country",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "website",
+              "label": "Website",
+              "shortcode": "website",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "industry",
+              "label": "Industry",
+              "shortcode": "industry",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "source",
+              "label": "Source",
+              "shortcode": "source",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "lead_status",
+              "label": "Lead Status",
+              "shortcode": "lead_status",
+              "value": "new",
+              "source": "standard",
+              "is_active": true
+            }
+          ]
+        }
+      },
+      "variables": [
+        {
+          "field_key": "project_name",
+          "label": "Project label",
+          "shortcode": "project",
+          "source": "imported",
+          "is_active": false,
+          "contact_count": 1,
+          "sample_value": "Skyline"
+        },
+        {
+          "field_key": "first_name",
+          "label": "First Name",
+          "shortcode": "first_name",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "Ada"
+        },
+        {
+          "field_key": "last_name",
+          "label": "Last Name",
+          "shortcode": "last_name",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "Obi"
+        },
+        {
+          "field_key": "full_name",
+          "label": "Full Name",
+          "shortcode": "full_name",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "Ada Obi"
+        },
+        {
+          "field_key": "business_name",
+          "label": "Business Name",
+          "shortcode": "business_name",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 0,
+          "sample_value": null
+        },
+        {
+          "field_key": "phone_number",
+          "label": "Phone Number",
+          "shortcode": "phone_number",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "+2348031112222"
+        },
+        {
+          "field_key": "email",
+          "label": "Email",
+          "shortcode": "email",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "ada@business.ng"
+        },
+        {
+          "field_key": "city",
+          "label": "City",
+          "shortcode": "city",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 0,
+          "sample_value": null
+        },
+        {
+          "field_key": "state",
+          "label": "State",
+          "shortcode": "state",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "Custom FCT"
+        },
+        {
+          "field_key": "country",
+          "label": "Country",
+          "shortcode": "country",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 0,
+          "sample_value": null
+        },
+        {
+          "field_key": "website",
+          "label": "Website",
+          "shortcode": "website",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 0,
+          "sample_value": null
+        },
+        {
+          "field_key": "industry",
+          "label": "Industry",
+          "shortcode": "industry",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 0,
+          "sample_value": null
+        },
+        {
+          "field_key": "flag",
+          "label": "Flag",
+          "shortcode": "flag",
+          "source": "imported",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "False"
+        },
+        {
+          "field_key": "yes",
+          "label": "Yes",
+          "shortcode": "yes",
+          "source": "imported",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "True"
+        },
+        {
+          "field_key": "amount",
+          "label": "Amount",
+          "shortcode": "amount",
+          "source": "imported",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "1.0"
+        },
+        {
+          "field_key": "empty",
+          "label": "Empty",
+          "shortcode": "empty",
+          "source": "imported",
+          "is_active": true,
+          "contact_count": 0,
+          "sample_value": null
+        },
+        {
+          "field_key": "0",
+          "label": "0",
+          "shortcode": "0",
+          "source": "imported",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "zero"
+        }
+      ]
+    },
+    {
+      "id": 999,
+      "expected": {
+        "status": 404
+      },
+      "variables": [
+        {
+          "field_key": "project_name",
+          "label": "Project label",
+          "shortcode": "project",
+          "source": "imported",
+          "is_active": false,
+          "contact_count": 1,
+          "sample_value": "Skyline"
+        },
+        {
+          "field_key": "first_name",
+          "label": "First Name",
+          "shortcode": "first_name",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "Ada"
+        },
+        {
+          "field_key": "last_name",
+          "label": "Last Name",
+          "shortcode": "last_name",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "Obi"
+        },
+        {
+          "field_key": "full_name",
+          "label": "Full Name",
+          "shortcode": "full_name",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "Ada Obi"
+        },
+        {
+          "field_key": "business_name",
+          "label": "Business Name",
+          "shortcode": "business_name",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 0,
+          "sample_value": null
+        },
+        {
+          "field_key": "phone_number",
+          "label": "Phone Number",
+          "shortcode": "phone_number",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "+2348031112222"
+        },
+        {
+          "field_key": "email",
+          "label": "Email",
+          "shortcode": "email",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "ada@business.ng"
+        },
+        {
+          "field_key": "city",
+          "label": "City",
+          "shortcode": "city",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 0,
+          "sample_value": null
+        },
+        {
+          "field_key": "state",
+          "label": "State",
+          "shortcode": "state",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "Custom FCT"
+        },
+        {
+          "field_key": "country",
+          "label": "Country",
+          "shortcode": "country",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 0,
+          "sample_value": null
+        },
+        {
+          "field_key": "website",
+          "label": "Website",
+          "shortcode": "website",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 0,
+          "sample_value": null
+        },
+        {
+          "field_key": "industry",
+          "label": "Industry",
+          "shortcode": "industry",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 0,
+          "sample_value": null
+        },
+        {
+          "field_key": "flag",
+          "label": "Flag",
+          "shortcode": "flag",
+          "source": "imported",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "False"
+        },
+        {
+          "field_key": "yes",
+          "label": "Yes",
+          "shortcode": "yes",
+          "source": "imported",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "True"
+        },
+        {
+          "field_key": "amount",
+          "label": "Amount",
+          "shortcode": "amount",
+          "source": "imported",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "1.0"
+        },
+        {
+          "field_key": "empty",
+          "label": "Empty",
+          "shortcode": "empty",
+          "source": "imported",
+          "is_active": true,
+          "contact_count": 0,
+          "sample_value": null
+        },
+        {
+          "field_key": "0",
+          "label": "0",
+          "shortcode": "0",
+          "source": "imported",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "zero"
+        }
+      ]
+    },
+    {
+      "id": 1,
+      "expected": {
+        "status": 200,
+        "body": {
+          "contact_id": 1,
+          "display_name": "Ada Obi",
+          "phone_number": "+2348031112222",
+          "lead_status": "new",
+          "is_opted_out": false,
+          "notes": "Private note",
+          "tags": [
+            "Buyer",
+            "VIP"
+          ],
+          "messages_sent": 4,
+          "messages_received": 2,
+          "last_contacted_at": "2026-01-02T12:00:00.123456",
+          "last_reply_at": "2026-01-02T12:00:00.123456",
+          "created_at": "2026-01-02T12:00:00.123456",
+          "fields": [
+            {
+              "field_key": "first_name",
+              "label": "First Name",
+              "shortcode": "first_name",
+              "value": "Ada",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "last_name",
+              "label": "Last Name",
+              "shortcode": "last_name",
+              "value": "Obi",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "business_name",
+              "label": "Business Name",
+              "shortcode": "business_name",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "phone_number",
+              "label": "Phone Number",
+              "shortcode": "phone_number",
+              "value": "+2348031112222",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "email",
+              "label": "Email",
+              "shortcode": "email",
+              "value": "ada@business.ng",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "city",
+              "label": "City",
+              "shortcode": "city",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "state",
+              "label": "State",
+              "shortcode": "state",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "country",
+              "label": "Country",
+              "shortcode": "country",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "website",
+              "label": "Website",
+              "shortcode": "website",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "industry",
+              "label": "Industry",
+              "shortcode": "industry",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "source",
+              "label": "Source",
+              "shortcode": "source",
+              "value": "",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "lead_status",
+              "label": "Lead Status",
+              "shortcode": "lead_status",
+              "value": "new",
+              "source": "standard",
+              "is_active": true
+            },
+            {
+              "field_key": "project_name",
+              "label": "Project label",
+              "shortcode": "project",
+              "value": "Skyline",
+              "source": "imported",
+              "is_active": false
+            },
+            {
+              "field_key": "flag",
+              "label": "Flag",
+              "shortcode": "flag",
+              "value": "False",
+              "source": "imported",
+              "is_active": true
+            },
+            {
+              "field_key": "yes",
+              "label": "Yes",
+              "shortcode": "yes",
+              "value": "True",
+              "source": "imported",
+              "is_active": true
+            },
+            {
+              "field_key": "amount",
+              "label": "Amount",
+              "shortcode": "amount",
+              "value": "1.0",
+              "source": "imported",
+              "is_active": true
+            },
+            {
+              "field_key": "empty",
+              "label": "Empty",
+              "shortcode": "empty",
+              "value": "",
+              "source": "imported",
+              "is_active": true
+            },
+            {
+              "field_key": "0",
+              "label": "0",
+              "shortcode": "0",
+              "value": "zero",
+              "source": "imported",
+              "is_active": true
+            },
+            {
+              "field_key": "list",
+              "label": "List",
+              "shortcode": "list",
+              "value": "['a', False, None]",
+              "source": "imported",
+              "is_active": true
+            },
+            {
+              "field_key": "object",
+              "label": "Object",
+              "shortcode": "object",
+              "value": "{'x': 'Ada'}",
+              "source": "imported",
+              "is_active": true
+            },
+            {
+              "field_key": "state",
+              "label": "State",
+              "shortcode": "state",
+              "value": "Custom FCT",
+              "source": "imported",
+              "is_active": true
+            },
+            {
+              "field_key": "notes",
+              "label": "Notes",
+              "shortcode": "notes",
+              "value": "Imported note",
+              "source": "imported",
+              "is_active": true
+            }
+          ]
+        }
+      },
+      "variables": [
+        {
+          "field_key": "project_name",
+          "label": "Project label",
+          "shortcode": "project",
+          "source": "imported",
+          "is_active": false,
+          "contact_count": 1,
+          "sample_value": "Skyline"
+        },
+        {
+          "field_key": "first_name",
+          "label": "First Name",
+          "shortcode": "first_name",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "Ada"
+        },
+        {
+          "field_key": "last_name",
+          "label": "Last Name",
+          "shortcode": "last_name",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "Obi"
+        },
+        {
+          "field_key": "full_name",
+          "label": "Full Name",
+          "shortcode": "full_name",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "Ada Obi"
+        },
+        {
+          "field_key": "business_name",
+          "label": "Business Name",
+          "shortcode": "business_name",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 0,
+          "sample_value": null
+        },
+        {
+          "field_key": "phone_number",
+          "label": "Phone Number",
+          "shortcode": "phone_number",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "+2348031112222"
+        },
+        {
+          "field_key": "email",
+          "label": "Email",
+          "shortcode": "email",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "ada@business.ng"
+        },
+        {
+          "field_key": "city",
+          "label": "City",
+          "shortcode": "city",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 0,
+          "sample_value": null
+        },
+        {
+          "field_key": "state",
+          "label": "State",
+          "shortcode": "state",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "Custom FCT"
+        },
+        {
+          "field_key": "country",
+          "label": "Country",
+          "shortcode": "country",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 0,
+          "sample_value": null
+        },
+        {
+          "field_key": "website",
+          "label": "Website",
+          "shortcode": "website",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 0,
+          "sample_value": null
+        },
+        {
+          "field_key": "industry",
+          "label": "Industry",
+          "shortcode": "industry",
+          "source": "standard",
+          "is_active": true,
+          "contact_count": 0,
+          "sample_value": null
+        },
+        {
+          "field_key": "flag",
+          "label": "Flag",
+          "shortcode": "flag",
+          "source": "imported",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "False"
+        },
+        {
+          "field_key": "yes",
+          "label": "Yes",
+          "shortcode": "yes",
+          "source": "imported",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "True"
+        },
+        {
+          "field_key": "amount",
+          "label": "Amount",
+          "shortcode": "amount",
+          "source": "imported",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "1.0"
+        },
+        {
+          "field_key": "empty",
+          "label": "Empty",
+          "shortcode": "empty",
+          "source": "imported",
+          "is_active": true,
+          "contact_count": 0,
+          "sample_value": null
+        },
+        {
+          "field_key": "0",
+          "label": "0",
+          "shortcode": "0",
+          "source": "imported",
+          "is_active": true,
+          "contact_count": 1,
+          "sample_value": "zero"
+        }
+      ]
+    }
+  ],
+  "scope": "Selected source, fixed clock/SQLite and synthetic SHA hash codec; no production crypto, HTTP, concurrency or browser proof"
+}

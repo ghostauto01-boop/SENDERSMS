@@ -1,0 +1,14 @@
+{
+  "ok": true,
+  "assertions": 147,
+  "diffs": [],
+  "php": "8.3.36",
+  "source_send_cases": 10,
+  "source_poll_cases": 8,
+  "native_wordpress_verified": false,
+  "native_mysql_verified": false,
+  "real_http_verified": false,
+  "provider_messages_sent": 0,
+  "scope": "Selected actual source SMS-Gate payloads with fake httpx/pinned transport; encrypted native phone settings, CAS/fault/rollback and no-test-SMS checks. No live HTTP/SMS, outbox, workers, native DNS/TLS/cURL/MySQL/concurrency/browser certification",
+  "suite": "sms-gateway"
+}

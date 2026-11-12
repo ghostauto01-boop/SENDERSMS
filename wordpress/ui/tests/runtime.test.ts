@@ -1,0 +1,17 @@
+import { beforeEach,describe,it,expect } from 'vitest';
+import { nativeRuntime,nativeApiUrl,nativeAssetUrl,routeSearch,navigateNative,loginNative } from '../overlay/runtime';
+beforeEach(()=>{window.SENDER_SUITE={apiRoot:'https://native.example/sub/wp-json/sender-suite/v1/',assetBase:'https://native.example/sub/wp-content/plugins/sender-suite/app/',smsOutboxEnabled:false,productionReady:false};history.replaceState(null,'','/sub/?sender_suite_app=1#/contacts');});
+describe('native runtime',()=>{
+ it('requires explicit truthful runtime',()=>{delete window.SENDER_SUITE;expect(()=>nativeRuntime()).toThrow('runtime is missing');});
+ for(const url of ['https://foreign.example/wp-json/','http://native.example/wp-json/','javascript:alert(1)','https://user:secret@native.example/api/','https://native.example/api/#x'])it('refuses foreign or unsafe API root '+url,()=>{window.SENDER_SUITE!.apiRoot=url;expect(()=>nativeRuntime()).toThrow();});
+ it('binds both script and API to the same origin',()=>{window.SENDER_SUITE!.assetBase='https://cdn.example/';expect(()=>nativeRuntime()).toThrow();});
+ it('constructs pretty-permalink requests within a subdirectory',()=>{expect(nativeApiUrl('/contacts?page=2&search=Ada%20Obi')).toBe('https://native.example/sub/wp-json/sender-suite/v1/contacts?page=2&search=Ada+Obi');});
+ it('constructs plain-permalink routes without swallowing query filters',()=>{window.SENDER_SUITE!.apiRoot='https://native.example/sub/index.php?rest_route=/sender-suite/v1/';const u=new URL(nativeApiUrl('/contacts/12?tags=One&tags=Two'));expect(u.pathname).toBe('/sub/index.php');expect(u.searchParams.get('rest_route')).toBe('/sender-suite/v1/contacts/12');expect(u.searchParams.getAll('tags')).toEqual(['One','Two']);});
+ for(const path of ['https://evil.example/api/','//evil.example/','contacts','/../contacts','/%2e%2e/contacts','/x\\secret','/x%2fsecret','/x%5csecret','/a b','/foo#secret','/foo\n','/%00foo','/contacts?rest_route=/wp/v2/users','/contacts?%5Fmethod=DELETE','/contacts?_jsonp=evil','/contacts?_envelope=1','/contacts?sender_suite_app=1'])it('refuses unsafe request '+JSON.stringify(path),()=>{expect(()=>nativeApiUrl(path)).toThrow();});
+ it('allows literal encoded query data without route replacement',()=>{const url=new URL(nativeApiUrl('/contacts?search=%26rest_route%3D%2Fwp%2Fv2'));expect(url.searchParams.get('search')).toBe('&rest_route=/wp/v2');expect(url.pathname).toBe('/sub/wp-json/sender-suite/v1/contacts');});
+ it('resolves plugin assets, not website root',()=>{expect(nativeAssetUrl('icon-192.png')).toBe('https://native.example/sub/wp-content/plugins/sender-suite/app/icon-192.png');});
+ for(const path of ['/sw.js','../secret','./secret','https://evil.example/a'])it('rejects unsafe asset '+path,()=>{expect(()=>nativeAssetUrl(path)).toThrow();});
+ it('uses hash query parameters rather than WordPress query parameters',()=>{window.location.hash='/contacts?search=Ada&tag=Buyer';expect(new URLSearchParams(routeSearch()).get('search')).toBe('Ada');expect(location.search).toBe('?sender_suite_app=1');});
+ it('navigates without replacing the WordPress page URL',()=>{navigateNative('/send?contact_id=5');expect(location.pathname).toBe('/sub/');expect(location.search).toBe('?sender_suite_app=1');expect(location.hash).toBe('#/send?contact_id=5');loginNative();expect(location.hash).toBe('#/login');});
+ for(const path of ['//evil.example','https://evil.example','/foo#other','/foo\n'])it('guards internal navigation '+JSON.stringify(path),()=>{expect(()=>navigateNative(path)).toThrow();});
+});

@@ -1,0 +1,13 @@
+{
+  "ok": true,
+  "assertions": 687,
+  "diffs": [],
+  "php": "7.4.34-dev",
+  "source_number_cases": 269,
+  "source_lifecycle_operations": 31,
+  "scope": "Actual pure source number comparisons and synthetic lifecycle scenarios with all source FK declarations enabled on SQLite. Not real WordPress/MySQL/HTTP/concurrency/provider or browser certification.",
+  "native_wordpress_verified": false,
+  "native_mysql_verified": false,
+  "provider_messages_sent": 0,
+  "suite": "contact-actions"
+}

@@ -1,0 +1,2695 @@
+{
+  "cases": [
+    {
+      "input": null,
+      "hard": {
+        "sendable": false,
+        "normalized": null,
+        "reason": "empty_number",
+        "detail": "No phone number on record."
+      },
+      "soft": null
+    },
+    {
+      "input": "",
+      "hard": {
+        "sendable": false,
+        "normalized": null,
+        "reason": "empty_number",
+        "detail": "No phone number on record."
+      },
+      "soft": null
+    },
+    {
+      "input": "0",
+      "hard": {
+        "sendable": false,
+        "normalized": null,
+        "reason": "invalid_format",
+        "detail": "'0' is too short to be a phone number."
+      },
+      "soft": null
+    },
+    {
+      "input": "08031234567",
+      "hard": {
+        "sendable": true,
+        "normalized": "+2348031234567",
+        "reason": null,
+        "detail": ""
+      },
+      "soft": null
+    },
+    {
+      "input": "8031234567",
+      "hard": {
+        "sendable": true,
+        "normalized": "+2348031234567",
+        "reason": null,
+        "detail": ""
+      },
+      "soft": null
+    },
+    {
+      "input": "2348031234567",
+      "hard": {
+        "sendable": true,
+        "normalized": "+2348031234567",
+        "reason": null,
+        "detail": ""
+      },
+      "soft": null
+    },
+    {
+      "input": "+2348031234567",
+      "hard": {
+        "sendable": true,
+        "normalized": "+2348031234567",
+        "reason": null,
+        "detail": ""
+      },
+      "soft": null
+    },
+    {
+      "input": "+14155552671",
+      "hard": {
+        "sendable": false,
+        "normalized": "+14155552671",
+        "reason": "foreign_number",
+        "detail": "'+14155552671' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+442079460018",
+      "hard": {
+        "sendable": false,
+        "normalized": "+442079460018",
+        "reason": "foreign_number",
+        "detail": "'+442079460018' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "not-a-number",
+      "hard": {
+        "sendable": false,
+        "normalized": null,
+        "reason": "invalid_format",
+        "detail": "'not-a-number' is too short to be a phone number."
+      },
+      "soft": null
+    },
+    {
+      "input": "٠٨٠٣١٢٣٤٥٦٧",
+      "hard": {
+        "sendable": true,
+        "normalized": "+2348031234567",
+        "reason": null,
+        "detail": ""
+      },
+      "soft": null
+    },
+    {
+      "input": "８０３１２３４５６７",
+      "hard": {
+        "sendable": true,
+        "normalized": "+2348031234567",
+        "reason": null,
+        "detail": ""
+      },
+      "soft": null
+    },
+    {
+      "input": "+24762889",
+      "hard": {
+        "sendable": false,
+        "normalized": "+24762889",
+        "reason": "foreign_number",
+        "detail": "'+24762889' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+376712345",
+      "hard": {
+        "sendable": false,
+        "normalized": "+376712345",
+        "reason": "foreign_number",
+        "detail": "'+376712345' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+97122345678",
+      "hard": {
+        "sendable": false,
+        "normalized": "+97122345678",
+        "reason": "foreign_number",
+        "detail": "'+97122345678' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+93234567890",
+      "hard": {
+        "sendable": false,
+        "normalized": "+93234567890",
+        "reason": "foreign_number",
+        "detail": "'+93234567890' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+12684601234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+12684601234",
+        "reason": "foreign_number",
+        "detail": "'+12684601234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+12644612345",
+      "hard": {
+        "sendable": false,
+        "normalized": "+12644612345",
+        "reason": "foreign_number",
+        "detail": "'+12644612345' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+35522345678",
+      "hard": {
+        "sendable": false,
+        "normalized": "+35522345678",
+        "reason": "foreign_number",
+        "detail": "'+35522345678' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+37410123456",
+      "hard": {
+        "sendable": false,
+        "normalized": "+37410123456",
+        "reason": "foreign_number",
+        "detail": "'+37410123456' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+244222123456",
+      "hard": {
+        "sendable": false,
+        "normalized": "+244222123456",
+        "reason": "foreign_number",
+        "detail": "'+244222123456' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+541123456789",
+      "hard": {
+        "sendable": false,
+        "normalized": "+541123456789",
+        "reason": "foreign_number",
+        "detail": "'+541123456789' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+16846221234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+16846221234",
+        "reason": "foreign_number",
+        "detail": "'+16846221234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+431234567890",
+      "hard": {
+        "sendable": false,
+        "normalized": "+431234567890",
+        "reason": "foreign_number",
+        "detail": "'+431234567890' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+61212345678",
+      "hard": {
+        "sendable": false,
+        "normalized": "+61212345678",
+        "reason": "foreign_number",
+        "detail": "'+61212345678' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+2975212345",
+      "hard": {
+        "sendable": false,
+        "normalized": "+2975212345",
+        "reason": "foreign_number",
+        "detail": "'+2975212345' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+358181234567",
+      "hard": {
+        "sendable": false,
+        "normalized": "+358181234567",
+        "reason": "foreign_number",
+        "detail": "'+358181234567' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+994123123456",
+      "hard": {
+        "sendable": false,
+        "normalized": "+994123123456",
+        "reason": "foreign_number",
+        "detail": "'+994123123456' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+38730212345",
+      "hard": {
+        "sendable": false,
+        "normalized": "+38730212345",
+        "reason": "foreign_number",
+        "detail": "'+38730212345' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+12464123456",
+      "hard": {
+        "sendable": false,
+        "normalized": "+12464123456",
+        "reason": "foreign_number",
+        "detail": "'+12464123456' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+88027111234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+88027111234",
+        "reason": "foreign_number",
+        "detail": "'+88027111234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+3212345678",
+      "hard": {
+        "sendable": false,
+        "normalized": "+3212345678",
+        "reason": "foreign_number",
+        "detail": "'+3212345678' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": "test_data_suspected"
+    },
+    {
+      "input": "+22620491234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+22620491234",
+        "reason": "foreign_number",
+        "detail": "'+22620491234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+3592123456",
+      "hard": {
+        "sendable": false,
+        "normalized": "+3592123456",
+        "reason": "foreign_number",
+        "detail": "'+3592123456' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+97317001234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+97317001234",
+        "reason": "foreign_number",
+        "detail": "'+97317001234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+25722201234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+25722201234",
+        "reason": "foreign_number",
+        "detail": "'+25722201234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+2290120211234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+2290120211234",
+        "reason": "foreign_number",
+        "detail": "'+2290120211234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+590590271234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+590590271234",
+        "reason": "foreign_number",
+        "detail": "'+590590271234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+14414123456",
+      "hard": {
+        "sendable": false,
+        "normalized": "+14414123456",
+        "reason": "foreign_number",
+        "detail": "'+14414123456' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+6732345678",
+      "hard": {
+        "sendable": false,
+        "normalized": "+6732345678",
+        "reason": "foreign_number",
+        "detail": "'+6732345678' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+59122123456",
+      "hard": {
+        "sendable": false,
+        "normalized": "+59122123456",
+        "reason": "foreign_number",
+        "detail": "'+59122123456' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+5997151234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+5997151234",
+        "reason": "foreign_number",
+        "detail": "'+5997151234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+551123456789",
+      "hard": {
+        "sendable": false,
+        "normalized": "+551123456789",
+        "reason": "foreign_number",
+        "detail": "'+551123456789' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+12423456789",
+      "hard": {
+        "sendable": false,
+        "normalized": "+12423456789",
+        "reason": "foreign_number",
+        "detail": "'+12423456789' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+9752345678",
+      "hard": {
+        "sendable": false,
+        "normalized": "+9752345678",
+        "reason": "foreign_number",
+        "detail": "'+9752345678' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+2672401234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+2672401234",
+        "reason": "foreign_number",
+        "detail": "'+2672401234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+375152450911",
+      "hard": {
+        "sendable": false,
+        "normalized": "+375152450911",
+        "reason": "foreign_number",
+        "detail": "'+375152450911' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+5012221234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+5012221234",
+        "reason": "foreign_number",
+        "detail": "'+5012221234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+15062345678",
+      "hard": {
+        "sendable": false,
+        "normalized": "+15062345678",
+        "reason": "foreign_number",
+        "detail": "'+15062345678' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+61891621234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+61891621234",
+        "reason": "foreign_number",
+        "detail": "'+61891621234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+2431234567",
+      "hard": {
+        "sendable": false,
+        "normalized": "+2431234567",
+        "reason": "foreign_number",
+        "detail": "'+2431234567' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+23621612345",
+      "hard": {
+        "sendable": false,
+        "normalized": "+23621612345",
+        "reason": "foreign_number",
+        "detail": "'+23621612345' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+242222123456",
+      "hard": {
+        "sendable": false,
+        "normalized": "+242222123456",
+        "reason": "foreign_number",
+        "detail": "'+242222123456' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+41212345678",
+      "hard": {
+        "sendable": false,
+        "normalized": "+41212345678",
+        "reason": "foreign_number",
+        "detail": "'+41212345678' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+2252123456789",
+      "hard": {
+        "sendable": false,
+        "normalized": "+2252123456789",
+        "reason": "foreign_number",
+        "detail": "'+2252123456789' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+68221234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+68221234",
+        "reason": "foreign_number",
+        "detail": "'+68221234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+56221234567",
+      "hard": {
+        "sendable": false,
+        "normalized": "+56221234567",
+        "reason": "foreign_number",
+        "detail": "'+56221234567' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+237222123456",
+      "hard": {
+        "sendable": false,
+        "normalized": "+237222123456",
+        "reason": "foreign_number",
+        "detail": "'+237222123456' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+861012345678",
+      "hard": {
+        "sendable": false,
+        "normalized": "+861012345678",
+        "reason": "foreign_number",
+        "detail": "'+861012345678' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+576012345678",
+      "hard": {
+        "sendable": false,
+        "normalized": "+576012345678",
+        "reason": "foreign_number",
+        "detail": "'+576012345678' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+50622123456",
+      "hard": {
+        "sendable": false,
+        "normalized": "+50622123456",
+        "reason": "foreign_number",
+        "detail": "'+50622123456' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+5371234567",
+      "hard": {
+        "sendable": false,
+        "normalized": "+5371234567",
+        "reason": "foreign_number",
+        "detail": "'+5371234567' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+2382211234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+2382211234",
+        "reason": "foreign_number",
+        "detail": "'+2382211234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+59994351234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+59994351234",
+        "reason": "foreign_number",
+        "detail": "'+59994351234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+61891641234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+61891641234",
+        "reason": "foreign_number",
+        "detail": "'+61891641234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+35722345678",
+      "hard": {
+        "sendable": false,
+        "normalized": "+35722345678",
+        "reason": "foreign_number",
+        "detail": "'+35722345678' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+420212345678",
+      "hard": {
+        "sendable": false,
+        "normalized": "+420212345678",
+        "reason": "foreign_number",
+        "detail": "'+420212345678' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+4930123456",
+      "hard": {
+        "sendable": false,
+        "normalized": "+4930123456",
+        "reason": "foreign_number",
+        "detail": "'+4930123456' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+25321360003",
+      "hard": {
+        "sendable": false,
+        "normalized": "+25321360003",
+        "reason": "foreign_number",
+        "detail": "'+25321360003' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+4532123456",
+      "hard": {
+        "sendable": false,
+        "normalized": "+4532123456",
+        "reason": "foreign_number",
+        "detail": "'+4532123456' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+17674201234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+17674201234",
+        "reason": "foreign_number",
+        "detail": "'+17674201234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+18092345678",
+      "hard": {
+        "sendable": false,
+        "normalized": "+18092345678",
+        "reason": "foreign_number",
+        "detail": "'+18092345678' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+21312345678",
+      "hard": {
+        "sendable": false,
+        "normalized": "+21312345678",
+        "reason": "foreign_number",
+        "detail": "'+21312345678' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+59322123456",
+      "hard": {
+        "sendable": false,
+        "normalized": "+59322123456",
+        "reason": "foreign_number",
+        "detail": "'+59322123456' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+3723212345",
+      "hard": {
+        "sendable": false,
+        "normalized": "+3723212345",
+        "reason": "foreign_number",
+        "detail": "'+3723212345' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+20234567890",
+      "hard": {
+        "sendable": false,
+        "normalized": "+20234567890",
+        "reason": "foreign_number",
+        "detail": "'+20234567890' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+212528812345",
+      "hard": {
+        "sendable": false,
+        "normalized": "+212528812345",
+        "reason": "foreign_number",
+        "detail": "'+212528812345' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+2918370362",
+      "hard": {
+        "sendable": false,
+        "normalized": "+2918370362",
+        "reason": "foreign_number",
+        "detail": "'+2918370362' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+34810123456",
+      "hard": {
+        "sendable": false,
+        "normalized": "+34810123456",
+        "reason": "foreign_number",
+        "detail": "'+34810123456' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+251111112345",
+      "hard": {
+        "sendable": false,
+        "normalized": "+251111112345",
+        "reason": "foreign_number",
+        "detail": "'+251111112345' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+358131234567",
+      "hard": {
+        "sendable": false,
+        "normalized": "+358131234567",
+        "reason": "foreign_number",
+        "detail": "'+358131234567' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+6793212345",
+      "hard": {
+        "sendable": false,
+        "normalized": "+6793212345",
+        "reason": "foreign_number",
+        "detail": "'+6793212345' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+50031234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+50031234",
+        "reason": "foreign_number",
+        "detail": "'+50031234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+6913201234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+6913201234",
+        "reason": "foreign_number",
+        "detail": "'+6913201234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+298201234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+298201234",
+        "reason": "foreign_number",
+        "detail": "'+298201234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+33123456789",
+      "hard": {
+        "sendable": false,
+        "normalized": "+33123456789",
+        "reason": "foreign_number",
+        "detail": "'+33123456789' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+24101441234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+24101441234",
+        "reason": "foreign_number",
+        "detail": "'+24101441234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+441212345678",
+      "hard": {
+        "sendable": false,
+        "normalized": "+441212345678",
+        "reason": "foreign_number",
+        "detail": "'+441212345678' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+14732691234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+14732691234",
+        "reason": "foreign_number",
+        "detail": "'+14732691234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+995322123456",
+      "hard": {
+        "sendable": false,
+        "normalized": "+995322123456",
+        "reason": "foreign_number",
+        "detail": "'+995322123456' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+594594101234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+594594101234",
+        "reason": "foreign_number",
+        "detail": "'+594594101234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+441481256789",
+      "hard": {
+        "sendable": false,
+        "normalized": "+441481256789",
+        "reason": "foreign_number",
+        "detail": "'+441481256789' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+233302345678",
+      "hard": {
+        "sendable": false,
+        "normalized": "+233302345678",
+        "reason": "foreign_number",
+        "detail": "'+233302345678' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+35020012345",
+      "hard": {
+        "sendable": false,
+        "normalized": "+35020012345",
+        "reason": "foreign_number",
+        "detail": "'+35020012345' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+299321000",
+      "hard": {
+        "sendable": false,
+        "normalized": "+299321000",
+        "reason": "foreign_number",
+        "detail": "'+299321000' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+2205661234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+2205661234",
+        "reason": "foreign_number",
+        "detail": "'+2205661234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+22430241234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+22430241234",
+        "reason": "foreign_number",
+        "detail": "'+22430241234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+590590201234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+590590201234",
+        "reason": "foreign_number",
+        "detail": "'+590590201234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+240333091234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+240333091234",
+        "reason": "foreign_number",
+        "detail": "'+240333091234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+302123456789",
+      "hard": {
+        "sendable": false,
+        "normalized": "+302123456789",
+        "reason": "foreign_number",
+        "detail": "'+302123456789' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+50222456789",
+      "hard": {
+        "sendable": false,
+        "normalized": "+50222456789",
+        "reason": "foreign_number",
+        "detail": "'+50222456789' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+16713001234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+16713001234",
+        "reason": "foreign_number",
+        "detail": "'+16713001234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+245443201234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+245443201234",
+        "reason": "foreign_number",
+        "detail": "'+245443201234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+5922201234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+5922201234",
+        "reason": "foreign_number",
+        "detail": "'+5922201234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+85221234567",
+      "hard": {
+        "sendable": false,
+        "normalized": "+85221234567",
+        "reason": "foreign_number",
+        "detail": "'+85221234567' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+50422123456",
+      "hard": {
+        "sendable": false,
+        "normalized": "+50422123456",
+        "reason": "foreign_number",
+        "detail": "'+50422123456' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+38512345678",
+      "hard": {
+        "sendable": false,
+        "normalized": "+38512345678",
+        "reason": "foreign_number",
+        "detail": "'+38512345678' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+50922453300",
+      "hard": {
+        "sendable": false,
+        "normalized": "+50922453300",
+        "reason": "foreign_number",
+        "detail": "'+50922453300' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+3612345678",
+      "hard": {
+        "sendable": false,
+        "normalized": "+3612345678",
+        "reason": "foreign_number",
+        "detail": "'+3612345678' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": "test_data_suspected"
+    },
+    {
+      "input": "+62218350123",
+      "hard": {
+        "sendable": false,
+        "normalized": "+62218350123",
+        "reason": "foreign_number",
+        "detail": "'+62218350123' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+3532212345",
+      "hard": {
+        "sendable": false,
+        "normalized": "+3532212345",
+        "reason": "foreign_number",
+        "detail": "'+3532212345' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+97221234567",
+      "hard": {
+        "sendable": false,
+        "normalized": "+97221234567",
+        "reason": "foreign_number",
+        "detail": "'+97221234567' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+441624756789",
+      "hard": {
+        "sendable": false,
+        "normalized": "+441624756789",
+        "reason": "foreign_number",
+        "detail": "'+441624756789' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+917410410123",
+      "hard": {
+        "sendable": false,
+        "normalized": "+917410410123",
+        "reason": "foreign_number",
+        "detail": "'+917410410123' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+2463709100",
+      "hard": {
+        "sendable": false,
+        "normalized": "+2463709100",
+        "reason": "foreign_number",
+        "detail": "'+2463709100' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+96412345678",
+      "hard": {
+        "sendable": false,
+        "normalized": "+96412345678",
+        "reason": "foreign_number",
+        "detail": "'+96412345678' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+982123456789",
+      "hard": {
+        "sendable": false,
+        "normalized": "+982123456789",
+        "reason": "foreign_number",
+        "detail": "'+982123456789' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+3544101234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+3544101234",
+        "reason": "foreign_number",
+        "detail": "'+3544101234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+390212345678",
+      "hard": {
+        "sendable": false,
+        "normalized": "+390212345678",
+        "reason": "foreign_number",
+        "detail": "'+390212345678' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+441534456789",
+      "hard": {
+        "sendable": false,
+        "normalized": "+441534456789",
+        "reason": "foreign_number",
+        "detail": "'+441534456789' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+18765230123",
+      "hard": {
+        "sendable": false,
+        "normalized": "+18765230123",
+        "reason": "foreign_number",
+        "detail": "'+18765230123' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+96262001234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+96262001234",
+        "reason": "foreign_number",
+        "detail": "'+96262001234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+81312345678",
+      "hard": {
+        "sendable": false,
+        "normalized": "+81312345678",
+        "reason": "foreign_number",
+        "detail": "'+81312345678' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+254202012345",
+      "hard": {
+        "sendable": false,
+        "normalized": "+254202012345",
+        "reason": "foreign_number",
+        "detail": "'+254202012345' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+996312123456",
+      "hard": {
+        "sendable": false,
+        "normalized": "+996312123456",
+        "reason": "foreign_number",
+        "detail": "'+996312123456' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+85523756789",
+      "hard": {
+        "sendable": false,
+        "normalized": "+85523756789",
+        "reason": "foreign_number",
+        "detail": "'+85523756789' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+68631234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+68631234",
+        "reason": "foreign_number",
+        "detail": "'+68631234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+2697712345",
+      "hard": {
+        "sendable": false,
+        "normalized": "+2697712345",
+        "reason": "foreign_number",
+        "detail": "'+2697712345' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+18692361234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+18692361234",
+        "reason": "foreign_number",
+        "detail": "'+18692361234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+85021234567",
+      "hard": {
+        "sendable": false,
+        "normalized": "+85021234567",
+        "reason": "foreign_number",
+        "detail": "'+85021234567' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+8222123456",
+      "hard": {
+        "sendable": false,
+        "normalized": "+8222123456",
+        "reason": "foreign_number",
+        "detail": "'+8222123456' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+96522345678",
+      "hard": {
+        "sendable": false,
+        "normalized": "+96522345678",
+        "reason": "foreign_number",
+        "detail": "'+96522345678' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+13452221234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+13452221234",
+        "reason": "foreign_number",
+        "detail": "'+13452221234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+77123456789",
+      "hard": {
+        "sendable": false,
+        "normalized": "+77123456789",
+        "reason": "foreign_number",
+        "detail": "'+77123456789' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+85621212862",
+      "hard": {
+        "sendable": false,
+        "normalized": "+85621212862",
+        "reason": "foreign_number",
+        "detail": "'+85621212862' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+9611123456",
+      "hard": {
+        "sendable": false,
+        "normalized": "+9611123456",
+        "reason": "foreign_number",
+        "detail": "'+9611123456' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+17584305678",
+      "hard": {
+        "sendable": false,
+        "normalized": "+17584305678",
+        "reason": "foreign_number",
+        "detail": "'+17584305678' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+4232345678",
+      "hard": {
+        "sendable": false,
+        "normalized": "+4232345678",
+        "reason": "foreign_number",
+        "detail": "'+4232345678' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+94112345678",
+      "hard": {
+        "sendable": false,
+        "normalized": "+94112345678",
+        "reason": "foreign_number",
+        "detail": "'+94112345678' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+23121234567",
+      "hard": {
+        "sendable": false,
+        "normalized": "+23121234567",
+        "reason": "foreign_number",
+        "detail": "'+23121234567' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+26622123456",
+      "hard": {
+        "sendable": false,
+        "normalized": "+26622123456",
+        "reason": "foreign_number",
+        "detail": "'+26622123456' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+37031234567",
+      "hard": {
+        "sendable": false,
+        "normalized": "+37031234567",
+        "reason": "foreign_number",
+        "detail": "'+37031234567' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+35227123456",
+      "hard": {
+        "sendable": false,
+        "normalized": "+35227123456",
+        "reason": "foreign_number",
+        "detail": "'+35227123456' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+37163123456",
+      "hard": {
+        "sendable": false,
+        "normalized": "+37163123456",
+        "reason": "foreign_number",
+        "detail": "'+37163123456' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+218212345678",
+      "hard": {
+        "sendable": false,
+        "normalized": "+218212345678",
+        "reason": "foreign_number",
+        "detail": "'+218212345678' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+212520123456",
+      "hard": {
+        "sendable": false,
+        "normalized": "+212520123456",
+        "reason": "foreign_number",
+        "detail": "'+212520123456' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+37799123456",
+      "hard": {
+        "sendable": false,
+        "normalized": "+37799123456",
+        "reason": "foreign_number",
+        "detail": "'+37799123456' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+37322212345",
+      "hard": {
+        "sendable": false,
+        "normalized": "+37322212345",
+        "reason": "foreign_number",
+        "detail": "'+37322212345' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+38230234567",
+      "hard": {
+        "sendable": false,
+        "normalized": "+38230234567",
+        "reason": "foreign_number",
+        "detail": "'+38230234567' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+261202123456",
+      "hard": {
+        "sendable": false,
+        "normalized": "+261202123456",
+        "reason": "foreign_number",
+        "detail": "'+261202123456' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+6922471234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+6922471234",
+        "reason": "foreign_number",
+        "detail": "'+6922471234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+38922012345",
+      "hard": {
+        "sendable": false,
+        "normalized": "+38922012345",
+        "reason": "foreign_number",
+        "detail": "'+38922012345' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+22320212345",
+      "hard": {
+        "sendable": false,
+        "normalized": "+22320212345",
+        "reason": "foreign_number",
+        "detail": "'+22320212345' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+951234567",
+      "hard": {
+        "sendable": false,
+        "normalized": "+951234567",
+        "reason": "foreign_number",
+        "detail": "'+951234567' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+97653123456",
+      "hard": {
+        "sendable": false,
+        "normalized": "+97653123456",
+        "reason": "foreign_number",
+        "detail": "'+97653123456' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+85328212345",
+      "hard": {
+        "sendable": false,
+        "normalized": "+85328212345",
+        "reason": "foreign_number",
+        "detail": "'+85328212345' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+16702345678",
+      "hard": {
+        "sendable": false,
+        "normalized": "+16702345678",
+        "reason": "foreign_number",
+        "detail": "'+16702345678' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+596596301234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+596596301234",
+        "reason": "foreign_number",
+        "detail": "'+596596301234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+22235123456",
+      "hard": {
+        "sendable": false,
+        "normalized": "+22235123456",
+        "reason": "foreign_number",
+        "detail": "'+22235123456' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+16644912345",
+      "hard": {
+        "sendable": false,
+        "normalized": "+16644912345",
+        "reason": "foreign_number",
+        "detail": "'+16644912345' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+35621001234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+35621001234",
+        "reason": "foreign_number",
+        "detail": "'+35621001234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+23054480123",
+      "hard": {
+        "sendable": false,
+        "normalized": "+23054480123",
+        "reason": "foreign_number",
+        "detail": "'+23054480123' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+9606701234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+9606701234",
+        "reason": "foreign_number",
+        "detail": "'+9606701234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+2651234567",
+      "hard": {
+        "sendable": false,
+        "normalized": "+2651234567",
+        "reason": "foreign_number",
+        "detail": "'+2651234567' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+522001234567",
+      "hard": {
+        "sendable": false,
+        "normalized": "+522001234567",
+        "reason": "foreign_number",
+        "detail": "'+522001234567' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+60323856789",
+      "hard": {
+        "sendable": false,
+        "normalized": "+60323856789",
+        "reason": "foreign_number",
+        "detail": "'+60323856789' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+25821123456",
+      "hard": {
+        "sendable": false,
+        "normalized": "+25821123456",
+        "reason": "foreign_number",
+        "detail": "'+25821123456' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+26461221234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+26461221234",
+        "reason": "foreign_number",
+        "detail": "'+26461221234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+687201234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+687201234",
+        "reason": "foreign_number",
+        "detail": "'+687201234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+22720201234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+22720201234",
+        "reason": "foreign_number",
+        "detail": "'+22720201234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+672106609",
+      "hard": {
+        "sendable": false,
+        "normalized": "+672106609",
+        "reason": "foreign_number",
+        "detail": "'+672106609' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+2342033123456",
+      "hard": {
+        "sendable": false,
+        "normalized": "+2342033123456",
+        "reason": "not_mobile",
+        "detail": "'+2342033123456' is not a Nigerian mobile prefix (landline/special range)."
+      },
+      "soft": null
+    },
+    {
+      "input": "+50521234567",
+      "hard": {
+        "sendable": false,
+        "normalized": "+50521234567",
+        "reason": "foreign_number",
+        "detail": "'+50521234567' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+31101234567",
+      "hard": {
+        "sendable": false,
+        "normalized": "+31101234567",
+        "reason": "foreign_number",
+        "detail": "'+31101234567' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+4721234567",
+      "hard": {
+        "sendable": false,
+        "normalized": "+4721234567",
+        "reason": "foreign_number",
+        "detail": "'+4721234567' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+97714567890",
+      "hard": {
+        "sendable": false,
+        "normalized": "+97714567890",
+        "reason": "foreign_number",
+        "detail": "'+97714567890' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+6744441234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+6744441234",
+        "reason": "foreign_number",
+        "detail": "'+6744441234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+6837012",
+      "hard": {
+        "sendable": false,
+        "normalized": "+6837012",
+        "reason": "foreign_number",
+        "detail": "'+6837012' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+6432345678",
+      "hard": {
+        "sendable": false,
+        "normalized": "+6432345678",
+        "reason": "foreign_number",
+        "detail": "'+6432345678' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+96823123456",
+      "hard": {
+        "sendable": false,
+        "normalized": "+96823123456",
+        "reason": "foreign_number",
+        "detail": "'+96823123456' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+5072001234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+5072001234",
+        "reason": "foreign_number",
+        "detail": "'+5072001234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+5111234567",
+      "hard": {
+        "sendable": false,
+        "normalized": "+5111234567",
+        "reason": "foreign_number",
+        "detail": "'+5111234567' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+68940412345",
+      "hard": {
+        "sendable": false,
+        "normalized": "+68940412345",
+        "reason": "foreign_number",
+        "detail": "'+68940412345' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+6753123456",
+      "hard": {
+        "sendable": false,
+        "normalized": "+6753123456",
+        "reason": "foreign_number",
+        "detail": "'+6753123456' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+63232345678",
+      "hard": {
+        "sendable": false,
+        "normalized": "+63232345678",
+        "reason": "foreign_number",
+        "detail": "'+63232345678' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+922123456789",
+      "hard": {
+        "sendable": false,
+        "normalized": "+922123456789",
+        "reason": "foreign_number",
+        "detail": "'+922123456789' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+48123456789",
+      "hard": {
+        "sendable": false,
+        "normalized": "+48123456789",
+        "reason": "foreign_number",
+        "detail": "'+48123456789' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+508430123",
+      "hard": {
+        "sendable": false,
+        "normalized": "+508430123",
+        "reason": "foreign_number",
+        "detail": "'+508430123' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+17872345678",
+      "hard": {
+        "sendable": false,
+        "normalized": "+17872345678",
+        "reason": "foreign_number",
+        "detail": "'+17872345678' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+97022234567",
+      "hard": {
+        "sendable": false,
+        "normalized": "+97022234567",
+        "reason": "foreign_number",
+        "detail": "'+97022234567' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+351212345678",
+      "hard": {
+        "sendable": false,
+        "normalized": "+351212345678",
+        "reason": "foreign_number",
+        "detail": "'+351212345678' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+6802771234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+6802771234",
+        "reason": "foreign_number",
+        "detail": "'+6802771234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+595212345678",
+      "hard": {
+        "sendable": false,
+        "normalized": "+595212345678",
+        "reason": "foreign_number",
+        "detail": "'+595212345678' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+97444123456",
+      "hard": {
+        "sendable": false,
+        "normalized": "+97444123456",
+        "reason": "foreign_number",
+        "detail": "'+97444123456' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+262262161234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+262262161234",
+        "reason": "foreign_number",
+        "detail": "'+262262161234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+40211234567",
+      "hard": {
+        "sendable": false,
+        "normalized": "+40211234567",
+        "reason": "foreign_number",
+        "detail": "'+40211234567' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+38110234567",
+      "hard": {
+        "sendable": false,
+        "normalized": "+38110234567",
+        "reason": "foreign_number",
+        "detail": "'+38110234567' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+73011234567",
+      "hard": {
+        "sendable": false,
+        "normalized": "+73011234567",
+        "reason": "foreign_number",
+        "detail": "'+73011234567' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+250250123456",
+      "hard": {
+        "sendable": false,
+        "normalized": "+250250123456",
+        "reason": "foreign_number",
+        "detail": "'+250250123456' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+966112345678",
+      "hard": {
+        "sendable": false,
+        "normalized": "+966112345678",
+        "reason": "foreign_number",
+        "detail": "'+966112345678' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+67740123",
+      "hard": {
+        "sendable": false,
+        "normalized": "+67740123",
+        "reason": "foreign_number",
+        "detail": "'+67740123' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+2484217123",
+      "hard": {
+        "sendable": false,
+        "normalized": "+2484217123",
+        "reason": "foreign_number",
+        "detail": "'+2484217123' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+249153123456",
+      "hard": {
+        "sendable": false,
+        "normalized": "+249153123456",
+        "reason": "foreign_number",
+        "detail": "'+249153123456' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+468123456",
+      "hard": {
+        "sendable": false,
+        "normalized": "+468123456",
+        "reason": "foreign_number",
+        "detail": "'+468123456' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+6561234567",
+      "hard": {
+        "sendable": false,
+        "normalized": "+6561234567",
+        "reason": "foreign_number",
+        "detail": "'+6561234567' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+29022158",
+      "hard": {
+        "sendable": false,
+        "normalized": "+29022158",
+        "reason": "foreign_number",
+        "detail": "'+29022158' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+38612345678",
+      "hard": {
+        "sendable": false,
+        "normalized": "+38612345678",
+        "reason": "foreign_number",
+        "detail": "'+38612345678' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+4779123456",
+      "hard": {
+        "sendable": false,
+        "normalized": "+4779123456",
+        "reason": "foreign_number",
+        "detail": "'+4779123456' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+421221234567",
+      "hard": {
+        "sendable": false,
+        "normalized": "+421221234567",
+        "reason": "foreign_number",
+        "detail": "'+421221234567' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+23222221234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+23222221234",
+        "reason": "foreign_number",
+        "detail": "'+23222221234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+3780549886377",
+      "hard": {
+        "sendable": false,
+        "normalized": "+3780549886377",
+        "reason": "foreign_number",
+        "detail": "'+3780549886377' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+221301012345",
+      "hard": {
+        "sendable": false,
+        "normalized": "+221301012345",
+        "reason": "foreign_number",
+        "detail": "'+221301012345' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+2524012345",
+      "hard": {
+        "sendable": false,
+        "normalized": "+2524012345",
+        "reason": "foreign_number",
+        "detail": "'+2524012345' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+597211234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+597211234",
+        "reason": "foreign_number",
+        "detail": "'+597211234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+211181234567",
+      "hard": {
+        "sendable": false,
+        "normalized": "+211181234567",
+        "reason": "foreign_number",
+        "detail": "'+211181234567' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+2392221234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+2392221234",
+        "reason": "foreign_number",
+        "detail": "'+2392221234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+50321234567",
+      "hard": {
+        "sendable": false,
+        "normalized": "+50321234567",
+        "reason": "foreign_number",
+        "detail": "'+50321234567' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+17215425678",
+      "hard": {
+        "sendable": false,
+        "normalized": "+17215425678",
+        "reason": "foreign_number",
+        "detail": "'+17215425678' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+963112345678",
+      "hard": {
+        "sendable": false,
+        "normalized": "+963112345678",
+        "reason": "foreign_number",
+        "detail": "'+963112345678' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+26822171234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+26822171234",
+        "reason": "foreign_number",
+        "detail": "'+26822171234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+2908999",
+      "hard": {
+        "sendable": false,
+        "normalized": "+2908999",
+        "reason": "foreign_number",
+        "detail": "'+2908999' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+16497121234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+16497121234",
+        "reason": "foreign_number",
+        "detail": "'+16497121234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+23522501234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+23522501234",
+        "reason": "foreign_number",
+        "detail": "'+23522501234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+22822212345",
+      "hard": {
+        "sendable": false,
+        "normalized": "+22822212345",
+        "reason": "foreign_number",
+        "detail": "'+22822212345' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+6621234567",
+      "hard": {
+        "sendable": false,
+        "normalized": "+6621234567",
+        "reason": "foreign_number",
+        "detail": "'+6621234567' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+992372123456",
+      "hard": {
+        "sendable": false,
+        "normalized": "+992372123456",
+        "reason": "foreign_number",
+        "detail": "'+992372123456' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+6903101",
+      "hard": {
+        "sendable": false,
+        "normalized": "+6903101",
+        "reason": "foreign_number",
+        "detail": "'+6903101' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+6702112345",
+      "hard": {
+        "sendable": false,
+        "normalized": "+6702112345",
+        "reason": "foreign_number",
+        "detail": "'+6702112345' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+99312345678",
+      "hard": {
+        "sendable": false,
+        "normalized": "+99312345678",
+        "reason": "foreign_number",
+        "detail": "'+99312345678' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+21630010123",
+      "hard": {
+        "sendable": false,
+        "normalized": "+21630010123",
+        "reason": "foreign_number",
+        "detail": "'+21630010123' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+67620123",
+      "hard": {
+        "sendable": false,
+        "normalized": "+67620123",
+        "reason": "foreign_number",
+        "detail": "'+67620123' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+902123456789",
+      "hard": {
+        "sendable": false,
+        "normalized": "+902123456789",
+        "reason": "foreign_number",
+        "detail": "'+902123456789' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+18682211234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+18682211234",
+        "reason": "foreign_number",
+        "detail": "'+18682211234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+68820123",
+      "hard": {
+        "sendable": false,
+        "normalized": "+68820123",
+        "reason": "foreign_number",
+        "detail": "'+68820123' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+886221234567",
+      "hard": {
+        "sendable": false,
+        "normalized": "+886221234567",
+        "reason": "foreign_number",
+        "detail": "'+886221234567' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+255222345678",
+      "hard": {
+        "sendable": false,
+        "normalized": "+255222345678",
+        "reason": "foreign_number",
+        "detail": "'+255222345678' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+380311234567",
+      "hard": {
+        "sendable": false,
+        "normalized": "+380311234567",
+        "reason": "foreign_number",
+        "detail": "'+380311234567' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+256312345678",
+      "hard": {
+        "sendable": false,
+        "normalized": "+256312345678",
+        "reason": "foreign_number",
+        "detail": "'+256312345678' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+12015550123",
+      "hard": {
+        "sendable": false,
+        "normalized": "+12015550123",
+        "reason": "foreign_number",
+        "detail": "'+12015550123' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+59821231234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+59821231234",
+        "reason": "foreign_number",
+        "detail": "'+59821231234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+998669050123",
+      "hard": {
+        "sendable": false,
+        "normalized": "+998669050123",
+        "reason": "foreign_number",
+        "detail": "'+998669050123' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+390669812345",
+      "hard": {
+        "sendable": false,
+        "normalized": "+390669812345",
+        "reason": "foreign_number",
+        "detail": "'+390669812345' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+17842661234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+17842661234",
+        "reason": "foreign_number",
+        "detail": "'+17842661234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+582121234567",
+      "hard": {
+        "sendable": false,
+        "normalized": "+582121234567",
+        "reason": "foreign_number",
+        "detail": "'+582121234567' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+12842291234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+12842291234",
+        "reason": "foreign_number",
+        "detail": "'+12842291234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+13406421234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+13406421234",
+        "reason": "foreign_number",
+        "detail": "'+13406421234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+842101234567",
+      "hard": {
+        "sendable": false,
+        "normalized": "+842101234567",
+        "reason": "foreign_number",
+        "detail": "'+842101234567' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+67822123",
+      "hard": {
+        "sendable": false,
+        "normalized": "+67822123",
+        "reason": "foreign_number",
+        "detail": "'+67822123' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+681721234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+681721234",
+        "reason": "foreign_number",
+        "detail": "'+681721234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+68522123",
+      "hard": {
+        "sendable": false,
+        "normalized": "+68522123",
+        "reason": "foreign_number",
+        "detail": "'+68522123' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+38328012345",
+      "hard": {
+        "sendable": false,
+        "normalized": "+38328012345",
+        "reason": "foreign_number",
+        "detail": "'+38328012345' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+9671234567",
+      "hard": {
+        "sendable": false,
+        "normalized": "+9671234567",
+        "reason": "foreign_number",
+        "detail": "'+9671234567' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+262269601234",
+      "hard": {
+        "sendable": false,
+        "normalized": "+262269601234",
+        "reason": "foreign_number",
+        "detail": "'+262269601234' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+27101234567",
+      "hard": {
+        "sendable": false,
+        "normalized": "+27101234567",
+        "reason": "foreign_number",
+        "detail": "'+27101234567' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+260211234567",
+      "hard": {
+        "sendable": false,
+        "normalized": "+260211234567",
+        "reason": "foreign_number",
+        "detail": "'+260211234567' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "+2631312345",
+      "hard": {
+        "sendable": false,
+        "normalized": "+2631312345",
+        "reason": "foreign_number",
+        "detail": "'+2631312345' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "08031111111",
+      "hard": {
+        "sendable": true,
+        "normalized": "+2348031111111",
+        "reason": null,
+        "detail": ""
+      },
+      "soft": null
+    },
+    {
+      "input": "08033333333",
+      "hard": {
+        "sendable": true,
+        "normalized": "+2348033333333",
+        "reason": null,
+        "detail": ""
+      },
+      "soft": "test_data_suspected"
+    },
+    {
+      "input": "08123456789",
+      "hard": {
+        "sendable": true,
+        "normalized": "+2348123456789",
+        "reason": null,
+        "detail": ""
+      },
+      "soft": "test_data_suspected"
+    },
+    {
+      "input": "08000000000",
+      "hard": {
+        "sendable": false,
+        "normalized": "+2348000000000",
+        "reason": "test_number",
+        "detail": "'08000000000' looks like a test/fake number."
+      },
+      "soft": "test_data_suspected"
+    },
+    {
+      "input": "09012345678",
+      "hard": {
+        "sendable": true,
+        "normalized": "+2349012345678",
+        "reason": null,
+        "detail": ""
+      },
+      "soft": "test_data_suspected"
+    },
+    {
+      "input": "08888888888",
+      "hard": {
+        "sendable": false,
+        "normalized": null,
+        "reason": "test_number",
+        "detail": "'08888888888' looks like a test/fake number."
+      },
+      "soft": "test_data_suspected"
+    },
+    {
+      "input": "+12025550123",
+      "hard": {
+        "sendable": false,
+        "normalized": "+12025550123",
+        "reason": "foreign_number",
+        "detail": "'+12025550123' is not a Nigerian number — the SIM cannot deliver to it."
+      },
+      "soft": null
+    },
+    {
+      "input": "123",
+      "hard": {
+        "sendable": false,
+        "normalized": null,
+        "reason": "short_code",
+        "detail": "'123' looks like a short code, not a mobile number."
+      },
+      "soft": null
+    },
+    {
+      "input": "12345678",
+      "hard": {
+        "sendable": false,
+        "normalized": null,
+        "reason": "short_code",
+        "detail": "'12345678' looks like a short code, not a mobile number."
+      },
+      "soft": null
+    },
+    {
+      "input": "9876543210",
+      "hard": {
+        "sendable": false,
+        "normalized": null,
+        "reason": "test_number",
+        "detail": "'9876543210' looks like a test/fake number."
+      },
+      "soft": "test_data_suspected"
+    },
+    {
+      "input": "+٢٣٤٨٠٣١١١٢٢٢٢",
+      "hard": {
+        "sendable": true,
+        "normalized": "+2348031112222",
+        "reason": null,
+        "detail": ""
+      },
+      "soft": null
+    },
+    {
+      "input": "٠٨٠٣١١١٢٢٢٢",
+      "hard": {
+        "sendable": true,
+        "normalized": "+2348031112222",
+        "reason": null,
+        "detail": ""
+      },
+      "soft": null
+    },
+    {
+      "input": "+234٠٨٠٣١١١٢٢٢٢",
+      "hard": {
+        "sendable": true,
+        "normalized": "+2348031112222",
+        "reason": null,
+        "detail": ""
+      },
+      "soft": null
+    }
+  ],
+  "scope": "Actual pure source number filter and phone AST; no sends, database, provider calls or WordPress runtime."
+}

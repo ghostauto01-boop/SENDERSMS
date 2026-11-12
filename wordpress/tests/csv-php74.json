@@ -1,0 +1,9 @@
+{
+  "ok": true,
+  "assertions": 10026,
+  "diffs": [],
+  "php": "7.4.34-dev",
+  "source_phone_version": "8.13.52",
+  "native_wordpress_verified": false,
+  "suite": "csv"
+}

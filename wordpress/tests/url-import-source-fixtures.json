@@ -1,0 +1,609 @@
+{
+  "dto": [
+    {
+      "input": {},
+      "ok": false
+    },
+    {
+      "input": null,
+      "ok": false
+    },
+    {
+      "input": [],
+      "ok": false
+    },
+    {
+      "input": {
+        "url": "short"
+      },
+      "ok": false
+    },
+    {
+      "input": {
+        "url": null
+      },
+      "ok": false
+    },
+    {
+      "input": {
+        "url": "https://csv.example.net/list.csv",
+        "extra": 1
+      },
+      "ok": false
+    },
+    {
+      "input": {
+        "url": "https://csv.example.net/list.csv",
+        "tags": [
+          " Buyer ",
+          "buyer",
+          "VIP"
+        ]
+      },
+      "ok": true,
+      "expected": {
+        "url": "https://csv.example.net/list.csv",
+        "filename": null,
+        "options": {
+          "list_id": null,
+          "new_list_name": null,
+          "skip_duplicates": true,
+          "column_mapping": {},
+          "auto_tag_rules": [],
+          "tags": [
+            "Buyer",
+            "VIP"
+          ]
+        }
+      }
+    },
+    {
+      "input": {
+        "url": "https://csv.example.net/list.csv",
+        "tags": "Buyer, buyer, VIP"
+      },
+      "ok": true,
+      "expected": {
+        "url": "https://csv.example.net/list.csv",
+        "filename": null,
+        "options": {
+          "list_id": null,
+          "new_list_name": null,
+          "skip_duplicates": true,
+          "column_mapping": {},
+          "auto_tag_rules": [],
+          "tags": [
+            "Buyer",
+            "VIP"
+          ]
+        }
+      }
+    },
+    {
+      "input": {
+        "url": "https://csv.example.net/list.csv",
+        "tags": "Buyer;VIP"
+      },
+      "ok": true,
+      "expected": {
+        "url": "https://csv.example.net/list.csv",
+        "filename": null,
+        "options": {
+          "list_id": null,
+          "new_list_name": null,
+          "skip_duplicates": true,
+          "column_mapping": {},
+          "auto_tag_rules": [],
+          "tags": [
+            "Buyer",
+            "VIP"
+          ]
+        }
+      }
+    },
+    {
+      "input": {
+        "url": "https://csv.example.net/list.csv",
+        "tags": null
+      },
+      "ok": true,
+      "expected": {
+        "url": "https://csv.example.net/list.csv",
+        "filename": null,
+        "options": {
+          "list_id": null,
+          "new_list_name": null,
+          "skip_duplicates": true,
+          "column_mapping": {},
+          "auto_tag_rules": [],
+          "tags": []
+        }
+      }
+    },
+    {
+      "input": {
+        "url": "https://csv.example.net/list.csv",
+        "tags": 2
+      },
+      "ok": false
+    },
+    {
+      "input": {
+        "url": "https://csv.example.net/list.csv",
+        "tags": [
+          false
+        ]
+      },
+      "ok": false
+    },
+    {
+      "input": {
+        "url": "https://csv.example.net/list.csv",
+        "tags": [
+          "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        ]
+      },
+      "ok": false
+    },
+    {
+      "input": {
+        "url": "https://csv.example.net/list.csv",
+        "column_mapping": []
+      },
+      "ok": false
+    },
+    {
+      "input": {
+        "url": "https://csv.example.net/list.csv",
+        "column_mapping": {
+          "Email": false
+        }
+      },
+      "ok": false
+    },
+    {
+      "input": {
+        "url": "https://csv.example.net/list.csv",
+        "column_mapping": null
+      },
+      "ok": true,
+      "expected": {
+        "url": "https://csv.example.net/list.csv",
+        "filename": null,
+        "options": {
+          "list_id": null,
+          "new_list_name": null,
+          "skip_duplicates": true,
+          "column_mapping": {},
+          "auto_tag_rules": [],
+          "tags": []
+        }
+      }
+    },
+    {
+      "input": {
+        "url": "https://csv.example.net/list.csv",
+        "auto_tag_rules": null
+      },
+      "ok": false
+    },
+    {
+      "input": {
+        "url": "https://csv.example.net/list.csv",
+        "auto_tag_rules": [
+          false
+        ]
+      },
+      "ok": false
+    },
+    {
+      "input": {
+        "url": "https://csv.example.net/list.csv",
+        "auto_tag_rules": [
+          {
+            "field": "Mood",
+            "contains": "warm",
+            "tag": "Warm"
+          }
+        ]
+      },
+      "ok": true,
+      "expected": {
+        "url": "https://csv.example.net/list.csv",
+        "filename": null,
+        "options": {
+          "list_id": null,
+          "new_list_name": null,
+          "skip_duplicates": true,
+          "column_mapping": {},
+          "auto_tag_rules": [
+            {
+              "field": "Mood",
+              "contains": "warm",
+              "tag": "Warm"
+            }
+          ],
+          "tags": []
+        }
+      }
+    },
+    {
+      "input": {
+        "url": "https://csv.example.net/list.csv",
+        "list_id": "3.0"
+      },
+      "ok": true,
+      "expected": {
+        "url": "https://csv.example.net/list.csv",
+        "filename": null,
+        "options": {
+          "list_id": 3,
+          "new_list_name": null,
+          "skip_duplicates": true,
+          "column_mapping": {},
+          "auto_tag_rules": [],
+          "tags": []
+        }
+      }
+    },
+    {
+      "input": {
+        "url": "https://csv.example.net/list.csv",
+        "skip_duplicates": "no"
+      },
+      "ok": true,
+      "expected": {
+        "url": "https://csv.example.net/list.csv",
+        "filename": null,
+        "options": {
+          "list_id": null,
+          "new_list_name": null,
+          "skip_duplicates": false,
+          "column_mapping": {},
+          "auto_tag_rules": [],
+          "tags": []
+        }
+      }
+    },
+    {
+      "input": {
+        "url": "https://csv.example.net/list.csv",
+        "skip_duplicates": null
+      },
+      "ok": false
+    },
+    {
+      "input": {
+        "url": "https://csv.example.net/list.csv",
+        "file_name": false
+      },
+      "ok": false
+    },
+    {
+      "input": {
+        "url": "https://csv.example.net/list.csv",
+        "new_list_name": null
+      },
+      "ok": true,
+      "expected": {
+        "url": "https://csv.example.net/list.csv",
+        "filename": null,
+        "options": {
+          "list_id": null,
+          "new_list_name": null,
+          "skip_duplicates": true,
+          "column_mapping": {},
+          "auto_tag_rules": [],
+          "tags": []
+        }
+      }
+    }
+  ],
+  "operations": [
+    {
+      "case": {
+        "url": "file:///etc/passwd"
+      },
+      "expected": {
+        "status": 422,
+        "message": "URL must be a public HTTP or HTTPS address"
+      },
+      "snapshot": {
+        "contacts": [],
+        "tags": [],
+        "tag_links": [],
+        "lists": [],
+        "members": [],
+        "aliases": []
+      }
+    },
+    {
+      "case": {
+        "url": "https://user:pass@csv.example.net/x"
+      },
+      "expected": {
+        "status": 422,
+        "message": "URL must be a public HTTP or HTTPS address"
+      },
+      "snapshot": {
+        "contacts": [],
+        "tags": [],
+        "tag_links": [],
+        "lists": [],
+        "members": [],
+        "aliases": []
+      }
+    },
+    {
+      "case": {
+        "url": "http://localhost/x"
+      },
+      "expected": {
+        "status": 422,
+        "message": "Private or local URLs are not allowed"
+      },
+      "snapshot": {
+        "contacts": [],
+        "tags": [],
+        "tag_links": [],
+        "lists": [],
+        "members": [],
+        "aliases": []
+      }
+    },
+    {
+      "case": {
+        "url": "http://metadata.google.internal/x"
+      },
+      "expected": {
+        "status": 422,
+        "message": "Private or local URLs are not allowed"
+      },
+      "snapshot": {
+        "contacts": [],
+        "tags": [],
+        "tag_links": [],
+        "lists": [],
+        "members": [],
+        "aliases": []
+      }
+    },
+    {
+      "case": {
+        "url": "https://csv.example.net/x",
+        "addresses": [
+          "127.0.0.1"
+        ]
+      },
+      "expected": {
+        "status": 422,
+        "message": "URL host must resolve to a public address"
+      },
+      "snapshot": {
+        "contacts": [],
+        "tags": [],
+        "tag_links": [],
+        "lists": [],
+        "members": [],
+        "aliases": []
+      }
+    },
+    {
+      "case": {
+        "url": "https://csv.example.net/x",
+        "addresses": [
+          "8.8.8.8",
+          "10.0.0.1"
+        ]
+      },
+      "expected": {
+        "status": 422,
+        "message": "URL host must resolve to a public address"
+      },
+      "snapshot": {
+        "contacts": [],
+        "tags": [],
+        "tag_links": [],
+        "lists": [],
+        "members": [],
+        "aliases": []
+      }
+    },
+    {
+      "case": {
+        "url": "https://csv.example.net/x",
+        "dns_error": true
+      },
+      "expected": {
+        "status": 422,
+        "message": "Could not resolve the public CSV URL"
+      },
+      "snapshot": {
+        "contacts": [],
+        "tags": [],
+        "tag_links": [],
+        "lists": [],
+        "members": [],
+        "aliases": []
+      }
+    },
+    {
+      "case": {
+        "url": "https://csv.example.net/x",
+        "status": 302
+      },
+      "expected": {
+        "status": 422,
+        "message": "CSV URL returned HTTP 302"
+      },
+      "snapshot": {
+        "contacts": [],
+        "tags": [],
+        "tag_links": [],
+        "lists": [],
+        "members": [],
+        "aliases": []
+      }
+    },
+    {
+      "case": {
+        "url": "https://csv.example.net/x",
+        "status": 404
+      },
+      "expected": {
+        "status": 422,
+        "message": "CSV URL returned HTTP 404"
+      },
+      "snapshot": {
+        "contacts": [],
+        "tags": [],
+        "tag_links": [],
+        "lists": [],
+        "members": [],
+        "aliases": []
+      }
+    },
+    {
+      "case": {
+        "url": "https://csv.example.net/x",
+        "length": "20971521"
+      },
+      "expected": {
+        "status": 413,
+        "message": "CSV file is larger than 20 MB"
+      },
+      "snapshot": {
+        "contacts": [],
+        "tags": [],
+        "tag_links": [],
+        "lists": [],
+        "members": [],
+        "aliases": []
+      }
+    },
+    {
+      "case": {
+        "url": "https://csv.example.net/x",
+        "transport_error": true
+      },
+      "expected": {
+        "status": 422,
+        "message": "Could not download CSV from the provided URL"
+      },
+      "snapshot": {
+        "contacts": [],
+        "tags": [],
+        "tag_links": [],
+        "lists": [],
+        "members": [],
+        "aliases": []
+      }
+    },
+    {
+      "case": {
+        "url": "https://csv.example.net/x",
+        "body": "Email,Mood\nremote@business.ng,warm\n",
+        "new_list_name": " Remote ",
+        "tags": [
+          "Buyer",
+          "buyer"
+        ],
+        "auto_tag_rules": [
+          {
+            "field": "Mood",
+            "contains": "warm",
+            "tag": "Warm"
+          }
+        ]
+      },
+      "expected": {
+        "status": 202,
+        "body": {
+          "id": "<job-id>",
+          "status": "queued",
+          "file_name": "csv.csv",
+          "total_rows": 1,
+          "processed_rows": 0,
+          "progress_percent": 0.0,
+          "imported": 0,
+          "merged": 0,
+          "duplicates": 0,
+          "invalid": 0,
+          "error": null,
+          "list_id": 1,
+          "created_at": "2026-01-02T12:00:00.123456+00:00",
+          "started_at": null,
+          "completed_at": null
+        },
+        "content": "Email,Mood\nremote@business.ng,warm\n",
+        "mapping": {
+          "email": "email",
+          "mood": "custom:mood"
+        },
+        "tags": [
+          "Buyer"
+        ],
+        "rules": [
+          {
+            "field": "Mood",
+            "contains": "warm",
+            "tag": "Warm"
+          }
+        ]
+      },
+      "snapshot": {
+        "contacts": [],
+        "tags": [],
+        "tag_links": [],
+        "lists": [
+          {
+            "id": 1,
+            "name": "Remote",
+            "contact_count": 0
+          }
+        ],
+        "members": [],
+        "aliases": []
+      }
+    },
+    {
+      "case": {
+        "url": "https://csv.example.net/x",
+        "body": "",
+        "new_list_name": "Rollback remote"
+      },
+      "expected": {
+        "status": 422,
+        "message": "No headers found in CSV"
+      },
+      "snapshot": {
+        "contacts": [],
+        "tags": [],
+        "tag_links": [],
+        "lists": [],
+        "members": [],
+        "aliases": []
+      }
+    },
+    {
+      "case": {
+        "url": "https://csv.example.net/x",
+        "body": "Email\nx@business.ng\n",
+        "list_id": 404
+      },
+      "expected": {
+        "status": 404,
+        "message": "List not found"
+      },
+      "snapshot": {
+        "contacts": [],
+        "tags": [],
+        "tag_links": [],
+        "lists": [],
+        "members": [],
+        "aliases": []
+      }
+    }
+  ],
+  "scope": "Actual original URL DTO and endpoint with forced fake DNS/httpx; isolated SQLite. Not real network, TLS, cURL, WP, MySQL, SSRF bypass or browser certification."
+}

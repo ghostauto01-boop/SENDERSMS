@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "assertions": 57,
+  "diffs": [],
+  "php": "7.4.34-dev",
+  "source_operations": 15,
+  "scope": "Actual original job create/read/report/worker AST comparisons, fixed clock, synthetic SQLite and simulated MySQL advisory locks; fault-injected partial commits and interrupted-worker recovery. No real WP cron/HTTP/uploads/MySQL locks/concurrency/host timing proof.",
+  "native_wordpress_verified": false,
+  "native_mysql_verified": false,
+  "provider_messages_sent": 0,
+  "suite": "import-jobs"
+}

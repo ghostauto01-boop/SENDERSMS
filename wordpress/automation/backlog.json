@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "branch": "arena/d761f7c5-sendersms",
+  "tasks": [
+    {"id": "transports", "goal": "Implement native SMS and email provider/account configuration, encrypted credential storage, sender selection, real sending and delivery reconciliation. Enforce consent at enqueue and delivery, idempotency, bounded retries and ambiguous provider acknowledgement recovery. Test against isolated fake transports; never contact live providers."},
+    {"id": "campaign-execution", "goal": "Complete classic campaigns, Ads Manager, sequence and follow-up execution using native WordPress workers with claims, leases, concurrency and crash recovery. Include CRUD, validation, transitions, budgets, quiet hours, cancellation and stop-on-reply/opt-out."},
+    {"id": "inbound", "goal": "Complete SMS/email inbox ingestion, mailbox/accounts/OAuth, replies, attachments, calls, authenticated webhooks and rule execution. Preserve attribution, suppression, privacy and duplicate-event safety."},
+    {"id": "remaining-features", "goal": "Complete all remaining source settings, accounts, contact enrichment/verification, calendar delivery, invoices/payments/PDF, notifications/push, AI agents and MCP with explicit permissions and substantive behavior. No successful placeholders."},
+    {"id": "frontend", "goal": "Integrate the full original application UI into WordPress, changing only copied migration files. Replace original API assumptions with native endpoints; implement routing, authentication, every page/wizard and browser workflows."},
+    {"id": "native-qualification", "goal": "Execute isolated native WordPress/PHP/MySQL/MariaDB installation, upgrades, migration, constraints, security, concurrent workers, failure recovery and complete browser journeys. Certify every source contract with reproducible evidence, not offline-only results."},
+    {"id": "release", "goal": "Only after every contract and full native/browser/worker/security release gate passes, build and verify a reproducible installable WordPress ZIP, installation documentation, checksums and release evidence. Never label a development package ready."}
+  ]
+}

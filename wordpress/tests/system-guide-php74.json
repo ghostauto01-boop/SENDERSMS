@@ -1,0 +1,10 @@
+{
+  "ok": true,
+  "assertions": 10,
+  "diffs": [],
+  "php": "7.4.34-dev",
+  "native_wordpress_verified": false,
+  "native_mysql_verified": false,
+  "scope": "Honest WordPress system health, dbProbe, scrubbed error log reads, and read-only setup guide.",
+  "suite": "system-guide"
+}

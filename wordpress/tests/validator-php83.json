@@ -1,0 +1,10 @@
+{
+  "ok": true,
+  "assertions": 13,
+  "diffs": [],
+  "php": "8.3.36",
+  "native_wordpress_verified": false,
+  "native_mysql_verified": false,
+  "scope": "Offline local email/phone validator, enrichment status, and contacts/lists email validation on synthetic SQLite.",
+  "suite": "validator"
+}

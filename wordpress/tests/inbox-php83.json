@@ -1,0 +1,13 @@
+{
+  "ok": true,
+  "assertions": 102,
+  "diffs": [],
+  "php": "8.3.36",
+  "source_operations": 38,
+  "scope": "Actual selected source inbox/attribution functions and original stop SQL; fixed clock, synthetic SQLite, omitted FKs/relationships. Known UTC timestamp and error-redaction normalization. Injected transaction/conflict/admission tests, not native WP/MySQL/HTTP/concurrency/sending/ingestion/sequence-execution proof.",
+  "native_wordpress_verified": false,
+  "native_mysql_verified": false,
+  "provider_requests": 0,
+  "messages_sent": 0,
+  "suite": "inbox"
+}

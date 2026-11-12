@@ -1,0 +1,15 @@
+{
+  "ok": true,
+  "assertions": 288,
+  "diffs": [],
+  "php": "7.4.34-dev",
+  "source_template_operations": 40,
+  "source_dto_cases": 42,
+  "attachment_cases": 6,
+  "attachment_boundaries": 6,
+  "suggestion_cases": 136,
+  "scope": "Selected source AST; fixed clock, omitted relationships, synthetic SQLite and monotonic committed IDs; not actual WordPress/HTTP/MySQL/FK cleanup/concurrency/provider/billing or HTML-safety certification",
+  "native_mysql_verified": false,
+  "native_wordpress_verified": false,
+  "suite": "templates"
+}

@@ -1,0 +1,997 @@
+{
+  "cases": [
+    {
+      "name": "missing password",
+      "password": null,
+      "username": null,
+      "admin": "operator",
+      "legacy": "",
+      "users": [],
+      "site": null,
+      "expected_access": {
+        "password_required": true,
+        "password_set": false,
+        "source": "admin",
+        "hint": "Enter the admin password for this deployment."
+      },
+      "expected_user": null,
+      "expected_users": []
+    },
+    {
+      "name": "blank password",
+      "password": "   ",
+      "username": null,
+      "admin": "operator",
+      "legacy": "",
+      "users": [],
+      "site": null,
+      "expected_access": {
+        "password_required": true,
+        "password_set": false,
+        "source": "admin",
+        "hint": "Enter the admin password for this deployment."
+      },
+      "expected_user": null,
+      "expected_users": []
+    },
+    {
+      "name": "operator first login",
+      "password": "operator",
+      "username": null,
+      "admin": "operator",
+      "legacy": "",
+      "users": [],
+      "site": null,
+      "expected_access": {
+        "password_required": true,
+        "password_set": false,
+        "source": "admin",
+        "hint": "Enter the admin password for this deployment."
+      },
+      "expected_user": {
+        "id": 1,
+        "username": "admin",
+        "display_name": "Administrator",
+        "role": "admin",
+        "is_active": true
+      },
+      "expected_users": [
+        {
+          "id": 1,
+          "username": "admin",
+          "password_hash": "synthetic:operator",
+          "email": null,
+          "display_name": "Administrator",
+          "role": "admin",
+          "is_active": true,
+          "last_login": null,
+          "created_at": "2026-01-02T12:00:00.123456+00:00",
+          "updated_at": "2026-01-02T12:00:00.123456+00:00"
+        }
+      ]
+    },
+    {
+      "name": "wrong first login",
+      "password": "wrong",
+      "username": null,
+      "admin": "operator",
+      "legacy": "",
+      "users": [],
+      "site": null,
+      "expected_access": {
+        "password_required": true,
+        "password_set": false,
+        "source": "admin",
+        "hint": "Enter the admin password for this deployment."
+      },
+      "expected_user": null,
+      "expected_users": [
+        {
+          "id": 1,
+          "username": "admin",
+          "password_hash": "synthetic:operator",
+          "email": null,
+          "display_name": "Administrator",
+          "role": "admin",
+          "is_active": true,
+          "last_login": null,
+          "created_at": "2026-01-02T12:00:00.123456",
+          "updated_at": "2026-01-02T12:00:00.123456"
+        }
+      ]
+    },
+    {
+      "name": "trimmed operator password",
+      "password": "  operator ",
+      "username": null,
+      "admin": "operator",
+      "legacy": "",
+      "users": [],
+      "site": null,
+      "expected_access": {
+        "password_required": true,
+        "password_set": false,
+        "source": "admin",
+        "hint": "Enter the admin password for this deployment."
+      },
+      "expected_user": {
+        "id": 1,
+        "username": "admin",
+        "display_name": "Administrator",
+        "role": "admin",
+        "is_active": true
+      },
+      "expected_users": [
+        {
+          "id": 1,
+          "username": "admin",
+          "password_hash": "synthetic:operator",
+          "email": null,
+          "display_name": "Administrator",
+          "role": "admin",
+          "is_active": true,
+          "last_login": null,
+          "created_at": "2026-01-02T12:00:00.123456+00:00",
+          "updated_at": "2026-01-02T12:00:00.123456+00:00"
+        }
+      ]
+    },
+    {
+      "name": "unknown username operator fallback",
+      "password": "operator",
+      "username": "unknown",
+      "admin": "operator",
+      "legacy": "",
+      "users": [],
+      "site": null,
+      "expected_access": {
+        "password_required": true,
+        "password_set": false,
+        "source": "admin",
+        "hint": "Enter the admin password for this deployment."
+      },
+      "expected_user": {
+        "id": 1,
+        "username": "admin",
+        "display_name": "Administrator",
+        "role": "admin",
+        "is_active": true
+      },
+      "expected_users": [
+        {
+          "id": 1,
+          "username": "admin",
+          "password_hash": "synthetic:operator",
+          "email": null,
+          "display_name": "Administrator",
+          "role": "admin",
+          "is_active": true,
+          "last_login": null,
+          "created_at": "2026-01-02T12:00:00.123456+00:00",
+          "updated_at": "2026-01-02T12:00:00.123456+00:00"
+        }
+      ]
+    },
+    {
+      "name": "legacy disabled by operator",
+      "password": "legacy",
+      "username": null,
+      "admin": "operator",
+      "legacy": "legacy",
+      "users": [],
+      "site": null,
+      "expected_access": {
+        "password_required": true,
+        "password_set": false,
+        "source": "admin",
+        "hint": "Enter the admin password for this deployment."
+      },
+      "expected_user": null,
+      "expected_users": [
+        {
+          "id": 1,
+          "username": "admin",
+          "password_hash": "synthetic:operator",
+          "email": null,
+          "display_name": "Administrator",
+          "role": "admin",
+          "is_active": true,
+          "last_login": null,
+          "created_at": "2026-01-02T12:00:00.123456",
+          "updated_at": "2026-01-02T12:00:00.123456"
+        }
+      ]
+    },
+    {
+      "name": "legacy only",
+      "password": "legacy",
+      "username": null,
+      "admin": "",
+      "legacy": "legacy",
+      "users": [],
+      "site": null,
+      "expected_access": {
+        "password_required": true,
+        "password_set": false,
+        "source": "legacy",
+        "hint": "Enter this deployment's login password."
+      },
+      "expected_user": {
+        "id": 1,
+        "username": "admin",
+        "display_name": "Administrator",
+        "role": "admin",
+        "is_active": true
+      },
+      "expected_users": [
+        {
+          "id": 1,
+          "username": "admin",
+          "password_hash": "synthetic:legacy",
+          "email": null,
+          "display_name": "Administrator",
+          "role": "admin",
+          "is_active": true,
+          "last_login": null,
+          "created_at": "2026-01-02T12:00:00.123456+00:00",
+          "updated_at": "2026-01-02T12:00:00.123456+00:00"
+        }
+      ]
+    },
+    {
+      "name": "explicit no-password deployment",
+      "password": null,
+      "username": null,
+      "admin": "",
+      "legacy": "",
+      "users": [],
+      "site": null,
+      "expected_access": {
+        "password_required": false,
+        "password_set": false,
+        "source": "none",
+        "hint": ""
+      },
+      "expected_user": {
+        "id": 1,
+        "username": "admin",
+        "display_name": "Administrator",
+        "role": "admin",
+        "is_active": true
+      },
+      "expected_users": [
+        {
+          "id": 1,
+          "username": "admin",
+          "password_hash": "synthetic:",
+          "email": null,
+          "display_name": "Administrator",
+          "role": "admin",
+          "is_active": true,
+          "last_login": null,
+          "created_at": "2026-01-02T12:00:00.123456+00:00",
+          "updated_at": "2026-01-02T12:00:00.123456+00:00"
+        }
+      ]
+    },
+    {
+      "name": "admin repaired even on wrong password",
+      "password": "wrong",
+      "username": null,
+      "admin": "operator",
+      "legacy": "",
+      "users": [
+        {
+          "id": 1,
+          "username": "admin",
+          "password_hash": "synthetic:old",
+          "display_name": "Existing",
+          "role": "member",
+          "is_active": false,
+          "created_at": "2025-01-01T00:00:00+00:00",
+          "updated_at": "2025-01-01T00:00:00+00:00"
+        }
+      ],
+      "site": null,
+      "expected_access": {
+        "password_required": true,
+        "password_set": false,
+        "source": "admin",
+        "hint": "Enter the admin password for this deployment."
+      },
+      "expected_user": null,
+      "expected_users": [
+        {
+          "id": 1,
+          "username": "admin",
+          "password_hash": "synthetic:operator",
+          "email": null,
+          "display_name": "Existing",
+          "role": "member",
+          "is_active": true,
+          "last_login": null,
+          "created_at": "2025-01-01T00:00:00",
+          "updated_at": "2026-01-02T12:00:00.123456"
+        }
+      ]
+    },
+    {
+      "name": "admin repaired and active",
+      "password": "operator",
+      "username": null,
+      "admin": "operator",
+      "legacy": "",
+      "users": [
+        {
+          "id": 1,
+          "username": "admin",
+          "password_hash": "synthetic:old",
+          "display_name": "Existing",
+          "role": "member",
+          "is_active": false,
+          "created_at": "2025-01-01T00:00:00+00:00",
+          "updated_at": "2025-01-01T00:00:00+00:00"
+        }
+      ],
+      "site": null,
+      "expected_access": {
+        "password_required": true,
+        "password_set": false,
+        "source": "admin",
+        "hint": "Enter the admin password for this deployment."
+      },
+      "expected_user": {
+        "id": 1,
+        "username": "admin",
+        "display_name": "Existing",
+        "role": "member",
+        "is_active": true
+      },
+      "expected_users": [
+        {
+          "id": 1,
+          "username": "admin",
+          "password_hash": "synthetic:operator",
+          "email": null,
+          "display_name": "Existing",
+          "role": "member",
+          "is_active": true,
+          "last_login": null,
+          "created_at": "2025-01-01T00:00:00",
+          "updated_at": "2026-01-02T12:00:00.123456+00:00"
+        }
+      ]
+    },
+    {
+      "name": "site alternative with unknown username",
+      "password": "site",
+      "username": "unknown",
+      "admin": "operator",
+      "legacy": "",
+      "users": [],
+      "site": "synthetic:site",
+      "expected_access": {
+        "password_required": true,
+        "password_set": true,
+        "source": "admin",
+        "hint": "Enter the admin password for this deployment."
+      },
+      "expected_user": {
+        "id": 1,
+        "username": "admin",
+        "display_name": "Administrator",
+        "role": "admin",
+        "is_active": true
+      },
+      "expected_users": [
+        {
+          "id": 1,
+          "username": "admin",
+          "password_hash": "synthetic:operator",
+          "email": null,
+          "display_name": "Administrator",
+          "role": "admin",
+          "is_active": true,
+          "last_login": null,
+          "created_at": "2026-01-02T12:00:00.123456+00:00",
+          "updated_at": "2026-01-02T12:00:00.123456+00:00"
+        }
+      ]
+    },
+    {
+      "name": "site alternative default username",
+      "password": "site",
+      "username": null,
+      "admin": "operator",
+      "legacy": "",
+      "users": [],
+      "site": "synthetic:site",
+      "expected_access": {
+        "password_required": true,
+        "password_set": true,
+        "source": "admin",
+        "hint": "Enter the admin password for this deployment."
+      },
+      "expected_user": {
+        "id": 1,
+        "username": "admin",
+        "display_name": "Administrator",
+        "role": "admin",
+        "is_active": true
+      },
+      "expected_users": [
+        {
+          "id": 1,
+          "username": "admin",
+          "password_hash": "synthetic:operator",
+          "email": null,
+          "display_name": "Administrator",
+          "role": "admin",
+          "is_active": true,
+          "last_login": null,
+          "created_at": "2026-01-02T12:00:00.123456+00:00",
+          "updated_at": "2026-01-02T12:00:00.123456+00:00"
+        }
+      ]
+    },
+    {
+      "name": "malformed site hash no empty-password bypass",
+      "password": null,
+      "username": null,
+      "admin": "",
+      "legacy": "",
+      "users": [],
+      "site": "0",
+      "expected_access": {
+        "password_required": true,
+        "password_set": true,
+        "source": "site",
+        "hint": "Enter the password saved in Settings → Site access."
+      },
+      "expected_user": null,
+      "expected_users": []
+    },
+    {
+      "name": "named account password",
+      "password": "staff-password",
+      "username": "staff",
+      "admin": "operator",
+      "legacy": "",
+      "users": [
+        {
+          "id": 1,
+          "username": "staff",
+          "password_hash": "synthetic:staff-password",
+          "display_name": "Staff",
+          "role": "staff",
+          "is_active": true
+        }
+      ],
+      "site": null,
+      "expected_access": {
+        "password_required": true,
+        "password_set": false,
+        "source": "admin",
+        "hint": "Enter the admin password for this deployment."
+      },
+      "expected_user": {
+        "id": 1,
+        "username": "staff",
+        "display_name": "Staff",
+        "role": "staff",
+        "is_active": true
+      },
+      "expected_users": [
+        {
+          "id": 1,
+          "username": "staff",
+          "password_hash": "synthetic:staff-password",
+          "email": null,
+          "display_name": "Staff",
+          "role": "staff",
+          "is_active": true,
+          "last_login": null,
+          "created_at": "2026-01-02T12:00:00.123456",
+          "updated_at": "2026-01-02T12:00:00.123456"
+        }
+      ]
+    },
+    {
+      "name": "operator password accepted for active named user",
+      "password": "operator",
+      "username": "staff",
+      "admin": "operator",
+      "legacy": "",
+      "users": [
+        {
+          "id": 1,
+          "username": "staff",
+          "password_hash": "synthetic:staff-password",
+          "display_name": "Staff",
+          "role": "staff",
+          "is_active": true
+        }
+      ],
+      "site": null,
+      "expected_access": {
+        "password_required": true,
+        "password_set": false,
+        "source": "admin",
+        "hint": "Enter the admin password for this deployment."
+      },
+      "expected_user": {
+        "id": 1,
+        "username": "staff",
+        "display_name": "Staff",
+        "role": "staff",
+        "is_active": true
+      },
+      "expected_users": [
+        {
+          "id": 1,
+          "username": "staff",
+          "password_hash": "synthetic:staff-password",
+          "email": null,
+          "display_name": "Staff",
+          "role": "staff",
+          "is_active": true,
+          "last_login": null,
+          "created_at": "2026-01-02T12:00:00.123456",
+          "updated_at": "2026-01-02T12:00:00.123456"
+        }
+      ]
+    },
+    {
+      "name": "disabled named account own password rejected",
+      "password": "staff-password",
+      "username": "staff",
+      "admin": "operator",
+      "legacy": "",
+      "users": [
+        {
+          "id": 1,
+          "username": "staff",
+          "password_hash": "synthetic:staff-password",
+          "display_name": "Staff",
+          "role": "staff",
+          "is_active": false
+        }
+      ],
+      "site": null,
+      "expected_access": {
+        "password_required": true,
+        "password_set": false,
+        "source": "admin",
+        "hint": "Enter the admin password for this deployment."
+      },
+      "expected_user": null,
+      "expected_users": [
+        {
+          "id": 1,
+          "username": "staff",
+          "password_hash": "synthetic:staff-password",
+          "email": null,
+          "display_name": "Staff",
+          "role": "staff",
+          "is_active": false,
+          "last_login": null,
+          "created_at": "2026-01-02T12:00:00.123456",
+          "updated_at": "2026-01-02T12:00:00.123456"
+        }
+      ]
+    },
+    {
+      "name": "operator password disabled named falls back admin",
+      "password": "operator",
+      "username": "staff",
+      "admin": "operator",
+      "legacy": "",
+      "users": [
+        {
+          "id": 1,
+          "username": "staff",
+          "password_hash": "synthetic:staff-password",
+          "display_name": "Staff",
+          "role": "staff",
+          "is_active": false
+        }
+      ],
+      "site": null,
+      "expected_access": {
+        "password_required": true,
+        "password_set": false,
+        "source": "admin",
+        "hint": "Enter the admin password for this deployment."
+      },
+      "expected_user": {
+        "id": 2,
+        "username": "admin",
+        "display_name": "Administrator",
+        "role": "admin",
+        "is_active": true
+      },
+      "expected_users": [
+        {
+          "id": 1,
+          "username": "staff",
+          "password_hash": "synthetic:staff-password",
+          "email": null,
+          "display_name": "Staff",
+          "role": "staff",
+          "is_active": false,
+          "last_login": null,
+          "created_at": "2026-01-02T12:00:00.123456",
+          "updated_at": "2026-01-02T12:00:00.123456"
+        },
+        {
+          "id": 2,
+          "username": "admin",
+          "password_hash": "synthetic:operator",
+          "email": null,
+          "display_name": "Administrator",
+          "role": "admin",
+          "is_active": true,
+          "last_login": null,
+          "created_at": "2026-01-02T12:00:00.123456+00:00",
+          "updated_at": "2026-01-02T12:00:00.123456+00:00"
+        }
+      ]
+    },
+    {
+      "name": "whitespace username",
+      "password": "operator",
+      "username": "  admin　",
+      "admin": "operator",
+      "legacy": "",
+      "users": [],
+      "site": null,
+      "expected_access": {
+        "password_required": true,
+        "password_set": false,
+        "source": "admin",
+        "hint": "Enter the admin password for this deployment."
+      },
+      "expected_user": {
+        "id": 1,
+        "username": "admin",
+        "display_name": "Administrator",
+        "role": "admin",
+        "is_active": true
+      },
+      "expected_users": [
+        {
+          "id": 1,
+          "username": "admin",
+          "password_hash": "synthetic:operator",
+          "email": null,
+          "display_name": "Administrator",
+          "role": "admin",
+          "is_active": true,
+          "last_login": null,
+          "created_at": "2026-01-02T12:00:00.123456+00:00",
+          "updated_at": "2026-01-02T12:00:00.123456+00:00"
+        }
+      ]
+    },
+    {
+      "name": "spaced configured password source repair quirk",
+      "password": "operator",
+      "username": null,
+      "admin": " operator ",
+      "legacy": "",
+      "users": [],
+      "site": null,
+      "expected_access": {
+        "password_required": true,
+        "password_set": false,
+        "source": "admin",
+        "hint": "Enter the admin password for this deployment."
+      },
+      "expected_user": {
+        "id": 1,
+        "username": "admin",
+        "display_name": "Administrator",
+        "role": "admin",
+        "is_active": true
+      },
+      "expected_users": [
+        {
+          "id": 1,
+          "username": "admin",
+          "password_hash": "synthetic:operator",
+          "email": null,
+          "display_name": "Administrator",
+          "role": "admin",
+          "is_active": true,
+          "last_login": null,
+          "created_at": "2026-01-02T12:00:00.123456+00:00",
+          "updated_at": "2026-01-02T12:00:00.123456+00:00"
+        }
+      ]
+    },
+    {
+      "name": "zero text is a real password",
+      "password": "0",
+      "username": null,
+      "admin": "0",
+      "legacy": "",
+      "users": [],
+      "site": null,
+      "expected_access": {
+        "password_required": true,
+        "password_set": false,
+        "source": "admin",
+        "hint": "Enter the admin password for this deployment."
+      },
+      "expected_user": {
+        "id": 1,
+        "username": "admin",
+        "display_name": "Administrator",
+        "role": "admin",
+        "is_active": true
+      },
+      "expected_users": [
+        {
+          "id": 1,
+          "username": "admin",
+          "password_hash": "synthetic:0",
+          "email": null,
+          "display_name": "Administrator",
+          "role": "admin",
+          "is_active": true,
+          "last_login": null,
+          "created_at": "2026-01-02T12:00:00.123456+00:00",
+          "updated_at": "2026-01-02T12:00:00.123456+00:00"
+        }
+      ]
+    }
+  ],
+  "dto": [
+    {
+      "input": null,
+      "optional": false,
+      "expected": {
+        "message": "Field required",
+        "field": null
+      }
+    },
+    {
+      "input": null,
+      "optional": true,
+      "expected": {
+        "body": {}
+      }
+    },
+    {
+      "input": [],
+      "optional": false,
+      "expected": {
+        "message": "Input should be a valid dictionary or object to extract fields from",
+        "field": null
+      }
+    },
+    {
+      "input": [],
+      "optional": true,
+      "expected": {
+        "message": "Input should be a valid dictionary or object to extract fields from",
+        "field": null
+      }
+    },
+    {
+      "input": 1,
+      "optional": false,
+      "expected": {
+        "message": "Input should be a valid dictionary or object to extract fields from",
+        "field": null
+      }
+    },
+    {
+      "input": 1,
+      "optional": true,
+      "expected": {
+        "message": "Input should be a valid dictionary or object to extract fields from",
+        "field": null
+      }
+    },
+    {
+      "input": "text",
+      "optional": false,
+      "expected": {
+        "message": "Input should be a valid dictionary or object to extract fields from",
+        "field": null
+      }
+    },
+    {
+      "input": "text",
+      "optional": true,
+      "expected": {
+        "message": "Input should be a valid dictionary or object to extract fields from",
+        "field": null
+      }
+    },
+    {
+      "input": {},
+      "optional": false,
+      "expected": {
+        "body": {
+          "username": null,
+          "password": null
+        }
+      }
+    },
+    {
+      "input": {},
+      "optional": true,
+      "expected": {
+        "body": {
+          "username": null,
+          "password": null
+        }
+      }
+    },
+    {
+      "input": {
+        "extra": "ignored"
+      },
+      "optional": false,
+      "expected": {
+        "body": {
+          "username": null,
+          "password": null
+        }
+      }
+    },
+    {
+      "input": {
+        "extra": "ignored"
+      },
+      "optional": true,
+      "expected": {
+        "body": {
+          "username": null,
+          "password": null
+        }
+      }
+    },
+    {
+      "input": {
+        "username": null,
+        "password": null
+      },
+      "optional": false,
+      "expected": {
+        "body": {
+          "username": null,
+          "password": null
+        }
+      }
+    },
+    {
+      "input": {
+        "username": null,
+        "password": null
+      },
+      "optional": true,
+      "expected": {
+        "body": {
+          "username": null,
+          "password": null
+        }
+      }
+    },
+    {
+      "input": {
+        "username": 5
+      },
+      "optional": false,
+      "expected": {
+        "message": "Input should be a valid string",
+        "field": "username"
+      }
+    },
+    {
+      "input": {
+        "username": 5
+      },
+      "optional": true,
+      "expected": {
+        "message": "Input should be a valid string",
+        "field": "username"
+      }
+    },
+    {
+      "input": {
+        "password": false
+      },
+      "optional": false,
+      "expected": {
+        "message": "Input should be a valid string",
+        "field": "password"
+      }
+    },
+    {
+      "input": {
+        "password": false
+      },
+      "optional": true,
+      "expected": {
+        "message": "Input should be a valid string",
+        "field": "password"
+      }
+    },
+    {
+      "input": {
+        "username": [],
+        "password": 5
+      },
+      "optional": false,
+      "expected": {
+        "message": "Input should be a valid string",
+        "field": "username"
+      }
+    },
+    {
+      "input": {
+        "username": [],
+        "password": 5
+      },
+      "optional": true,
+      "expected": {
+        "message": "Input should be a valid string",
+        "field": "username"
+      }
+    },
+    {
+      "input": {
+        "password": "0"
+      },
+      "optional": false,
+      "expected": {
+        "body": {
+          "username": null,
+          "password": "0"
+        }
+      }
+    },
+    {
+      "input": {
+        "password": "0"
+      },
+      "optional": true,
+      "expected": {
+        "body": {
+          "username": null,
+          "password": "0"
+        }
+      }
+    },
+    {
+      "input": {
+        "username": " admin",
+        "password": "é"
+      },
+      "optional": false,
+      "expected": {
+        "body": {
+          "username": " admin",
+          "password": "é"
+        }
+      }
+    },
+    {
+      "input": {
+        "username": " admin",
+        "password": "é"
+      },
+      "optional": true,
+      "expected": {
+        "body": {
+          "username": " admin",
+          "password": "é"
+        }
+      }
+    }
+  ],
+  "scope": "Original auth/DTO AST, synthetic SQLite and explicitly fake password codec; not native Argon2/login/HTTP proof"
+}

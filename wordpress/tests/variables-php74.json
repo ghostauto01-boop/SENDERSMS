@@ -1,0 +1,14 @@
+{
+  "ok": true,
+  "assertions": 1403,
+  "diffs": [],
+  "php": "7.4.34-dev",
+  "source_render_cases": 420,
+  "source_registry_operations": 27,
+  "source_dto_cases": 32,
+  "source_segment_cases": 50,
+  "scope": "Original pure renderer plus selected registry AST, synthetic SQLite with explicit monotonic committed registry IDs and fixed clock; not native WordPress/HTTP/MySQL/concurrency, HTML safety or carrier-billing certification",
+  "native_wordpress_verified": false,
+  "native_mysql_verified": false,
+  "suite": "variables"
+}

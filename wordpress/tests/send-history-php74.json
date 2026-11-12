@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "assertions": 144,
+  "diffs": [],
+  "php": "7.4.34-dev",
+  "source_operations": 42,
+  "provider_messages_sent": 0,
+  "native_wordpress_verified": false,
+  "native_mysql_verified": false,
+  "scope": "Selected actual source outgoing history/channel AST and synthetic SQLite projection/privacy/budget tests. No HTTP, native collation/transactions/WordPress or browser qualification.",
+  "suite": "send-history"
+}

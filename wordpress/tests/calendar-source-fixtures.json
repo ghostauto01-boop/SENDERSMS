@@ -1,0 +1,5825 @@
+{
+  "operations": [
+    {
+      "kind": "list",
+      "expected": {
+        "status": 200,
+        "body": {
+          "total": 0,
+          "items": []
+        }
+      },
+      "snapshot": {
+        "meetings": [],
+        "attendees": [],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "new"
+          },
+          {
+            "id": 2,
+            "lead_status": "customer"
+          },
+          {
+            "id": 3,
+            "lead_status": "closed"
+          }
+        ],
+        "conversations": []
+      }
+    },
+    {
+      "kind": "create",
+      "body": {
+        "title": " Review ",
+        "starts_at": "2026-01-03T14:00:00+01:00",
+        "send_invite_sms": false,
+        "send_sms_reminder": false,
+        "contact_ids": [
+          1,
+          1,
+          404
+        ],
+        "tags": [
+          " vip ",
+          "vip",
+          "VIP",
+          "",
+          "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        ],
+        "location": " Abuja "
+      },
+      "expected": {
+        "status": 201,
+        "body": {
+          "id": 1,
+          "title": "Review",
+          "description": null,
+          "event_type": "meeting",
+          "status": "scheduled",
+          "starts_at": "2026-01-03T13:00:00+00:00",
+          "ends_at": "2026-01-03T13:30:00+00:00",
+          "all_day": false,
+          "location": "Abuja",
+          "meeting_link": null,
+          "contact_id": 1,
+          "contact_name": "Ada",
+          "conversation_id": 1,
+          "campaign_id": null,
+          "tags": [
+            "vip",
+            "VIP"
+          ],
+          "send_invite_sms": false,
+          "send_invite_email": false,
+          "invite_subject": null,
+          "invite_template_id": null,
+          "invite_body": null,
+          "invite_sent": false,
+          "invite_email_sent": false,
+          "email_account_id": null,
+          "send_sms_reminder": false,
+          "send_email_reminder": false,
+          "reminder_subject": null,
+          "reminder_minutes": [],
+          "reminder_template_id": null,
+          "reminder_body": null,
+          "reminders_sent": {},
+          "outcome_notes": null,
+          "attendees": [
+            {
+              "id": 1,
+              "contact_id": 1,
+              "status": "invited",
+              "notified": false,
+              "name": "Ada",
+              "phone": null
+            }
+          ],
+          "created_at": "2026-01-02T12:00:00.123456+00:00",
+          "updated_at": "2026-01-02T12:00:00.123456+00:00",
+          "invite": {
+            "sent": 0,
+            "skipped": 0
+          }
+        }
+      },
+      "snapshot": {
+        "meetings": [
+          {
+            "id": 1,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "scheduled",
+            "starts_at": "2026-01-03T13:00:00+00:00",
+            "ends_at": "2026-01-03T13:30:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": [
+              "vip",
+              "VIP"
+            ],
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": null,
+            "outcome_notes": null
+          }
+        ],
+        "attendees": [
+          {
+            "id": 1,
+            "meeting_id": 1,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "meeting"
+          },
+          {
+            "id": 2,
+            "lead_status": "customer"
+          },
+          {
+            "id": 3,
+            "lead_status": "closed"
+          }
+        ],
+        "conversations": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "channel": "sms",
+            "status": "active"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "get",
+      "id": 1,
+      "expected": {
+        "status": 200,
+        "body": {
+          "id": 1,
+          "title": "Review",
+          "description": null,
+          "event_type": "meeting",
+          "status": "scheduled",
+          "starts_at": "2026-01-03T13:00:00+00:00",
+          "ends_at": "2026-01-03T13:30:00+00:00",
+          "all_day": false,
+          "location": "Abuja",
+          "meeting_link": null,
+          "contact_id": 1,
+          "contact_name": "Ada",
+          "conversation_id": 1,
+          "campaign_id": null,
+          "tags": [
+            "vip",
+            "VIP"
+          ],
+          "send_invite_sms": false,
+          "send_invite_email": false,
+          "invite_subject": null,
+          "invite_template_id": null,
+          "invite_body": null,
+          "invite_sent": false,
+          "invite_email_sent": false,
+          "email_account_id": null,
+          "send_sms_reminder": false,
+          "send_email_reminder": false,
+          "reminder_subject": null,
+          "reminder_minutes": [],
+          "reminder_template_id": null,
+          "reminder_body": null,
+          "reminders_sent": {},
+          "outcome_notes": null,
+          "attendees": [
+            {
+              "id": 1,
+              "contact_id": 1,
+              "status": "invited",
+              "notified": false,
+              "name": "Ada",
+              "phone": null
+            }
+          ],
+          "created_at": "2026-01-02T12:00:00.123456+00:00",
+          "updated_at": "2026-01-02T12:00:00.123456+00:00"
+        }
+      },
+      "snapshot": {
+        "meetings": [
+          {
+            "id": 1,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "scheduled",
+            "starts_at": "2026-01-03T13:00:00+00:00",
+            "ends_at": "2026-01-03T13:30:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": [
+              "vip",
+              "VIP"
+            ],
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": null,
+            "outcome_notes": null
+          }
+        ],
+        "attendees": [
+          {
+            "id": 1,
+            "meeting_id": 1,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "meeting"
+          },
+          {
+            "id": 2,
+            "lead_status": "customer"
+          },
+          {
+            "id": 3,
+            "lead_status": "closed"
+          }
+        ],
+        "conversations": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "channel": "sms",
+            "status": "active"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "list",
+      "q": {
+        "contact_id": 1
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "total": 1,
+          "items": [
+            {
+              "id": 1,
+              "title": "Review",
+              "description": null,
+              "event_type": "meeting",
+              "status": "scheduled",
+              "starts_at": "2026-01-03T13:00:00+00:00",
+              "ends_at": "2026-01-03T13:30:00+00:00",
+              "all_day": false,
+              "location": "Abuja",
+              "meeting_link": null,
+              "contact_id": 1,
+              "contact_name": "Ada",
+              "conversation_id": 1,
+              "campaign_id": null,
+              "tags": [
+                "vip",
+                "VIP"
+              ],
+              "send_invite_sms": false,
+              "send_invite_email": false,
+              "invite_subject": null,
+              "invite_template_id": null,
+              "invite_body": null,
+              "invite_sent": false,
+              "invite_email_sent": false,
+              "email_account_id": null,
+              "send_sms_reminder": false,
+              "send_email_reminder": false,
+              "reminder_subject": null,
+              "reminder_minutes": [],
+              "reminder_template_id": null,
+              "reminder_body": null,
+              "reminders_sent": {},
+              "outcome_notes": null,
+              "attendees": [
+                {
+                  "id": 1,
+                  "contact_id": 1,
+                  "status": "invited",
+                  "notified": false,
+                  "name": "Ada",
+                  "phone": null
+                }
+              ],
+              "created_at": "2026-01-02T12:00:00.123456+00:00",
+              "updated_at": "2026-01-02T12:00:00.123456+00:00"
+            }
+          ]
+        }
+      },
+      "snapshot": {
+        "meetings": [
+          {
+            "id": 1,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "scheduled",
+            "starts_at": "2026-01-03T13:00:00+00:00",
+            "ends_at": "2026-01-03T13:30:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": [
+              "vip",
+              "VIP"
+            ],
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": null,
+            "outcome_notes": null
+          }
+        ],
+        "attendees": [
+          {
+            "id": 1,
+            "meeting_id": 1,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "meeting"
+          },
+          {
+            "id": 2,
+            "lead_status": "customer"
+          },
+          {
+            "id": 3,
+            "lead_status": "closed"
+          }
+        ],
+        "conversations": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "channel": "sms",
+            "status": "active"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "tags",
+      "expected": {
+        "status": 200,
+        "body": {
+          "items": [
+            {
+              "name": "vip",
+              "count": 1
+            },
+            {
+              "name": "VIP",
+              "count": 1
+            }
+          ]
+        }
+      },
+      "snapshot": {
+        "meetings": [
+          {
+            "id": 1,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "scheduled",
+            "starts_at": "2026-01-03T13:00:00+00:00",
+            "ends_at": "2026-01-03T13:30:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": [
+              "vip",
+              "VIP"
+            ],
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": null,
+            "outcome_notes": null
+          }
+        ],
+        "attendees": [
+          {
+            "id": 1,
+            "meeting_id": 1,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "meeting"
+          },
+          {
+            "id": 2,
+            "lead_status": "customer"
+          },
+          {
+            "id": 3,
+            "lead_status": "closed"
+          }
+        ],
+        "conversations": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "channel": "sms",
+            "status": "active"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "day",
+      "date": "2026-01-03",
+      "expected": {
+        "status": 200,
+        "body": {
+          "date": "2026-01-03",
+          "count": 1,
+          "items": [
+            {
+              "id": 1,
+              "title": "Review",
+              "description": null,
+              "event_type": "meeting",
+              "status": "scheduled",
+              "starts_at": "2026-01-03T13:00:00+00:00",
+              "ends_at": "2026-01-03T13:30:00+00:00",
+              "all_day": false,
+              "location": "Abuja",
+              "meeting_link": null,
+              "contact_id": 1,
+              "contact_name": "Ada",
+              "conversation_id": 1,
+              "campaign_id": null,
+              "tags": [
+                "vip",
+                "VIP"
+              ],
+              "send_invite_sms": false,
+              "send_invite_email": false,
+              "invite_subject": null,
+              "invite_template_id": null,
+              "invite_body": null,
+              "invite_sent": false,
+              "invite_email_sent": false,
+              "email_account_id": null,
+              "send_sms_reminder": false,
+              "send_email_reminder": false,
+              "reminder_subject": null,
+              "reminder_minutes": [],
+              "reminder_template_id": null,
+              "reminder_body": null,
+              "reminders_sent": {},
+              "outcome_notes": null,
+              "attendees": [
+                {
+                  "id": 1,
+                  "contact_id": 1,
+                  "status": "invited",
+                  "notified": false,
+                  "name": "Ada",
+                  "phone": null
+                }
+              ],
+              "created_at": "2026-01-02T12:00:00.123456+00:00",
+              "updated_at": "2026-01-02T12:00:00.123456+00:00"
+            }
+          ]
+        }
+      },
+      "snapshot": {
+        "meetings": [
+          {
+            "id": 1,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "scheduled",
+            "starts_at": "2026-01-03T13:00:00+00:00",
+            "ends_at": "2026-01-03T13:30:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": [
+              "vip",
+              "VIP"
+            ],
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": null,
+            "outcome_notes": null
+          }
+        ],
+        "attendees": [
+          {
+            "id": 1,
+            "meeting_id": 1,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "meeting"
+          },
+          {
+            "id": 2,
+            "lead_status": "customer"
+          },
+          {
+            "id": 3,
+            "lead_status": "closed"
+          }
+        ],
+        "conversations": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "channel": "sms",
+            "status": "active"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "upcoming",
+      "expected": {
+        "status": 200,
+        "body": {
+          "total": 1,
+          "items": [
+            {
+              "id": 1,
+              "title": "Review",
+              "description": null,
+              "event_type": "meeting",
+              "status": "scheduled",
+              "starts_at": "2026-01-03T13:00:00+00:00",
+              "ends_at": "2026-01-03T13:30:00+00:00",
+              "all_day": false,
+              "location": "Abuja",
+              "meeting_link": null,
+              "contact_id": 1,
+              "contact_name": "Ada",
+              "conversation_id": 1,
+              "campaign_id": null,
+              "tags": [
+                "vip",
+                "VIP"
+              ],
+              "send_invite_sms": false,
+              "send_invite_email": false,
+              "invite_subject": null,
+              "invite_template_id": null,
+              "invite_body": null,
+              "invite_sent": false,
+              "invite_email_sent": false,
+              "email_account_id": null,
+              "send_sms_reminder": false,
+              "send_email_reminder": false,
+              "reminder_subject": null,
+              "reminder_minutes": [],
+              "reminder_template_id": null,
+              "reminder_body": null,
+              "reminders_sent": {},
+              "outcome_notes": null,
+              "attendees": [
+                {
+                  "id": 1,
+                  "contact_id": 1,
+                  "status": "invited",
+                  "notified": false,
+                  "name": "Ada",
+                  "phone": null
+                }
+              ],
+              "created_at": "2026-01-02T12:00:00.123456+00:00",
+              "updated_at": "2026-01-02T12:00:00.123456+00:00"
+            }
+          ]
+        }
+      },
+      "snapshot": {
+        "meetings": [
+          {
+            "id": 1,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "scheduled",
+            "starts_at": "2026-01-03T13:00:00+00:00",
+            "ends_at": "2026-01-03T13:30:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": [
+              "vip",
+              "VIP"
+            ],
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": null,
+            "outcome_notes": null
+          }
+        ],
+        "attendees": [
+          {
+            "id": 1,
+            "meeting_id": 1,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "meeting"
+          },
+          {
+            "id": 2,
+            "lead_status": "customer"
+          },
+          {
+            "id": 3,
+            "lead_status": "closed"
+          }
+        ],
+        "conversations": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "channel": "sms",
+            "status": "active"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "update",
+      "id": 1,
+      "body": {
+        "starts_at": "2026-01-04T08:30:00Z"
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "id": 1,
+          "title": "Review",
+          "description": null,
+          "event_type": "meeting",
+          "status": "scheduled",
+          "starts_at": "2026-01-04T08:30:00+00:00",
+          "ends_at": "2026-01-04T09:00:00+00:00",
+          "all_day": false,
+          "location": "Abuja",
+          "meeting_link": null,
+          "contact_id": 1,
+          "contact_name": "Ada",
+          "conversation_id": 1,
+          "campaign_id": null,
+          "tags": [
+            "vip",
+            "VIP"
+          ],
+          "send_invite_sms": false,
+          "send_invite_email": false,
+          "invite_subject": null,
+          "invite_template_id": null,
+          "invite_body": null,
+          "invite_sent": false,
+          "invite_email_sent": false,
+          "email_account_id": null,
+          "send_sms_reminder": false,
+          "send_email_reminder": false,
+          "reminder_subject": null,
+          "reminder_minutes": [],
+          "reminder_template_id": null,
+          "reminder_body": null,
+          "reminders_sent": {},
+          "outcome_notes": null,
+          "attendees": [
+            {
+              "id": 1,
+              "contact_id": 1,
+              "status": "invited",
+              "notified": false,
+              "name": "Ada",
+              "phone": null
+            }
+          ],
+          "created_at": "2026-01-02T12:00:00.123456+00:00",
+          "updated_at": "2026-01-02T12:00:00.123456+00:00"
+        }
+      },
+      "snapshot": {
+        "meetings": [
+          {
+            "id": 1,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "scheduled",
+            "starts_at": "2026-01-04T08:30:00+00:00",
+            "ends_at": "2026-01-04T09:00:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": [
+              "vip",
+              "VIP"
+            ],
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": null,
+            "outcome_notes": null
+          }
+        ],
+        "attendees": [
+          {
+            "id": 1,
+            "meeting_id": 1,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "meeting"
+          },
+          {
+            "id": 2,
+            "lead_status": "customer"
+          },
+          {
+            "id": 3,
+            "lead_status": "closed"
+          }
+        ],
+        "conversations": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "channel": "sms",
+            "status": "active"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "get",
+      "id": 1,
+      "expected": {
+        "status": 200,
+        "body": {
+          "id": 1,
+          "title": "Review",
+          "description": null,
+          "event_type": "meeting",
+          "status": "scheduled",
+          "starts_at": "2026-01-04T08:30:00+00:00",
+          "ends_at": "2026-01-04T09:00:00+00:00",
+          "all_day": false,
+          "location": "Abuja",
+          "meeting_link": null,
+          "contact_id": 1,
+          "contact_name": "Ada",
+          "conversation_id": 1,
+          "campaign_id": null,
+          "tags": [
+            "vip",
+            "VIP"
+          ],
+          "send_invite_sms": false,
+          "send_invite_email": false,
+          "invite_subject": null,
+          "invite_template_id": null,
+          "invite_body": null,
+          "invite_sent": false,
+          "invite_email_sent": false,
+          "email_account_id": null,
+          "send_sms_reminder": false,
+          "send_email_reminder": false,
+          "reminder_subject": null,
+          "reminder_minutes": [],
+          "reminder_template_id": null,
+          "reminder_body": null,
+          "reminders_sent": {},
+          "outcome_notes": null,
+          "attendees": [
+            {
+              "id": 1,
+              "contact_id": 1,
+              "status": "invited",
+              "notified": false,
+              "name": "Ada",
+              "phone": null
+            }
+          ],
+          "created_at": "2026-01-02T12:00:00.123456+00:00",
+          "updated_at": "2026-01-02T12:00:00.123456+00:00"
+        }
+      },
+      "snapshot": {
+        "meetings": [
+          {
+            "id": 1,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "scheduled",
+            "starts_at": "2026-01-04T08:30:00+00:00",
+            "ends_at": "2026-01-04T09:00:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": [
+              "vip",
+              "VIP"
+            ],
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": null,
+            "outcome_notes": null
+          }
+        ],
+        "attendees": [
+          {
+            "id": 1,
+            "meeting_id": 1,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "meeting"
+          },
+          {
+            "id": 2,
+            "lead_status": "customer"
+          },
+          {
+            "id": 3,
+            "lead_status": "closed"
+          }
+        ],
+        "conversations": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "channel": "sms",
+            "status": "active"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "update",
+      "id": 1,
+      "body": {
+        "duration_minutes": 45,
+        "tags": [
+          "Follow-up"
+        ],
+        "reminder_minutes": [
+          15,
+          60,
+          15,
+          0,
+          10081
+        ]
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "id": 1,
+          "title": "Review",
+          "description": null,
+          "event_type": "meeting",
+          "status": "scheduled",
+          "starts_at": "2026-01-04T08:30:00+00:00",
+          "ends_at": "2026-01-04T09:15:00+00:00",
+          "all_day": false,
+          "location": "Abuja",
+          "meeting_link": null,
+          "contact_id": 1,
+          "contact_name": "Ada",
+          "conversation_id": 1,
+          "campaign_id": null,
+          "tags": [
+            "Follow-up"
+          ],
+          "send_invite_sms": false,
+          "send_invite_email": false,
+          "invite_subject": null,
+          "invite_template_id": null,
+          "invite_body": null,
+          "invite_sent": false,
+          "invite_email_sent": false,
+          "email_account_id": null,
+          "send_sms_reminder": false,
+          "send_email_reminder": false,
+          "reminder_subject": null,
+          "reminder_minutes": [
+            60,
+            15
+          ],
+          "reminder_template_id": null,
+          "reminder_body": null,
+          "reminders_sent": {},
+          "outcome_notes": null,
+          "attendees": [
+            {
+              "id": 1,
+              "contact_id": 1,
+              "status": "invited",
+              "notified": false,
+              "name": "Ada",
+              "phone": null
+            }
+          ],
+          "created_at": "2026-01-02T12:00:00.123456+00:00",
+          "updated_at": "2026-01-02T12:00:00.123456+00:00"
+        }
+      },
+      "snapshot": {
+        "meetings": [
+          {
+            "id": 1,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "scheduled",
+            "starts_at": "2026-01-04T08:30:00+00:00",
+            "ends_at": "2026-01-04T09:15:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": [
+              "Follow-up"
+            ],
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": [
+              60,
+              15
+            ],
+            "outcome_notes": null
+          }
+        ],
+        "attendees": [
+          {
+            "id": 1,
+            "meeting_id": 1,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "meeting"
+          },
+          {
+            "id": 2,
+            "lead_status": "customer"
+          },
+          {
+            "id": 3,
+            "lead_status": "closed"
+          }
+        ],
+        "conversations": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "channel": "sms",
+            "status": "active"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "status",
+      "id": 1,
+      "status": "confirmed",
+      "expected": {
+        "status": 200,
+        "body": {
+          "id": 1,
+          "title": "Review",
+          "description": null,
+          "event_type": "meeting",
+          "status": "confirmed",
+          "starts_at": "2026-01-04T08:30:00+00:00",
+          "ends_at": "2026-01-04T09:15:00+00:00",
+          "all_day": false,
+          "location": "Abuja",
+          "meeting_link": null,
+          "contact_id": 1,
+          "contact_name": "Ada",
+          "conversation_id": 1,
+          "campaign_id": null,
+          "tags": [
+            "Follow-up"
+          ],
+          "send_invite_sms": false,
+          "send_invite_email": false,
+          "invite_subject": null,
+          "invite_template_id": null,
+          "invite_body": null,
+          "invite_sent": false,
+          "invite_email_sent": false,
+          "email_account_id": null,
+          "send_sms_reminder": false,
+          "send_email_reminder": false,
+          "reminder_subject": null,
+          "reminder_minutes": [
+            60,
+            15
+          ],
+          "reminder_template_id": null,
+          "reminder_body": null,
+          "reminders_sent": {},
+          "outcome_notes": null,
+          "attendees": [
+            {
+              "id": 1,
+              "contact_id": 1,
+              "status": "invited",
+              "notified": false,
+              "name": "Ada",
+              "phone": null
+            }
+          ],
+          "created_at": "2026-01-02T12:00:00.123456+00:00",
+          "updated_at": "2026-01-02T12:00:00.123456+00:00"
+        }
+      },
+      "snapshot": {
+        "meetings": [
+          {
+            "id": 1,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "confirmed",
+            "starts_at": "2026-01-04T08:30:00+00:00",
+            "ends_at": "2026-01-04T09:15:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": [
+              "Follow-up"
+            ],
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": [
+              60,
+              15
+            ],
+            "outcome_notes": null
+          }
+        ],
+        "attendees": [
+          {
+            "id": 1,
+            "meeting_id": 1,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "meeting"
+          },
+          {
+            "id": 2,
+            "lead_status": "customer"
+          },
+          {
+            "id": 3,
+            "lead_status": "closed"
+          }
+        ],
+        "conversations": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "channel": "sms",
+            "status": "active"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "status",
+      "id": 1,
+      "status": "completed",
+      "notes": " Agreed ",
+      "expected": {
+        "status": 200,
+        "body": {
+          "id": 1,
+          "title": "Review",
+          "description": null,
+          "event_type": "meeting",
+          "status": "completed",
+          "starts_at": "2026-01-04T08:30:00+00:00",
+          "ends_at": "2026-01-04T09:15:00+00:00",
+          "all_day": false,
+          "location": "Abuja",
+          "meeting_link": null,
+          "contact_id": 1,
+          "contact_name": "Ada",
+          "conversation_id": 1,
+          "campaign_id": null,
+          "tags": [
+            "Follow-up"
+          ],
+          "send_invite_sms": false,
+          "send_invite_email": false,
+          "invite_subject": null,
+          "invite_template_id": null,
+          "invite_body": null,
+          "invite_sent": false,
+          "invite_email_sent": false,
+          "email_account_id": null,
+          "send_sms_reminder": false,
+          "send_email_reminder": false,
+          "reminder_subject": null,
+          "reminder_minutes": [
+            60,
+            15
+          ],
+          "reminder_template_id": null,
+          "reminder_body": null,
+          "reminders_sent": {},
+          "outcome_notes": "Agreed",
+          "attendees": [
+            {
+              "id": 1,
+              "contact_id": 1,
+              "status": "invited",
+              "notified": false,
+              "name": "Ada",
+              "phone": null
+            }
+          ],
+          "created_at": "2026-01-02T12:00:00.123456+00:00",
+          "updated_at": "2026-01-02T12:00:00.123456+00:00"
+        }
+      },
+      "snapshot": {
+        "meetings": [
+          {
+            "id": 1,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "completed",
+            "starts_at": "2026-01-04T08:30:00+00:00",
+            "ends_at": "2026-01-04T09:15:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": [
+              "Follow-up"
+            ],
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": [
+              60,
+              15
+            ],
+            "outcome_notes": "Agreed"
+          }
+        ],
+        "attendees": [
+          {
+            "id": 1,
+            "meeting_id": 1,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "contacted"
+          },
+          {
+            "id": 2,
+            "lead_status": "customer"
+          },
+          {
+            "id": 3,
+            "lead_status": "closed"
+          }
+        ],
+        "conversations": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "channel": "sms",
+            "status": "active"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "get",
+      "id": 1,
+      "expected": {
+        "status": 200,
+        "body": {
+          "id": 1,
+          "title": "Review",
+          "description": null,
+          "event_type": "meeting",
+          "status": "completed",
+          "starts_at": "2026-01-04T08:30:00+00:00",
+          "ends_at": "2026-01-04T09:15:00+00:00",
+          "all_day": false,
+          "location": "Abuja",
+          "meeting_link": null,
+          "contact_id": 1,
+          "contact_name": "Ada",
+          "conversation_id": 1,
+          "campaign_id": null,
+          "tags": [
+            "Follow-up"
+          ],
+          "send_invite_sms": false,
+          "send_invite_email": false,
+          "invite_subject": null,
+          "invite_template_id": null,
+          "invite_body": null,
+          "invite_sent": false,
+          "invite_email_sent": false,
+          "email_account_id": null,
+          "send_sms_reminder": false,
+          "send_email_reminder": false,
+          "reminder_subject": null,
+          "reminder_minutes": [
+            60,
+            15
+          ],
+          "reminder_template_id": null,
+          "reminder_body": null,
+          "reminders_sent": {},
+          "outcome_notes": "Agreed",
+          "attendees": [
+            {
+              "id": 1,
+              "contact_id": 1,
+              "status": "invited",
+              "notified": false,
+              "name": "Ada",
+              "phone": null
+            }
+          ],
+          "created_at": "2026-01-02T12:00:00.123456+00:00",
+          "updated_at": "2026-01-02T12:00:00.123456+00:00"
+        }
+      },
+      "snapshot": {
+        "meetings": [
+          {
+            "id": 1,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "completed",
+            "starts_at": "2026-01-04T08:30:00+00:00",
+            "ends_at": "2026-01-04T09:15:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": [
+              "Follow-up"
+            ],
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": [
+              60,
+              15
+            ],
+            "outcome_notes": "Agreed"
+          }
+        ],
+        "attendees": [
+          {
+            "id": 1,
+            "meeting_id": 1,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "contacted"
+          },
+          {
+            "id": 2,
+            "lead_status": "customer"
+          },
+          {
+            "id": 3,
+            "lead_status": "closed"
+          }
+        ],
+        "conversations": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "channel": "sms",
+            "status": "active"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "create",
+      "body": {
+        "title": " Review ",
+        "starts_at": "2026-01-03T14:00:00+01:00",
+        "send_invite_sms": false,
+        "send_sms_reminder": false,
+        "contact_id": 2,
+        "description": "Customer",
+        "event_type": "call"
+      },
+      "expected": {
+        "status": 201,
+        "body": {
+          "id": 2,
+          "title": "Review",
+          "description": "Customer",
+          "event_type": "call",
+          "status": "scheduled",
+          "starts_at": "2026-01-03T13:00:00+00:00",
+          "ends_at": "2026-01-03T13:30:00+00:00",
+          "all_day": false,
+          "location": null,
+          "meeting_link": null,
+          "contact_id": 2,
+          "contact_name": "Bola",
+          "conversation_id": 2,
+          "campaign_id": null,
+          "tags": [],
+          "send_invite_sms": false,
+          "send_invite_email": false,
+          "invite_subject": null,
+          "invite_template_id": null,
+          "invite_body": null,
+          "invite_sent": false,
+          "invite_email_sent": false,
+          "email_account_id": null,
+          "send_sms_reminder": false,
+          "send_email_reminder": false,
+          "reminder_subject": null,
+          "reminder_minutes": [],
+          "reminder_template_id": null,
+          "reminder_body": null,
+          "reminders_sent": {},
+          "outcome_notes": null,
+          "attendees": [
+            {
+              "id": 2,
+              "contact_id": 2,
+              "status": "invited",
+              "notified": false,
+              "name": "Bola",
+              "phone": null
+            }
+          ],
+          "created_at": "2026-01-02T12:00:00.123456+00:00",
+          "updated_at": "2026-01-02T12:00:00.123456+00:00",
+          "invite": {
+            "sent": 0,
+            "skipped": 0
+          }
+        }
+      },
+      "snapshot": {
+        "meetings": [
+          {
+            "id": 1,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "completed",
+            "starts_at": "2026-01-04T08:30:00+00:00",
+            "ends_at": "2026-01-04T09:15:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": [
+              "Follow-up"
+            ],
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": [
+              60,
+              15
+            ],
+            "outcome_notes": "Agreed"
+          },
+          {
+            "id": 2,
+            "title": "Review",
+            "description": "Customer",
+            "event_type": "call",
+            "status": "scheduled",
+            "starts_at": "2026-01-03T13:00:00+00:00",
+            "ends_at": "2026-01-03T13:30:00+00:00",
+            "all_day": 0,
+            "contact_id": 2,
+            "conversation_id": 2,
+            "campaign_id": null,
+            "tags_json": null,
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": null,
+            "outcome_notes": null
+          }
+        ],
+        "attendees": [
+          {
+            "id": 1,
+            "meeting_id": 1,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          },
+          {
+            "id": 2,
+            "meeting_id": 2,
+            "contact_id": 2,
+            "status": "invited",
+            "notified": 0
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "contacted"
+          },
+          {
+            "id": 2,
+            "lead_status": "customer"
+          },
+          {
+            "id": 3,
+            "lead_status": "closed"
+          }
+        ],
+        "conversations": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "channel": "sms",
+            "status": "active"
+          },
+          {
+            "id": 2,
+            "contact_id": 2,
+            "channel": "sms",
+            "status": "active"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "create",
+      "body": {
+        "title": " Review ",
+        "starts_at": "2026-01-03T14:00:00+01:00",
+        "send_invite_sms": false,
+        "send_sms_reminder": false,
+        "conversation_id": 1,
+        "ends_at": "2026-01-03T15:00:00Z"
+      },
+      "expected": {
+        "status": 201,
+        "body": {
+          "id": 3,
+          "title": "Review",
+          "description": null,
+          "event_type": "meeting",
+          "status": "scheduled",
+          "starts_at": "2026-01-03T13:00:00+00:00",
+          "ends_at": "2026-01-03T15:00:00+00:00",
+          "all_day": false,
+          "location": null,
+          "meeting_link": null,
+          "contact_id": 1,
+          "contact_name": "Ada",
+          "conversation_id": 1,
+          "campaign_id": null,
+          "tags": [],
+          "send_invite_sms": false,
+          "send_invite_email": false,
+          "invite_subject": null,
+          "invite_template_id": null,
+          "invite_body": null,
+          "invite_sent": false,
+          "invite_email_sent": false,
+          "email_account_id": null,
+          "send_sms_reminder": false,
+          "send_email_reminder": false,
+          "reminder_subject": null,
+          "reminder_minutes": [],
+          "reminder_template_id": null,
+          "reminder_body": null,
+          "reminders_sent": {},
+          "outcome_notes": null,
+          "attendees": [
+            {
+              "id": 3,
+              "contact_id": 1,
+              "status": "invited",
+              "notified": false,
+              "name": "Ada",
+              "phone": null
+            }
+          ],
+          "created_at": "2026-01-02T12:00:00.123456+00:00",
+          "updated_at": "2026-01-02T12:00:00.123456+00:00",
+          "invite": {
+            "sent": 0,
+            "skipped": 0
+          }
+        }
+      },
+      "snapshot": {
+        "meetings": [
+          {
+            "id": 1,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "completed",
+            "starts_at": "2026-01-04T08:30:00+00:00",
+            "ends_at": "2026-01-04T09:15:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": [
+              "Follow-up"
+            ],
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": [
+              60,
+              15
+            ],
+            "outcome_notes": "Agreed"
+          },
+          {
+            "id": 2,
+            "title": "Review",
+            "description": "Customer",
+            "event_type": "call",
+            "status": "scheduled",
+            "starts_at": "2026-01-03T13:00:00+00:00",
+            "ends_at": "2026-01-03T13:30:00+00:00",
+            "all_day": 0,
+            "contact_id": 2,
+            "conversation_id": 2,
+            "campaign_id": null,
+            "tags_json": null,
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": null,
+            "outcome_notes": null
+          },
+          {
+            "id": 3,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "scheduled",
+            "starts_at": "2026-01-03T13:00:00+00:00",
+            "ends_at": "2026-01-03T15:00:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": null,
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": null,
+            "outcome_notes": null
+          }
+        ],
+        "attendees": [
+          {
+            "id": 1,
+            "meeting_id": 1,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          },
+          {
+            "id": 2,
+            "meeting_id": 2,
+            "contact_id": 2,
+            "status": "invited",
+            "notified": 0
+          },
+          {
+            "id": 3,
+            "meeting_id": 3,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "meeting"
+          },
+          {
+            "id": 2,
+            "lead_status": "customer"
+          },
+          {
+            "id": 3,
+            "lead_status": "closed"
+          }
+        ],
+        "conversations": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "channel": "sms",
+            "status": "active"
+          },
+          {
+            "id": 2,
+            "contact_id": 2,
+            "channel": "sms",
+            "status": "active"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "list",
+      "q": {
+        "search": "Rev%",
+        "per_page": 1,
+        "page": 2
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "total": 3,
+          "items": [
+            {
+              "id": 3,
+              "title": "Review",
+              "description": null,
+              "event_type": "meeting",
+              "status": "scheduled",
+              "starts_at": "2026-01-03T13:00:00+00:00",
+              "ends_at": "2026-01-03T15:00:00+00:00",
+              "all_day": false,
+              "location": null,
+              "meeting_link": null,
+              "contact_id": 1,
+              "contact_name": "Ada",
+              "conversation_id": 1,
+              "campaign_id": null,
+              "tags": [],
+              "send_invite_sms": false,
+              "send_invite_email": false,
+              "invite_subject": null,
+              "invite_template_id": null,
+              "invite_body": null,
+              "invite_sent": false,
+              "invite_email_sent": false,
+              "email_account_id": null,
+              "send_sms_reminder": false,
+              "send_email_reminder": false,
+              "reminder_subject": null,
+              "reminder_minutes": [],
+              "reminder_template_id": null,
+              "reminder_body": null,
+              "reminders_sent": {},
+              "outcome_notes": null,
+              "attendees": [
+                {
+                  "id": 3,
+                  "contact_id": 1,
+                  "status": "invited",
+                  "notified": false,
+                  "name": "Ada",
+                  "phone": null
+                }
+              ],
+              "created_at": "2026-01-02T12:00:00.123456+00:00",
+              "updated_at": "2026-01-02T12:00:00.123456+00:00"
+            }
+          ]
+        }
+      },
+      "snapshot": {
+        "meetings": [
+          {
+            "id": 1,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "completed",
+            "starts_at": "2026-01-04T08:30:00+00:00",
+            "ends_at": "2026-01-04T09:15:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": [
+              "Follow-up"
+            ],
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": [
+              60,
+              15
+            ],
+            "outcome_notes": "Agreed"
+          },
+          {
+            "id": 2,
+            "title": "Review",
+            "description": "Customer",
+            "event_type": "call",
+            "status": "scheduled",
+            "starts_at": "2026-01-03T13:00:00+00:00",
+            "ends_at": "2026-01-03T13:30:00+00:00",
+            "all_day": 0,
+            "contact_id": 2,
+            "conversation_id": 2,
+            "campaign_id": null,
+            "tags_json": null,
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": null,
+            "outcome_notes": null
+          },
+          {
+            "id": 3,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "scheduled",
+            "starts_at": "2026-01-03T13:00:00+00:00",
+            "ends_at": "2026-01-03T15:00:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": null,
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": null,
+            "outcome_notes": null
+          }
+        ],
+        "attendees": [
+          {
+            "id": 1,
+            "meeting_id": 1,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          },
+          {
+            "id": 2,
+            "meeting_id": 2,
+            "contact_id": 2,
+            "status": "invited",
+            "notified": 0
+          },
+          {
+            "id": 3,
+            "meeting_id": 3,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "meeting"
+          },
+          {
+            "id": 2,
+            "lead_status": "customer"
+          },
+          {
+            "id": 3,
+            "lead_status": "closed"
+          }
+        ],
+        "conversations": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "channel": "sms",
+            "status": "active"
+          },
+          {
+            "id": 2,
+            "contact_id": 2,
+            "channel": "sms",
+            "status": "active"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "list",
+      "q": {
+        "status": "completed"
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "total": 1,
+          "items": [
+            {
+              "id": 1,
+              "title": "Review",
+              "description": null,
+              "event_type": "meeting",
+              "status": "completed",
+              "starts_at": "2026-01-04T08:30:00+00:00",
+              "ends_at": "2026-01-04T09:15:00+00:00",
+              "all_day": false,
+              "location": "Abuja",
+              "meeting_link": null,
+              "contact_id": 1,
+              "contact_name": "Ada",
+              "conversation_id": 1,
+              "campaign_id": null,
+              "tags": [
+                "Follow-up"
+              ],
+              "send_invite_sms": false,
+              "send_invite_email": false,
+              "invite_subject": null,
+              "invite_template_id": null,
+              "invite_body": null,
+              "invite_sent": false,
+              "invite_email_sent": false,
+              "email_account_id": null,
+              "send_sms_reminder": false,
+              "send_email_reminder": false,
+              "reminder_subject": null,
+              "reminder_minutes": [
+                60,
+                15
+              ],
+              "reminder_template_id": null,
+              "reminder_body": null,
+              "reminders_sent": {},
+              "outcome_notes": "Agreed",
+              "attendees": [
+                {
+                  "id": 1,
+                  "contact_id": 1,
+                  "status": "invited",
+                  "notified": false,
+                  "name": "Ada",
+                  "phone": null
+                }
+              ],
+              "created_at": "2026-01-02T12:00:00.123456+00:00",
+              "updated_at": "2026-01-02T12:00:00.123456+00:00"
+            }
+          ]
+        }
+      },
+      "snapshot": {
+        "meetings": [
+          {
+            "id": 1,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "completed",
+            "starts_at": "2026-01-04T08:30:00+00:00",
+            "ends_at": "2026-01-04T09:15:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": [
+              "Follow-up"
+            ],
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": [
+              60,
+              15
+            ],
+            "outcome_notes": "Agreed"
+          },
+          {
+            "id": 2,
+            "title": "Review",
+            "description": "Customer",
+            "event_type": "call",
+            "status": "scheduled",
+            "starts_at": "2026-01-03T13:00:00+00:00",
+            "ends_at": "2026-01-03T13:30:00+00:00",
+            "all_day": 0,
+            "contact_id": 2,
+            "conversation_id": 2,
+            "campaign_id": null,
+            "tags_json": null,
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": null,
+            "outcome_notes": null
+          },
+          {
+            "id": 3,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "scheduled",
+            "starts_at": "2026-01-03T13:00:00+00:00",
+            "ends_at": "2026-01-03T15:00:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": null,
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": null,
+            "outcome_notes": null
+          }
+        ],
+        "attendees": [
+          {
+            "id": 1,
+            "meeting_id": 1,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          },
+          {
+            "id": 2,
+            "meeting_id": 2,
+            "contact_id": 2,
+            "status": "invited",
+            "notified": 0
+          },
+          {
+            "id": 3,
+            "meeting_id": 3,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "meeting"
+          },
+          {
+            "id": 2,
+            "lead_status": "customer"
+          },
+          {
+            "id": 3,
+            "lead_status": "closed"
+          }
+        ],
+        "conversations": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "channel": "sms",
+            "status": "active"
+          },
+          {
+            "id": 2,
+            "contact_id": 2,
+            "channel": "sms",
+            "status": "active"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "list",
+      "q": {
+        "event_type": "call"
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "total": 1,
+          "items": [
+            {
+              "id": 2,
+              "title": "Review",
+              "description": "Customer",
+              "event_type": "call",
+              "status": "scheduled",
+              "starts_at": "2026-01-03T13:00:00+00:00",
+              "ends_at": "2026-01-03T13:30:00+00:00",
+              "all_day": false,
+              "location": null,
+              "meeting_link": null,
+              "contact_id": 2,
+              "contact_name": "Bola",
+              "conversation_id": 2,
+              "campaign_id": null,
+              "tags": [],
+              "send_invite_sms": false,
+              "send_invite_email": false,
+              "invite_subject": null,
+              "invite_template_id": null,
+              "invite_body": null,
+              "invite_sent": false,
+              "invite_email_sent": false,
+              "email_account_id": null,
+              "send_sms_reminder": false,
+              "send_email_reminder": false,
+              "reminder_subject": null,
+              "reminder_minutes": [],
+              "reminder_template_id": null,
+              "reminder_body": null,
+              "reminders_sent": {},
+              "outcome_notes": null,
+              "attendees": [
+                {
+                  "id": 2,
+                  "contact_id": 2,
+                  "status": "invited",
+                  "notified": false,
+                  "name": "Bola",
+                  "phone": null
+                }
+              ],
+              "created_at": "2026-01-02T12:00:00.123456+00:00",
+              "updated_at": "2026-01-02T12:00:00.123456+00:00"
+            }
+          ]
+        }
+      },
+      "snapshot": {
+        "meetings": [
+          {
+            "id": 1,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "completed",
+            "starts_at": "2026-01-04T08:30:00+00:00",
+            "ends_at": "2026-01-04T09:15:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": [
+              "Follow-up"
+            ],
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": [
+              60,
+              15
+            ],
+            "outcome_notes": "Agreed"
+          },
+          {
+            "id": 2,
+            "title": "Review",
+            "description": "Customer",
+            "event_type": "call",
+            "status": "scheduled",
+            "starts_at": "2026-01-03T13:00:00+00:00",
+            "ends_at": "2026-01-03T13:30:00+00:00",
+            "all_day": 0,
+            "contact_id": 2,
+            "conversation_id": 2,
+            "campaign_id": null,
+            "tags_json": null,
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": null,
+            "outcome_notes": null
+          },
+          {
+            "id": 3,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "scheduled",
+            "starts_at": "2026-01-03T13:00:00+00:00",
+            "ends_at": "2026-01-03T15:00:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": null,
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": null,
+            "outcome_notes": null
+          }
+        ],
+        "attendees": [
+          {
+            "id": 1,
+            "meeting_id": 1,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          },
+          {
+            "id": 2,
+            "meeting_id": 2,
+            "contact_id": 2,
+            "status": "invited",
+            "notified": 0
+          },
+          {
+            "id": 3,
+            "meeting_id": 3,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "meeting"
+          },
+          {
+            "id": 2,
+            "lead_status": "customer"
+          },
+          {
+            "id": 3,
+            "lead_status": "closed"
+          }
+        ],
+        "conversations": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "channel": "sms",
+            "status": "active"
+          },
+          {
+            "id": 2,
+            "contact_id": 2,
+            "channel": "sms",
+            "status": "active"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "list",
+      "q": {
+        "tag": "Follow-up"
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "total": 1,
+          "items": [
+            {
+              "id": 1,
+              "title": "Review",
+              "description": null,
+              "event_type": "meeting",
+              "status": "completed",
+              "starts_at": "2026-01-04T08:30:00+00:00",
+              "ends_at": "2026-01-04T09:15:00+00:00",
+              "all_day": false,
+              "location": "Abuja",
+              "meeting_link": null,
+              "contact_id": 1,
+              "contact_name": "Ada",
+              "conversation_id": 1,
+              "campaign_id": null,
+              "tags": [
+                "Follow-up"
+              ],
+              "send_invite_sms": false,
+              "send_invite_email": false,
+              "invite_subject": null,
+              "invite_template_id": null,
+              "invite_body": null,
+              "invite_sent": false,
+              "invite_email_sent": false,
+              "email_account_id": null,
+              "send_sms_reminder": false,
+              "send_email_reminder": false,
+              "reminder_subject": null,
+              "reminder_minutes": [
+                60,
+                15
+              ],
+              "reminder_template_id": null,
+              "reminder_body": null,
+              "reminders_sent": {},
+              "outcome_notes": "Agreed",
+              "attendees": [
+                {
+                  "id": 1,
+                  "contact_id": 1,
+                  "status": "invited",
+                  "notified": false,
+                  "name": "Ada",
+                  "phone": null
+                }
+              ],
+              "created_at": "2026-01-02T12:00:00.123456+00:00",
+              "updated_at": "2026-01-02T12:00:00.123456+00:00"
+            }
+          ]
+        }
+      },
+      "snapshot": {
+        "meetings": [
+          {
+            "id": 1,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "completed",
+            "starts_at": "2026-01-04T08:30:00+00:00",
+            "ends_at": "2026-01-04T09:15:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": [
+              "Follow-up"
+            ],
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": [
+              60,
+              15
+            ],
+            "outcome_notes": "Agreed"
+          },
+          {
+            "id": 2,
+            "title": "Review",
+            "description": "Customer",
+            "event_type": "call",
+            "status": "scheduled",
+            "starts_at": "2026-01-03T13:00:00+00:00",
+            "ends_at": "2026-01-03T13:30:00+00:00",
+            "all_day": 0,
+            "contact_id": 2,
+            "conversation_id": 2,
+            "campaign_id": null,
+            "tags_json": null,
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": null,
+            "outcome_notes": null
+          },
+          {
+            "id": 3,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "scheduled",
+            "starts_at": "2026-01-03T13:00:00+00:00",
+            "ends_at": "2026-01-03T15:00:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": null,
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": null,
+            "outcome_notes": null
+          }
+        ],
+        "attendees": [
+          {
+            "id": 1,
+            "meeting_id": 1,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          },
+          {
+            "id": 2,
+            "meeting_id": 2,
+            "contact_id": 2,
+            "status": "invited",
+            "notified": 0
+          },
+          {
+            "id": 3,
+            "meeting_id": 3,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "meeting"
+          },
+          {
+            "id": 2,
+            "lead_status": "customer"
+          },
+          {
+            "id": 3,
+            "lead_status": "closed"
+          }
+        ],
+        "conversations": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "channel": "sms",
+            "status": "active"
+          },
+          {
+            "id": 2,
+            "contact_id": 2,
+            "channel": "sms",
+            "status": "active"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "list",
+      "q": {
+        "date_from": "invalid",
+        "date_to": "2026-01-03T23:59:00Z"
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "total": 2,
+          "items": [
+            {
+              "id": 2,
+              "title": "Review",
+              "description": "Customer",
+              "event_type": "call",
+              "status": "scheduled",
+              "starts_at": "2026-01-03T13:00:00+00:00",
+              "ends_at": "2026-01-03T13:30:00+00:00",
+              "all_day": false,
+              "location": null,
+              "meeting_link": null,
+              "contact_id": 2,
+              "contact_name": "Bola",
+              "conversation_id": 2,
+              "campaign_id": null,
+              "tags": [],
+              "send_invite_sms": false,
+              "send_invite_email": false,
+              "invite_subject": null,
+              "invite_template_id": null,
+              "invite_body": null,
+              "invite_sent": false,
+              "invite_email_sent": false,
+              "email_account_id": null,
+              "send_sms_reminder": false,
+              "send_email_reminder": false,
+              "reminder_subject": null,
+              "reminder_minutes": [],
+              "reminder_template_id": null,
+              "reminder_body": null,
+              "reminders_sent": {},
+              "outcome_notes": null,
+              "attendees": [
+                {
+                  "id": 2,
+                  "contact_id": 2,
+                  "status": "invited",
+                  "notified": false,
+                  "name": "Bola",
+                  "phone": null
+                }
+              ],
+              "created_at": "2026-01-02T12:00:00.123456+00:00",
+              "updated_at": "2026-01-02T12:00:00.123456+00:00"
+            },
+            {
+              "id": 3,
+              "title": "Review",
+              "description": null,
+              "event_type": "meeting",
+              "status": "scheduled",
+              "starts_at": "2026-01-03T13:00:00+00:00",
+              "ends_at": "2026-01-03T15:00:00+00:00",
+              "all_day": false,
+              "location": null,
+              "meeting_link": null,
+              "contact_id": 1,
+              "contact_name": "Ada",
+              "conversation_id": 1,
+              "campaign_id": null,
+              "tags": [],
+              "send_invite_sms": false,
+              "send_invite_email": false,
+              "invite_subject": null,
+              "invite_template_id": null,
+              "invite_body": null,
+              "invite_sent": false,
+              "invite_email_sent": false,
+              "email_account_id": null,
+              "send_sms_reminder": false,
+              "send_email_reminder": false,
+              "reminder_subject": null,
+              "reminder_minutes": [],
+              "reminder_template_id": null,
+              "reminder_body": null,
+              "reminders_sent": {},
+              "outcome_notes": null,
+              "attendees": [
+                {
+                  "id": 3,
+                  "contact_id": 1,
+                  "status": "invited",
+                  "notified": false,
+                  "name": "Ada",
+                  "phone": null
+                }
+              ],
+              "created_at": "2026-01-02T12:00:00.123456+00:00",
+              "updated_at": "2026-01-02T12:00:00.123456+00:00"
+            }
+          ]
+        }
+      },
+      "snapshot": {
+        "meetings": [
+          {
+            "id": 1,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "completed",
+            "starts_at": "2026-01-04T08:30:00+00:00",
+            "ends_at": "2026-01-04T09:15:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": [
+              "Follow-up"
+            ],
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": [
+              60,
+              15
+            ],
+            "outcome_notes": "Agreed"
+          },
+          {
+            "id": 2,
+            "title": "Review",
+            "description": "Customer",
+            "event_type": "call",
+            "status": "scheduled",
+            "starts_at": "2026-01-03T13:00:00+00:00",
+            "ends_at": "2026-01-03T13:30:00+00:00",
+            "all_day": 0,
+            "contact_id": 2,
+            "conversation_id": 2,
+            "campaign_id": null,
+            "tags_json": null,
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": null,
+            "outcome_notes": null
+          },
+          {
+            "id": 3,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "scheduled",
+            "starts_at": "2026-01-03T13:00:00+00:00",
+            "ends_at": "2026-01-03T15:00:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": null,
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": null,
+            "outcome_notes": null
+          }
+        ],
+        "attendees": [
+          {
+            "id": 1,
+            "meeting_id": 1,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          },
+          {
+            "id": 2,
+            "meeting_id": 2,
+            "contact_id": 2,
+            "status": "invited",
+            "notified": 0
+          },
+          {
+            "id": 3,
+            "meeting_id": 3,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "meeting"
+          },
+          {
+            "id": 2,
+            "lead_status": "customer"
+          },
+          {
+            "id": 3,
+            "lead_status": "closed"
+          }
+        ],
+        "conversations": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "channel": "sms",
+            "status": "active"
+          },
+          {
+            "id": 2,
+            "contact_id": 2,
+            "channel": "sms",
+            "status": "active"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "status",
+      "id": 2,
+      "status": "cancelled",
+      "notes": "",
+      "expected": {
+        "status": 200,
+        "body": {
+          "id": 2,
+          "title": "Review",
+          "description": "Customer",
+          "event_type": "call",
+          "status": "cancelled",
+          "starts_at": "2026-01-03T13:00:00+00:00",
+          "ends_at": "2026-01-03T13:30:00+00:00",
+          "all_day": false,
+          "location": null,
+          "meeting_link": null,
+          "contact_id": 2,
+          "contact_name": "Bola",
+          "conversation_id": 2,
+          "campaign_id": null,
+          "tags": [],
+          "send_invite_sms": false,
+          "send_invite_email": false,
+          "invite_subject": null,
+          "invite_template_id": null,
+          "invite_body": null,
+          "invite_sent": false,
+          "invite_email_sent": false,
+          "email_account_id": null,
+          "send_sms_reminder": false,
+          "send_email_reminder": false,
+          "reminder_subject": null,
+          "reminder_minutes": [],
+          "reminder_template_id": null,
+          "reminder_body": null,
+          "reminders_sent": {},
+          "outcome_notes": null,
+          "attendees": [
+            {
+              "id": 2,
+              "contact_id": 2,
+              "status": "invited",
+              "notified": false,
+              "name": "Bola",
+              "phone": null
+            }
+          ],
+          "created_at": "2026-01-02T12:00:00.123456+00:00",
+          "updated_at": "2026-01-02T12:00:00.123456+00:00"
+        }
+      },
+      "snapshot": {
+        "meetings": [
+          {
+            "id": 1,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "completed",
+            "starts_at": "2026-01-04T08:30:00+00:00",
+            "ends_at": "2026-01-04T09:15:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": [
+              "Follow-up"
+            ],
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": [
+              60,
+              15
+            ],
+            "outcome_notes": "Agreed"
+          },
+          {
+            "id": 2,
+            "title": "Review",
+            "description": "Customer",
+            "event_type": "call",
+            "status": "cancelled",
+            "starts_at": "2026-01-03T13:00:00+00:00",
+            "ends_at": "2026-01-03T13:30:00+00:00",
+            "all_day": 0,
+            "contact_id": 2,
+            "conversation_id": 2,
+            "campaign_id": null,
+            "tags_json": null,
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": null,
+            "outcome_notes": null
+          },
+          {
+            "id": 3,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "scheduled",
+            "starts_at": "2026-01-03T13:00:00+00:00",
+            "ends_at": "2026-01-03T15:00:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": null,
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": null,
+            "outcome_notes": null
+          }
+        ],
+        "attendees": [
+          {
+            "id": 1,
+            "meeting_id": 1,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          },
+          {
+            "id": 2,
+            "meeting_id": 2,
+            "contact_id": 2,
+            "status": "invited",
+            "notified": 0
+          },
+          {
+            "id": 3,
+            "meeting_id": 3,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "meeting"
+          },
+          {
+            "id": 2,
+            "lead_status": "customer"
+          },
+          {
+            "id": 3,
+            "lead_status": "closed"
+          }
+        ],
+        "conversations": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "channel": "sms",
+            "status": "active"
+          },
+          {
+            "id": 2,
+            "contact_id": 2,
+            "channel": "sms",
+            "status": "active"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "status",
+      "id": 3,
+      "status": "no_show",
+      "expected": {
+        "status": 200,
+        "body": {
+          "id": 3,
+          "title": "Review",
+          "description": null,
+          "event_type": "meeting",
+          "status": "no_show",
+          "starts_at": "2026-01-03T13:00:00+00:00",
+          "ends_at": "2026-01-03T15:00:00+00:00",
+          "all_day": false,
+          "location": null,
+          "meeting_link": null,
+          "contact_id": 1,
+          "contact_name": "Ada",
+          "conversation_id": 1,
+          "campaign_id": null,
+          "tags": [],
+          "send_invite_sms": false,
+          "send_invite_email": false,
+          "invite_subject": null,
+          "invite_template_id": null,
+          "invite_body": null,
+          "invite_sent": false,
+          "invite_email_sent": false,
+          "email_account_id": null,
+          "send_sms_reminder": false,
+          "send_email_reminder": false,
+          "reminder_subject": null,
+          "reminder_minutes": [],
+          "reminder_template_id": null,
+          "reminder_body": null,
+          "reminders_sent": {},
+          "outcome_notes": null,
+          "attendees": [
+            {
+              "id": 3,
+              "contact_id": 1,
+              "status": "invited",
+              "notified": false,
+              "name": "Ada",
+              "phone": null
+            }
+          ],
+          "created_at": "2026-01-02T12:00:00.123456+00:00",
+          "updated_at": "2026-01-02T12:00:00.123456+00:00"
+        }
+      },
+      "snapshot": {
+        "meetings": [
+          {
+            "id": 1,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "completed",
+            "starts_at": "2026-01-04T08:30:00+00:00",
+            "ends_at": "2026-01-04T09:15:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": [
+              "Follow-up"
+            ],
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": [
+              60,
+              15
+            ],
+            "outcome_notes": "Agreed"
+          },
+          {
+            "id": 2,
+            "title": "Review",
+            "description": "Customer",
+            "event_type": "call",
+            "status": "cancelled",
+            "starts_at": "2026-01-03T13:00:00+00:00",
+            "ends_at": "2026-01-03T13:30:00+00:00",
+            "all_day": 0,
+            "contact_id": 2,
+            "conversation_id": 2,
+            "campaign_id": null,
+            "tags_json": null,
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": null,
+            "outcome_notes": null
+          },
+          {
+            "id": 3,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "no_show",
+            "starts_at": "2026-01-03T13:00:00+00:00",
+            "ends_at": "2026-01-03T15:00:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": null,
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": null,
+            "outcome_notes": null
+          }
+        ],
+        "attendees": [
+          {
+            "id": 1,
+            "meeting_id": 1,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          },
+          {
+            "id": 2,
+            "meeting_id": 2,
+            "contact_id": 2,
+            "status": "invited",
+            "notified": 0
+          },
+          {
+            "id": 3,
+            "meeting_id": 3,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "meeting"
+          },
+          {
+            "id": 2,
+            "lead_status": "customer"
+          },
+          {
+            "id": 3,
+            "lead_status": "closed"
+          }
+        ],
+        "conversations": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "channel": "sms",
+            "status": "active"
+          },
+          {
+            "id": 2,
+            "contact_id": 2,
+            "channel": "sms",
+            "status": "active"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "upcoming",
+      "expected": {
+        "status": 200,
+        "body": {
+          "total": 0,
+          "items": []
+        }
+      },
+      "snapshot": {
+        "meetings": [
+          {
+            "id": 1,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "completed",
+            "starts_at": "2026-01-04T08:30:00+00:00",
+            "ends_at": "2026-01-04T09:15:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": [
+              "Follow-up"
+            ],
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": [
+              60,
+              15
+            ],
+            "outcome_notes": "Agreed"
+          },
+          {
+            "id": 2,
+            "title": "Review",
+            "description": "Customer",
+            "event_type": "call",
+            "status": "cancelled",
+            "starts_at": "2026-01-03T13:00:00+00:00",
+            "ends_at": "2026-01-03T13:30:00+00:00",
+            "all_day": 0,
+            "contact_id": 2,
+            "conversation_id": 2,
+            "campaign_id": null,
+            "tags_json": null,
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": null,
+            "outcome_notes": null
+          },
+          {
+            "id": 3,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "no_show",
+            "starts_at": "2026-01-03T13:00:00+00:00",
+            "ends_at": "2026-01-03T15:00:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": null,
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": null,
+            "outcome_notes": null
+          }
+        ],
+        "attendees": [
+          {
+            "id": 1,
+            "meeting_id": 1,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          },
+          {
+            "id": 2,
+            "meeting_id": 2,
+            "contact_id": 2,
+            "status": "invited",
+            "notified": 0
+          },
+          {
+            "id": 3,
+            "meeting_id": 3,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "meeting"
+          },
+          {
+            "id": 2,
+            "lead_status": "customer"
+          },
+          {
+            "id": 3,
+            "lead_status": "closed"
+          }
+        ],
+        "conversations": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "channel": "sms",
+            "status": "active"
+          },
+          {
+            "id": 2,
+            "contact_id": 2,
+            "channel": "sms",
+            "status": "active"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "tags",
+      "expected": {
+        "status": 200,
+        "body": {
+          "items": [
+            {
+              "name": "Follow-up",
+              "count": 1
+            }
+          ]
+        }
+      },
+      "snapshot": {
+        "meetings": [
+          {
+            "id": 1,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "completed",
+            "starts_at": "2026-01-04T08:30:00+00:00",
+            "ends_at": "2026-01-04T09:15:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": [
+              "Follow-up"
+            ],
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": [
+              60,
+              15
+            ],
+            "outcome_notes": "Agreed"
+          },
+          {
+            "id": 2,
+            "title": "Review",
+            "description": "Customer",
+            "event_type": "call",
+            "status": "cancelled",
+            "starts_at": "2026-01-03T13:00:00+00:00",
+            "ends_at": "2026-01-03T13:30:00+00:00",
+            "all_day": 0,
+            "contact_id": 2,
+            "conversation_id": 2,
+            "campaign_id": null,
+            "tags_json": null,
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": null,
+            "outcome_notes": null
+          },
+          {
+            "id": 3,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "no_show",
+            "starts_at": "2026-01-03T13:00:00+00:00",
+            "ends_at": "2026-01-03T15:00:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": null,
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": null,
+            "outcome_notes": null
+          }
+        ],
+        "attendees": [
+          {
+            "id": 1,
+            "meeting_id": 1,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          },
+          {
+            "id": 2,
+            "meeting_id": 2,
+            "contact_id": 2,
+            "status": "invited",
+            "notified": 0
+          },
+          {
+            "id": 3,
+            "meeting_id": 3,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "meeting"
+          },
+          {
+            "id": 2,
+            "lead_status": "customer"
+          },
+          {
+            "id": 3,
+            "lead_status": "closed"
+          }
+        ],
+        "conversations": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "channel": "sms",
+            "status": "active"
+          },
+          {
+            "id": 2,
+            "contact_id": 2,
+            "channel": "sms",
+            "status": "active"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "day",
+      "date": "invalid",
+      "expected": {
+        "status": 422,
+        "message": "date must be YYYY-MM-DD"
+      },
+      "snapshot": {
+        "meetings": [
+          {
+            "id": 1,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "completed",
+            "starts_at": "2026-01-04T08:30:00+00:00",
+            "ends_at": "2026-01-04T09:15:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": [
+              "Follow-up"
+            ],
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": [
+              60,
+              15
+            ],
+            "outcome_notes": "Agreed"
+          },
+          {
+            "id": 2,
+            "title": "Review",
+            "description": "Customer",
+            "event_type": "call",
+            "status": "cancelled",
+            "starts_at": "2026-01-03T13:00:00+00:00",
+            "ends_at": "2026-01-03T13:30:00+00:00",
+            "all_day": 0,
+            "contact_id": 2,
+            "conversation_id": 2,
+            "campaign_id": null,
+            "tags_json": null,
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": null,
+            "outcome_notes": null
+          },
+          {
+            "id": 3,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "no_show",
+            "starts_at": "2026-01-03T13:00:00+00:00",
+            "ends_at": "2026-01-03T15:00:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": null,
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": null,
+            "outcome_notes": null
+          }
+        ],
+        "attendees": [
+          {
+            "id": 1,
+            "meeting_id": 1,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          },
+          {
+            "id": 2,
+            "meeting_id": 2,
+            "contact_id": 2,
+            "status": "invited",
+            "notified": 0
+          },
+          {
+            "id": 3,
+            "meeting_id": 3,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "meeting"
+          },
+          {
+            "id": 2,
+            "lead_status": "customer"
+          },
+          {
+            "id": 3,
+            "lead_status": "closed"
+          }
+        ],
+        "conversations": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "channel": "sms",
+            "status": "active"
+          },
+          {
+            "id": 2,
+            "contact_id": 2,
+            "channel": "sms",
+            "status": "active"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "update",
+      "id": 2,
+      "body": {
+        "title": "   "
+      },
+      "expected": {
+        "status": 422,
+        "message": "title cannot be empty"
+      },
+      "snapshot": {
+        "meetings": [
+          {
+            "id": 1,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "completed",
+            "starts_at": "2026-01-04T08:30:00+00:00",
+            "ends_at": "2026-01-04T09:15:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": [
+              "Follow-up"
+            ],
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": [
+              60,
+              15
+            ],
+            "outcome_notes": "Agreed"
+          },
+          {
+            "id": 2,
+            "title": "Review",
+            "description": "Customer",
+            "event_type": "call",
+            "status": "cancelled",
+            "starts_at": "2026-01-03T13:00:00+00:00",
+            "ends_at": "2026-01-03T13:30:00+00:00",
+            "all_day": 0,
+            "contact_id": 2,
+            "conversation_id": 2,
+            "campaign_id": null,
+            "tags_json": null,
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": null,
+            "outcome_notes": null
+          },
+          {
+            "id": 3,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "no_show",
+            "starts_at": "2026-01-03T13:00:00+00:00",
+            "ends_at": "2026-01-03T15:00:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": null,
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": null,
+            "outcome_notes": null
+          }
+        ],
+        "attendees": [
+          {
+            "id": 1,
+            "meeting_id": 1,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          },
+          {
+            "id": 2,
+            "meeting_id": 2,
+            "contact_id": 2,
+            "status": "invited",
+            "notified": 0
+          },
+          {
+            "id": 3,
+            "meeting_id": 3,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "meeting"
+          },
+          {
+            "id": 2,
+            "lead_status": "customer"
+          },
+          {
+            "id": 3,
+            "lead_status": "closed"
+          }
+        ],
+        "conversations": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "channel": "sms",
+            "status": "active"
+          },
+          {
+            "id": 2,
+            "contact_id": 2,
+            "channel": "sms",
+            "status": "active"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "update",
+      "id": 2,
+      "body": {
+        "ends_at": "2026-01-02T00:00:00Z"
+      },
+      "expected": {
+        "status": 422,
+        "message": "ends_at must be after starts_at"
+      },
+      "snapshot": {
+        "meetings": [
+          {
+            "id": 1,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "completed",
+            "starts_at": "2026-01-04T08:30:00+00:00",
+            "ends_at": "2026-01-04T09:15:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": [
+              "Follow-up"
+            ],
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": [
+              60,
+              15
+            ],
+            "outcome_notes": "Agreed"
+          },
+          {
+            "id": 2,
+            "title": "Review",
+            "description": "Customer",
+            "event_type": "call",
+            "status": "cancelled",
+            "starts_at": "2026-01-03T13:00:00+00:00",
+            "ends_at": "2026-01-03T13:30:00+00:00",
+            "all_day": 0,
+            "contact_id": 2,
+            "conversation_id": 2,
+            "campaign_id": null,
+            "tags_json": null,
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": null,
+            "outcome_notes": null
+          },
+          {
+            "id": 3,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "no_show",
+            "starts_at": "2026-01-03T13:00:00+00:00",
+            "ends_at": "2026-01-03T15:00:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": null,
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": null,
+            "outcome_notes": null
+          }
+        ],
+        "attendees": [
+          {
+            "id": 1,
+            "meeting_id": 1,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          },
+          {
+            "id": 2,
+            "meeting_id": 2,
+            "contact_id": 2,
+            "status": "invited",
+            "notified": 0
+          },
+          {
+            "id": 3,
+            "meeting_id": 3,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "meeting"
+          },
+          {
+            "id": 2,
+            "lead_status": "customer"
+          },
+          {
+            "id": 3,
+            "lead_status": "closed"
+          }
+        ],
+        "conversations": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "channel": "sms",
+            "status": "active"
+          },
+          {
+            "id": 2,
+            "contact_id": 2,
+            "channel": "sms",
+            "status": "active"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "create",
+      "body": {
+        "title": " Review ",
+        "starts_at": "2026-01-03T14:00:00+01:00",
+        "send_invite_sms": false,
+        "send_sms_reminder": false,
+        "conversation_id": 404
+      },
+      "expected": {
+        "status": 404,
+        "message": "Conversation not found"
+      },
+      "snapshot": {
+        "meetings": [
+          {
+            "id": 1,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "completed",
+            "starts_at": "2026-01-04T08:30:00+00:00",
+            "ends_at": "2026-01-04T09:15:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": [
+              "Follow-up"
+            ],
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": [
+              60,
+              15
+            ],
+            "outcome_notes": "Agreed"
+          },
+          {
+            "id": 2,
+            "title": "Review",
+            "description": "Customer",
+            "event_type": "call",
+            "status": "cancelled",
+            "starts_at": "2026-01-03T13:00:00+00:00",
+            "ends_at": "2026-01-03T13:30:00+00:00",
+            "all_day": 0,
+            "contact_id": 2,
+            "conversation_id": 2,
+            "campaign_id": null,
+            "tags_json": null,
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": null,
+            "outcome_notes": null
+          },
+          {
+            "id": 3,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "no_show",
+            "starts_at": "2026-01-03T13:00:00+00:00",
+            "ends_at": "2026-01-03T15:00:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": null,
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": null,
+            "outcome_notes": null
+          }
+        ],
+        "attendees": [
+          {
+            "id": 1,
+            "meeting_id": 1,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          },
+          {
+            "id": 2,
+            "meeting_id": 2,
+            "contact_id": 2,
+            "status": "invited",
+            "notified": 0
+          },
+          {
+            "id": 3,
+            "meeting_id": 3,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "meeting"
+          },
+          {
+            "id": 2,
+            "lead_status": "customer"
+          },
+          {
+            "id": 3,
+            "lead_status": "closed"
+          }
+        ],
+        "conversations": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "channel": "sms",
+            "status": "active"
+          },
+          {
+            "id": 2,
+            "contact_id": 2,
+            "channel": "sms",
+            "status": "active"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "create",
+      "body": {
+        "title": " Review ",
+        "starts_at": "2026-01-03T14:00:00+01:00",
+        "send_invite_sms": false,
+        "send_sms_reminder": false,
+        "event_type": "invalid"
+      },
+      "expected": {
+        "status": 422,
+        "message": "event_type must be one of meeting, call, reminder, task, follow_up, other"
+      },
+      "snapshot": {
+        "meetings": [
+          {
+            "id": 1,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "completed",
+            "starts_at": "2026-01-04T08:30:00+00:00",
+            "ends_at": "2026-01-04T09:15:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": [
+              "Follow-up"
+            ],
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": [
+              60,
+              15
+            ],
+            "outcome_notes": "Agreed"
+          },
+          {
+            "id": 2,
+            "title": "Review",
+            "description": "Customer",
+            "event_type": "call",
+            "status": "cancelled",
+            "starts_at": "2026-01-03T13:00:00+00:00",
+            "ends_at": "2026-01-03T13:30:00+00:00",
+            "all_day": 0,
+            "contact_id": 2,
+            "conversation_id": 2,
+            "campaign_id": null,
+            "tags_json": null,
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": null,
+            "outcome_notes": null
+          },
+          {
+            "id": 3,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "no_show",
+            "starts_at": "2026-01-03T13:00:00+00:00",
+            "ends_at": "2026-01-03T15:00:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": null,
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": null,
+            "outcome_notes": null
+          }
+        ],
+        "attendees": [
+          {
+            "id": 1,
+            "meeting_id": 1,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          },
+          {
+            "id": 2,
+            "meeting_id": 2,
+            "contact_id": 2,
+            "status": "invited",
+            "notified": 0
+          },
+          {
+            "id": 3,
+            "meeting_id": 3,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "meeting"
+          },
+          {
+            "id": 2,
+            "lead_status": "customer"
+          },
+          {
+            "id": 3,
+            "lead_status": "closed"
+          }
+        ],
+        "conversations": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "channel": "sms",
+            "status": "active"
+          },
+          {
+            "id": 2,
+            "contact_id": 2,
+            "channel": "sms",
+            "status": "active"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "get",
+      "id": 404,
+      "expected": {
+        "status": 404,
+        "message": "Meeting not found"
+      },
+      "snapshot": {
+        "meetings": [
+          {
+            "id": 1,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "completed",
+            "starts_at": "2026-01-04T08:30:00+00:00",
+            "ends_at": "2026-01-04T09:15:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": [
+              "Follow-up"
+            ],
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": [
+              60,
+              15
+            ],
+            "outcome_notes": "Agreed"
+          },
+          {
+            "id": 2,
+            "title": "Review",
+            "description": "Customer",
+            "event_type": "call",
+            "status": "cancelled",
+            "starts_at": "2026-01-03T13:00:00+00:00",
+            "ends_at": "2026-01-03T13:30:00+00:00",
+            "all_day": 0,
+            "contact_id": 2,
+            "conversation_id": 2,
+            "campaign_id": null,
+            "tags_json": null,
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": null,
+            "outcome_notes": null
+          },
+          {
+            "id": 3,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "no_show",
+            "starts_at": "2026-01-03T13:00:00+00:00",
+            "ends_at": "2026-01-03T15:00:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": null,
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": null,
+            "outcome_notes": null
+          }
+        ],
+        "attendees": [
+          {
+            "id": 1,
+            "meeting_id": 1,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          },
+          {
+            "id": 2,
+            "meeting_id": 2,
+            "contact_id": 2,
+            "status": "invited",
+            "notified": 0
+          },
+          {
+            "id": 3,
+            "meeting_id": 3,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "meeting"
+          },
+          {
+            "id": 2,
+            "lead_status": "customer"
+          },
+          {
+            "id": 3,
+            "lead_status": "closed"
+          }
+        ],
+        "conversations": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "channel": "sms",
+            "status": "active"
+          },
+          {
+            "id": 2,
+            "contact_id": 2,
+            "channel": "sms",
+            "status": "active"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "delete",
+      "id": 3,
+      "expected": {
+        "status": 204,
+        "body": null
+      },
+      "snapshot": {
+        "meetings": [
+          {
+            "id": 1,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "completed",
+            "starts_at": "2026-01-04T08:30:00+00:00",
+            "ends_at": "2026-01-04T09:15:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": [
+              "Follow-up"
+            ],
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": [
+              60,
+              15
+            ],
+            "outcome_notes": "Agreed"
+          },
+          {
+            "id": 2,
+            "title": "Review",
+            "description": "Customer",
+            "event_type": "call",
+            "status": "cancelled",
+            "starts_at": "2026-01-03T13:00:00+00:00",
+            "ends_at": "2026-01-03T13:30:00+00:00",
+            "all_day": 0,
+            "contact_id": 2,
+            "conversation_id": 2,
+            "campaign_id": null,
+            "tags_json": null,
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": null,
+            "outcome_notes": null
+          }
+        ],
+        "attendees": [
+          {
+            "id": 1,
+            "meeting_id": 1,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          },
+          {
+            "id": 2,
+            "meeting_id": 2,
+            "contact_id": 2,
+            "status": "invited",
+            "notified": 0
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "meeting"
+          },
+          {
+            "id": 2,
+            "lead_status": "customer"
+          },
+          {
+            "id": 3,
+            "lead_status": "closed"
+          }
+        ],
+        "conversations": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "channel": "sms",
+            "status": "active"
+          },
+          {
+            "id": 2,
+            "contact_id": 2,
+            "channel": "sms",
+            "status": "active"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "get",
+      "id": 3,
+      "expected": {
+        "status": 404,
+        "message": "Meeting not found"
+      },
+      "snapshot": {
+        "meetings": [
+          {
+            "id": 1,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "completed",
+            "starts_at": "2026-01-04T08:30:00+00:00",
+            "ends_at": "2026-01-04T09:15:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": [
+              "Follow-up"
+            ],
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": [
+              60,
+              15
+            ],
+            "outcome_notes": "Agreed"
+          },
+          {
+            "id": 2,
+            "title": "Review",
+            "description": "Customer",
+            "event_type": "call",
+            "status": "cancelled",
+            "starts_at": "2026-01-03T13:00:00+00:00",
+            "ends_at": "2026-01-03T13:30:00+00:00",
+            "all_day": 0,
+            "contact_id": 2,
+            "conversation_id": 2,
+            "campaign_id": null,
+            "tags_json": null,
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": null,
+            "outcome_notes": null
+          }
+        ],
+        "attendees": [
+          {
+            "id": 1,
+            "meeting_id": 1,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          },
+          {
+            "id": 2,
+            "meeting_id": 2,
+            "contact_id": 2,
+            "status": "invited",
+            "notified": 0
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "meeting"
+          },
+          {
+            "id": 2,
+            "lead_status": "customer"
+          },
+          {
+            "id": 3,
+            "lead_status": "closed"
+          }
+        ],
+        "conversations": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "channel": "sms",
+            "status": "active"
+          },
+          {
+            "id": 2,
+            "contact_id": 2,
+            "channel": "sms",
+            "status": "active"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "delete",
+      "id": 404,
+      "expected": {
+        "status": 404,
+        "message": "Meeting not found"
+      },
+      "snapshot": {
+        "meetings": [
+          {
+            "id": 1,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "completed",
+            "starts_at": "2026-01-04T08:30:00+00:00",
+            "ends_at": "2026-01-04T09:15:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": [
+              "Follow-up"
+            ],
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": [
+              60,
+              15
+            ],
+            "outcome_notes": "Agreed"
+          },
+          {
+            "id": 2,
+            "title": "Review",
+            "description": "Customer",
+            "event_type": "call",
+            "status": "cancelled",
+            "starts_at": "2026-01-03T13:00:00+00:00",
+            "ends_at": "2026-01-03T13:30:00+00:00",
+            "all_day": 0,
+            "contact_id": 2,
+            "conversation_id": 2,
+            "campaign_id": null,
+            "tags_json": null,
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": null,
+            "outcome_notes": null
+          }
+        ],
+        "attendees": [
+          {
+            "id": 1,
+            "meeting_id": 1,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          },
+          {
+            "id": 2,
+            "meeting_id": 2,
+            "contact_id": 2,
+            "status": "invited",
+            "notified": 0
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "meeting"
+          },
+          {
+            "id": 2,
+            "lead_status": "customer"
+          },
+          {
+            "id": 3,
+            "lead_status": "closed"
+          }
+        ],
+        "conversations": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "channel": "sms",
+            "status": "active"
+          },
+          {
+            "id": 2,
+            "contact_id": 2,
+            "channel": "sms",
+            "status": "active"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "create",
+      "body": {
+        "title": " Review ",
+        "starts_at": "2026-01-03T14:00:00+01:00",
+        "send_invite_sms": false,
+        "send_sms_reminder": false,
+        "contact_ids": [
+          3
+        ],
+        "all_day": true
+      },
+      "expected": {
+        "status": 201,
+        "body": {
+          "id": 4,
+          "title": "Review",
+          "description": null,
+          "event_type": "meeting",
+          "status": "scheduled",
+          "starts_at": "2026-01-03T13:00:00+00:00",
+          "ends_at": "2026-01-03T13:30:00+00:00",
+          "all_day": true,
+          "location": null,
+          "meeting_link": null,
+          "contact_id": 3,
+          "contact_name": "Chidi",
+          "conversation_id": 3,
+          "campaign_id": null,
+          "tags": [],
+          "send_invite_sms": false,
+          "send_invite_email": false,
+          "invite_subject": null,
+          "invite_template_id": null,
+          "invite_body": null,
+          "invite_sent": false,
+          "invite_email_sent": false,
+          "email_account_id": null,
+          "send_sms_reminder": false,
+          "send_email_reminder": false,
+          "reminder_subject": null,
+          "reminder_minutes": [],
+          "reminder_template_id": null,
+          "reminder_body": null,
+          "reminders_sent": {},
+          "outcome_notes": null,
+          "attendees": [
+            {
+              "id": 4,
+              "contact_id": 3,
+              "status": "invited",
+              "notified": false,
+              "name": "Chidi",
+              "phone": null
+            }
+          ],
+          "created_at": "2026-01-02T12:00:00.123456+00:00",
+          "updated_at": "2026-01-02T12:00:00.123456+00:00",
+          "invite": {
+            "sent": 0,
+            "skipped": 0
+          }
+        }
+      },
+      "snapshot": {
+        "meetings": [
+          {
+            "id": 1,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "completed",
+            "starts_at": "2026-01-04T08:30:00+00:00",
+            "ends_at": "2026-01-04T09:15:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": [
+              "Follow-up"
+            ],
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": [
+              60,
+              15
+            ],
+            "outcome_notes": "Agreed"
+          },
+          {
+            "id": 2,
+            "title": "Review",
+            "description": "Customer",
+            "event_type": "call",
+            "status": "cancelled",
+            "starts_at": "2026-01-03T13:00:00+00:00",
+            "ends_at": "2026-01-03T13:30:00+00:00",
+            "all_day": 0,
+            "contact_id": 2,
+            "conversation_id": 2,
+            "campaign_id": null,
+            "tags_json": null,
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": null,
+            "outcome_notes": null
+          },
+          {
+            "id": 4,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "scheduled",
+            "starts_at": "2026-01-03T13:00:00+00:00",
+            "ends_at": "2026-01-03T13:30:00+00:00",
+            "all_day": 1,
+            "contact_id": 3,
+            "conversation_id": 3,
+            "campaign_id": null,
+            "tags_json": null,
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": null,
+            "outcome_notes": null
+          }
+        ],
+        "attendees": [
+          {
+            "id": 1,
+            "meeting_id": 1,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          },
+          {
+            "id": 2,
+            "meeting_id": 2,
+            "contact_id": 2,
+            "status": "invited",
+            "notified": 0
+          },
+          {
+            "id": 4,
+            "meeting_id": 4,
+            "contact_id": 3,
+            "status": "invited",
+            "notified": 0
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "meeting"
+          },
+          {
+            "id": 2,
+            "lead_status": "customer"
+          },
+          {
+            "id": 3,
+            "lead_status": "closed"
+          }
+        ],
+        "conversations": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "channel": "sms",
+            "status": "active"
+          },
+          {
+            "id": 2,
+            "contact_id": 2,
+            "channel": "sms",
+            "status": "active"
+          },
+          {
+            "id": 3,
+            "contact_id": 3,
+            "channel": "sms",
+            "status": "active"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "update",
+      "id": 4,
+      "body": {
+        "contact_ids": []
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "id": 4,
+          "title": "Review",
+          "description": null,
+          "event_type": "meeting",
+          "status": "scheduled",
+          "starts_at": "2026-01-03T13:00:00+00:00",
+          "ends_at": "2026-01-03T13:30:00+00:00",
+          "all_day": true,
+          "location": null,
+          "meeting_link": null,
+          "contact_id": null,
+          "contact_name": null,
+          "conversation_id": 3,
+          "campaign_id": null,
+          "tags": [],
+          "send_invite_sms": false,
+          "send_invite_email": false,
+          "invite_subject": null,
+          "invite_template_id": null,
+          "invite_body": null,
+          "invite_sent": false,
+          "invite_email_sent": false,
+          "email_account_id": null,
+          "send_sms_reminder": false,
+          "send_email_reminder": false,
+          "reminder_subject": null,
+          "reminder_minutes": [],
+          "reminder_template_id": null,
+          "reminder_body": null,
+          "reminders_sent": {},
+          "outcome_notes": null,
+          "attendees": [
+            {
+              "id": 4,
+              "contact_id": 3,
+              "status": "invited",
+              "notified": false,
+              "name": "Chidi",
+              "phone": null
+            }
+          ],
+          "created_at": "2026-01-02T12:00:00.123456+00:00",
+          "updated_at": "2026-01-02T12:00:00.123456+00:00"
+        }
+      },
+      "fresh_read": {
+        "id": 4,
+        "title": "Review",
+        "description": null,
+        "event_type": "meeting",
+        "status": "scheduled",
+        "starts_at": "2026-01-03T13:00:00+00:00",
+        "ends_at": "2026-01-03T13:30:00+00:00",
+        "all_day": true,
+        "location": null,
+        "meeting_link": null,
+        "contact_id": null,
+        "contact_name": null,
+        "conversation_id": 3,
+        "campaign_id": null,
+        "tags": [],
+        "send_invite_sms": false,
+        "send_invite_email": false,
+        "invite_subject": null,
+        "invite_template_id": null,
+        "invite_body": null,
+        "invite_sent": false,
+        "invite_email_sent": false,
+        "email_account_id": null,
+        "send_sms_reminder": false,
+        "send_email_reminder": false,
+        "reminder_subject": null,
+        "reminder_minutes": [],
+        "reminder_template_id": null,
+        "reminder_body": null,
+        "reminders_sent": {},
+        "outcome_notes": null,
+        "attendees": [],
+        "created_at": "2026-01-02T12:00:00.123456+00:00",
+        "updated_at": "2026-01-02T12:00:00.123456+00:00"
+      },
+      "snapshot": {
+        "meetings": [
+          {
+            "id": 1,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "completed",
+            "starts_at": "2026-01-04T08:30:00+00:00",
+            "ends_at": "2026-01-04T09:15:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": [
+              "Follow-up"
+            ],
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": [
+              60,
+              15
+            ],
+            "outcome_notes": "Agreed"
+          },
+          {
+            "id": 2,
+            "title": "Review",
+            "description": "Customer",
+            "event_type": "call",
+            "status": "cancelled",
+            "starts_at": "2026-01-03T13:00:00+00:00",
+            "ends_at": "2026-01-03T13:30:00+00:00",
+            "all_day": 0,
+            "contact_id": 2,
+            "conversation_id": 2,
+            "campaign_id": null,
+            "tags_json": null,
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": null,
+            "outcome_notes": null
+          },
+          {
+            "id": 4,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "scheduled",
+            "starts_at": "2026-01-03T13:00:00+00:00",
+            "ends_at": "2026-01-03T13:30:00+00:00",
+            "all_day": 1,
+            "contact_id": null,
+            "conversation_id": 3,
+            "campaign_id": null,
+            "tags_json": null,
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": null,
+            "outcome_notes": null
+          }
+        ],
+        "attendees": [
+          {
+            "id": 1,
+            "meeting_id": 1,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          },
+          {
+            "id": 2,
+            "meeting_id": 2,
+            "contact_id": 2,
+            "status": "invited",
+            "notified": 0
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "meeting"
+          },
+          {
+            "id": 2,
+            "lead_status": "customer"
+          },
+          {
+            "id": 3,
+            "lead_status": "closed"
+          }
+        ],
+        "conversations": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "channel": "sms",
+            "status": "active"
+          },
+          {
+            "id": 2,
+            "contact_id": 2,
+            "channel": "sms",
+            "status": "active"
+          },
+          {
+            "id": 3,
+            "contact_id": 3,
+            "channel": "sms",
+            "status": "active"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "get",
+      "id": 4,
+      "expected": {
+        "status": 200,
+        "body": {
+          "id": 4,
+          "title": "Review",
+          "description": null,
+          "event_type": "meeting",
+          "status": "scheduled",
+          "starts_at": "2026-01-03T13:00:00+00:00",
+          "ends_at": "2026-01-03T13:30:00+00:00",
+          "all_day": true,
+          "location": null,
+          "meeting_link": null,
+          "contact_id": null,
+          "contact_name": null,
+          "conversation_id": 3,
+          "campaign_id": null,
+          "tags": [],
+          "send_invite_sms": false,
+          "send_invite_email": false,
+          "invite_subject": null,
+          "invite_template_id": null,
+          "invite_body": null,
+          "invite_sent": false,
+          "invite_email_sent": false,
+          "email_account_id": null,
+          "send_sms_reminder": false,
+          "send_email_reminder": false,
+          "reminder_subject": null,
+          "reminder_minutes": [],
+          "reminder_template_id": null,
+          "reminder_body": null,
+          "reminders_sent": {},
+          "outcome_notes": null,
+          "attendees": [],
+          "created_at": "2026-01-02T12:00:00.123456+00:00",
+          "updated_at": "2026-01-02T12:00:00.123456+00:00"
+        }
+      },
+      "snapshot": {
+        "meetings": [
+          {
+            "id": 1,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "completed",
+            "starts_at": "2026-01-04T08:30:00+00:00",
+            "ends_at": "2026-01-04T09:15:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": [
+              "Follow-up"
+            ],
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": [
+              60,
+              15
+            ],
+            "outcome_notes": "Agreed"
+          },
+          {
+            "id": 2,
+            "title": "Review",
+            "description": "Customer",
+            "event_type": "call",
+            "status": "cancelled",
+            "starts_at": "2026-01-03T13:00:00+00:00",
+            "ends_at": "2026-01-03T13:30:00+00:00",
+            "all_day": 0,
+            "contact_id": 2,
+            "conversation_id": 2,
+            "campaign_id": null,
+            "tags_json": null,
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": null,
+            "outcome_notes": null
+          },
+          {
+            "id": 4,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "scheduled",
+            "starts_at": "2026-01-03T13:00:00+00:00",
+            "ends_at": "2026-01-03T13:30:00+00:00",
+            "all_day": 1,
+            "contact_id": null,
+            "conversation_id": 3,
+            "campaign_id": null,
+            "tags_json": null,
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": null,
+            "outcome_notes": null
+          }
+        ],
+        "attendees": [
+          {
+            "id": 1,
+            "meeting_id": 1,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          },
+          {
+            "id": 2,
+            "meeting_id": 2,
+            "contact_id": 2,
+            "status": "invited",
+            "notified": 0
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "meeting"
+          },
+          {
+            "id": 2,
+            "lead_status": "customer"
+          },
+          {
+            "id": 3,
+            "lead_status": "closed"
+          }
+        ],
+        "conversations": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "channel": "sms",
+            "status": "active"
+          },
+          {
+            "id": 2,
+            "contact_id": 2,
+            "channel": "sms",
+            "status": "active"
+          },
+          {
+            "id": 3,
+            "contact_id": 3,
+            "channel": "sms",
+            "status": "active"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "delete",
+      "id": 4,
+      "expected": {
+        "status": 204,
+        "body": null
+      },
+      "snapshot": {
+        "meetings": [
+          {
+            "id": 1,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "completed",
+            "starts_at": "2026-01-04T08:30:00+00:00",
+            "ends_at": "2026-01-04T09:15:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": [
+              "Follow-up"
+            ],
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": [
+              60,
+              15
+            ],
+            "outcome_notes": "Agreed"
+          },
+          {
+            "id": 2,
+            "title": "Review",
+            "description": "Customer",
+            "event_type": "call",
+            "status": "cancelled",
+            "starts_at": "2026-01-03T13:00:00+00:00",
+            "ends_at": "2026-01-03T13:30:00+00:00",
+            "all_day": 0,
+            "contact_id": 2,
+            "conversation_id": 2,
+            "campaign_id": null,
+            "tags_json": null,
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": null,
+            "outcome_notes": null
+          }
+        ],
+        "attendees": [
+          {
+            "id": 1,
+            "meeting_id": 1,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          },
+          {
+            "id": 2,
+            "meeting_id": 2,
+            "contact_id": 2,
+            "status": "invited",
+            "notified": 0
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "meeting"
+          },
+          {
+            "id": 2,
+            "lead_status": "customer"
+          },
+          {
+            "id": 3,
+            "lead_status": "closed"
+          }
+        ],
+        "conversations": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "channel": "sms",
+            "status": "active"
+          },
+          {
+            "id": 2,
+            "contact_id": 2,
+            "channel": "sms",
+            "status": "active"
+          },
+          {
+            "id": 3,
+            "contact_id": 3,
+            "channel": "sms",
+            "status": "active"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "list",
+      "expected": {
+        "status": 200,
+        "body": {
+          "total": 2,
+          "items": [
+            {
+              "id": 2,
+              "title": "Review",
+              "description": "Customer",
+              "event_type": "call",
+              "status": "cancelled",
+              "starts_at": "2026-01-03T13:00:00+00:00",
+              "ends_at": "2026-01-03T13:30:00+00:00",
+              "all_day": false,
+              "location": null,
+              "meeting_link": null,
+              "contact_id": 2,
+              "contact_name": "Bola",
+              "conversation_id": 2,
+              "campaign_id": null,
+              "tags": [],
+              "send_invite_sms": false,
+              "send_invite_email": false,
+              "invite_subject": null,
+              "invite_template_id": null,
+              "invite_body": null,
+              "invite_sent": false,
+              "invite_email_sent": false,
+              "email_account_id": null,
+              "send_sms_reminder": false,
+              "send_email_reminder": false,
+              "reminder_subject": null,
+              "reminder_minutes": [],
+              "reminder_template_id": null,
+              "reminder_body": null,
+              "reminders_sent": {},
+              "outcome_notes": null,
+              "attendees": [
+                {
+                  "id": 2,
+                  "contact_id": 2,
+                  "status": "invited",
+                  "notified": false,
+                  "name": "Bola",
+                  "phone": null
+                }
+              ],
+              "created_at": "2026-01-02T12:00:00.123456+00:00",
+              "updated_at": "2026-01-02T12:00:00.123456+00:00"
+            },
+            {
+              "id": 1,
+              "title": "Review",
+              "description": null,
+              "event_type": "meeting",
+              "status": "completed",
+              "starts_at": "2026-01-04T08:30:00+00:00",
+              "ends_at": "2026-01-04T09:15:00+00:00",
+              "all_day": false,
+              "location": "Abuja",
+              "meeting_link": null,
+              "contact_id": 1,
+              "contact_name": "Ada",
+              "conversation_id": 1,
+              "campaign_id": null,
+              "tags": [
+                "Follow-up"
+              ],
+              "send_invite_sms": false,
+              "send_invite_email": false,
+              "invite_subject": null,
+              "invite_template_id": null,
+              "invite_body": null,
+              "invite_sent": false,
+              "invite_email_sent": false,
+              "email_account_id": null,
+              "send_sms_reminder": false,
+              "send_email_reminder": false,
+              "reminder_subject": null,
+              "reminder_minutes": [
+                60,
+                15
+              ],
+              "reminder_template_id": null,
+              "reminder_body": null,
+              "reminders_sent": {},
+              "outcome_notes": "Agreed",
+              "attendees": [
+                {
+                  "id": 1,
+                  "contact_id": 1,
+                  "status": "invited",
+                  "notified": false,
+                  "name": "Ada",
+                  "phone": null
+                }
+              ],
+              "created_at": "2026-01-02T12:00:00.123456+00:00",
+              "updated_at": "2026-01-02T12:00:00.123456+00:00"
+            }
+          ]
+        }
+      },
+      "snapshot": {
+        "meetings": [
+          {
+            "id": 1,
+            "title": "Review",
+            "description": null,
+            "event_type": "meeting",
+            "status": "completed",
+            "starts_at": "2026-01-04T08:30:00+00:00",
+            "ends_at": "2026-01-04T09:15:00+00:00",
+            "all_day": 0,
+            "contact_id": 1,
+            "conversation_id": 1,
+            "campaign_id": null,
+            "tags_json": [
+              "Follow-up"
+            ],
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": [
+              60,
+              15
+            ],
+            "outcome_notes": "Agreed"
+          },
+          {
+            "id": 2,
+            "title": "Review",
+            "description": "Customer",
+            "event_type": "call",
+            "status": "cancelled",
+            "starts_at": "2026-01-03T13:00:00+00:00",
+            "ends_at": "2026-01-03T13:30:00+00:00",
+            "all_day": 0,
+            "contact_id": 2,
+            "conversation_id": 2,
+            "campaign_id": null,
+            "tags_json": null,
+            "send_invite_sms": 0,
+            "send_invite_email": 0,
+            "invite_sent": 0,
+            "invite_email_sent": 0,
+            "send_sms_reminder": 0,
+            "send_email_reminder": 0,
+            "reminder_minutes_json": null,
+            "outcome_notes": null
+          }
+        ],
+        "attendees": [
+          {
+            "id": 1,
+            "meeting_id": 1,
+            "contact_id": 1,
+            "status": "invited",
+            "notified": 0
+          },
+          {
+            "id": 2,
+            "meeting_id": 2,
+            "contact_id": 2,
+            "status": "invited",
+            "notified": 0
+          }
+        ],
+        "contacts": [
+          {
+            "id": 1,
+            "lead_status": "meeting"
+          },
+          {
+            "id": 2,
+            "lead_status": "customer"
+          },
+          {
+            "id": 3,
+            "lead_status": "closed"
+          }
+        ],
+        "conversations": [
+          {
+            "id": 1,
+            "contact_id": 1,
+            "channel": "sms",
+            "status": "active"
+          },
+          {
+            "id": 2,
+            "contact_id": 2,
+            "channel": "sms",
+            "status": "active"
+          },
+          {
+            "id": 3,
+            "contact_id": 3,
+            "channel": "sms",
+            "status": "active"
+          }
+        ]
+      }
+    }
+  ],
+  "dto": [
+    {
+      "update": false,
+      "input": null,
+      "ok": false
+    },
+    {
+      "update": false,
+      "input": [],
+      "ok": false
+    },
+    {
+      "update": false,
+      "input": {},
+      "ok": false
+    },
+    {
+      "update": false,
+      "input": {
+        "title": " Review ",
+        "starts_at": "2026-01-03T14:00:00+01:00",
+        "send_invite_sms": false,
+        "send_sms_reminder": false
+      },
+      "ok": true
+    },
+    {
+      "update": false,
+      "input": {
+        "title": "X"
+      },
+      "ok": false
+    },
+    {
+      "update": false,
+      "input": {
+        "title": " Review ",
+        "starts_at": "2026-01-03T14:00:00+01:00",
+        "send_invite_sms": false,
+        "send_sms_reminder": false,
+        "duration_minutes": 4
+      },
+      "ok": false
+    },
+    {
+      "update": false,
+      "input": {
+        "title": " Review ",
+        "starts_at": "2026-01-03T14:00:00+01:00",
+        "send_invite_sms": false,
+        "send_sms_reminder": false,
+        "duration_minutes": "30"
+      },
+      "ok": true
+    },
+    {
+      "update": false,
+      "input": {
+        "title": " Review ",
+        "starts_at": "2026-01-03T14:00:00+01:00",
+        "send_invite_sms": false,
+        "send_sms_reminder": false,
+        "all_day": "yes"
+      },
+      "ok": true
+    },
+    {
+      "update": false,
+      "input": {
+        "title": " Review ",
+        "starts_at": "bad",
+        "send_invite_sms": false,
+        "send_sms_reminder": false
+      },
+      "ok": false
+    },
+    {
+      "update": false,
+      "input": {
+        "title": " Review ",
+        "starts_at": "2026-01-03T14:00:00+01:00",
+        "send_invite_sms": false,
+        "send_sms_reminder": false,
+        "contact_ids": [
+          "1",
+          2
+        ]
+      },
+      "ok": true
+    },
+    {
+      "update": false,
+      "input": {
+        "title": " Review ",
+        "starts_at": "2026-01-03T14:00:00+01:00",
+        "send_invite_sms": false,
+        "send_sms_reminder": false,
+        "tags": [
+          1
+        ]
+      },
+      "ok": false
+    },
+    {
+      "update": false,
+      "input": {
+        "title": " Review ",
+        "starts_at": "2026-01-03T14:00:00+01:00",
+        "send_invite_sms": false,
+        "send_sms_reminder": false,
+        "ends_at": null
+      },
+      "ok": true
+    },
+    {
+      "update": false,
+      "input": {
+        "title": null
+      },
+      "ok": false
+    },
+    {
+      "update": false,
+      "input": {
+        "tags": null
+      },
+      "ok": false
+    },
+    {
+      "update": false,
+      "input": {
+        "event_type": null
+      },
+      "ok": false
+    },
+    {
+      "update": true,
+      "input": null,
+      "ok": false
+    },
+    {
+      "update": true,
+      "input": [],
+      "ok": false
+    },
+    {
+      "update": true,
+      "input": {},
+      "ok": true
+    },
+    {
+      "update": true,
+      "input": {
+        "title": " Review ",
+        "starts_at": "2026-01-03T14:00:00+01:00",
+        "send_invite_sms": false,
+        "send_sms_reminder": false
+      },
+      "ok": true
+    },
+    {
+      "update": true,
+      "input": {
+        "title": "X"
+      },
+      "ok": true
+    },
+    {
+      "update": true,
+      "input": {
+        "title": " Review ",
+        "starts_at": "2026-01-03T14:00:00+01:00",
+        "send_invite_sms": false,
+        "send_sms_reminder": false,
+        "duration_minutes": 4
+      },
+      "ok": false
+    },
+    {
+      "update": true,
+      "input": {
+        "title": " Review ",
+        "starts_at": "2026-01-03T14:00:00+01:00",
+        "send_invite_sms": false,
+        "send_sms_reminder": false,
+        "duration_minutes": "30"
+      },
+      "ok": true
+    },
+    {
+      "update": true,
+      "input": {
+        "title": " Review ",
+        "starts_at": "2026-01-03T14:00:00+01:00",
+        "send_invite_sms": false,
+        "send_sms_reminder": false,
+        "all_day": "yes"
+      },
+      "ok": true
+    },
+    {
+      "update": true,
+      "input": {
+        "title": " Review ",
+        "starts_at": "bad",
+        "send_invite_sms": false,
+        "send_sms_reminder": false
+      },
+      "ok": false
+    },
+    {
+      "update": true,
+      "input": {
+        "title": " Review ",
+        "starts_at": "2026-01-03T14:00:00+01:00",
+        "send_invite_sms": false,
+        "send_sms_reminder": false,
+        "contact_ids": [
+          "1",
+          2
+        ]
+      },
+      "ok": true
+    },
+    {
+      "update": true,
+      "input": {
+        "title": " Review ",
+        "starts_at": "2026-01-03T14:00:00+01:00",
+        "send_invite_sms": false,
+        "send_sms_reminder": false,
+        "tags": [
+          1
+        ]
+      },
+      "ok": false
+    },
+    {
+      "update": true,
+      "input": {
+        "title": " Review ",
+        "starts_at": "2026-01-03T14:00:00+01:00",
+        "send_invite_sms": false,
+        "send_sms_reminder": false,
+        "ends_at": null
+      },
+      "ok": true
+    },
+    {
+      "update": true,
+      "input": {
+        "title": null
+      },
+      "ok": true
+    },
+    {
+      "update": true,
+      "input": {
+        "tags": null
+      },
+      "ok": true
+    },
+    {
+      "update": true,
+      "input": {
+        "event_type": null
+      },
+      "ok": true
+    }
+  ],
+  "helpers": [
+    {
+      "input": {
+        "title": "Call é",
+        "starts_at": "2026-01-03T00:00:00Z",
+        "location": null,
+        "meeting_link": "https://example.test/meeting"
+      },
+      "expected": {
+        "meeting_title": "Call é",
+        "meeting_date": "Sat, 03 Jan 2026",
+        "meeting_time": "12:00 AM",
+        "meeting_datetime": "Sat, 3 Jan 2026 at 12:00 AM",
+        "meeting_location": "",
+        "meeting_link": "https://example.test/meeting"
+      }
+    },
+    {
+      "input": {
+        "title": "Call é",
+        "starts_at": "2026-01-03T00:00:00Z",
+        "location": "Abuja",
+        "meeting_link": "https://example.test/meeting"
+      },
+      "expected": {
+        "meeting_title": "Call é",
+        "meeting_date": "Sat, 03 Jan 2026",
+        "meeting_time": "12:00 AM",
+        "meeting_datetime": "Sat, 3 Jan 2026 at 12:00 AM",
+        "meeting_location": "at Abuja.",
+        "meeting_link": "https://example.test/meeting"
+      }
+    },
+    {
+      "input": {
+        "title": "Call é",
+        "starts_at": "2026-01-03T12:00:00Z",
+        "location": null,
+        "meeting_link": "https://example.test/meeting"
+      },
+      "expected": {
+        "meeting_title": "Call é",
+        "meeting_date": "Sat, 03 Jan 2026",
+        "meeting_time": "12:00 PM",
+        "meeting_datetime": "Sat, 3 Jan 2026 at 12:00 PM",
+        "meeting_location": "",
+        "meeting_link": "https://example.test/meeting"
+      }
+    },
+    {
+      "input": {
+        "title": "Call é",
+        "starts_at": "2026-01-03T12:00:00Z",
+        "location": "Abuja",
+        "meeting_link": "https://example.test/meeting"
+      },
+      "expected": {
+        "meeting_title": "Call é",
+        "meeting_date": "Sat, 03 Jan 2026",
+        "meeting_time": "12:00 PM",
+        "meeting_datetime": "Sat, 3 Jan 2026 at 12:00 PM",
+        "meeting_location": "at Abuja.",
+        "meeting_link": "https://example.test/meeting"
+      }
+    },
+    {
+      "input": {
+        "title": "Call é",
+        "starts_at": "2026-12-31T23:45:00-03:30",
+        "location": null,
+        "meeting_link": "https://example.test/meeting"
+      },
+      "expected": {
+        "meeting_title": "Call é",
+        "meeting_date": "Fri, 01 Jan 2027",
+        "meeting_time": "3:15 AM",
+        "meeting_datetime": "Fri, 1 Jan 2027 at 3:15 AM",
+        "meeting_location": "",
+        "meeting_link": "https://example.test/meeting"
+      }
+    },
+    {
+      "input": {
+        "title": "Call é",
+        "starts_at": "2026-12-31T23:45:00-03:30",
+        "location": "Abuja",
+        "meeting_link": "https://example.test/meeting"
+      },
+      "expected": {
+        "meeting_title": "Call é",
+        "meeting_date": "Fri, 01 Jan 2027",
+        "meeting_time": "3:15 AM",
+        "meeting_datetime": "Fri, 1 Jan 2027 at 3:15 AM",
+        "meeting_location": "at Abuja.",
+        "meeting_link": "https://example.test/meeting"
+      }
+    }
+  ],
+  "scope": "Actual selected calendar source AST. Isolated SQLite, fixed UTC clock, synthetic contacts, omitted FKs and reconstructed attendee relationship. No source app imports, providers, native WordPress/MySQL/concurrency/browser/delivery proof."
+}

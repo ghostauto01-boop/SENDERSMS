@@ -1,0 +1,15 @@
+{
+  "ok": true,
+  "assertions": 36,
+  "browser": "Chromium HeadlessChrome/149.0.7827.0",
+  "modes": [
+    "pretty",
+    "plain",
+    "disabled"
+  ],
+  "original_backend_used": false,
+  "provider_messages_sent": 0,
+  "native_wordpress_verified": false,
+  "native_mysql_verified": false,
+  "scope": "Actual built copied UI in Chromium against a synthetic local native-REST fixture and actual PHP-rendered shell/CSP. Login, contacts, explicit queue, ambiguous acknowledgement/key retry, cancellation and reload checks. NOT a real WordPress/MySQL browser or complete application qualification."
+}

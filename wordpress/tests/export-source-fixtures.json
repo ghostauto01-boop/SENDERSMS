@@ -1,0 +1,2043 @@
+{
+  "seeds": [
+    {
+      "table": "contacts",
+      "values": {
+        "id": 1,
+        "first_name": "Ada",
+        "last_name": null,
+        "business_name": null,
+        "phone_number": "+2348031112222",
+        "email": "ada@business.ng",
+        "city": "Abuja",
+        "state": null,
+        "country": null,
+        "website": null,
+        "industry": null,
+        "source": null,
+        "lead_status": "new",
+        "consent_status": "unknown",
+        "has_consented": false,
+        "is_opted_out": false,
+        "opted_out_at": null,
+        "opt_out_reason": null,
+        "is_undeliverable": false,
+        "undeliverable_reason": null,
+        "delivery_fail_count": 0,
+        "is_email_opted_out": false,
+        "email_opted_out_at": null,
+        "email_opt_out_reason": null,
+        "email_status": "active",
+        "is_email_undeliverable": false,
+        "email_fail_count": 0,
+        "email_last_error": null,
+        "email_source": null,
+        "email_verified": false,
+        "email_verified_at": null,
+        "email_confidence": null,
+        "email_verdict": null,
+        "email_enriched_at": null,
+        "email_enrichment_note": null,
+        "email_lower": null,
+        "notes": null,
+        "custom_fields": "{\"tier\": \"Gold\", \"score\": 42, \"enabled\": false, \"nested\": {\"x\": true}}",
+        "messages_sent": 0,
+        "messages_received": 0,
+        "emails_sent": 0,
+        "emails_received": 0,
+        "last_emailed_at": null,
+        "last_email_reply_at": null,
+        "last_contacted_at": null,
+        "last_reply_at": null,
+        "created_at": "2026-01-02T12:00:00+00:00",
+        "updated_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "contacts",
+      "values": {
+        "id": 2,
+        "first_name": "Bola",
+        "last_name": null,
+        "business_name": null,
+        "phone_number": null,
+        "email": "bola@business.ng",
+        "city": null,
+        "state": null,
+        "country": null,
+        "website": null,
+        "industry": null,
+        "source": null,
+        "lead_status": "new",
+        "consent_status": "unknown",
+        "has_consented": false,
+        "is_opted_out": false,
+        "opted_out_at": null,
+        "opt_out_reason": null,
+        "is_undeliverable": false,
+        "undeliverable_reason": null,
+        "delivery_fail_count": 0,
+        "is_email_opted_out": false,
+        "email_opted_out_at": null,
+        "email_opt_out_reason": null,
+        "email_status": "active",
+        "is_email_undeliverable": false,
+        "email_fail_count": 0,
+        "email_last_error": null,
+        "email_source": null,
+        "email_verified": false,
+        "email_verified_at": null,
+        "email_confidence": null,
+        "email_verdict": null,
+        "email_enriched_at": null,
+        "email_enrichment_note": null,
+        "email_lower": null,
+        "notes": "A comma, a quote \" and\na newline",
+        "custom_fields": "{\"tier\": \"Silver\", \"note\": \"\\u00e9 \\ud83d\\ude00\", \"items\": [1, true, null]}",
+        "messages_sent": 0,
+        "messages_received": 0,
+        "emails_sent": 0,
+        "emails_received": 0,
+        "last_emailed_at": null,
+        "last_email_reply_at": null,
+        "last_contacted_at": null,
+        "last_reply_at": null,
+        "created_at": "2026-01-02T12:00:00.000001+00:00",
+        "updated_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "contacts",
+      "values": {
+        "id": 3,
+        "first_name": "=HYPERLINK(\"https://evil.invalid\")",
+        "last_name": null,
+        "business_name": null,
+        "phone_number": null,
+        "email": "safe@business.ng",
+        "city": null,
+        "state": null,
+        "country": null,
+        "website": null,
+        "industry": null,
+        "source": null,
+        "lead_status": "new",
+        "consent_status": "unknown",
+        "has_consented": false,
+        "is_opted_out": false,
+        "opted_out_at": null,
+        "opt_out_reason": null,
+        "is_undeliverable": false,
+        "undeliverable_reason": null,
+        "delivery_fail_count": 0,
+        "is_email_opted_out": false,
+        "email_opted_out_at": null,
+        "email_opt_out_reason": null,
+        "email_status": "active",
+        "is_email_undeliverable": false,
+        "email_fail_count": 0,
+        "email_last_error": null,
+        "email_source": null,
+        "email_verified": false,
+        "email_verified_at": null,
+        "email_confidence": null,
+        "email_verdict": null,
+        "email_enriched_at": null,
+        "email_enrichment_note": null,
+        "email_lower": null,
+        "notes": "\t=1+1",
+        "custom_fields": "{\"=header\": \"@SUM(1)\", \"0\": \"zero\"}",
+        "messages_sent": 0,
+        "messages_received": 0,
+        "emails_sent": 0,
+        "emails_received": 0,
+        "last_emailed_at": null,
+        "last_email_reply_at": null,
+        "last_contacted_at": null,
+        "last_reply_at": null,
+        "created_at": "2026-01-02T12:00:00.000002+00:00",
+        "updated_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "contacts",
+      "values": {
+        "id": 4,
+        "first_name": "No email",
+        "last_name": null,
+        "business_name": null,
+        "phone_number": "+2348031112223",
+        "email": null,
+        "city": null,
+        "state": null,
+        "country": null,
+        "website": null,
+        "industry": null,
+        "source": null,
+        "lead_status": "new",
+        "consent_status": "unknown",
+        "has_consented": false,
+        "is_opted_out": false,
+        "opted_out_at": null,
+        "opt_out_reason": null,
+        "is_undeliverable": false,
+        "undeliverable_reason": null,
+        "delivery_fail_count": 0,
+        "is_email_opted_out": false,
+        "email_opted_out_at": null,
+        "email_opt_out_reason": null,
+        "email_status": "active",
+        "is_email_undeliverable": false,
+        "email_fail_count": 0,
+        "email_last_error": null,
+        "email_source": null,
+        "email_verified": false,
+        "email_verified_at": null,
+        "email_confidence": null,
+        "email_verdict": null,
+        "email_enriched_at": null,
+        "email_enrichment_note": null,
+        "email_lower": null,
+        "notes": null,
+        "custom_fields": "not json",
+        "messages_sent": 0,
+        "messages_received": 0,
+        "emails_sent": 0,
+        "emails_received": 0,
+        "last_emailed_at": null,
+        "last_email_reply_at": null,
+        "last_contacted_at": null,
+        "last_reply_at": null,
+        "created_at": "2026-01-02T12:00:00.000003+00:00",
+        "updated_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "contacts",
+      "values": {
+        "id": 5,
+        "first_name": "Last",
+        "last_name": null,
+        "business_name": null,
+        "phone_number": null,
+        "email": "last@business.ng",
+        "city": null,
+        "state": null,
+        "country": null,
+        "website": null,
+        "industry": null,
+        "source": null,
+        "lead_status": "new",
+        "consent_status": "unknown",
+        "has_consented": false,
+        "is_opted_out": false,
+        "opted_out_at": null,
+        "opt_out_reason": null,
+        "is_undeliverable": false,
+        "undeliverable_reason": null,
+        "delivery_fail_count": 0,
+        "is_email_opted_out": false,
+        "email_opted_out_at": null,
+        "email_opt_out_reason": null,
+        "email_status": "active",
+        "is_email_undeliverable": false,
+        "email_fail_count": 0,
+        "email_last_error": null,
+        "email_source": null,
+        "email_verified": false,
+        "email_verified_at": null,
+        "email_confidence": null,
+        "email_verdict": null,
+        "email_enriched_at": null,
+        "email_enrichment_note": null,
+        "email_lower": null,
+        "notes": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "custom_fields": "{\"later\": \"value\"}",
+        "messages_sent": 0,
+        "messages_received": 0,
+        "emails_sent": 0,
+        "emails_received": 0,
+        "last_emailed_at": null,
+        "last_email_reply_at": null,
+        "last_contacted_at": null,
+        "last_reply_at": null,
+        "created_at": "2026-01-02T12:00:00.000004+00:00",
+        "updated_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "tags",
+      "values": {
+        "id": 1,
+        "name": "Buyer",
+        "color": null,
+        "created_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "contact_tags",
+      "values": {
+        "id": 1,
+        "contact_id": 1,
+        "tag_id": 1,
+        "created_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "contact_tags",
+      "values": {
+        "id": 2,
+        "contact_id": 2,
+        "tag_id": 1,
+        "created_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "contact_lists",
+      "values": {
+        "id": 1,
+        "name": "Subset",
+        "description": null,
+        "contact_count": 0,
+        "created_at": "2026-01-02T12:00:00.123456+00:00",
+        "updated_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "contact_list_members",
+      "values": {
+        "id": 1,
+        "list_id": 1,
+        "contact_id": 2,
+        "added_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    },
+    {
+      "table": "contact_list_members",
+      "values": {
+        "id": 2,
+        "list_id": 1,
+        "contact_id": 5,
+        "added_at": "2026-01-02T12:00:00.123456+00:00"
+      }
+    }
+  ],
+  "operations": [
+    {
+      "kind": "page",
+      "filters": {
+        "search": null,
+        "lead_status": null,
+        "tag": null,
+        "email_state": null,
+        "channel": null,
+        "list_id": null
+      },
+      "query": {
+        "format": "csv",
+        "limit": 2
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "format": "csv",
+          "columns": [
+            "first_name",
+            "last_name",
+            "business_name",
+            "phone_number",
+            "email",
+            "city",
+            "state",
+            "country",
+            "website",
+            "industry",
+            "source",
+            "lead_status",
+            "notes",
+            "tags",
+            "tier",
+            "score",
+            "enabled",
+            "nested",
+            "note",
+            "items",
+            "=header",
+            "0",
+            "later"
+          ],
+          "returned": 2,
+          "total": 5,
+          "truncated": true,
+          "next_cursor": "eyJsYXN0X2lkIjoyLCJjb2x1bW5zIjpbInRpZXIiLCJzY29yZSIsImVuYWJsZWQiLCJuZXN0ZWQiLCJub3RlIiwiaXRlbXMiLCI9aGVhZGVyIiwiMCIsImxhdGVyIl0sImYiOiIyOTY0YjIzMDVjYmIifQ",
+          "csv": "first_name,last_name,business_name,phone_number,email,city,state,country,website,industry,source,lead_status,notes,tags,tier,score,enabled,nested,note,items,=header,0,later\r\nAda,,,+2348031112222,ada@business.ng,Abuja,,,,,,new,,Buyer,Gold,42,False,{'x': True},,,,,\r\nBola,,,,bola@business.ng,,,,,,,new,\"A comma, a quote \"\" and\na newline\",Buyer,Silver,,,,é 😀,\"[1, True, None]\",,,\r\n"
+        },
+        "safe_csv": "first_name,last_name,business_name,phone_number,email,city,state,country,website,industry,source,lead_status,notes,tags,tier,score,enabled,nested,note,items,'=header,0,later\r\nAda,,,'+2348031112222,ada@business.ng,Abuja,,,,,,new,,Buyer,Gold,42,False,{'x': True},,,,,\r\nBola,,,,bola@business.ng,,,,,,,new,\"A comma, a quote \"\" and\na newline\",Buyer,Silver,,,,é 😀,\"[1, True, None]\",,,\r\n"
+      }
+    },
+    {
+      "kind": "page",
+      "filters": {
+        "search": null,
+        "lead_status": null,
+        "tag": null,
+        "email_state": null,
+        "channel": null,
+        "list_id": null
+      },
+      "query": {
+        "format": "json",
+        "limit": 2
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "format": "json",
+          "columns": [
+            "first_name",
+            "last_name",
+            "business_name",
+            "phone_number",
+            "email",
+            "city",
+            "state",
+            "country",
+            "website",
+            "industry",
+            "source",
+            "lead_status",
+            "notes",
+            "tags",
+            "tier",
+            "score",
+            "enabled",
+            "nested",
+            "note",
+            "items",
+            "=header",
+            "0",
+            "later"
+          ],
+          "returned": 2,
+          "total": 5,
+          "truncated": true,
+          "next_cursor": "eyJsYXN0X2lkIjoyLCJjb2x1bW5zIjpbInRpZXIiLCJzY29yZSIsImVuYWJsZWQiLCJuZXN0ZWQiLCJub3RlIiwiaXRlbXMiLCI9aGVhZGVyIiwiMCIsImxhdGVyIl0sImYiOiIyOTY0YjIzMDVjYmIifQ",
+          "rows": [
+            {
+              "first_name": "Ada",
+              "last_name": "",
+              "business_name": "",
+              "phone_number": "+2348031112222",
+              "email": "ada@business.ng",
+              "city": "Abuja",
+              "state": "",
+              "country": "",
+              "website": "",
+              "industry": "",
+              "source": "",
+              "lead_status": "new",
+              "notes": "",
+              "tags": "Buyer",
+              "tier": "Gold",
+              "score": 42,
+              "enabled": false,
+              "nested": {
+                "x": true
+              },
+              "note": "",
+              "items": "",
+              "=header": "",
+              "0": "",
+              "later": ""
+            },
+            {
+              "first_name": "Bola",
+              "last_name": "",
+              "business_name": "",
+              "phone_number": "",
+              "email": "bola@business.ng",
+              "city": "",
+              "state": "",
+              "country": "",
+              "website": "",
+              "industry": "",
+              "source": "",
+              "lead_status": "new",
+              "notes": "A comma, a quote \" and\na newline",
+              "tags": "Buyer",
+              "tier": "Silver",
+              "score": "",
+              "enabled": "",
+              "nested": "",
+              "note": "é 😀",
+              "items": [
+                1,
+                true,
+                null
+              ],
+              "=header": "",
+              "0": "",
+              "later": ""
+            }
+          ]
+        }
+      }
+    },
+    {
+      "kind": "download",
+      "filters": {
+        "search": null,
+        "lead_status": null,
+        "tag": null,
+        "email_state": null,
+        "channel": null,
+        "list_id": null
+      },
+      "query": {},
+      "expected": {
+        "csv": "first_name,last_name,business_name,phone_number,email,city,state,country,website,industry,source,lead_status,notes,tags,later,=header,0,tier,note,items,score,enabled,nested\r\nLast,,,,last@business.ng,,,,,,,new,xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx,,value,,,,,,,,\r\nNo email,,,+2348031112223,,,,,,,,new,,,,,,,,,,,\r\n\"=HYPERLINK(\"\"https://evil.invalid\"\")\",,,,safe@business.ng,,,,,,,new,\t=1+1,,,@SUM(1),zero,,,,,,\r\nBola,,,,bola@business.ng,,,,,,,new,\"A comma, a quote \"\" and\na newline\",Buyer,,,,Silver,é 😀,\"[1, True, None]\",,,\r\nAda,,,+2348031112222,ada@business.ng,Abuja,,,,,,new,,Buyer,,,,Gold,,,42,False,{'x': True}\r\n",
+        "safe_csv": "first_name,last_name,business_name,phone_number,email,city,state,country,website,industry,source,lead_status,notes,tags,later,'=header,0,tier,note,items,score,enabled,nested\r\nLast,,,,last@business.ng,,,,,,,new,xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx,,value,,,,,,,,\r\nNo email,,,'+2348031112223,,,,,,,,new,,,,,,,,,,,\r\n\"'=HYPERLINK(\"\"https://evil.invalid\"\")\",,,,safe@business.ng,,,,,,,new,'\t=1+1,,,'@SUM(1),zero,,,,,,\r\nBola,,,,bola@business.ng,,,,,,,new,\"A comma, a quote \"\" and\na newline\",Buyer,,,,Silver,é 😀,\"[1, True, None]\",,,\r\nAda,,,'+2348031112222,ada@business.ng,Abuja,,,,,,new,,Buyer,,,,Gold,,,42,False,{'x': True}\r\n"
+      }
+    },
+    {
+      "kind": "page",
+      "filters": {
+        "search": "Bola",
+        "lead_status": null,
+        "tag": null,
+        "email_state": null,
+        "channel": null,
+        "list_id": null
+      },
+      "query": {
+        "format": "csv",
+        "limit": 2
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "format": "csv",
+          "columns": [
+            "first_name",
+            "last_name",
+            "business_name",
+            "phone_number",
+            "email",
+            "city",
+            "state",
+            "country",
+            "website",
+            "industry",
+            "source",
+            "lead_status",
+            "notes",
+            "tags",
+            "tier",
+            "note",
+            "items"
+          ],
+          "returned": 1,
+          "total": 1,
+          "truncated": false,
+          "next_cursor": null,
+          "csv": "first_name,last_name,business_name,phone_number,email,city,state,country,website,industry,source,lead_status,notes,tags,tier,note,items\r\nBola,,,,bola@business.ng,,,,,,,new,\"A comma, a quote \"\" and\na newline\",Buyer,Silver,é 😀,\"[1, True, None]\"\r\n"
+        },
+        "safe_csv": "first_name,last_name,business_name,phone_number,email,city,state,country,website,industry,source,lead_status,notes,tags,tier,note,items\r\nBola,,,,bola@business.ng,,,,,,,new,\"A comma, a quote \"\" and\na newline\",Buyer,Silver,é 😀,\"[1, True, None]\"\r\n"
+      }
+    },
+    {
+      "kind": "page",
+      "filters": {
+        "search": "Bola",
+        "lead_status": null,
+        "tag": null,
+        "email_state": null,
+        "channel": null,
+        "list_id": null
+      },
+      "query": {
+        "format": "json",
+        "limit": 2
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "format": "json",
+          "columns": [
+            "first_name",
+            "last_name",
+            "business_name",
+            "phone_number",
+            "email",
+            "city",
+            "state",
+            "country",
+            "website",
+            "industry",
+            "source",
+            "lead_status",
+            "notes",
+            "tags",
+            "tier",
+            "note",
+            "items"
+          ],
+          "returned": 1,
+          "total": 1,
+          "truncated": false,
+          "next_cursor": null,
+          "rows": [
+            {
+              "first_name": "Bola",
+              "last_name": "",
+              "business_name": "",
+              "phone_number": "",
+              "email": "bola@business.ng",
+              "city": "",
+              "state": "",
+              "country": "",
+              "website": "",
+              "industry": "",
+              "source": "",
+              "lead_status": "new",
+              "notes": "A comma, a quote \" and\na newline",
+              "tags": "Buyer",
+              "tier": "Silver",
+              "note": "é 😀",
+              "items": [
+                1,
+                true,
+                null
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "kind": "download",
+      "filters": {
+        "search": "Bola",
+        "lead_status": null,
+        "tag": null,
+        "email_state": null,
+        "channel": null,
+        "list_id": null
+      },
+      "query": {},
+      "expected": {
+        "csv": "first_name,last_name,business_name,phone_number,email,city,state,country,website,industry,source,lead_status,notes,tags,tier,note,items\r\nBola,,,,bola@business.ng,,,,,,,new,\"A comma, a quote \"\" and\na newline\",Buyer,Silver,é 😀,\"[1, True, None]\"\r\n",
+        "safe_csv": "first_name,last_name,business_name,phone_number,email,city,state,country,website,industry,source,lead_status,notes,tags,tier,note,items\r\nBola,,,,bola@business.ng,,,,,,,new,\"A comma, a quote \"\" and\na newline\",Buyer,Silver,é 😀,\"[1, True, None]\"\r\n"
+      }
+    },
+    {
+      "kind": "page",
+      "filters": {
+        "search": null,
+        "lead_status": null,
+        "tag": "Buyer",
+        "email_state": null,
+        "channel": null,
+        "list_id": null
+      },
+      "query": {
+        "format": "csv",
+        "limit": 2
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "format": "csv",
+          "columns": [
+            "first_name",
+            "last_name",
+            "business_name",
+            "phone_number",
+            "email",
+            "city",
+            "state",
+            "country",
+            "website",
+            "industry",
+            "source",
+            "lead_status",
+            "notes",
+            "tags",
+            "tier",
+            "score",
+            "enabled",
+            "nested",
+            "note",
+            "items"
+          ],
+          "returned": 2,
+          "total": 2,
+          "truncated": false,
+          "next_cursor": null,
+          "csv": "first_name,last_name,business_name,phone_number,email,city,state,country,website,industry,source,lead_status,notes,tags,tier,score,enabled,nested,note,items\r\nAda,,,+2348031112222,ada@business.ng,Abuja,,,,,,new,,Buyer,Gold,42,False,{'x': True},,\r\nBola,,,,bola@business.ng,,,,,,,new,\"A comma, a quote \"\" and\na newline\",Buyer,Silver,,,,é 😀,\"[1, True, None]\"\r\n"
+        },
+        "safe_csv": "first_name,last_name,business_name,phone_number,email,city,state,country,website,industry,source,lead_status,notes,tags,tier,score,enabled,nested,note,items\r\nAda,,,'+2348031112222,ada@business.ng,Abuja,,,,,,new,,Buyer,Gold,42,False,{'x': True},,\r\nBola,,,,bola@business.ng,,,,,,,new,\"A comma, a quote \"\" and\na newline\",Buyer,Silver,,,,é 😀,\"[1, True, None]\"\r\n"
+      }
+    },
+    {
+      "kind": "page",
+      "filters": {
+        "search": null,
+        "lead_status": null,
+        "tag": "Buyer",
+        "email_state": null,
+        "channel": null,
+        "list_id": null
+      },
+      "query": {
+        "format": "json",
+        "limit": 2
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "format": "json",
+          "columns": [
+            "first_name",
+            "last_name",
+            "business_name",
+            "phone_number",
+            "email",
+            "city",
+            "state",
+            "country",
+            "website",
+            "industry",
+            "source",
+            "lead_status",
+            "notes",
+            "tags",
+            "tier",
+            "score",
+            "enabled",
+            "nested",
+            "note",
+            "items"
+          ],
+          "returned": 2,
+          "total": 2,
+          "truncated": false,
+          "next_cursor": null,
+          "rows": [
+            {
+              "first_name": "Ada",
+              "last_name": "",
+              "business_name": "",
+              "phone_number": "+2348031112222",
+              "email": "ada@business.ng",
+              "city": "Abuja",
+              "state": "",
+              "country": "",
+              "website": "",
+              "industry": "",
+              "source": "",
+              "lead_status": "new",
+              "notes": "",
+              "tags": "Buyer",
+              "tier": "Gold",
+              "score": 42,
+              "enabled": false,
+              "nested": {
+                "x": true
+              },
+              "note": "",
+              "items": ""
+            },
+            {
+              "first_name": "Bola",
+              "last_name": "",
+              "business_name": "",
+              "phone_number": "",
+              "email": "bola@business.ng",
+              "city": "",
+              "state": "",
+              "country": "",
+              "website": "",
+              "industry": "",
+              "source": "",
+              "lead_status": "new",
+              "notes": "A comma, a quote \" and\na newline",
+              "tags": "Buyer",
+              "tier": "Silver",
+              "score": "",
+              "enabled": "",
+              "nested": "",
+              "note": "é 😀",
+              "items": [
+                1,
+                true,
+                null
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "kind": "download",
+      "filters": {
+        "search": null,
+        "lead_status": null,
+        "tag": "Buyer",
+        "email_state": null,
+        "channel": null,
+        "list_id": null
+      },
+      "query": {},
+      "expected": {
+        "csv": "first_name,last_name,business_name,phone_number,email,city,state,country,website,industry,source,lead_status,notes,tags,tier,note,items,score,enabled,nested\r\nBola,,,,bola@business.ng,,,,,,,new,\"A comma, a quote \"\" and\na newline\",Buyer,Silver,é 😀,\"[1, True, None]\",,,\r\nAda,,,+2348031112222,ada@business.ng,Abuja,,,,,,new,,Buyer,Gold,,,42,False,{'x': True}\r\n",
+        "safe_csv": "first_name,last_name,business_name,phone_number,email,city,state,country,website,industry,source,lead_status,notes,tags,tier,note,items,score,enabled,nested\r\nBola,,,,bola@business.ng,,,,,,,new,\"A comma, a quote \"\" and\na newline\",Buyer,Silver,é 😀,\"[1, True, None]\",,,\r\nAda,,,'+2348031112222,ada@business.ng,Abuja,,,,,,new,,Buyer,Gold,,,42,False,{'x': True}\r\n"
+      }
+    },
+    {
+      "kind": "page",
+      "filters": {
+        "search": null,
+        "lead_status": null,
+        "tag": null,
+        "email_state": null,
+        "channel": "sms",
+        "list_id": null
+      },
+      "query": {
+        "format": "csv",
+        "limit": 2
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "format": "csv",
+          "columns": [
+            "first_name",
+            "last_name",
+            "business_name",
+            "phone_number",
+            "email",
+            "city",
+            "state",
+            "country",
+            "website",
+            "industry",
+            "source",
+            "lead_status",
+            "notes",
+            "tags",
+            "tier",
+            "score",
+            "enabled",
+            "nested"
+          ],
+          "returned": 2,
+          "total": 2,
+          "truncated": false,
+          "next_cursor": null,
+          "csv": "first_name,last_name,business_name,phone_number,email,city,state,country,website,industry,source,lead_status,notes,tags,tier,score,enabled,nested\r\nAda,,,+2348031112222,ada@business.ng,Abuja,,,,,,new,,Buyer,Gold,42,False,{'x': True}\r\nNo email,,,+2348031112223,,,,,,,,new,,,,,,\r\n"
+        },
+        "safe_csv": "first_name,last_name,business_name,phone_number,email,city,state,country,website,industry,source,lead_status,notes,tags,tier,score,enabled,nested\r\nAda,,,'+2348031112222,ada@business.ng,Abuja,,,,,,new,,Buyer,Gold,42,False,{'x': True}\r\nNo email,,,'+2348031112223,,,,,,,,new,,,,,,\r\n"
+      }
+    },
+    {
+      "kind": "page",
+      "filters": {
+        "search": null,
+        "lead_status": null,
+        "tag": null,
+        "email_state": null,
+        "channel": "sms",
+        "list_id": null
+      },
+      "query": {
+        "format": "json",
+        "limit": 2
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "format": "json",
+          "columns": [
+            "first_name",
+            "last_name",
+            "business_name",
+            "phone_number",
+            "email",
+            "city",
+            "state",
+            "country",
+            "website",
+            "industry",
+            "source",
+            "lead_status",
+            "notes",
+            "tags",
+            "tier",
+            "score",
+            "enabled",
+            "nested"
+          ],
+          "returned": 2,
+          "total": 2,
+          "truncated": false,
+          "next_cursor": null,
+          "rows": [
+            {
+              "first_name": "Ada",
+              "last_name": "",
+              "business_name": "",
+              "phone_number": "+2348031112222",
+              "email": "ada@business.ng",
+              "city": "Abuja",
+              "state": "",
+              "country": "",
+              "website": "",
+              "industry": "",
+              "source": "",
+              "lead_status": "new",
+              "notes": "",
+              "tags": "Buyer",
+              "tier": "Gold",
+              "score": 42,
+              "enabled": false,
+              "nested": {
+                "x": true
+              }
+            },
+            {
+              "first_name": "No email",
+              "last_name": "",
+              "business_name": "",
+              "phone_number": "+2348031112223",
+              "email": "",
+              "city": "",
+              "state": "",
+              "country": "",
+              "website": "",
+              "industry": "",
+              "source": "",
+              "lead_status": "new",
+              "notes": "",
+              "tags": "",
+              "tier": "",
+              "score": "",
+              "enabled": "",
+              "nested": ""
+            }
+          ]
+        }
+      }
+    },
+    {
+      "kind": "download",
+      "filters": {
+        "search": null,
+        "lead_status": null,
+        "tag": null,
+        "email_state": null,
+        "channel": "sms",
+        "list_id": null
+      },
+      "query": {},
+      "expected": {
+        "csv": "first_name,last_name,business_name,phone_number,email,city,state,country,website,industry,source,lead_status,notes,tags,tier,score,enabled,nested\r\nNo email,,,+2348031112223,,,,,,,,new,,,,,,\r\nAda,,,+2348031112222,ada@business.ng,Abuja,,,,,,new,,Buyer,Gold,42,False,{'x': True}\r\n",
+        "safe_csv": "first_name,last_name,business_name,phone_number,email,city,state,country,website,industry,source,lead_status,notes,tags,tier,score,enabled,nested\r\nNo email,,,'+2348031112223,,,,,,,,new,,,,,,\r\nAda,,,'+2348031112222,ada@business.ng,Abuja,,,,,,new,,Buyer,Gold,42,False,{'x': True}\r\n"
+      }
+    },
+    {
+      "kind": "page",
+      "filters": {
+        "search": null,
+        "lead_status": null,
+        "tag": null,
+        "email_state": null,
+        "channel": "email",
+        "list_id": null
+      },
+      "query": {
+        "format": "csv",
+        "limit": 2
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "format": "csv",
+          "columns": [
+            "first_name",
+            "last_name",
+            "business_name",
+            "phone_number",
+            "email",
+            "city",
+            "state",
+            "country",
+            "website",
+            "industry",
+            "source",
+            "lead_status",
+            "notes",
+            "tags",
+            "tier",
+            "score",
+            "enabled",
+            "nested",
+            "note",
+            "items",
+            "=header",
+            "0",
+            "later"
+          ],
+          "returned": 2,
+          "total": 4,
+          "truncated": true,
+          "next_cursor": "eyJsYXN0X2lkIjoyLCJjb2x1bW5zIjpbInRpZXIiLCJzY29yZSIsImVuYWJsZWQiLCJuZXN0ZWQiLCJub3RlIiwiaXRlbXMiLCI9aGVhZGVyIiwiMCIsImxhdGVyIl0sImYiOiI5OGUyN2MxM2RhZTcifQ",
+          "csv": "first_name,last_name,business_name,phone_number,email,city,state,country,website,industry,source,lead_status,notes,tags,tier,score,enabled,nested,note,items,=header,0,later\r\nAda,,,+2348031112222,ada@business.ng,Abuja,,,,,,new,,Buyer,Gold,42,False,{'x': True},,,,,\r\nBola,,,,bola@business.ng,,,,,,,new,\"A comma, a quote \"\" and\na newline\",Buyer,Silver,,,,é 😀,\"[1, True, None]\",,,\r\n"
+        },
+        "safe_csv": "first_name,last_name,business_name,phone_number,email,city,state,country,website,industry,source,lead_status,notes,tags,tier,score,enabled,nested,note,items,'=header,0,later\r\nAda,,,'+2348031112222,ada@business.ng,Abuja,,,,,,new,,Buyer,Gold,42,False,{'x': True},,,,,\r\nBola,,,,bola@business.ng,,,,,,,new,\"A comma, a quote \"\" and\na newline\",Buyer,Silver,,,,é 😀,\"[1, True, None]\",,,\r\n"
+      }
+    },
+    {
+      "kind": "page",
+      "filters": {
+        "search": null,
+        "lead_status": null,
+        "tag": null,
+        "email_state": null,
+        "channel": "email",
+        "list_id": null
+      },
+      "query": {
+        "format": "json",
+        "limit": 2
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "format": "json",
+          "columns": [
+            "first_name",
+            "last_name",
+            "business_name",
+            "phone_number",
+            "email",
+            "city",
+            "state",
+            "country",
+            "website",
+            "industry",
+            "source",
+            "lead_status",
+            "notes",
+            "tags",
+            "tier",
+            "score",
+            "enabled",
+            "nested",
+            "note",
+            "items",
+            "=header",
+            "0",
+            "later"
+          ],
+          "returned": 2,
+          "total": 4,
+          "truncated": true,
+          "next_cursor": "eyJsYXN0X2lkIjoyLCJjb2x1bW5zIjpbInRpZXIiLCJzY29yZSIsImVuYWJsZWQiLCJuZXN0ZWQiLCJub3RlIiwiaXRlbXMiLCI9aGVhZGVyIiwiMCIsImxhdGVyIl0sImYiOiI5OGUyN2MxM2RhZTcifQ",
+          "rows": [
+            {
+              "first_name": "Ada",
+              "last_name": "",
+              "business_name": "",
+              "phone_number": "+2348031112222",
+              "email": "ada@business.ng",
+              "city": "Abuja",
+              "state": "",
+              "country": "",
+              "website": "",
+              "industry": "",
+              "source": "",
+              "lead_status": "new",
+              "notes": "",
+              "tags": "Buyer",
+              "tier": "Gold",
+              "score": 42,
+              "enabled": false,
+              "nested": {
+                "x": true
+              },
+              "note": "",
+              "items": "",
+              "=header": "",
+              "0": "",
+              "later": ""
+            },
+            {
+              "first_name": "Bola",
+              "last_name": "",
+              "business_name": "",
+              "phone_number": "",
+              "email": "bola@business.ng",
+              "city": "",
+              "state": "",
+              "country": "",
+              "website": "",
+              "industry": "",
+              "source": "",
+              "lead_status": "new",
+              "notes": "A comma, a quote \" and\na newline",
+              "tags": "Buyer",
+              "tier": "Silver",
+              "score": "",
+              "enabled": "",
+              "nested": "",
+              "note": "é 😀",
+              "items": [
+                1,
+                true,
+                null
+              ],
+              "=header": "",
+              "0": "",
+              "later": ""
+            }
+          ]
+        }
+      }
+    },
+    {
+      "kind": "download",
+      "filters": {
+        "search": null,
+        "lead_status": null,
+        "tag": null,
+        "email_state": null,
+        "channel": "email",
+        "list_id": null
+      },
+      "query": {},
+      "expected": {
+        "csv": "first_name,last_name,business_name,phone_number,email,city,state,country,website,industry,source,lead_status,notes,tags,later,=header,0,tier,note,items,score,enabled,nested\r\nLast,,,,last@business.ng,,,,,,,new,xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx,,value,,,,,,,,\r\n\"=HYPERLINK(\"\"https://evil.invalid\"\")\",,,,safe@business.ng,,,,,,,new,\t=1+1,,,@SUM(1),zero,,,,,,\r\nBola,,,,bola@business.ng,,,,,,,new,\"A comma, a quote \"\" and\na newline\",Buyer,,,,Silver,é 😀,\"[1, True, None]\",,,\r\nAda,,,+2348031112222,ada@business.ng,Abuja,,,,,,new,,Buyer,,,,Gold,,,42,False,{'x': True}\r\n",
+        "safe_csv": "first_name,last_name,business_name,phone_number,email,city,state,country,website,industry,source,lead_status,notes,tags,later,'=header,0,tier,note,items,score,enabled,nested\r\nLast,,,,last@business.ng,,,,,,,new,xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx,,value,,,,,,,,\r\n\"'=HYPERLINK(\"\"https://evil.invalid\"\")\",,,,safe@business.ng,,,,,,,new,'\t=1+1,,,'@SUM(1),zero,,,,,,\r\nBola,,,,bola@business.ng,,,,,,,new,\"A comma, a quote \"\" and\na newline\",Buyer,,,,Silver,é 😀,\"[1, True, None]\",,,\r\nAda,,,'+2348031112222,ada@business.ng,Abuja,,,,,,new,,Buyer,,,,Gold,,,42,False,{'x': True}\r\n"
+      }
+    },
+    {
+      "kind": "page",
+      "filters": {
+        "search": null,
+        "lead_status": null,
+        "tag": null,
+        "email_state": null,
+        "channel": null,
+        "list_id": 1
+      },
+      "query": {
+        "format": "csv",
+        "limit": 2
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "format": "csv",
+          "columns": [
+            "first_name",
+            "last_name",
+            "business_name",
+            "phone_number",
+            "email",
+            "city",
+            "state",
+            "country",
+            "website",
+            "industry",
+            "source",
+            "lead_status",
+            "notes",
+            "tags",
+            "tier",
+            "note",
+            "items",
+            "later"
+          ],
+          "returned": 2,
+          "total": 2,
+          "truncated": false,
+          "next_cursor": null,
+          "csv": "first_name,last_name,business_name,phone_number,email,city,state,country,website,industry,source,lead_status,notes,tags,tier,note,items,later\r\nBola,,,,bola@business.ng,,,,,,,new,\"A comma, a quote \"\" and\na newline\",Buyer,Silver,é 😀,\"[1, True, None]\",\r\nLast,,,,last@business.ng,,,,,,,new,xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx,,,,,value\r\n"
+        },
+        "safe_csv": "first_name,last_name,business_name,phone_number,email,city,state,country,website,industry,source,lead_status,notes,tags,tier,note,items,later\r\nBola,,,,bola@business.ng,,,,,,,new,\"A comma, a quote \"\" and\na newline\",Buyer,Silver,é 😀,\"[1, True, None]\",\r\nLast,,,,last@business.ng,,,,,,,new,xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx,,,,,value\r\n"
+      }
+    },
+    {
+      "kind": "page",
+      "filters": {
+        "search": null,
+        "lead_status": null,
+        "tag": null,
+        "email_state": null,
+        "channel": null,
+        "list_id": 1
+      },
+      "query": {
+        "format": "json",
+        "limit": 2
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "format": "json",
+          "columns": [
+            "first_name",
+            "last_name",
+            "business_name",
+            "phone_number",
+            "email",
+            "city",
+            "state",
+            "country",
+            "website",
+            "industry",
+            "source",
+            "lead_status",
+            "notes",
+            "tags",
+            "tier",
+            "note",
+            "items",
+            "later"
+          ],
+          "returned": 2,
+          "total": 2,
+          "truncated": false,
+          "next_cursor": null,
+          "rows": [
+            {
+              "first_name": "Bola",
+              "last_name": "",
+              "business_name": "",
+              "phone_number": "",
+              "email": "bola@business.ng",
+              "city": "",
+              "state": "",
+              "country": "",
+              "website": "",
+              "industry": "",
+              "source": "",
+              "lead_status": "new",
+              "notes": "A comma, a quote \" and\na newline",
+              "tags": "Buyer",
+              "tier": "Silver",
+              "note": "é 😀",
+              "items": [
+                1,
+                true,
+                null
+              ],
+              "later": ""
+            },
+            {
+              "first_name": "Last",
+              "last_name": "",
+              "business_name": "",
+              "phone_number": "",
+              "email": "last@business.ng",
+              "city": "",
+              "state": "",
+              "country": "",
+              "website": "",
+              "industry": "",
+              "source": "",
+              "lead_status": "new",
+              "notes": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "tags": "",
+              "tier": "",
+              "note": "",
+              "items": "",
+              "later": "value"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "kind": "download",
+      "filters": {
+        "search": null,
+        "lead_status": null,
+        "tag": null,
+        "email_state": null,
+        "channel": null,
+        "list_id": 1
+      },
+      "query": {},
+      "expected": {
+        "csv": "first_name,last_name,business_name,phone_number,email,city,state,country,website,industry,source,lead_status,notes,tags,later,tier,note,items\r\nLast,,,,last@business.ng,,,,,,,new,xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx,,value,,,\r\nBola,,,,bola@business.ng,,,,,,,new,\"A comma, a quote \"\" and\na newline\",Buyer,,Silver,é 😀,\"[1, True, None]\"\r\n",
+        "safe_csv": "first_name,last_name,business_name,phone_number,email,city,state,country,website,industry,source,lead_status,notes,tags,later,tier,note,items\r\nLast,,,,last@business.ng,,,,,,,new,xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx,,value,,,\r\nBola,,,,bola@business.ng,,,,,,,new,\"A comma, a quote \"\" and\na newline\",Buyer,,Silver,é 😀,\"[1, True, None]\"\r\n"
+      }
+    },
+    {
+      "kind": "page",
+      "filters": {
+        "search": "missing",
+        "lead_status": null,
+        "tag": null,
+        "email_state": null,
+        "channel": null,
+        "list_id": null
+      },
+      "query": {
+        "format": "csv",
+        "limit": 2
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "format": "csv",
+          "columns": [
+            "first_name",
+            "last_name",
+            "business_name",
+            "phone_number",
+            "email",
+            "city",
+            "state",
+            "country",
+            "website",
+            "industry",
+            "source",
+            "lead_status",
+            "notes",
+            "tags"
+          ],
+          "returned": 0,
+          "total": 0,
+          "truncated": false,
+          "next_cursor": null,
+          "csv": "first_name,last_name,business_name,phone_number,email,city,state,country,website,industry,source,lead_status,notes,tags\r\n"
+        },
+        "safe_csv": "first_name,last_name,business_name,phone_number,email,city,state,country,website,industry,source,lead_status,notes,tags\r\n"
+      }
+    },
+    {
+      "kind": "page",
+      "filters": {
+        "search": "missing",
+        "lead_status": null,
+        "tag": null,
+        "email_state": null,
+        "channel": null,
+        "list_id": null
+      },
+      "query": {
+        "format": "json",
+        "limit": 2
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "format": "json",
+          "columns": [
+            "first_name",
+            "last_name",
+            "business_name",
+            "phone_number",
+            "email",
+            "city",
+            "state",
+            "country",
+            "website",
+            "industry",
+            "source",
+            "lead_status",
+            "notes",
+            "tags"
+          ],
+          "returned": 0,
+          "total": 0,
+          "truncated": false,
+          "next_cursor": null,
+          "rows": []
+        }
+      }
+    },
+    {
+      "kind": "download",
+      "filters": {
+        "search": "missing",
+        "lead_status": null,
+        "tag": null,
+        "email_state": null,
+        "channel": null,
+        "list_id": null
+      },
+      "query": {},
+      "expected": {
+        "csv": "first_name,last_name,business_name,phone_number,email,city,state,country,website,industry,source,lead_status,notes,tags\r\n",
+        "safe_csv": "first_name,last_name,business_name,phone_number,email,city,state,country,website,industry,source,lead_status,notes,tags\r\n"
+      }
+    },
+    {
+      "kind": "page",
+      "filters": {
+        "search": "é",
+        "lead_status": null,
+        "tag": null,
+        "email_state": null,
+        "channel": null,
+        "list_id": null
+      },
+      "query": {
+        "format": "csv",
+        "limit": 2
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "format": "csv",
+          "columns": [
+            "first_name",
+            "last_name",
+            "business_name",
+            "phone_number",
+            "email",
+            "city",
+            "state",
+            "country",
+            "website",
+            "industry",
+            "source",
+            "lead_status",
+            "notes",
+            "tags"
+          ],
+          "returned": 0,
+          "total": 0,
+          "truncated": false,
+          "next_cursor": null,
+          "csv": "first_name,last_name,business_name,phone_number,email,city,state,country,website,industry,source,lead_status,notes,tags\r\n"
+        },
+        "safe_csv": "first_name,last_name,business_name,phone_number,email,city,state,country,website,industry,source,lead_status,notes,tags\r\n"
+      }
+    },
+    {
+      "kind": "page",
+      "filters": {
+        "search": "é",
+        "lead_status": null,
+        "tag": null,
+        "email_state": null,
+        "channel": null,
+        "list_id": null
+      },
+      "query": {
+        "format": "json",
+        "limit": 2
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "format": "json",
+          "columns": [
+            "first_name",
+            "last_name",
+            "business_name",
+            "phone_number",
+            "email",
+            "city",
+            "state",
+            "country",
+            "website",
+            "industry",
+            "source",
+            "lead_status",
+            "notes",
+            "tags"
+          ],
+          "returned": 0,
+          "total": 0,
+          "truncated": false,
+          "next_cursor": null,
+          "rows": []
+        }
+      }
+    },
+    {
+      "kind": "download",
+      "filters": {
+        "search": "é",
+        "lead_status": null,
+        "tag": null,
+        "email_state": null,
+        "channel": null,
+        "list_id": null
+      },
+      "query": {},
+      "expected": {
+        "csv": "first_name,last_name,business_name,phone_number,email,city,state,country,website,industry,source,lead_status,notes,tags\r\n",
+        "safe_csv": "first_name,last_name,business_name,phone_number,email,city,state,country,website,industry,source,lead_status,notes,tags\r\n"
+      }
+    },
+    {
+      "kind": "page",
+      "filters": {
+        "search": null,
+        "lead_status": null,
+        "tag": null,
+        "email_state": null,
+        "channel": null,
+        "list_id": null
+      },
+      "query": {
+        "format": "csv",
+        "limit": 2,
+        "cursor": null,
+        "max_bytes": 1000
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "format": "csv",
+          "columns": [
+            "first_name",
+            "last_name",
+            "business_name",
+            "phone_number",
+            "email",
+            "city",
+            "state",
+            "country",
+            "website",
+            "industry",
+            "source",
+            "lead_status",
+            "notes",
+            "tags",
+            "tier",
+            "score",
+            "enabled",
+            "nested",
+            "note",
+            "items",
+            "=header",
+            "0",
+            "later"
+          ],
+          "returned": 2,
+          "total": 5,
+          "truncated": true,
+          "next_cursor": "eyJsYXN0X2lkIjoyLCJjb2x1bW5zIjpbInRpZXIiLCJzY29yZSIsImVuYWJsZWQiLCJuZXN0ZWQiLCJub3RlIiwiaXRlbXMiLCI9aGVhZGVyIiwiMCIsImxhdGVyIl0sImYiOiIyOTY0YjIzMDVjYmIifQ",
+          "csv": "first_name,last_name,business_name,phone_number,email,city,state,country,website,industry,source,lead_status,notes,tags,tier,score,enabled,nested,note,items,=header,0,later\r\nAda,,,+2348031112222,ada@business.ng,Abuja,,,,,,new,,Buyer,Gold,42,False,{'x': True},,,,,\r\nBola,,,,bola@business.ng,,,,,,,new,\"A comma, a quote \"\" and\na newline\",Buyer,Silver,,,,é 😀,\"[1, True, None]\",,,\r\n"
+        },
+        "safe_csv": "first_name,last_name,business_name,phone_number,email,city,state,country,website,industry,source,lead_status,notes,tags,tier,score,enabled,nested,note,items,'=header,0,later\r\nAda,,,'+2348031112222,ada@business.ng,Abuja,,,,,,new,,Buyer,Gold,42,False,{'x': True},,,,,\r\nBola,,,,bola@business.ng,,,,,,,new,\"A comma, a quote \"\" and\na newline\",Buyer,Silver,,,,é 😀,\"[1, True, None]\",,,\r\n"
+      }
+    },
+    {
+      "kind": "page",
+      "filters": {
+        "search": null,
+        "lead_status": null,
+        "tag": null,
+        "email_state": null,
+        "channel": null,
+        "list_id": null
+      },
+      "query": {
+        "format": "csv",
+        "limit": 2,
+        "cursor": "eyJsYXN0X2lkIjoyLCJjb2x1bW5zIjpbInRpZXIiLCJzY29yZSIsImVuYWJsZWQiLCJuZXN0ZWQiLCJub3RlIiwiaXRlbXMiLCI9aGVhZGVyIiwiMCIsImxhdGVyIl0sImYiOiIyOTY0YjIzMDVjYmIifQ",
+        "max_bytes": 1000
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "format": "csv",
+          "columns": [
+            "first_name",
+            "last_name",
+            "business_name",
+            "phone_number",
+            "email",
+            "city",
+            "state",
+            "country",
+            "website",
+            "industry",
+            "source",
+            "lead_status",
+            "notes",
+            "tags",
+            "tier",
+            "score",
+            "enabled",
+            "nested",
+            "note",
+            "items",
+            "=header",
+            "0",
+            "later"
+          ],
+          "returned": 2,
+          "total": 5,
+          "truncated": true,
+          "next_cursor": "eyJsYXN0X2lkIjo0LCJjb2x1bW5zIjpbInRpZXIiLCJzY29yZSIsImVuYWJsZWQiLCJuZXN0ZWQiLCJub3RlIiwiaXRlbXMiLCI9aGVhZGVyIiwiMCIsImxhdGVyIl0sImYiOiIyOTY0YjIzMDVjYmIifQ",
+          "csv": "\"=HYPERLINK(\"\"https://evil.invalid\"\")\",,,,safe@business.ng,,,,,,,new,\t=1+1,,,,,,,,@SUM(1),zero,\r\nNo email,,,+2348031112223,,,,,,,,new,,,,,,,,,,,\r\n"
+        },
+        "safe_csv": "\"'=HYPERLINK(\"\"https://evil.invalid\"\")\",,,,safe@business.ng,,,,,,,new,'\t=1+1,,,,,,,,'@SUM(1),zero,\r\nNo email,,,'+2348031112223,,,,,,,,new,,,,,,,,,,,\r\n"
+      }
+    },
+    {
+      "kind": "page",
+      "filters": {
+        "search": null,
+        "lead_status": null,
+        "tag": null,
+        "email_state": null,
+        "channel": null,
+        "list_id": null
+      },
+      "query": {
+        "format": "csv",
+        "limit": 2,
+        "cursor": "eyJsYXN0X2lkIjo0LCJjb2x1bW5zIjpbInRpZXIiLCJzY29yZSIsImVuYWJsZWQiLCJuZXN0ZWQiLCJub3RlIiwiaXRlbXMiLCI9aGVhZGVyIiwiMCIsImxhdGVyIl0sImYiOiIyOTY0YjIzMDVjYmIifQ",
+        "max_bytes": 1000
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "format": "csv",
+          "columns": [
+            "first_name",
+            "last_name",
+            "business_name",
+            "phone_number",
+            "email",
+            "city",
+            "state",
+            "country",
+            "website",
+            "industry",
+            "source",
+            "lead_status",
+            "notes",
+            "tags",
+            "tier",
+            "score",
+            "enabled",
+            "nested",
+            "note",
+            "items",
+            "=header",
+            "0",
+            "later"
+          ],
+          "returned": 1,
+          "total": 5,
+          "truncated": false,
+          "next_cursor": null,
+          "csv": "Last,,,,last@business.ng,,,,,,,new,xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx,,,,,,,,,,value\r\n"
+        },
+        "safe_csv": "Last,,,,last@business.ng,,,,,,,new,xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx,,,,,,,,,,value\r\n"
+      }
+    },
+    {
+      "kind": "page",
+      "filters": {
+        "search": null,
+        "lead_status": null,
+        "tag": null,
+        "email_state": null,
+        "channel": null,
+        "list_id": null
+      },
+      "query": {
+        "format": "json",
+        "limit": 2,
+        "cursor": null,
+        "max_bytes": 1000
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "format": "json",
+          "columns": [
+            "first_name",
+            "last_name",
+            "business_name",
+            "phone_number",
+            "email",
+            "city",
+            "state",
+            "country",
+            "website",
+            "industry",
+            "source",
+            "lead_status",
+            "notes",
+            "tags",
+            "tier",
+            "score",
+            "enabled",
+            "nested",
+            "note",
+            "items",
+            "=header",
+            "0",
+            "later"
+          ],
+          "returned": 2,
+          "total": 5,
+          "truncated": true,
+          "next_cursor": "eyJsYXN0X2lkIjoyLCJjb2x1bW5zIjpbInRpZXIiLCJzY29yZSIsImVuYWJsZWQiLCJuZXN0ZWQiLCJub3RlIiwiaXRlbXMiLCI9aGVhZGVyIiwiMCIsImxhdGVyIl0sImYiOiIyOTY0YjIzMDVjYmIifQ",
+          "rows": [
+            {
+              "first_name": "Ada",
+              "last_name": "",
+              "business_name": "",
+              "phone_number": "+2348031112222",
+              "email": "ada@business.ng",
+              "city": "Abuja",
+              "state": "",
+              "country": "",
+              "website": "",
+              "industry": "",
+              "source": "",
+              "lead_status": "new",
+              "notes": "",
+              "tags": "Buyer",
+              "tier": "Gold",
+              "score": 42,
+              "enabled": false,
+              "nested": {
+                "x": true
+              },
+              "note": "",
+              "items": "",
+              "=header": "",
+              "0": "",
+              "later": ""
+            },
+            {
+              "first_name": "Bola",
+              "last_name": "",
+              "business_name": "",
+              "phone_number": "",
+              "email": "bola@business.ng",
+              "city": "",
+              "state": "",
+              "country": "",
+              "website": "",
+              "industry": "",
+              "source": "",
+              "lead_status": "new",
+              "notes": "A comma, a quote \" and\na newline",
+              "tags": "Buyer",
+              "tier": "Silver",
+              "score": "",
+              "enabled": "",
+              "nested": "",
+              "note": "é 😀",
+              "items": [
+                1,
+                true,
+                null
+              ],
+              "=header": "",
+              "0": "",
+              "later": ""
+            }
+          ]
+        }
+      }
+    },
+    {
+      "kind": "page",
+      "filters": {
+        "search": null,
+        "lead_status": null,
+        "tag": null,
+        "email_state": null,
+        "channel": null,
+        "list_id": null
+      },
+      "query": {
+        "format": "json",
+        "limit": 2,
+        "cursor": "eyJsYXN0X2lkIjoyLCJjb2x1bW5zIjpbInRpZXIiLCJzY29yZSIsImVuYWJsZWQiLCJuZXN0ZWQiLCJub3RlIiwiaXRlbXMiLCI9aGVhZGVyIiwiMCIsImxhdGVyIl0sImYiOiIyOTY0YjIzMDVjYmIifQ",
+        "max_bytes": 1000
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "format": "json",
+          "columns": [
+            "first_name",
+            "last_name",
+            "business_name",
+            "phone_number",
+            "email",
+            "city",
+            "state",
+            "country",
+            "website",
+            "industry",
+            "source",
+            "lead_status",
+            "notes",
+            "tags",
+            "tier",
+            "score",
+            "enabled",
+            "nested",
+            "note",
+            "items",
+            "=header",
+            "0",
+            "later"
+          ],
+          "returned": 2,
+          "total": 5,
+          "truncated": true,
+          "next_cursor": "eyJsYXN0X2lkIjo0LCJjb2x1bW5zIjpbInRpZXIiLCJzY29yZSIsImVuYWJsZWQiLCJuZXN0ZWQiLCJub3RlIiwiaXRlbXMiLCI9aGVhZGVyIiwiMCIsImxhdGVyIl0sImYiOiIyOTY0YjIzMDVjYmIifQ",
+          "rows": [
+            {
+              "first_name": "=HYPERLINK(\"https://evil.invalid\")",
+              "last_name": "",
+              "business_name": "",
+              "phone_number": "",
+              "email": "safe@business.ng",
+              "city": "",
+              "state": "",
+              "country": "",
+              "website": "",
+              "industry": "",
+              "source": "",
+              "lead_status": "new",
+              "notes": "\t=1+1",
+              "tags": "",
+              "tier": "",
+              "score": "",
+              "enabled": "",
+              "nested": "",
+              "note": "",
+              "items": "",
+              "=header": "@SUM(1)",
+              "0": "zero",
+              "later": ""
+            },
+            {
+              "first_name": "No email",
+              "last_name": "",
+              "business_name": "",
+              "phone_number": "+2348031112223",
+              "email": "",
+              "city": "",
+              "state": "",
+              "country": "",
+              "website": "",
+              "industry": "",
+              "source": "",
+              "lead_status": "new",
+              "notes": "",
+              "tags": "",
+              "tier": "",
+              "score": "",
+              "enabled": "",
+              "nested": "",
+              "note": "",
+              "items": "",
+              "=header": "",
+              "0": "",
+              "later": ""
+            }
+          ]
+        }
+      }
+    },
+    {
+      "kind": "page",
+      "filters": {
+        "search": null,
+        "lead_status": null,
+        "tag": null,
+        "email_state": null,
+        "channel": null,
+        "list_id": null
+      },
+      "query": {
+        "format": "json",
+        "limit": 2,
+        "cursor": "eyJsYXN0X2lkIjo0LCJjb2x1bW5zIjpbInRpZXIiLCJzY29yZSIsImVuYWJsZWQiLCJuZXN0ZWQiLCJub3RlIiwiaXRlbXMiLCI9aGVhZGVyIiwiMCIsImxhdGVyIl0sImYiOiIyOTY0YjIzMDVjYmIifQ",
+        "max_bytes": 1000
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "format": "json",
+          "columns": [
+            "first_name",
+            "last_name",
+            "business_name",
+            "phone_number",
+            "email",
+            "city",
+            "state",
+            "country",
+            "website",
+            "industry",
+            "source",
+            "lead_status",
+            "notes",
+            "tags",
+            "tier",
+            "score",
+            "enabled",
+            "nested",
+            "note",
+            "items",
+            "=header",
+            "0",
+            "later"
+          ],
+          "returned": 1,
+          "total": 5,
+          "truncated": false,
+          "next_cursor": null,
+          "rows": [
+            {
+              "first_name": "Last",
+              "last_name": "",
+              "business_name": "",
+              "phone_number": "",
+              "email": "last@business.ng",
+              "city": "",
+              "state": "",
+              "country": "",
+              "website": "",
+              "industry": "",
+              "source": "",
+              "lead_status": "new",
+              "notes": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "tags": "",
+              "tier": "",
+              "score": "",
+              "enabled": "",
+              "nested": "",
+              "note": "",
+              "items": "",
+              "=header": "",
+              "0": "",
+              "later": "value"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "kind": "page",
+      "filters": {
+        "search": null,
+        "lead_status": null,
+        "tag": null,
+        "email_state": null,
+        "channel": null,
+        "list_id": null
+      },
+      "query": {
+        "limit": 1
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "format": "csv",
+          "columns": [
+            "first_name",
+            "last_name",
+            "business_name",
+            "phone_number",
+            "email",
+            "city",
+            "state",
+            "country",
+            "website",
+            "industry",
+            "source",
+            "lead_status",
+            "notes",
+            "tags",
+            "tier",
+            "score",
+            "enabled",
+            "nested",
+            "note",
+            "items",
+            "=header",
+            "0",
+            "later"
+          ],
+          "returned": 1,
+          "total": 5,
+          "truncated": true,
+          "next_cursor": "eyJsYXN0X2lkIjoxLCJjb2x1bW5zIjpbInRpZXIiLCJzY29yZSIsImVuYWJsZWQiLCJuZXN0ZWQiLCJub3RlIiwiaXRlbXMiLCI9aGVhZGVyIiwiMCIsImxhdGVyIl0sImYiOiIyOTY0YjIzMDVjYmIifQ",
+          "csv": "first_name,last_name,business_name,phone_number,email,city,state,country,website,industry,source,lead_status,notes,tags,tier,score,enabled,nested,note,items,=header,0,later\r\nAda,,,+2348031112222,ada@business.ng,Abuja,,,,,,new,,Buyer,Gold,42,False,{'x': True},,,,,\r\n"
+        },
+        "safe_csv": "first_name,last_name,business_name,phone_number,email,city,state,country,website,industry,source,lead_status,notes,tags,tier,score,enabled,nested,note,items,'=header,0,later\r\nAda,,,'+2348031112222,ada@business.ng,Abuja,,,,,,new,,Buyer,Gold,42,False,{'x': True},,,,,\r\n"
+      }
+    },
+    {
+      "kind": "page",
+      "filters": {
+        "search": null,
+        "lead_status": null,
+        "tag": null,
+        "email_state": null,
+        "channel": "email",
+        "list_id": null
+      },
+      "query": {
+        "cursor": "eyJsYXN0X2lkIjoxLCJjb2x1bW5zIjpbInRpZXIiLCJzY29yZSIsImVuYWJsZWQiLCJuZXN0ZWQiLCJub3RlIiwiaXRlbXMiLCI9aGVhZGVyIiwiMCIsImxhdGVyIl0sImYiOiIyOTY0YjIzMDVjYmIifQ"
+      },
+      "expected": {
+        "status": 422,
+        "message": "This cursor was issued for different filters. Repeat the same filters on every page, or start again without a cursor."
+      }
+    },
+    {
+      "kind": "page",
+      "filters": {
+        "search": null,
+        "lead_status": null,
+        "tag": null,
+        "email_state": null,
+        "channel": null,
+        "list_id": null
+      },
+      "query": {
+        "cursor": "not-a-cursor"
+      },
+      "expected": {
+        "status": 422,
+        "message": "Invalid export cursor. Use the next_cursor from the previous page, unchanged."
+      }
+    },
+    {
+      "kind": "page",
+      "filters": {
+        "search": null,
+        "lead_status": null,
+        "tag": null,
+        "email_state": null,
+        "channel": null,
+        "list_id": null
+      },
+      "query": {
+        "cursor": "eyJsYXN0X2lkIjowLCJjb2x1bW5zIjpbXSwiZiI6Indyb25nIn0"
+      },
+      "expected": {
+        "status": 422,
+        "message": "This cursor was issued for different filters. Repeat the same filters on every page, or start again without a cursor."
+      }
+    }
+  ],
+  "scope": "Actual selected source exports, synthetic SQLite, no native WordPress/MySQL/browser evidence. Raw source CSV retained; safe_csv separately neutralizes dangerous spreadsheet cells. Native UTF-8 byte budgets and cursor/column/resource hardening are separately tested intentional differences."
+}

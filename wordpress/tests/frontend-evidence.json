@@ -1,0 +1,12 @@
+{
+  "test_command": "npm test -- --reporter=dot",
+  "tests_passed": 269,
+  "test_files_passed": 43,
+  "test_output_sha256": "db41ad7e7b7ee11d3a27b9de3fa1e2f1e6c96554efe4030b46f106e98bce8782",
+  "build_command": "npm run build -- --outDir ../wordpress/sender-suite/app",
+  "build_passed": true,
+  "built_asset_files": 132,
+  "original_frontend_modified": false,
+  "native_wordpress_browser_verified": false,
+  "note": "Fresh stdout from actual execution, not earlier conversation counts; jsdom navigation warning is not browser coverage"
+}

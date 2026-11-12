@@ -1,0 +1,12 @@
+{
+  "source_commit": "587969338a9b62f00ab3488b6a4b71ca491feacb",
+  "tables": 73,
+  "columns": 1120,
+  "indexes": 235,
+  "foreign_keys": 61,
+  "http_declarations": 511,
+  "distinct_http_contracts": 508,
+  "settings": 71,
+  "frontend_files": 165,
+  "certified_contracts": 0
+}

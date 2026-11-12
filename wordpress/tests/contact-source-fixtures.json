@@ -1,0 +1,2384 @@
+{
+  "operations": [
+    {
+      "op": "create",
+      "body": {
+        "first_name": "Ada",
+        "phone_number": "08031112222",
+        "tags": " VIP, vip, Buyer , ,0",
+        "country": "0"
+      },
+      "expected": {
+        "status": 201,
+        "body": {
+          "id": 1,
+          "first_name": "Ada",
+          "last_name": null,
+          "business_name": null,
+          "phone_number": "+2348031112222",
+          "email": null,
+          "city": null,
+          "state": null,
+          "country": "0",
+          "website": null,
+          "industry": null,
+          "source": null,
+          "lead_status": "new",
+          "consent_status": "unknown",
+          "has_consented": false,
+          "is_opted_out": false,
+          "is_undeliverable": false,
+          "undeliverable_reason": null,
+          "delivery_fail_count": 0,
+          "is_email_opted_out": false,
+          "email_status": "active",
+          "email_opted_out_at": null,
+          "email_opt_out_reason": null,
+          "is_email_undeliverable": false,
+          "emails_sent": 0,
+          "emails_received": 0,
+          "last_emailed_at": null,
+          "email_source": null,
+          "email_verified": false,
+          "email_verified_at": null,
+          "email_verdict": null,
+          "email_confidence": null,
+          "email_enriched_at": null,
+          "email_enrichment_note": null,
+          "opt_out_reason": null,
+          "opted_out_at": null,
+          "notes": null,
+          "custom_fields": null,
+          "tags": [
+            "0",
+            "Buyer",
+            "VIP"
+          ],
+          "messages_sent": 0,
+          "messages_received": 0,
+          "last_contacted_at": null,
+          "last_reply_at": null,
+          "created_at": "2026-01-02T12:00:00.123456",
+          "updated_at": "2026-01-02T12:00:00.123456"
+        }
+      },
+      "expected_contact_count": 1
+    },
+    {
+      "op": "create",
+      "body": {
+        "first_name": "Bola",
+        "email": "<BOLA@business.ng>,",
+        "city": "Abuja"
+      },
+      "expected": {
+        "status": 201,
+        "body": {
+          "id": 2,
+          "first_name": "Bola",
+          "last_name": null,
+          "business_name": null,
+          "phone_number": null,
+          "email": "bola@business.ng",
+          "city": "Abuja",
+          "state": null,
+          "country": null,
+          "website": null,
+          "industry": null,
+          "source": null,
+          "lead_status": "new",
+          "consent_status": "unknown",
+          "has_consented": false,
+          "is_opted_out": false,
+          "is_undeliverable": false,
+          "undeliverable_reason": null,
+          "delivery_fail_count": 0,
+          "is_email_opted_out": false,
+          "email_status": "active",
+          "email_opted_out_at": null,
+          "email_opt_out_reason": null,
+          "is_email_undeliverable": false,
+          "emails_sent": 0,
+          "emails_received": 0,
+          "last_emailed_at": null,
+          "email_source": "manual",
+          "email_verified": false,
+          "email_verified_at": null,
+          "email_verdict": null,
+          "email_confidence": null,
+          "email_enriched_at": null,
+          "email_enrichment_note": null,
+          "opt_out_reason": null,
+          "opted_out_at": null,
+          "notes": null,
+          "custom_fields": null,
+          "tags": [],
+          "messages_sent": 0,
+          "messages_received": 0,
+          "last_contacted_at": null,
+          "last_reply_at": null,
+          "created_at": "2026-01-02T12:00:00.123456",
+          "updated_at": "2026-01-02T12:00:00.123456"
+        }
+      },
+      "expected_contact_count": 2
+    },
+    {
+      "op": "create",
+      "body": {},
+      "expected": {
+        "status": 400,
+        "message": "A contact needs a phone number or an email address"
+      },
+      "expected_contact_count": 2
+    },
+    {
+      "op": "create",
+      "body": {
+        "phone_number": "0",
+        "email": "third@business.ng"
+      },
+      "expected": {
+        "status": 422,
+        "message": "Invalid Nigerian phone number"
+      },
+      "expected_contact_count": 2
+    },
+    {
+      "op": "create",
+      "body": {
+        "phone_number": "+2348031112222"
+      },
+      "expected": {
+        "status": 409,
+        "message": "Contact with this phone number already exists"
+      },
+      "expected_contact_count": 2
+    },
+    {
+      "op": "create",
+      "body": {
+        "email": "bola@business.ng"
+      },
+      "expected": {
+        "status": 409,
+        "message": "Contact with this email already exists"
+      },
+      "expected_contact_count": 2
+    },
+    {
+      "op": "create",
+      "body": {
+        "email": "bad"
+      },
+      "expected": {
+        "status": 422,
+        "message": "Value error, Enter one valid email address",
+        "field": "email"
+      },
+      "expected_contact_count": 2
+    },
+    {
+      "op": "get",
+      "id": 404,
+      "expected": {
+        "status": 404,
+        "message": "Contact not found"
+      },
+      "expected_contact_count": 2
+    },
+    {
+      "op": "get",
+      "id": 1,
+      "expected": {
+        "status": 200,
+        "body": {
+          "id": 1,
+          "first_name": "Ada",
+          "last_name": null,
+          "business_name": null,
+          "phone_number": "+2348031112222",
+          "email": null,
+          "city": null,
+          "state": null,
+          "country": "0",
+          "website": null,
+          "industry": null,
+          "source": null,
+          "lead_status": "new",
+          "consent_status": "unknown",
+          "has_consented": false,
+          "is_opted_out": false,
+          "is_undeliverable": false,
+          "undeliverable_reason": null,
+          "delivery_fail_count": 0,
+          "is_email_opted_out": false,
+          "email_status": "active",
+          "email_opted_out_at": null,
+          "email_opt_out_reason": null,
+          "is_email_undeliverable": false,
+          "emails_sent": 0,
+          "emails_received": 0,
+          "last_emailed_at": null,
+          "email_source": null,
+          "email_verified": false,
+          "email_verified_at": null,
+          "email_verdict": null,
+          "email_confidence": null,
+          "email_enriched_at": null,
+          "email_enrichment_note": null,
+          "opt_out_reason": null,
+          "opted_out_at": null,
+          "notes": null,
+          "custom_fields": null,
+          "tags": [
+            "0",
+            "Buyer",
+            "VIP"
+          ],
+          "messages_sent": 0,
+          "messages_received": 0,
+          "last_contacted_at": null,
+          "last_reply_at": null,
+          "created_at": "2026-01-02T12:00:00.123456",
+          "updated_at": "2026-01-02T12:00:00.123456"
+        }
+      },
+      "expected_contact_count": 2
+    },
+    {
+      "op": "list",
+      "filters": {},
+      "expected": {
+        "status": 200,
+        "body": {
+          "total": 2,
+          "items": [
+            {
+              "id": 2,
+              "first_name": "Bola",
+              "last_name": null,
+              "business_name": null,
+              "phone_number": null,
+              "email": "bola@business.ng",
+              "city": "Abuja",
+              "state": null,
+              "country": null,
+              "website": null,
+              "industry": null,
+              "source": null,
+              "lead_status": "new",
+              "consent_status": "unknown",
+              "has_consented": false,
+              "is_opted_out": false,
+              "is_undeliverable": false,
+              "undeliverable_reason": null,
+              "delivery_fail_count": 0,
+              "is_email_opted_out": false,
+              "email_status": "active",
+              "email_opted_out_at": null,
+              "email_opt_out_reason": null,
+              "is_email_undeliverable": false,
+              "emails_sent": 0,
+              "emails_received": 0,
+              "last_emailed_at": null,
+              "email_source": "manual",
+              "email_verified": false,
+              "email_verified_at": null,
+              "email_verdict": null,
+              "email_confidence": null,
+              "email_enriched_at": null,
+              "email_enrichment_note": null,
+              "opt_out_reason": null,
+              "opted_out_at": null,
+              "notes": null,
+              "custom_fields": null,
+              "tags": [],
+              "messages_sent": 0,
+              "messages_received": 0,
+              "last_contacted_at": null,
+              "last_reply_at": null,
+              "created_at": "2026-01-02T12:00:00.123456",
+              "updated_at": "2026-01-02T12:00:00.123456"
+            },
+            {
+              "id": 1,
+              "first_name": "Ada",
+              "last_name": null,
+              "business_name": null,
+              "phone_number": "+2348031112222",
+              "email": null,
+              "city": null,
+              "state": null,
+              "country": "0",
+              "website": null,
+              "industry": null,
+              "source": null,
+              "lead_status": "new",
+              "consent_status": "unknown",
+              "has_consented": false,
+              "is_opted_out": false,
+              "is_undeliverable": false,
+              "undeliverable_reason": null,
+              "delivery_fail_count": 0,
+              "is_email_opted_out": false,
+              "email_status": "active",
+              "email_opted_out_at": null,
+              "email_opt_out_reason": null,
+              "is_email_undeliverable": false,
+              "emails_sent": 0,
+              "emails_received": 0,
+              "last_emailed_at": null,
+              "email_source": null,
+              "email_verified": false,
+              "email_verified_at": null,
+              "email_verdict": null,
+              "email_confidence": null,
+              "email_enriched_at": null,
+              "email_enrichment_note": null,
+              "opt_out_reason": null,
+              "opted_out_at": null,
+              "notes": null,
+              "custom_fields": null,
+              "tags": [
+                "0",
+                "Buyer",
+                "VIP"
+              ],
+              "messages_sent": 0,
+              "messages_received": 0,
+              "last_contacted_at": null,
+              "last_reply_at": null,
+              "created_at": "2026-01-02T12:00:00.123456",
+              "updated_at": "2026-01-02T12:00:00.123456"
+            }
+          ],
+          "page": 1,
+          "per_page": 25,
+          "next_page": null
+        }
+      },
+      "expected_contact_count": 2
+    },
+    {
+      "op": "list",
+      "filters": {
+        "search": "0803111"
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "total": 1,
+          "items": [
+            {
+              "id": 1,
+              "first_name": "Ada",
+              "last_name": null,
+              "business_name": null,
+              "phone_number": "+2348031112222",
+              "email": null,
+              "city": null,
+              "state": null,
+              "country": "0",
+              "website": null,
+              "industry": null,
+              "source": null,
+              "lead_status": "new",
+              "consent_status": "unknown",
+              "has_consented": false,
+              "is_opted_out": false,
+              "is_undeliverable": false,
+              "undeliverable_reason": null,
+              "delivery_fail_count": 0,
+              "is_email_opted_out": false,
+              "email_status": "active",
+              "email_opted_out_at": null,
+              "email_opt_out_reason": null,
+              "is_email_undeliverable": false,
+              "emails_sent": 0,
+              "emails_received": 0,
+              "last_emailed_at": null,
+              "email_source": null,
+              "email_verified": false,
+              "email_verified_at": null,
+              "email_verdict": null,
+              "email_confidence": null,
+              "email_enriched_at": null,
+              "email_enrichment_note": null,
+              "opt_out_reason": null,
+              "opted_out_at": null,
+              "notes": null,
+              "custom_fields": null,
+              "tags": [
+                "0",
+                "Buyer",
+                "VIP"
+              ],
+              "messages_sent": 0,
+              "messages_received": 0,
+              "last_contacted_at": null,
+              "last_reply_at": null,
+              "created_at": "2026-01-02T12:00:00.123456",
+              "updated_at": "2026-01-02T12:00:00.123456"
+            }
+          ],
+          "page": 1,
+          "per_page": 25,
+          "next_page": null
+        }
+      },
+      "expected_contact_count": 2
+    },
+    {
+      "op": "list",
+      "filters": {
+        "channel": "email"
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "total": 1,
+          "items": [
+            {
+              "id": 2,
+              "first_name": "Bola",
+              "last_name": null,
+              "business_name": null,
+              "phone_number": null,
+              "email": "bola@business.ng",
+              "city": "Abuja",
+              "state": null,
+              "country": null,
+              "website": null,
+              "industry": null,
+              "source": null,
+              "lead_status": "new",
+              "consent_status": "unknown",
+              "has_consented": false,
+              "is_opted_out": false,
+              "is_undeliverable": false,
+              "undeliverable_reason": null,
+              "delivery_fail_count": 0,
+              "is_email_opted_out": false,
+              "email_status": "active",
+              "email_opted_out_at": null,
+              "email_opt_out_reason": null,
+              "is_email_undeliverable": false,
+              "emails_sent": 0,
+              "emails_received": 0,
+              "last_emailed_at": null,
+              "email_source": "manual",
+              "email_verified": false,
+              "email_verified_at": null,
+              "email_verdict": null,
+              "email_confidence": null,
+              "email_enriched_at": null,
+              "email_enrichment_note": null,
+              "opt_out_reason": null,
+              "opted_out_at": null,
+              "notes": null,
+              "custom_fields": null,
+              "tags": [],
+              "messages_sent": 0,
+              "messages_received": 0,
+              "last_contacted_at": null,
+              "last_reply_at": null,
+              "created_at": "2026-01-02T12:00:00.123456",
+              "updated_at": "2026-01-02T12:00:00.123456"
+            }
+          ],
+          "page": 1,
+          "per_page": 25,
+          "next_page": null
+        }
+      },
+      "expected_contact_count": 2
+    },
+    {
+      "op": "list",
+      "filters": {
+        "email_state": "no_email"
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "total": 1,
+          "items": [
+            {
+              "id": 1,
+              "first_name": "Ada",
+              "last_name": null,
+              "business_name": null,
+              "phone_number": "+2348031112222",
+              "email": null,
+              "city": null,
+              "state": null,
+              "country": "0",
+              "website": null,
+              "industry": null,
+              "source": null,
+              "lead_status": "new",
+              "consent_status": "unknown",
+              "has_consented": false,
+              "is_opted_out": false,
+              "is_undeliverable": false,
+              "undeliverable_reason": null,
+              "delivery_fail_count": 0,
+              "is_email_opted_out": false,
+              "email_status": "active",
+              "email_opted_out_at": null,
+              "email_opt_out_reason": null,
+              "is_email_undeliverable": false,
+              "emails_sent": 0,
+              "emails_received": 0,
+              "last_emailed_at": null,
+              "email_source": null,
+              "email_verified": false,
+              "email_verified_at": null,
+              "email_verdict": null,
+              "email_confidence": null,
+              "email_enriched_at": null,
+              "email_enrichment_note": null,
+              "opt_out_reason": null,
+              "opted_out_at": null,
+              "notes": null,
+              "custom_fields": null,
+              "tags": [
+                "0",
+                "Buyer",
+                "VIP"
+              ],
+              "messages_sent": 0,
+              "messages_received": 0,
+              "last_contacted_at": null,
+              "last_reply_at": null,
+              "created_at": "2026-01-02T12:00:00.123456",
+              "updated_at": "2026-01-02T12:00:00.123456"
+            }
+          ],
+          "page": 1,
+          "per_page": 25,
+          "next_page": null
+        }
+      },
+      "expected_contact_count": 2
+    },
+    {
+      "op": "list",
+      "filters": {},
+      "page": 1,
+      "per_page": 1,
+      "expected": {
+        "status": 200,
+        "body": {
+          "total": 2,
+          "items": [
+            {
+              "id": 2,
+              "first_name": "Bola",
+              "last_name": null,
+              "business_name": null,
+              "phone_number": null,
+              "email": "bola@business.ng",
+              "city": "Abuja",
+              "state": null,
+              "country": null,
+              "website": null,
+              "industry": null,
+              "source": null,
+              "lead_status": "new",
+              "consent_status": "unknown",
+              "has_consented": false,
+              "is_opted_out": false,
+              "is_undeliverable": false,
+              "undeliverable_reason": null,
+              "delivery_fail_count": 0,
+              "is_email_opted_out": false,
+              "email_status": "active",
+              "email_opted_out_at": null,
+              "email_opt_out_reason": null,
+              "is_email_undeliverable": false,
+              "emails_sent": 0,
+              "emails_received": 0,
+              "last_emailed_at": null,
+              "email_source": "manual",
+              "email_verified": false,
+              "email_verified_at": null,
+              "email_verdict": null,
+              "email_confidence": null,
+              "email_enriched_at": null,
+              "email_enrichment_note": null,
+              "opt_out_reason": null,
+              "opted_out_at": null,
+              "notes": null,
+              "custom_fields": null,
+              "tags": [],
+              "messages_sent": 0,
+              "messages_received": 0,
+              "last_contacted_at": null,
+              "last_reply_at": null,
+              "created_at": "2026-01-02T12:00:00.123456",
+              "updated_at": "2026-01-02T12:00:00.123456"
+            }
+          ],
+          "page": 1,
+          "per_page": 1,
+          "next_page": 2
+        }
+      },
+      "expected_contact_count": 2
+    },
+    {
+      "op": "list",
+      "filters": {},
+      "page": 2,
+      "per_page": 1,
+      "expected": {
+        "status": 200,
+        "body": {
+          "total": 2,
+          "items": [
+            {
+              "id": 1,
+              "first_name": "Ada",
+              "last_name": null,
+              "business_name": null,
+              "phone_number": "+2348031112222",
+              "email": null,
+              "city": null,
+              "state": null,
+              "country": "0",
+              "website": null,
+              "industry": null,
+              "source": null,
+              "lead_status": "new",
+              "consent_status": "unknown",
+              "has_consented": false,
+              "is_opted_out": false,
+              "is_undeliverable": false,
+              "undeliverable_reason": null,
+              "delivery_fail_count": 0,
+              "is_email_opted_out": false,
+              "email_status": "active",
+              "email_opted_out_at": null,
+              "email_opt_out_reason": null,
+              "is_email_undeliverable": false,
+              "emails_sent": 0,
+              "emails_received": 0,
+              "last_emailed_at": null,
+              "email_source": null,
+              "email_verified": false,
+              "email_verified_at": null,
+              "email_verdict": null,
+              "email_confidence": null,
+              "email_enriched_at": null,
+              "email_enrichment_note": null,
+              "opt_out_reason": null,
+              "opted_out_at": null,
+              "notes": null,
+              "custom_fields": null,
+              "tags": [
+                "0",
+                "Buyer",
+                "VIP"
+              ],
+              "messages_sent": 0,
+              "messages_received": 0,
+              "last_contacted_at": null,
+              "last_reply_at": null,
+              "created_at": "2026-01-02T12:00:00.123456",
+              "updated_at": "2026-01-02T12:00:00.123456"
+            }
+          ],
+          "page": 2,
+          "per_page": 1,
+          "next_page": null
+        }
+      },
+      "expected_contact_count": 2
+    },
+    {
+      "op": "list",
+      "filters": {
+        "sort_by": "name); DROP TABLE contacts;--",
+        "sort_dir": "asc"
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "total": 2,
+          "items": [
+            {
+              "id": 1,
+              "first_name": "Ada",
+              "last_name": null,
+              "business_name": null,
+              "phone_number": "+2348031112222",
+              "email": null,
+              "city": null,
+              "state": null,
+              "country": "0",
+              "website": null,
+              "industry": null,
+              "source": null,
+              "lead_status": "new",
+              "consent_status": "unknown",
+              "has_consented": false,
+              "is_opted_out": false,
+              "is_undeliverable": false,
+              "undeliverable_reason": null,
+              "delivery_fail_count": 0,
+              "is_email_opted_out": false,
+              "email_status": "active",
+              "email_opted_out_at": null,
+              "email_opt_out_reason": null,
+              "is_email_undeliverable": false,
+              "emails_sent": 0,
+              "emails_received": 0,
+              "last_emailed_at": null,
+              "email_source": null,
+              "email_verified": false,
+              "email_verified_at": null,
+              "email_verdict": null,
+              "email_confidence": null,
+              "email_enriched_at": null,
+              "email_enrichment_note": null,
+              "opt_out_reason": null,
+              "opted_out_at": null,
+              "notes": null,
+              "custom_fields": null,
+              "tags": [
+                "0",
+                "Buyer",
+                "VIP"
+              ],
+              "messages_sent": 0,
+              "messages_received": 0,
+              "last_contacted_at": null,
+              "last_reply_at": null,
+              "created_at": "2026-01-02T12:00:00.123456",
+              "updated_at": "2026-01-02T12:00:00.123456"
+            },
+            {
+              "id": 2,
+              "first_name": "Bola",
+              "last_name": null,
+              "business_name": null,
+              "phone_number": null,
+              "email": "bola@business.ng",
+              "city": "Abuja",
+              "state": null,
+              "country": null,
+              "website": null,
+              "industry": null,
+              "source": null,
+              "lead_status": "new",
+              "consent_status": "unknown",
+              "has_consented": false,
+              "is_opted_out": false,
+              "is_undeliverable": false,
+              "undeliverable_reason": null,
+              "delivery_fail_count": 0,
+              "is_email_opted_out": false,
+              "email_status": "active",
+              "email_opted_out_at": null,
+              "email_opt_out_reason": null,
+              "is_email_undeliverable": false,
+              "emails_sent": 0,
+              "emails_received": 0,
+              "last_emailed_at": null,
+              "email_source": "manual",
+              "email_verified": false,
+              "email_verified_at": null,
+              "email_verdict": null,
+              "email_confidence": null,
+              "email_enriched_at": null,
+              "email_enrichment_note": null,
+              "opt_out_reason": null,
+              "opted_out_at": null,
+              "notes": null,
+              "custom_fields": null,
+              "tags": [],
+              "messages_sent": 0,
+              "messages_received": 0,
+              "last_contacted_at": null,
+              "last_reply_at": null,
+              "created_at": "2026-01-02T12:00:00.123456",
+              "updated_at": "2026-01-02T12:00:00.123456"
+            }
+          ],
+          "page": 1,
+          "per_page": 25,
+          "next_page": null
+        }
+      },
+      "expected_contact_count": 2
+    },
+    {
+      "op": "update",
+      "id": 1,
+      "body": {
+        "tags": [
+          "New",
+          "VIP"
+        ],
+        "tag_operation": "add",
+        "notes": "Test notes"
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "id": 1,
+          "first_name": "Ada",
+          "last_name": null,
+          "business_name": null,
+          "phone_number": "+2348031112222",
+          "email": null,
+          "city": null,
+          "state": null,
+          "country": "0",
+          "website": null,
+          "industry": null,
+          "source": null,
+          "lead_status": "new",
+          "consent_status": "unknown",
+          "has_consented": false,
+          "is_opted_out": false,
+          "is_undeliverable": false,
+          "undeliverable_reason": null,
+          "delivery_fail_count": 0,
+          "is_email_opted_out": false,
+          "email_status": "active",
+          "email_opted_out_at": null,
+          "email_opt_out_reason": null,
+          "is_email_undeliverable": false,
+          "emails_sent": 0,
+          "emails_received": 0,
+          "last_emailed_at": null,
+          "email_source": null,
+          "email_verified": false,
+          "email_verified_at": null,
+          "email_verdict": null,
+          "email_confidence": null,
+          "email_enriched_at": null,
+          "email_enrichment_note": null,
+          "opt_out_reason": null,
+          "opted_out_at": null,
+          "notes": "Test notes",
+          "custom_fields": null,
+          "tags": [
+            "0",
+            "Buyer",
+            "New",
+            "VIP"
+          ],
+          "messages_sent": 0,
+          "messages_received": 0,
+          "last_contacted_at": null,
+          "last_reply_at": null,
+          "created_at": "2026-01-02T12:00:00.123456",
+          "updated_at": "2026-01-02T12:00:00.123456"
+        }
+      },
+      "expected_contact_count": 2
+    },
+    {
+      "op": "update",
+      "id": 1,
+      "body": {
+        "tags": "vip",
+        "tag_operation": "remove"
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "id": 1,
+          "first_name": "Ada",
+          "last_name": null,
+          "business_name": null,
+          "phone_number": "+2348031112222",
+          "email": null,
+          "city": null,
+          "state": null,
+          "country": "0",
+          "website": null,
+          "industry": null,
+          "source": null,
+          "lead_status": "new",
+          "consent_status": "unknown",
+          "has_consented": false,
+          "is_opted_out": false,
+          "is_undeliverable": false,
+          "undeliverable_reason": null,
+          "delivery_fail_count": 0,
+          "is_email_opted_out": false,
+          "email_status": "active",
+          "email_opted_out_at": null,
+          "email_opt_out_reason": null,
+          "is_email_undeliverable": false,
+          "emails_sent": 0,
+          "emails_received": 0,
+          "last_emailed_at": null,
+          "email_source": null,
+          "email_verified": false,
+          "email_verified_at": null,
+          "email_verdict": null,
+          "email_confidence": null,
+          "email_enriched_at": null,
+          "email_enrichment_note": null,
+          "opt_out_reason": null,
+          "opted_out_at": null,
+          "notes": "Test notes",
+          "custom_fields": null,
+          "tags": [
+            "0",
+            "Buyer",
+            "New"
+          ],
+          "messages_sent": 0,
+          "messages_received": 0,
+          "last_contacted_at": null,
+          "last_reply_at": null,
+          "created_at": "2026-01-02T12:00:00.123456",
+          "updated_at": "2026-01-02T12:00:00.123456"
+        }
+      },
+      "expected_contact_count": 2
+    },
+    {
+      "op": "tags",
+      "expected": {
+        "status": 200,
+        "body": {
+          "items": [
+            {
+              "name": "0",
+              "count": 1
+            },
+            {
+              "name": "Buyer",
+              "count": 1
+            },
+            {
+              "name": "New",
+              "count": 1
+            },
+            {
+              "name": "VIP",
+              "count": 0
+            }
+          ]
+        }
+      },
+      "expected_contact_count": 2
+    },
+    {
+      "op": "update",
+      "id": 1,
+      "body": {
+        "tags": null
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "id": 1,
+          "first_name": "Ada",
+          "last_name": null,
+          "business_name": null,
+          "phone_number": "+2348031112222",
+          "email": null,
+          "city": null,
+          "state": null,
+          "country": "0",
+          "website": null,
+          "industry": null,
+          "source": null,
+          "lead_status": "new",
+          "consent_status": "unknown",
+          "has_consented": false,
+          "is_opted_out": false,
+          "is_undeliverable": false,
+          "undeliverable_reason": null,
+          "delivery_fail_count": 0,
+          "is_email_opted_out": false,
+          "email_status": "active",
+          "email_opted_out_at": null,
+          "email_opt_out_reason": null,
+          "is_email_undeliverable": false,
+          "emails_sent": 0,
+          "emails_received": 0,
+          "last_emailed_at": null,
+          "email_source": null,
+          "email_verified": false,
+          "email_verified_at": null,
+          "email_verdict": null,
+          "email_confidence": null,
+          "email_enriched_at": null,
+          "email_enrichment_note": null,
+          "opt_out_reason": null,
+          "opted_out_at": null,
+          "notes": "Test notes",
+          "custom_fields": null,
+          "tags": [],
+          "messages_sent": 0,
+          "messages_received": 0,
+          "last_contacted_at": null,
+          "last_reply_at": null,
+          "created_at": "2026-01-02T12:00:00.123456",
+          "updated_at": "2026-01-02T12:00:00.123456"
+        }
+      },
+      "expected_contact_count": 2
+    },
+    {
+      "op": "update",
+      "id": 1,
+      "body": {
+        "email": "first@business.ng"
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "id": 1,
+          "first_name": "Ada",
+          "last_name": null,
+          "business_name": null,
+          "phone_number": "+2348031112222",
+          "email": "first@business.ng",
+          "city": null,
+          "state": null,
+          "country": "0",
+          "website": null,
+          "industry": null,
+          "source": null,
+          "lead_status": "new",
+          "consent_status": "unknown",
+          "has_consented": false,
+          "is_opted_out": false,
+          "is_undeliverable": false,
+          "undeliverable_reason": null,
+          "delivery_fail_count": 0,
+          "is_email_opted_out": false,
+          "email_status": "active",
+          "email_opted_out_at": null,
+          "email_opt_out_reason": null,
+          "is_email_undeliverable": false,
+          "emails_sent": 0,
+          "emails_received": 0,
+          "last_emailed_at": null,
+          "email_source": "manual",
+          "email_verified": false,
+          "email_verified_at": null,
+          "email_verdict": null,
+          "email_confidence": null,
+          "email_enriched_at": null,
+          "email_enrichment_note": null,
+          "opt_out_reason": null,
+          "opted_out_at": null,
+          "notes": "Test notes",
+          "custom_fields": null,
+          "tags": [],
+          "messages_sent": 0,
+          "messages_received": 0,
+          "last_contacted_at": null,
+          "last_reply_at": null,
+          "created_at": "2026-01-02T12:00:00.123456",
+          "updated_at": "2026-01-02T12:00:00.123456"
+        }
+      },
+      "expected_contact_count": 2
+    },
+    {
+      "op": "update",
+      "id": 1,
+      "body": {
+        "phone_number": null
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "id": 1,
+          "first_name": "Ada",
+          "last_name": null,
+          "business_name": null,
+          "phone_number": null,
+          "email": "first@business.ng",
+          "city": null,
+          "state": null,
+          "country": "0",
+          "website": null,
+          "industry": null,
+          "source": null,
+          "lead_status": "new",
+          "consent_status": "unknown",
+          "has_consented": false,
+          "is_opted_out": false,
+          "is_undeliverable": false,
+          "undeliverable_reason": null,
+          "delivery_fail_count": 0,
+          "is_email_opted_out": false,
+          "email_status": "active",
+          "email_opted_out_at": null,
+          "email_opt_out_reason": null,
+          "is_email_undeliverable": false,
+          "emails_sent": 0,
+          "emails_received": 0,
+          "last_emailed_at": null,
+          "email_source": "manual",
+          "email_verified": false,
+          "email_verified_at": null,
+          "email_verdict": null,
+          "email_confidence": null,
+          "email_enriched_at": null,
+          "email_enrichment_note": null,
+          "opt_out_reason": null,
+          "opted_out_at": null,
+          "notes": "Test notes",
+          "custom_fields": null,
+          "tags": [],
+          "messages_sent": 0,
+          "messages_received": 0,
+          "last_contacted_at": null,
+          "last_reply_at": null,
+          "created_at": "2026-01-02T12:00:00.123456",
+          "updated_at": "2026-01-02T12:00:00.123456"
+        }
+      },
+      "expected_contact_count": 2
+    },
+    {
+      "op": "update",
+      "id": 1,
+      "body": {
+        "email": null
+      },
+      "expected": {
+        "status": 400,
+        "message": "A contact needs a phone number or an email address"
+      },
+      "expected_contact_count": 2
+    },
+    {
+      "op": "get",
+      "id": 1,
+      "expected": {
+        "status": 200,
+        "body": {
+          "id": 1,
+          "first_name": "Ada",
+          "last_name": null,
+          "business_name": null,
+          "phone_number": null,
+          "email": "first@business.ng",
+          "city": null,
+          "state": null,
+          "country": "0",
+          "website": null,
+          "industry": null,
+          "source": null,
+          "lead_status": "new",
+          "consent_status": "unknown",
+          "has_consented": false,
+          "is_opted_out": false,
+          "is_undeliverable": false,
+          "undeliverable_reason": null,
+          "delivery_fail_count": 0,
+          "is_email_opted_out": false,
+          "email_status": "active",
+          "email_opted_out_at": null,
+          "email_opt_out_reason": null,
+          "is_email_undeliverable": false,
+          "emails_sent": 0,
+          "emails_received": 0,
+          "last_emailed_at": null,
+          "email_source": "manual",
+          "email_verified": false,
+          "email_verified_at": null,
+          "email_verdict": null,
+          "email_confidence": null,
+          "email_enriched_at": null,
+          "email_enrichment_note": null,
+          "opt_out_reason": null,
+          "opted_out_at": null,
+          "notes": "Test notes",
+          "custom_fields": null,
+          "tags": [],
+          "messages_sent": 0,
+          "messages_received": 0,
+          "last_contacted_at": null,
+          "last_reply_at": null,
+          "created_at": "2026-01-02T12:00:00.123456",
+          "updated_at": "2026-01-02T12:00:00.123456"
+        }
+      },
+      "expected_contact_count": 2
+    },
+    {
+      "op": "update",
+      "id": 1,
+      "body": {
+        "email": "bola@business.ng"
+      },
+      "expected": {
+        "status": 409,
+        "message": "Another contact already has this email"
+      },
+      "expected_contact_count": 2
+    },
+    {
+      "op": "update",
+      "id": 2,
+      "body": {
+        "first_name": "Bola renamed",
+        "tags": [
+          "Team"
+        ]
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "id": 2,
+          "first_name": "Bola renamed",
+          "last_name": null,
+          "business_name": null,
+          "phone_number": null,
+          "email": "bola@business.ng",
+          "city": "Abuja",
+          "state": null,
+          "country": null,
+          "website": null,
+          "industry": null,
+          "source": null,
+          "lead_status": "new",
+          "consent_status": "unknown",
+          "has_consented": false,
+          "is_opted_out": false,
+          "is_undeliverable": false,
+          "undeliverable_reason": null,
+          "delivery_fail_count": 0,
+          "is_email_opted_out": false,
+          "email_status": "active",
+          "email_opted_out_at": null,
+          "email_opt_out_reason": null,
+          "is_email_undeliverable": false,
+          "emails_sent": 0,
+          "emails_received": 0,
+          "last_emailed_at": null,
+          "email_source": "manual",
+          "email_verified": false,
+          "email_verified_at": null,
+          "email_verdict": null,
+          "email_confidence": null,
+          "email_enriched_at": null,
+          "email_enrichment_note": null,
+          "opt_out_reason": null,
+          "opted_out_at": null,
+          "notes": null,
+          "custom_fields": null,
+          "tags": [
+            "Team"
+          ],
+          "messages_sent": 0,
+          "messages_received": 0,
+          "last_contacted_at": null,
+          "last_reply_at": null,
+          "created_at": "2026-01-02T12:00:00.123456",
+          "updated_at": "2026-01-02T12:00:00.123456"
+        }
+      },
+      "expected_contact_count": 2
+    },
+    {
+      "op": "list_create",
+      "name": "  Prospects  ",
+      "description": "Test list",
+      "expected": {
+        "status": 201,
+        "body": {
+          "id": 1,
+          "name": "Prospects",
+          "description": "Test list",
+          "contact_count": 0
+        }
+      },
+      "expected_contact_count": 2
+    },
+    {
+      "op": "list_create",
+      "name": "prospects",
+      "expected": {
+        "status": 409,
+        "message": "A list named 'Prospects' already exists (id 1). Use that list, or choose a different name."
+      },
+      "expected_contact_count": 2
+    },
+    {
+      "op": "list_create",
+      "name": " 　 ",
+      "expected": {
+        "status": 422,
+        "message": "A list needs a name"
+      },
+      "expected_contact_count": 2
+    },
+    {
+      "op": "list_create",
+      "name": "Other",
+      "expected": {
+        "status": 201,
+        "body": {
+          "id": 2,
+          "name": "Other",
+          "description": null,
+          "contact_count": 0
+        }
+      },
+      "expected_contact_count": 2
+    },
+    {
+      "op": "list_update",
+      "id": 2,
+      "name": "PROSPECTS",
+      "expected": {
+        "status": 409,
+        "message": "A list named 'Prospects' already exists (id 1). Use that list, or choose a different name."
+      },
+      "expected_contact_count": 2
+    },
+    {
+      "op": "list_update",
+      "id": 2,
+      "name": "Renamed",
+      "description": "Edited",
+      "expected": {
+        "status": 200,
+        "body": {
+          "success": true
+        }
+      },
+      "expected_contact_count": 2
+    },
+    {
+      "op": "members_add",
+      "id": 1,
+      "ids": [
+        1,
+        2,
+        2
+      ],
+      "expected": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "added": 2,
+          "contact_count": 2
+        }
+      },
+      "expected_contact_count": 2
+    },
+    {
+      "op": "members_add",
+      "id": 1,
+      "ids": [
+        1,
+        2
+      ],
+      "expected": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "added": 0,
+          "contact_count": 2
+        }
+      },
+      "expected_contact_count": 2
+    },
+    {
+      "op": "members_add",
+      "id": 1,
+      "ids": [
+        2,
+        404
+      ],
+      "expected": {
+        "status": 404,
+        "message": "Contact not found: 404"
+      },
+      "expected_contact_count": 2
+    },
+    {
+      "op": "members",
+      "id": 1,
+      "expected": {
+        "status": 200,
+        "body": {
+          "total": 2,
+          "page": 1,
+          "per_page": 25,
+          "items": [
+            {
+              "id": 1,
+              "first_name": "Ada",
+              "last_name": null,
+              "business_name": null,
+              "phone_number": null,
+              "email": "first@business.ng",
+              "city": null,
+              "state": null,
+              "country": "0",
+              "website": null,
+              "industry": null,
+              "source": null,
+              "lead_status": "new",
+              "consent_status": "unknown",
+              "has_consented": false,
+              "is_opted_out": false,
+              "is_undeliverable": false,
+              "undeliverable_reason": null,
+              "delivery_fail_count": 0,
+              "is_email_opted_out": false,
+              "email_status": "active",
+              "email_opted_out_at": null,
+              "email_opt_out_reason": null,
+              "is_email_undeliverable": false,
+              "emails_sent": 0,
+              "emails_received": 0,
+              "last_emailed_at": null,
+              "email_source": "manual",
+              "email_verified": false,
+              "email_verified_at": null,
+              "email_verdict": null,
+              "email_confidence": null,
+              "email_enriched_at": null,
+              "email_enrichment_note": null,
+              "opt_out_reason": null,
+              "opted_out_at": null,
+              "notes": "Test notes",
+              "custom_fields": null,
+              "tags": [],
+              "messages_sent": 0,
+              "messages_received": 0,
+              "last_contacted_at": null,
+              "last_reply_at": null,
+              "created_at": "2026-01-02T12:00:00.123456",
+              "updated_at": "2026-01-02T12:00:00.123456"
+            },
+            {
+              "id": 2,
+              "first_name": "Bola renamed",
+              "last_name": null,
+              "business_name": null,
+              "phone_number": null,
+              "email": "bola@business.ng",
+              "city": "Abuja",
+              "state": null,
+              "country": null,
+              "website": null,
+              "industry": null,
+              "source": null,
+              "lead_status": "new",
+              "consent_status": "unknown",
+              "has_consented": false,
+              "is_opted_out": false,
+              "is_undeliverable": false,
+              "undeliverable_reason": null,
+              "delivery_fail_count": 0,
+              "is_email_opted_out": false,
+              "email_status": "active",
+              "email_opted_out_at": null,
+              "email_opt_out_reason": null,
+              "is_email_undeliverable": false,
+              "emails_sent": 0,
+              "emails_received": 0,
+              "last_emailed_at": null,
+              "email_source": "manual",
+              "email_verified": false,
+              "email_verified_at": null,
+              "email_verdict": null,
+              "email_confidence": null,
+              "email_enriched_at": null,
+              "email_enrichment_note": null,
+              "opt_out_reason": null,
+              "opted_out_at": null,
+              "notes": null,
+              "custom_fields": null,
+              "tags": [
+                "Team"
+              ],
+              "messages_sent": 0,
+              "messages_received": 0,
+              "last_contacted_at": null,
+              "last_reply_at": null,
+              "created_at": "2026-01-02T12:00:00.123456",
+              "updated_at": "2026-01-02T12:00:00.123456"
+            }
+          ]
+        }
+      },
+      "expected_contact_count": 2
+    },
+    {
+      "op": "stats",
+      "id": 1,
+      "expected": {
+        "status": 200,
+        "body": {
+          "id": 1,
+          "name": "Prospects",
+          "contact_count": 2,
+          "lead_status_distribution": {
+            "new": 2
+          }
+        }
+      },
+      "expected_contact_count": 2
+    },
+    {
+      "op": "lists",
+      "expected": {
+        "status": 200,
+        "body": {
+          "total": 2,
+          "items": [
+            {
+              "id": 1,
+              "name": "Prospects",
+              "description": "Test list",
+              "contact_count": 2,
+              "created_at": "2026-01-02T12:00:00.123456",
+              "updated_at": "2026-01-02T12:00:00.123456"
+            },
+            {
+              "id": 2,
+              "name": "Renamed",
+              "description": "Edited",
+              "contact_count": 0,
+              "created_at": "2026-01-02T12:00:00.123456",
+              "updated_at": "2026-01-02T12:00:00.123456"
+            }
+          ]
+        }
+      },
+      "expected_contact_count": 2
+    },
+    {
+      "op": "list",
+      "filters": {
+        "list_id": 1
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "total": 2,
+          "items": [
+            {
+              "id": 2,
+              "first_name": "Bola renamed",
+              "last_name": null,
+              "business_name": null,
+              "phone_number": null,
+              "email": "bola@business.ng",
+              "city": "Abuja",
+              "state": null,
+              "country": null,
+              "website": null,
+              "industry": null,
+              "source": null,
+              "lead_status": "new",
+              "consent_status": "unknown",
+              "has_consented": false,
+              "is_opted_out": false,
+              "is_undeliverable": false,
+              "undeliverable_reason": null,
+              "delivery_fail_count": 0,
+              "is_email_opted_out": false,
+              "email_status": "active",
+              "email_opted_out_at": null,
+              "email_opt_out_reason": null,
+              "is_email_undeliverable": false,
+              "emails_sent": 0,
+              "emails_received": 0,
+              "last_emailed_at": null,
+              "email_source": "manual",
+              "email_verified": false,
+              "email_verified_at": null,
+              "email_verdict": null,
+              "email_confidence": null,
+              "email_enriched_at": null,
+              "email_enrichment_note": null,
+              "opt_out_reason": null,
+              "opted_out_at": null,
+              "notes": null,
+              "custom_fields": null,
+              "tags": [
+                "Team"
+              ],
+              "messages_sent": 0,
+              "messages_received": 0,
+              "last_contacted_at": null,
+              "last_reply_at": null,
+              "created_at": "2026-01-02T12:00:00.123456",
+              "updated_at": "2026-01-02T12:00:00.123456"
+            },
+            {
+              "id": 1,
+              "first_name": "Ada",
+              "last_name": null,
+              "business_name": null,
+              "phone_number": null,
+              "email": "first@business.ng",
+              "city": null,
+              "state": null,
+              "country": "0",
+              "website": null,
+              "industry": null,
+              "source": null,
+              "lead_status": "new",
+              "consent_status": "unknown",
+              "has_consented": false,
+              "is_opted_out": false,
+              "is_undeliverable": false,
+              "undeliverable_reason": null,
+              "delivery_fail_count": 0,
+              "is_email_opted_out": false,
+              "email_status": "active",
+              "email_opted_out_at": null,
+              "email_opt_out_reason": null,
+              "is_email_undeliverable": false,
+              "emails_sent": 0,
+              "emails_received": 0,
+              "last_emailed_at": null,
+              "email_source": "manual",
+              "email_verified": false,
+              "email_verified_at": null,
+              "email_verdict": null,
+              "email_confidence": null,
+              "email_enriched_at": null,
+              "email_enrichment_note": null,
+              "opt_out_reason": null,
+              "opted_out_at": null,
+              "notes": "Test notes",
+              "custom_fields": null,
+              "tags": [],
+              "messages_sent": 0,
+              "messages_received": 0,
+              "last_contacted_at": null,
+              "last_reply_at": null,
+              "created_at": "2026-01-02T12:00:00.123456",
+              "updated_at": "2026-01-02T12:00:00.123456"
+            }
+          ],
+          "page": 1,
+          "per_page": 25,
+          "next_page": null
+        }
+      },
+      "expected_contact_count": 2
+    },
+    {
+      "op": "list",
+      "filters": {
+        "exclude_list_id": 1
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "total": 0,
+          "items": [],
+          "page": 1,
+          "per_page": 25,
+          "next_page": null
+        }
+      },
+      "expected_contact_count": 2
+    },
+    {
+      "op": "members_remove",
+      "id": 1,
+      "body": {
+        "contact_ids": [
+          1
+        ]
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "removed": 1,
+          "contact_count": 1
+        }
+      },
+      "expected_contact_count": 2
+    },
+    {
+      "op": "members_remove",
+      "id": 1,
+      "body": {
+        "contact_ids": [
+          1
+        ]
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "removed": 0,
+          "contact_count": 1
+        }
+      },
+      "expected_contact_count": 2
+    },
+    {
+      "op": "members_add_all",
+      "id": 1,
+      "body": {
+        "channel": "email"
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "added": 1,
+          "matched": 2,
+          "contact_count": 2
+        }
+      },
+      "expected_contact_count": 2
+    },
+    {
+      "op": "members_add_all",
+      "id": 1,
+      "body": {
+        "channel": "email"
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "added": 0,
+          "matched": 2,
+          "contact_count": 2
+        }
+      },
+      "expected_contact_count": 2
+    },
+    {
+      "op": "members_remove",
+      "id": 1,
+      "body": {
+        "scope": "all",
+        "search": "Bola"
+      },
+      "expected": {
+        "status": 200,
+        "body": {
+          "success": true,
+          "removed": 1,
+          "contact_count": 1
+        }
+      },
+      "expected_contact_count": 2
+    },
+    {
+      "op": "members",
+      "id": 1,
+      "expected": {
+        "status": 200,
+        "body": {
+          "total": 1,
+          "page": 1,
+          "per_page": 25,
+          "items": [
+            {
+              "id": 1,
+              "first_name": "Ada",
+              "last_name": null,
+              "business_name": null,
+              "phone_number": null,
+              "email": "first@business.ng",
+              "city": null,
+              "state": null,
+              "country": "0",
+              "website": null,
+              "industry": null,
+              "source": null,
+              "lead_status": "new",
+              "consent_status": "unknown",
+              "has_consented": false,
+              "is_opted_out": false,
+              "is_undeliverable": false,
+              "undeliverable_reason": null,
+              "delivery_fail_count": 0,
+              "is_email_opted_out": false,
+              "email_status": "active",
+              "email_opted_out_at": null,
+              "email_opt_out_reason": null,
+              "is_email_undeliverable": false,
+              "emails_sent": 0,
+              "emails_received": 0,
+              "last_emailed_at": null,
+              "email_source": "manual",
+              "email_verified": false,
+              "email_verified_at": null,
+              "email_verdict": null,
+              "email_confidence": null,
+              "email_enriched_at": null,
+              "email_enrichment_note": null,
+              "opt_out_reason": null,
+              "opted_out_at": null,
+              "notes": "Test notes",
+              "custom_fields": null,
+              "tags": [],
+              "messages_sent": 0,
+              "messages_received": 0,
+              "last_contacted_at": null,
+              "last_reply_at": null,
+              "created_at": "2026-01-02T12:00:00.123456",
+              "updated_at": "2026-01-02T12:00:00.123456"
+            }
+          ]
+        }
+      },
+      "expected_contact_count": 2
+    },
+    {
+      "op": "stats",
+      "id": 1,
+      "expected": {
+        "status": 200,
+        "body": {
+          "id": 1,
+          "name": "Prospects",
+          "contact_count": 1,
+          "lead_status_distribution": {
+            "new": 1
+          }
+        }
+      },
+      "expected_contact_count": 2
+    },
+    {
+      "op": "members_add",
+      "id": 404,
+      "ids": [],
+      "expected": {
+        "status": 404,
+        "message": "List not found"
+      },
+      "expected_contact_count": 2
+    }
+  ],
+  "dto": [
+    {
+      "update": false,
+      "input": null,
+      "expected": {
+        "message": "Input should be a valid dictionary or object to extract fields from",
+        "field": null
+      }
+    },
+    {
+      "update": false,
+      "input": [],
+      "expected": {
+        "message": "Input should be a valid dictionary or object to extract fields from",
+        "field": null
+      }
+    },
+    {
+      "update": false,
+      "input": {},
+      "expected": {
+        "body": {
+          "first_name": null,
+          "last_name": null,
+          "business_name": null,
+          "phone_number": null,
+          "email": null,
+          "city": null,
+          "state": null,
+          "country": null,
+          "website": null,
+          "industry": null,
+          "source": null,
+          "lead_status": "new",
+          "notes": null,
+          "custom_fields": null,
+          "tags": null
+        }
+      }
+    },
+    {
+      "update": false,
+      "input": {
+        "phone_number": 5
+      },
+      "expected": {
+        "message": "Input should be a valid string",
+        "field": "phone_number"
+      }
+    },
+    {
+      "update": false,
+      "input": {
+        "phone_number": "xxxxxxxxxxxxxxxxxxxxx"
+      },
+      "expected": {
+        "message": "String should have at most 20 characters",
+        "field": "phone_number"
+      }
+    },
+    {
+      "update": false,
+      "input": {
+        "country": "ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+      },
+      "expected": {
+        "message": "String should have at most 100 characters",
+        "field": "country"
+      }
+    },
+    {
+      "update": false,
+      "input": {
+        "email": "bad"
+      },
+      "expected": {
+        "message": "Value error, Enter one valid email address",
+        "field": "email"
+      }
+    },
+    {
+      "update": false,
+      "input": {
+        "email": "<A@business.ng>,"
+      },
+      "expected": {
+        "body": {
+          "first_name": null,
+          "last_name": null,
+          "business_name": null,
+          "phone_number": null,
+          "email": "a@business.ng",
+          "city": null,
+          "state": null,
+          "country": null,
+          "website": null,
+          "industry": null,
+          "source": null,
+          "lead_status": "new",
+          "notes": null,
+          "custom_fields": null,
+          "tags": null
+        }
+      }
+    },
+    {
+      "update": false,
+      "input": {
+        "lead_status": null
+      },
+      "expected": {
+        "message": "Input should be a valid string",
+        "field": "lead_status"
+      }
+    },
+    {
+      "update": false,
+      "input": {
+        "tags": false
+      },
+      "expected": {
+        "message": "Value error, tags must be an array of tag names or a comma-separated string",
+        "field": "tags"
+      }
+    },
+    {
+      "update": false,
+      "input": {
+        "tags": [
+          4
+        ]
+      },
+      "expected": {
+        "message": "Value error, each tag must be a string",
+        "field": "tags"
+      }
+    },
+    {
+      "update": false,
+      "input": {
+        "tags": [
+          "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        ]
+      },
+      "expected": {
+        "message": "Value error, tag names must be 100 characters or fewer",
+        "field": "tags"
+      }
+    },
+    {
+      "update": false,
+      "input": {
+        "tags": " A, a, 　, 0"
+      },
+      "expected": {
+        "body": {
+          "first_name": null,
+          "last_name": null,
+          "business_name": null,
+          "phone_number": null,
+          "email": null,
+          "city": null,
+          "state": null,
+          "country": null,
+          "website": null,
+          "industry": null,
+          "source": null,
+          "lead_status": "new",
+          "notes": null,
+          "custom_fields": null,
+          "tags": [
+            "A",
+            "0"
+          ]
+        }
+      }
+    },
+    {
+      "update": false,
+      "input": {
+        "tags": null
+      },
+      "expected": {
+        "body": {
+          "first_name": null,
+          "last_name": null,
+          "business_name": null,
+          "phone_number": null,
+          "email": null,
+          "city": null,
+          "state": null,
+          "country": null,
+          "website": null,
+          "industry": null,
+          "source": null,
+          "lead_status": "new",
+          "notes": null,
+          "custom_fields": null,
+          "tags": null
+        }
+      }
+    },
+    {
+      "update": false,
+      "input": {
+        "tag_operation": "bad"
+      },
+      "expected": {
+        "body": {
+          "first_name": null,
+          "last_name": null,
+          "business_name": null,
+          "phone_number": null,
+          "email": null,
+          "city": null,
+          "state": null,
+          "country": null,
+          "website": null,
+          "industry": null,
+          "source": null,
+          "lead_status": "new",
+          "notes": null,
+          "custom_fields": null,
+          "tags": null
+        }
+      }
+    },
+    {
+      "update": false,
+      "input": {
+        "has_consented": "yes"
+      },
+      "expected": {
+        "body": {
+          "first_name": null,
+          "last_name": null,
+          "business_name": null,
+          "phone_number": null,
+          "email": null,
+          "city": null,
+          "state": null,
+          "country": null,
+          "website": null,
+          "industry": null,
+          "source": null,
+          "lead_status": "new",
+          "notes": null,
+          "custom_fields": null,
+          "tags": null
+        }
+      }
+    },
+    {
+      "update": false,
+      "input": {
+        "is_opted_out": 0
+      },
+      "expected": {
+        "body": {
+          "first_name": null,
+          "last_name": null,
+          "business_name": null,
+          "phone_number": null,
+          "email": null,
+          "city": null,
+          "state": null,
+          "country": null,
+          "website": null,
+          "industry": null,
+          "source": null,
+          "lead_status": "new",
+          "notes": null,
+          "custom_fields": null,
+          "tags": null
+        }
+      }
+    },
+    {
+      "update": false,
+      "input": {
+        "custom_fields": {
+          "a": 1
+        }
+      },
+      "expected": {
+        "message": "Input should be a valid string",
+        "field": "custom_fields"
+      }
+    },
+    {
+      "update": false,
+      "input": {
+        "unknown": "ignored"
+      },
+      "expected": {
+        "body": {
+          "first_name": null,
+          "last_name": null,
+          "business_name": null,
+          "phone_number": null,
+          "email": null,
+          "city": null,
+          "state": null,
+          "country": null,
+          "website": null,
+          "industry": null,
+          "source": null,
+          "lead_status": "new",
+          "notes": null,
+          "custom_fields": null,
+          "tags": null
+        }
+      }
+    },
+    {
+      "update": true,
+      "input": null,
+      "expected": {
+        "message": "Input should be a valid dictionary or object to extract fields from",
+        "field": null
+      }
+    },
+    {
+      "update": true,
+      "input": [],
+      "expected": {
+        "message": "Input should be a valid dictionary or object to extract fields from",
+        "field": null
+      }
+    },
+    {
+      "update": true,
+      "input": {},
+      "expected": {
+        "body": {}
+      }
+    },
+    {
+      "update": true,
+      "input": {
+        "phone_number": 5
+      },
+      "expected": {
+        "message": "Input should be a valid string",
+        "field": "phone_number"
+      }
+    },
+    {
+      "update": true,
+      "input": {
+        "phone_number": "xxxxxxxxxxxxxxxxxxxxx"
+      },
+      "expected": {
+        "message": "String should have at most 20 characters",
+        "field": "phone_number"
+      }
+    },
+    {
+      "update": true,
+      "input": {
+        "country": "ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+      },
+      "expected": {
+        "message": "String should have at most 100 characters",
+        "field": "country"
+      }
+    },
+    {
+      "update": true,
+      "input": {
+        "email": "bad"
+      },
+      "expected": {
+        "message": "Value error, Enter one valid email address",
+        "field": "email"
+      }
+    },
+    {
+      "update": true,
+      "input": {
+        "email": "<A@business.ng>,"
+      },
+      "expected": {
+        "body": {
+          "email": "a@business.ng"
+        }
+      }
+    },
+    {
+      "update": true,
+      "input": {
+        "lead_status": null
+      },
+      "expected": {
+        "body": {
+          "lead_status": null
+        }
+      }
+    },
+    {
+      "update": true,
+      "input": {
+        "tags": false
+      },
+      "expected": {
+        "message": "Value error, tags must be an array of tag names or a comma-separated string",
+        "field": "tags"
+      }
+    },
+    {
+      "update": true,
+      "input": {
+        "tags": [
+          4
+        ]
+      },
+      "expected": {
+        "message": "Value error, each tag must be a string",
+        "field": "tags"
+      }
+    },
+    {
+      "update": true,
+      "input": {
+        "tags": [
+          "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        ]
+      },
+      "expected": {
+        "message": "Value error, tag names must be 100 characters or fewer",
+        "field": "tags"
+      }
+    },
+    {
+      "update": true,
+      "input": {
+        "tags": " A, a, 　, 0"
+      },
+      "expected": {
+        "body": {
+          "tags": [
+            "A",
+            "0"
+          ]
+        }
+      }
+    },
+    {
+      "update": true,
+      "input": {
+        "tags": null
+      },
+      "expected": {
+        "body": {
+          "tags": null
+        }
+      }
+    },
+    {
+      "update": true,
+      "input": {
+        "tag_operation": "bad"
+      },
+      "expected": {
+        "message": "Input should be 'replace', 'add' or 'remove'",
+        "field": "tag_operation"
+      }
+    },
+    {
+      "update": true,
+      "input": {
+        "has_consented": "yes"
+      },
+      "expected": {
+        "body": {
+          "has_consented": true
+        }
+      }
+    },
+    {
+      "update": true,
+      "input": {
+        "is_opted_out": 0
+      },
+      "expected": {
+        "body": {
+          "is_opted_out": false
+        }
+      }
+    },
+    {
+      "update": true,
+      "input": {
+        "custom_fields": {
+          "a": 1
+        }
+      },
+      "expected": {
+        "message": "Input should be a valid string",
+        "field": "custom_fields"
+      }
+    },
+    {
+      "update": true,
+      "input": {
+        "unknown": "ignored"
+      },
+      "expected": {
+        "body": {}
+      }
+    }
+  ],
+  "scope": "Original selected AST only; five synthetic SQLite tables, omitted relationships and fixed clock; not HTTP, provider, native DB, Unicode-collation or concurrency proof"
+}

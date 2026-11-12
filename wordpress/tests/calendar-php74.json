@@ -1,0 +1,13 @@
+{
+  "ok": true,
+  "assertions": 148,
+  "diffs": [],
+  "php": "7.4.34-dev",
+  "source_operations": 38,
+  "source_dto_cases": 30,
+  "scope": "Selected actual calendar source with isolated SQLite, UTC result adapter, fixed clock, reconstructed attendee relationship; explicit native safety fixes, synthetic rollback and conflict injection. updated_at excluded from source comparisons: native monotonic CAS timestamp differs. No WordPress/MySQL/concurrency/browser/delivery certification.",
+  "native_wordpress_verified": false,
+  "native_mysql_verified": false,
+  "provider_messages_sent": 0,
+  "suite": "calendar"
+}

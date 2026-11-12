@@ -1,0 +1,7 @@
+{
+  "ok": true,
+  "assertions": 38,
+  "php": "7.4.34-dev",
+  "scope": "WordPress hook mocks; not actual WordPress/upload/HTTP certification",
+  "suite": "hooks"
+}

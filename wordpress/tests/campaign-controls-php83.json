@@ -1,0 +1,14 @@
+{
+  "ok": true,
+  "assertions": 175,
+  "diffs": [],
+  "php": "8.3.36",
+  "source_operations": 38,
+  "source_dto_cases": 11,
+  "provider_messages_sent": 0,
+  "native_wordpress_verified": false,
+  "native_mysql_verified": false,
+  "native_concurrency_verified": false,
+  "scope": "Selected actual campaign mutation AST/DTO and synthetic SQLite/fence/rollback/history safeguards. Native workers, email sender resolution, actual HTTP/FKs/locks/concurrency, live sends and complete campaign parity remain unqualified.",
+  "suite": "campaign-controls"
+}

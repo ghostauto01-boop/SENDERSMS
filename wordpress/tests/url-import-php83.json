@@ -1,0 +1,13 @@
+{
+  "ok": true,
+  "assertions": 187,
+  "diffs": [],
+  "php": "8.3.36",
+  "source_dto_cases": 24,
+  "source_operations": 14,
+  "scope": "Actual original URL DTO/endpoint comparisons with explicitly fake DNS/HTTP and synthetic SQLite; separate conservative IP/URL/streaming-limit tests. No real DNS/TLS/cURL/HTTP/MySQL/WordPress/SSRF bypass/concurrency proof.",
+  "native_wordpress_verified": false,
+  "real_network_verified": false,
+  "provider_messages_sent": 0,
+  "suite": "url-import"
+}

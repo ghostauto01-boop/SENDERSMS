@@ -1,0 +1,18 @@
+<?php
+/** Pure shell document/security tests; no activation/native WordPress claims. */
+require __DIR__.'/../sender-suite/includes/class-app-shell.php';
+$count=0;function shell_check($label,$ok){global $count;if(!$ok){throw new RuntimeException($label);}$count++;}
+foreach(array(array(),array('sender_suite_app'=>1),array('sender_suite_app'=>array('1')),array('sender_suite_app'=>'01'),array('sender_suite_app'=>'true'),array('other'=>'1')) as $query){shell_check('nonmatching query never takes over site',!\SenderSuite\AppShell::requested($query));}
+shell_check('explicit string query launch',\SenderSuite\AppShell::requested(array('sender_suite_app'=>'1')));
+$asset='https://site.example/sub/wp-content/plugins/sender-suite/app/';
+foreach(array('https://site.example/sub/wp-json/sender-suite/v1/','https://site.example/sub/index.php?rest_route=/sender-suite/v1/') as $api){
+ $page=\SenderSuite\AppShell::document($asset,$api);$html=$page['body'];
+ shell_check('native UI marker',strpos($html,'sender-suite-native-ui')!==false);shell_check('runtime API injected',strpos($html,json_encode($api))!==false);shell_check('outbox default disabled',strpos($html,'"smsOutboxEnabled":false')!==false);shell_check('truthful development runtime',strpos($html,'"productionReady":false')!==false);
+ shell_check('asset base bound to plugin',strpos($html,'src="'.$asset.'assets/')!==false);shell_check('no root-relative module URL',!preg_match('~(?:src|href)="/(?!/)~',$html));shell_check('no static service worker registration',strpos($html,'serviceWorker.register')===false);shell_check('no original API root',strpos($html,'/api/v1')===false);
+ shell_check('private document no store',$page['headers']['Cache-Control']==='no-store, private, max-age=0');shell_check('sniffing denied',$page['headers']['X-Content-Type-Options']==='nosniff');shell_check('same origin frames',$page['headers']['X-Frame-Options']==='SAMEORIGIN');shell_check('no-referrer leakage cross origin',$page['headers']['Referrer-Policy']==='same-origin');
+ preg_match("/script-src 'self' 'nonce-([^']+)'/",$page['headers']['Content-Security-Policy'],$nonce);shell_check('strong nonce',(bool)preg_match('/^[A-Za-z0-9+\/]{32}$/D',$nonce[1]??''));preg_match_all('/<script\b([^>]*)>/',$html,$scripts);foreach($scripts[1] as $attrs){shell_check('all scripts carry CSP nonce',strpos($attrs,'nonce="'.$nonce[1].'"')!==false);}
+ foreach(array("connect-src 'self'","worker-src 'none'","object-src 'none'","base-uri 'none'","form-action 'self'") as $rule){shell_check('CSP '.$rule,strpos($page['headers']['Content-Security-Policy'],$rule)!==false);}
+}
+$on=\SenderSuite\AppShell::document($asset,'https://site.example/wp-json/sender-suite/v1/',true);shell_check('explicit boolean outbox enabled',strpos($on['body'],'"smsOutboxEnabled":true')!==false);shell_check('fresh per document CSP nonce',$on['headers']['Content-Security-Policy']!==$page['headers']['Content-Security-Policy']);
+foreach(array('javascript:alert(1)','/relative','https://user:password@site.example/','https://site.example/" onload="attack','file:///tmp/test') as $bad){try{\SenderSuite\AppShell::document($bad,'https://site.example/wp-json/');shell_check('invalid asset URL accepted',false);}catch(RuntimeException $e){$count++;}try{\SenderSuite\AppShell::document($asset,$bad);shell_check('invalid API URL accepted',false);}catch(RuntimeException $e){$count++;}}
+echo json_encode(array('ok'=>true,'assertions'=>$count,'php'=>PHP_VERSION,'native_wordpress_verified'=>false,'native_mysql_verified'=>false,'scope'=>'Pure PHP document/CSP/runtime/explicit launch-gate tests only. Not live WordPress activation, REST dispatch or browser workflow qualification.'),JSON_THROW_ON_ERROR);

@@ -1,0 +1,16 @@
+{
+  "ok": true,
+  "assertions": 1289,
+  "diffs": [],
+  "php": "8.3.36",
+  "source_operations": 68,
+  "source_dto_cases": 108,
+  "classifier_cases": 273,
+  "matching_cases": 200,
+  "condition_cases": 504,
+  "scope": "Original selected rule/notification AST and pure classifier; isolated SQLite, fixed clock, no relationships. No action execution/cooldown/sending/provider/native DB/real WP/HTTP/concurrency certification.",
+  "native_mysql_verified": false,
+  "native_wordpress_verified": false,
+  "provider_messages_sent": 0,
+  "suite": "reply"
+}

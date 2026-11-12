@@ -1,0 +1,13 @@
+{
+  "ok": true,
+  "assertions": 200,
+  "diffs": [],
+  "php": "7.4.34-dev",
+  "source_signature_vectors": 60,
+  "source_reconciliation_operations": 19,
+  "native_wordpress_verified": false,
+  "native_mysql_verified": false,
+  "gateway_connectivity_verified": false,
+  "scope": "Selected original AST/SQLite synthetic HMAC and state parity, deliberate terminal/dedup safety hardening, fault rollback; no real HTTP/gateway/send/concurrency proof",
+  "suite": "sms-receipts"
+}

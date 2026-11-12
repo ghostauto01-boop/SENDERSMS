@@ -1,0 +1,11 @@
+{
+  "ok": true,
+  "assertions": 52,
+  "diffs": [],
+  "php": "7.4.34-dev",
+  "provider_messages_sent": 0,
+  "native_wordpress_verified": false,
+  "native_mysql_verified": false,
+  "scope": "Feature-enabled fake WordPress request/session/cron dispatch with synthetic SQLite and fake gateway. Not real HTTP, production credentials, actual WP cron, native concurrency or complete original send API parity",
+  "suite": "sms-outbox-routes"
+}

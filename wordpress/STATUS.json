@@ -1,0 +1,15 @@
+{
+  "version": "1.0.0",
+  "source_contracts": 508,
+  "implemented_native_contracts": 499,
+  "root_static_scoped_contracts": 9,
+  "certified": 0,
+  "wp_rest_route_registrations": 313,
+  "php_classes": 69,
+  "php_lint_checks": 138,
+  "php_assertions": 45038,
+  "unchanged_frontend_files": 165,
+  "native_ui_provenance_checks": 141,
+  "native_mysql_verified": false,
+  "native_wordpress_install_verified": false
+}

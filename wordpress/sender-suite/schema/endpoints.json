@@ -1,0 +1,3068 @@
+[
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/overview",
+    "source": "backend/app/api/v1/ads.py:187",
+    "handler": "overview"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/campaigns",
+    "source": "backend/app/api/v1/ads.py:275",
+    "handler": "list_campaigns"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns",
+    "source": "backend/app/api/v1/ads.py:321",
+    "handler": "create_campaign"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/campaigns/{campaign_id}",
+    "source": "backend/app/api/v1/ads.py:352",
+    "handler": "get_campaign"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/ads/campaigns/{campaign_id}",
+    "source": "backend/app/api/v1/ads.py:394",
+    "handler": "update_campaign"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/ads/campaigns/{campaign_id}",
+    "source": "backend/app/api/v1/ads.py:514",
+    "handler": "delete_campaign"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/validate",
+    "source": "backend/app/api/v1/ads.py:523",
+    "handler": "validate"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/simulate",
+    "source": "backend/app/api/v1/ads.py:569",
+    "handler": "simulate"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/launch",
+    "source": "backend/app/api/v1/ads.py:576",
+    "handler": "launch"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/pause",
+    "source": "backend/app/api/v1/ads.py:610",
+    "handler": "pause"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/resume",
+    "source": "backend/app/api/v1/ads.py:630",
+    "handler": "resume"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/complete",
+    "source": "backend/app/api/v1/ads.py:665",
+    "handler": "complete"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/archive",
+    "source": "backend/app/api/v1/ads.py:681",
+    "handler": "archive"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/duplicate",
+    "source": "backend/app/api/v1/ads.py:697",
+    "handler": "duplicate"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/dispatch",
+    "source": "backend/app/api/v1/ads.py:711",
+    "handler": "dispatch_now"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/contacts",
+    "source": "backend/app/api/v1/ads.py:733",
+    "handler": "add_contacts"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/rebuild-audience",
+    "source": "backend/app/api/v1/ads.py:802",
+    "handler": "rebuild_audience"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/audience",
+    "source": "backend/app/api/v1/ads.py:812",
+    "handler": "campaign_audience"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/jobs",
+    "source": "backend/app/api/v1/ads.py:893",
+    "handler": "campaign_jobs"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/jobs/retry",
+    "source": "backend/app/api/v1/ads.py:907",
+    "handler": "retry_campaign_job"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/send-logs",
+    "source": "backend/app/api/v1/ads.py:936",
+    "handler": "campaign_send_logs"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/analytics",
+    "source": "backend/app/api/v1/ads.py:1046",
+    "handler": "analytics"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/audience/{assignment_id}",
+    "source": "backend/app/api/v1/ads.py:1053",
+    "handler": "remove_audience_contact"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/audience/bulk-remove",
+    "source": "backend/app/api/v1/ads.py:1083",
+    "handler": "bulk_remove_audience"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/optimization",
+    "source": "backend/app/api/v1/ads.py:1110",
+    "handler": "optimization_status"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/optimize",
+    "source": "backend/app/api/v1/ads.py:1118",
+    "handler": "run_optimization_now"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/activity",
+    "source": "backend/app/api/v1/ads.py:1139",
+    "handler": "campaign_activity"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/sets",
+    "source": "backend/app/api/v1/ads.py:1177",
+    "handler": "list_sets"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/sets",
+    "source": "backend/app/api/v1/ads.py:1197",
+    "handler": "create_set"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/ads/sets/{set_id}",
+    "source": "backend/app/api/v1/ads.py:1220",
+    "handler": "update_set"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/sets/{set_id}/duplicate",
+    "source": "backend/app/api/v1/ads.py:1239",
+    "handler": "duplicate_set"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/sets/{set_id}/pause-losers",
+    "source": "backend/app/api/v1/ads.py:1252",
+    "handler": "pause_losers"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/sets/preview",
+    "source": "backend/app/api/v1/ads.py:1274",
+    "handler": "preview_unsaved_targeting"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/ads/sets/{set_id}",
+    "source": "backend/app/api/v1/ads.py:1285",
+    "handler": "delete_set"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/sets/{set_id}/preview",
+    "source": "backend/app/api/v1/ads.py:1306",
+    "handler": "preview_set"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/sets/{set_id}/creatives",
+    "source": "backend/app/api/v1/ads.py:1338",
+    "handler": "list_creatives"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/sets/{set_id}/creatives",
+    "source": "backend/app/api/v1/ads.py:1364",
+    "handler": "create_creative"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/ads/creatives/{creative_id}",
+    "source": "backend/app/api/v1/ads.py:1387",
+    "handler": "update_creative"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/creatives/{creative_id}/versions",
+    "source": "backend/app/api/v1/ads.py:1441",
+    "handler": "creative_versions"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/creatives/{creative_id}/duplicate",
+    "source": "backend/app/api/v1/ads.py:1471",
+    "handler": "duplicate_creative"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/ads/creatives/{creative_id}",
+    "source": "backend/app/api/v1/ads.py:1499",
+    "handler": "delete_creative"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/creatives/{creative_id}/promote",
+    "source": "backend/app/api/v1/ads.py:1519",
+    "handler": "promote_winner"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/creatives/{creative_id}/analytics",
+    "source": "backend/app/api/v1/ads.py:1568",
+    "handler": "creative_analytics"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/audiences",
+    "source": "backend/app/api/v1/ads.py:1651",
+    "handler": "list_audiences"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/audiences",
+    "source": "backend/app/api/v1/ads.py:1675",
+    "handler": "create_audience"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/audiences/{audience_id}",
+    "source": "backend/app/api/v1/ads.py:1691",
+    "handler": "get_audience"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/ads/audiences/{audience_id}",
+    "source": "backend/app/api/v1/ads.py:1700",
+    "handler": "update_audience"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/ads/audiences/{audience_id}",
+    "source": "backend/app/api/v1/ads.py:1719",
+    "handler": "delete_audience"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/audiences/{audience_id}/preview",
+    "source": "backend/app/api/v1/ads.py:1732",
+    "handler": "preview_audience"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/audiences/{audience_id}/duplicate",
+    "source": "backend/app/api/v1/ads.py:1739",
+    "handler": "duplicate_audience"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/audiences/{audience_id}/attach",
+    "source": "backend/app/api/v1/ads.py:1772",
+    "handler": "attach_audience"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/track/click",
+    "source": "backend/app/api/v1/ads.py:1813",
+    "handler": "track_click"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/r/{assignment_id}",
+    "source": "backend/app/api/v1/ads.py:1831",
+    "handler": "click_redirect"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/followup-steps",
+    "source": "backend/app/api/v1/ads.py:1938",
+    "handler": "list_steps"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/followup-steps",
+    "source": "backend/app/api/v1/ads.py:1964",
+    "handler": "create_step"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/followup-steps/{step_id}",
+    "source": "backend/app/api/v1/ads.py:2009",
+    "handler": "get_step"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/followup-steps/{step_id}",
+    "source": "backend/app/api/v1/ads.py:2045",
+    "handler": "update_campaign_step"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/ads/followup-steps/{step_id}",
+    "source": "backend/app/api/v1/ads.py:2058",
+    "handler": "update_step_legacy"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/ads/campaigns/{campaign_id}/followup-steps/{step_id}",
+    "source": "backend/app/api/v1/ads.py:2123",
+    "handler": "delete_campaign_step"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/ads/followup-steps/{step_id}",
+    "source": "backend/app/api/v1/ads.py:2140",
+    "handler": "delete_step_legacy"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/followup-templates",
+    "source": "backend/app/api/v1/ads.py:2213",
+    "handler": "list_followup_templates"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/followup-templates",
+    "source": "backend/app/api/v1/ads.py:2235",
+    "handler": "create_followup_template"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/followup-templates/{template_id}",
+    "source": "backend/app/api/v1/ads.py:2249",
+    "handler": "get_followup_template"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/ads/followup-templates/{template_id}",
+    "source": "backend/app/api/v1/ads.py:2263",
+    "handler": "update_followup_template"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/ads/followup-templates/{template_id}",
+    "source": "backend/app/api/v1/ads.py:2284",
+    "handler": "delete_followup_template"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/followups",
+    "source": "backend/app/api/v1/ads.py:2301",
+    "handler": "list_followups"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/followups",
+    "source": "backend/app/api/v1/ads.py:2382",
+    "handler": "create_followup"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/followups/{task_id}/{action}",
+    "source": "backend/app/api/v1/ads.py:2401",
+    "handler": "followup_action"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/followups/process",
+    "source": "backend/app/api/v1/ads.py:2439",
+    "handler": "process_followups_now"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/calendar",
+    "source": "backend/app/api/v1/ads.py:2451",
+    "handler": "list_events"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/calendar",
+    "source": "backend/app/api/v1/ads.py:2511",
+    "handler": "create_event"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/ads/calendar/{event_id}",
+    "source": "backend/app/api/v1/ads.py:2527",
+    "handler": "update_event"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/ads/calendar/{event_id}",
+    "source": "backend/app/api/v1/ads.py:2545",
+    "handler": "delete_event"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/suppression",
+    "source": "backend/app/api/v1/ads.py:2563",
+    "handler": "list_suppression"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/suppression",
+    "source": "backend/app/api/v1/ads.py:2598",
+    "handler": "add_suppression"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/ads/suppression/{entry_id}",
+    "source": "backend/app/api/v1/ads.py:2626",
+    "handler": "remove_suppression"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/contacts/{contact_id}/action",
+    "source": "backend/app/api/v1/ads.py:2650",
+    "handler": "contact_action"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/contacts/{contact_id}/timeline",
+    "source": "backend/app/api/v1/ads.py:2718",
+    "handler": "contact_timeline"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/search",
+    "source": "backend/app/api/v1/ads.py:2805",
+    "handler": "global_search"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/campaigns/bulk",
+    "source": "backend/app/api/v1/ads.py:2859",
+    "handler": "bulk_campaigns"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/creatives/bulk",
+    "source": "backend/app/api/v1/ads.py:2895",
+    "handler": "bulk_creatives"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ads/contacts/bulk",
+    "source": "backend/app/api/v1/ads.py:2919",
+    "handler": "bulk_contacts"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/export/{kind}",
+    "source": "backend/app/api/v1/ads.py:2943",
+    "handler": "export"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/reference",
+    "source": "backend/app/api/v1/ads.py:3039",
+    "handler": "reference"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ads/activity",
+    "source": "backend/app/api/v1/ads.py:3100",
+    "handler": "global_activity"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ai/classify",
+    "source": "backend/app/api/v1/ai.py:24",
+    "handler": "classify_text"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ai-agent/models",
+    "source": "backend/app/api/v1/ai_agent.py:101",
+    "handler": "list_models"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ai-agent/presets",
+    "source": "backend/app/api/v1/ai_agent.py:133",
+    "handler": "list_presets"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/ai-agent/presets",
+    "source": "backend/app/api/v1/ai_agent.py:153",
+    "handler": "put_preset"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ai-agent/health",
+    "source": "backend/app/api/v1/ai_agent.py:183",
+    "handler": "agent_health"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ai-agent/settings",
+    "source": "backend/app/api/v1/ai_agent.py:228",
+    "handler": "get_settings"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/ai-agent/settings",
+    "source": "backend/app/api/v1/ai_agent.py:258",
+    "handler": "put_settings"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/ai-agent/settings/voice",
+    "source": "backend/app/api/v1/ai_agent.py:284",
+    "handler": "put_voice_settings"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ai-agent/settings/test",
+    "source": "backend/app/api/v1/ai_agent.py:307",
+    "handler": "test_key"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ai-agent/sessions",
+    "source": "backend/app/api/v1/ai_agent.py:366",
+    "handler": "list_sessions"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ai-agent/sessions",
+    "source": "backend/app/api/v1/ai_agent.py:398",
+    "handler": "create_session"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ai-agent/sessions/{session_id}",
+    "source": "backend/app/api/v1/ai_agent.py:418",
+    "handler": "get_session"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/ai-agent/sessions/{session_id}",
+    "source": "backend/app/api/v1/ai_agent.py:487",
+    "handler": "update_session"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/ai-agent/sessions/{session_id}",
+    "source": "backend/app/api/v1/ai_agent.py:507",
+    "handler": "delete_session"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ai-agent/sessions/{session_id}/chat",
+    "source": "backend/app/api/v1/ai_agent.py:531",
+    "handler": "chat"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ai-agent/actions/{action_id}/approve",
+    "source": "backend/app/api/v1/ai_agent.py:602",
+    "handler": "approve_action"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ai-agent/actions/{action_id}/cancel",
+    "source": "backend/app/api/v1/ai_agent.py:624",
+    "handler": "cancel_action"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ai-agent/activity",
+    "source": "backend/app/api/v1/ai_agent.py:643",
+    "handler": "agent_activity"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ai-agent/activity/{action_id}/undo",
+    "source": "backend/app/api/v1/ai_agent.py:674",
+    "handler": "undo_action"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ai-agent/sessions/{session_id}/files",
+    "source": "backend/app/api/v1/ai_agent.py:777",
+    "handler": "upload_to_session"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ai-agent/files",
+    "source": "backend/app/api/v1/ai_agent.py:790",
+    "handler": "upload_file"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ai-agent/files",
+    "source": "backend/app/api/v1/ai_agent.py:802",
+    "handler": "list_files"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ai-agent/files/{file_id}",
+    "source": "backend/app/api/v1/ai_agent.py:815",
+    "handler": "get_file"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/ai-agent/files/{file_id}",
+    "source": "backend/app/api/v1/ai_agent.py:835",
+    "handler": "delete_file"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ai-agent/transcribe",
+    "source": "backend/app/api/v1/ai_agent.py:853",
+    "handler": "transcribe"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ai-agent/memory/global",
+    "source": "backend/app/api/v1/ai_agent.py:898",
+    "handler": "get_global_memory"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/ai-agent/memory/global",
+    "source": "backend/app/api/v1/ai_agent.py:903",
+    "handler": "put_global_memory"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/ai-agent/memory/global",
+    "source": "backend/app/api/v1/ai_agent.py:914",
+    "handler": "clear_global_memory"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ai-agent/memory/{session_id}",
+    "source": "backend/app/api/v1/ai_agent.py:921",
+    "handler": "get_session_memory"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/ai-agent/memory/{session_id}",
+    "source": "backend/app/api/v1/ai_agent.py:931",
+    "handler": "put_session_memory"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/ai-agent/memory/{session_id}",
+    "source": "backend/app/api/v1/ai_agent.py:944",
+    "handler": "clear_session_memory"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ai-agent/skills",
+    "source": "backend/app/api/v1/ai_agent.py:959",
+    "handler": "list_skills"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ai-agent/skills",
+    "source": "backend/app/api/v1/ai_agent.py:977",
+    "handler": "create_skill"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/ai-agent/skills/json",
+    "source": "backend/app/api/v1/ai_agent.py:999",
+    "handler": "create_skill_json"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ai-agent/skills/{skill_id}",
+    "source": "backend/app/api/v1/ai_agent.py:1030",
+    "handler": "get_skill"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/ai-agent/skills/{skill_id}",
+    "source": "backend/app/api/v1/ai_agent.py:1043",
+    "handler": "delete_skill"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/ai-agent/tools",
+    "source": "backend/app/api/v1/ai_agent.py:1057",
+    "handler": "list_tools"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/analytics/overview",
+    "source": "backend/app/api/v1/analytics.py:24",
+    "handler": "get_analytics_overview"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/analytics/timeseries",
+    "source": "backend/app/api/v1/analytics.py:101",
+    "handler": "get_timeseries"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/analytics/funnel",
+    "source": "backend/app/api/v1/analytics.py:148",
+    "handler": "get_funnel"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/analytics/by-campaign",
+    "source": "backend/app/api/v1/analytics.py:205",
+    "handler": "get_by_campaign"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/analytics/calls",
+    "source": "backend/app/api/v1/analytics.py:251",
+    "handler": "get_call_stats"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/auth/admin",
+    "source": "backend/app/api/v1/auth.py:187",
+    "handler": "login_as_admin"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/auth/login",
+    "source": "backend/app/api/v1/auth.py:212",
+    "handler": "login"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/auth/logout",
+    "source": "backend/app/api/v1/auth.py:229",
+    "handler": "logout"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/auth/access",
+    "source": "backend/app/api/v1/auth.py:243",
+    "handler": "access_status"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/auth/me",
+    "source": "backend/app/api/v1/auth.py:276",
+    "handler": "get_me"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/automations/",
+    "source": "backend/app/api/v1/automations.py:43",
+    "handler": "list_automations"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/automations",
+    "source": "backend/app/api/v1/automations.py:43",
+    "handler": "list_automations"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/automations/",
+    "source": "backend/app/api/v1/automations.py:60",
+    "handler": "create_automation"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/automations/{automation_id}",
+    "source": "backend/app/api/v1/automations.py:88",
+    "handler": "get_automation"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/automations/{automation_id}",
+    "source": "backend/app/api/v1/automations.py:100",
+    "handler": "update_automation"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/automations/{automation_id}",
+    "source": "backend/app/api/v1/automations.py:130",
+    "handler": "delete_automation"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/automations/test",
+    "source": "backend/app/api/v1/automations.py:144",
+    "handler": "test_automation"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/autoreply/",
+    "source": "backend/app/api/v1/autoreply.py:44",
+    "handler": "list_rules"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/autoreply",
+    "source": "backend/app/api/v1/autoreply.py:44",
+    "handler": "list_rules"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/autoreply/",
+    "source": "backend/app/api/v1/autoreply.py:67",
+    "handler": "create_rule"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/autoreply/{rule_id}",
+    "source": "backend/app/api/v1/autoreply.py:87",
+    "handler": "get_rule"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/autoreply/{rule_id}",
+    "source": "backend/app/api/v1/autoreply.py:99",
+    "handler": "update_rule"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/autoreply/{rule_id}",
+    "source": "backend/app/api/v1/autoreply.py:134",
+    "handler": "delete_rule"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/autoreply/test",
+    "source": "backend/app/api/v1/autoreply.py:148",
+    "handler": "test_rules"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/calendar/",
+    "source": "backend/app/api/v1/calendar.py:164",
+    "handler": "list_meetings"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/calendar",
+    "source": "backend/app/api/v1/calendar.py:164",
+    "handler": "list_meetings"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/calendar/upcoming",
+    "source": "backend/app/api/v1/calendar.py:237",
+    "handler": "upcoming_meetings"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/calendar/day",
+    "source": "backend/app/api/v1/calendar.py:251",
+    "handler": "day_agenda"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/calendar/tags",
+    "source": "backend/app/api/v1/calendar.py:273",
+    "handler": "meeting_tags"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/calendar/{meeting_id}",
+    "source": "backend/app/api/v1/calendar.py:301",
+    "handler": "get_meeting"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/calendar/{meeting_id}/preview",
+    "source": "backend/app/api/v1/calendar.py:315",
+    "handler": "preview_meeting_message"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/calendar/",
+    "source": "backend/app/api/v1/calendar.py:361",
+    "handler": "create_meeting"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/calendar/{meeting_id}",
+    "source": "backend/app/api/v1/calendar.py:457",
+    "handler": "update_meeting"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/calendar/{meeting_id}",
+    "source": "backend/app/api/v1/calendar.py:535",
+    "handler": "delete_meeting"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/calendar/{meeting_id}/confirm",
+    "source": "backend/app/api/v1/calendar.py:568",
+    "handler": "confirm_meeting"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/calendar/{meeting_id}/complete",
+    "source": "backend/app/api/v1/calendar.py:577",
+    "handler": "complete_meeting"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/calendar/{meeting_id}/cancel",
+    "source": "backend/app/api/v1/calendar.py:587",
+    "handler": "cancel_meeting"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/calendar/{meeting_id}/no-show",
+    "source": "backend/app/api/v1/calendar.py:597",
+    "handler": "no_show_meeting"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/calendar/{meeting_id}/send-invite",
+    "source": "backend/app/api/v1/calendar.py:606",
+    "handler": "resend_invite"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/calendar/{meeting_id}/send-reminder",
+    "source": "backend/app/api/v1/calendar.py:620",
+    "handler": "send_reminder_now"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/calendar/tags/all",
+    "source": "backend/app/api/v1/calendar.py:634",
+    "handler": "all_tags_alias"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/calls/config",
+    "source": "backend/app/api/v1/calls.py:59",
+    "handler": "get_config"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/calls/config",
+    "source": "backend/app/api/v1/calls.py:78",
+    "handler": "save_config"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/calls/test",
+    "source": "backend/app/api/v1/calls.py:102",
+    "handler": "test_connection"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/calls/webhooks",
+    "source": "backend/app/api/v1/calls.py:113",
+    "handler": "list_webhooks"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/calls/register-webhook",
+    "source": "backend/app/api/v1/calls.py:125",
+    "handler": "register_webhook"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/calls/webhooks/{webhook_id}",
+    "source": "backend/app/api/v1/calls.py:160",
+    "handler": "delete_webhook"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/calls/start",
+    "source": "backend/app/api/v1/calls.py:184",
+    "handler": "start_call"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/calls/end",
+    "source": "backend/app/api/v1/calls.py:240",
+    "handler": "end_call"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/calls/log-direct",
+    "source": "backend/app/api/v1/calls.py:263",
+    "handler": "log_direct"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/calls/logs",
+    "source": "backend/app/api/v1/calls.py:287",
+    "handler": "call_logs"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/calls/active",
+    "source": "backend/app/api/v1/calls.py:328",
+    "handler": "active_call"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/campaign-followups/campaigns",
+    "source": "backend/app/api/v1/campaign_followups.py:45",
+    "handler": "list_campaigns_with_followups"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/campaign-followups/campaigns/{campaign_id}",
+    "source": "backend/app/api/v1/campaign_followups.py:100",
+    "handler": "list_campaign_followups"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/campaign-followups/campaigns/{campaign_id}",
+    "source": "backend/app/api/v1/campaign_followups.py:144",
+    "handler": "create_campaign_followup"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/campaign-followups/{followup_id}",
+    "source": "backend/app/api/v1/campaign_followups.py:212",
+    "handler": "update_campaign_followup"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/campaign-followups/{followup_id}",
+    "source": "backend/app/api/v1/campaign_followups.py:247",
+    "handler": "delete_campaign_followup"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/campaign-followups/{followup_id}/run",
+    "source": "backend/app/api/v1/campaign_followups.py:264",
+    "handler": "run_campaign_followup"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/campaign-followups/campaigns/{campaign_id}/process-now",
+    "source": "backend/app/api/v1/campaign_followups.py:287",
+    "handler": "process_campaign_followups_now"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/campaign-followups/{followup_id}/preview",
+    "source": "backend/app/api/v1/campaign_followups.py:323",
+    "handler": "preview_campaign_followup"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/campaign-followups/{followup_id}/log",
+    "source": "backend/app/api/v1/campaign_followups.py:405",
+    "handler": "followup_log"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/campaigns/",
+    "source": "backend/app/api/v1/campaigns.py:53",
+    "handler": "list_campaigns"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/campaigns",
+    "source": "backend/app/api/v1/campaigns.py:53",
+    "handler": "list_campaigns"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/campaigns/reconcile",
+    "source": "backend/app/api/v1/campaigns.py:106",
+    "handler": "reconcile_campaign_state_endpoint"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/campaigns/{campaign_id}",
+    "source": "backend/app/api/v1/campaigns.py:131",
+    "handler": "get_campaign"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/campaigns/",
+    "source": "backend/app/api/v1/campaigns.py:160",
+    "handler": "create_campaign"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/campaigns/{campaign_id}",
+    "source": "backend/app/api/v1/campaigns.py:221",
+    "handler": "update_campaign"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/campaigns/{campaign_id}",
+    "source": "backend/app/api/v1/campaigns.py:221",
+    "handler": "update_campaign"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/campaigns/{campaign_id}/validate",
+    "source": "backend/app/api/v1/campaigns.py:321",
+    "handler": "validate_campaign"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/campaigns/{campaign_id}/schedule",
+    "source": "backend/app/api/v1/campaigns.py:340",
+    "handler": "schedule_campaign"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/campaigns/{campaign_id}/start",
+    "source": "backend/app/api/v1/campaigns.py:394",
+    "handler": "start_campaign"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/campaigns/{campaign_id}/pause",
+    "source": "backend/app/api/v1/campaigns.py:481",
+    "handler": "pause_campaign"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/campaigns/{campaign_id}/resume",
+    "source": "backend/app/api/v1/campaigns.py:507",
+    "handler": "resume_campaign"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/campaigns/{campaign_id}/stop",
+    "source": "backend/app/api/v1/campaigns.py:576",
+    "handler": "stop_campaign"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/campaigns/{campaign_id}",
+    "source": "backend/app/api/v1/campaigns.py:596",
+    "handler": "delete_campaign"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/campaigns/{campaign_id}/analytics",
+    "source": "backend/app/api/v1/campaigns.py:610",
+    "handler": "get_campaign_analytics"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/campaigns/{campaign_id}/conversations",
+    "source": "backend/app/api/v1/campaigns.py:634",
+    "handler": "get_campaign_conversations"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/campaigns/{campaign_id}/performance",
+    "source": "backend/app/api/v1/campaigns.py:763",
+    "handler": "get_campaign_performance"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/campaigns/{campaign_id}/duplicate",
+    "source": "backend/app/api/v1/campaigns.py:917",
+    "handler": "duplicate_campaign"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/contacts/",
+    "source": "backend/app/api/v1/contacts.py:186",
+    "handler": "list_contacts"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/contacts",
+    "source": "backend/app/api/v1/contacts.py:186",
+    "handler": "list_contacts"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/contacts/export",
+    "source": "backend/app/api/v1/contacts.py:349",
+    "handler": "export_contacts_page"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/contacts/clean",
+    "source": "backend/app/api/v1/contacts.py:477",
+    "handler": "clean_all_contacts"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/contacts/validate-emails",
+    "source": "backend/app/api/v1/contacts.py:495",
+    "handler": "validate_emails"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/contacts/tags/",
+    "source": "backend/app/api/v1/contacts.py:546",
+    "handler": "list_tags"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/contacts/quarantine/generated",
+    "source": "backend/app/api/v1/contacts.py:569",
+    "handler": "quarantine_generated_addresses"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/contacts/{contact_id}",
+    "source": "backend/app/api/v1/contacts.py:588",
+    "handler": "get_contact"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/contacts/",
+    "source": "backend/app/api/v1/contacts.py:602",
+    "handler": "create_contact"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/contacts/{contact_id}",
+    "source": "backend/app/api/v1/contacts.py:663",
+    "handler": "update_contact"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/contacts/{contact_id}",
+    "source": "backend/app/api/v1/contacts.py:963",
+    "handler": "delete_contact"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/contacts/bulk",
+    "source": "backend/app/api/v1/contacts.py:978",
+    "handler": "bulk_action"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/contacts/import/preview",
+    "source": "backend/app/api/v1/contacts.py:1227",
+    "handler": "preview_csv_import"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/contacts/import/jobs",
+    "source": "backend/app/api/v1/contacts.py:1241",
+    "handler": "create_csv_import_job"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/contacts/import/url",
+    "source": "backend/app/api/v1/contacts.py:1274",
+    "handler": "create_csv_import_job_from_url"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/contacts/import/jobs/{job_id}",
+    "source": "backend/app/api/v1/contacts.py:1334",
+    "handler": "read_csv_import_job"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/contacts/import/jobs/{job_id}/errors.csv",
+    "source": "backend/app/api/v1/contacts.py:1367",
+    "handler": "download_csv_import_errors"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/contacts/import/csv",
+    "source": "backend/app/api/v1/contacts.py:1393",
+    "handler": "import_csv"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/contacts/enrich/status",
+    "source": "backend/app/api/v1/contacts.py:1496",
+    "handler": "enrichment_status"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/contacts/enrich",
+    "source": "backend/app/api/v1/contacts.py:1558",
+    "handler": "enrich_emails"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/contacts/export/csv",
+    "source": "backend/app/api/v1/contacts.py:1663",
+    "handler": "export_csv"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/contacts/{contact_id}/email-opt-out",
+    "source": "backend/app/api/v1/contacts.py:1725",
+    "handler": "email_opt_out"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/contacts/{contact_id}/email-opt-in",
+    "source": "backend/app/api/v1/contacts.py:1749",
+    "handler": "email_opt_in"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/contacts/{contact_id}/sms-opt-in",
+    "source": "backend/app/api/v1/contacts.py:1773",
+    "handler": "sms_opt_in"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/contacts/{contact_id}/activity",
+    "source": "backend/app/api/v1/contacts.py:1803",
+    "handler": "get_contact_activity"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/dashboard/stats",
+    "source": "backend/app/api/v1/dashboard.py:38",
+    "handler": "get_dashboard_stats"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/dashboard/charts",
+    "source": "backend/app/api/v1/dashboard.py:205",
+    "handler": "get_dashboard_charts"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/accounts",
+    "source": "backend/app/api/v1/email.py:154",
+    "handler": "list_accounts"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/senders",
+    "source": "backend/app/api/v1/email.py:172",
+    "handler": "list_unified_senders"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/health",
+    "source": "backend/app/api/v1/email.py:182",
+    "handler": "email_health"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/accounts",
+    "source": "backend/app/api/v1/email.py:226",
+    "handler": "create_account"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/email/accounts/{account_id}",
+    "source": "backend/app/api/v1/email.py:256",
+    "handler": "update_account"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/email/accounts/{account_id}",
+    "source": "backend/app/api/v1/email.py:295",
+    "handler": "delete_account"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/domains",
+    "source": "backend/app/api/v1/email.py:339",
+    "handler": "register_sending_domain"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/domains",
+    "source": "backend/app/api/v1/email.py:361",
+    "handler": "list_sending_domains"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/domains/{domain_id}",
+    "source": "backend/app/api/v1/email.py:382",
+    "handler": "get_sending_domain"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/domains/{domain_id}/verify",
+    "source": "backend/app/api/v1/email.py:393",
+    "handler": "verify_sending_domain"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/email/domains/{domain_id}",
+    "source": "backend/app/api/v1/email.py:412",
+    "handler": "delete_sending_domain"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/accounts/{account_id}/webhook/reveal",
+    "source": "backend/app/api/v1/email.py:443",
+    "handler": "reveal_webhook"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/accounts/{account_id}/webhook/rotate",
+    "source": "backend/app/api/v1/email.py:471",
+    "handler": "rotate_webhook"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/accounts/{account_id}/default",
+    "source": "backend/app/api/v1/email.py:507",
+    "handler": "make_default"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/accounts/{account_id}/test",
+    "source": "backend/app/api/v1/email.py:522",
+    "handler": "test_account"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/accounts/{account_id}/test-send",
+    "source": "backend/app/api/v1/email.py:541",
+    "handler": "test_send"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/senders-preview",
+    "source": "backend/app/api/v1/email.py:557",
+    "handler": "senders_preview"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/test-send",
+    "source": "backend/app/api/v1/email.py:623",
+    "handler": "composer_test_send"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/accounts/{account_id}/senders",
+    "source": "backend/app/api/v1/email.py:669",
+    "handler": "verified_senders"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/overview",
+    "source": "backend/app/api/v1/email.py:694",
+    "handler": "overview"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/stats",
+    "source": "backend/app/api/v1/email.py:786",
+    "handler": "stats"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/reference",
+    "source": "backend/app/api/v1/email.py:796",
+    "handler": "reference"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/preview",
+    "source": "backend/app/api/v1/email.py:839",
+    "handler": "preview"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/send",
+    "source": "backend/app/api/v1/email.py:895",
+    "handler": "send_email"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/history",
+    "source": "backend/app/api/v1/email.py:1062",
+    "handler": "history"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/messages/{message_id}/retry",
+    "source": "backend/app/api/v1/email.py:1122",
+    "handler": "retry_message"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/inbox/conversations",
+    "source": "backend/app/api/v1/email.py:1167",
+    "handler": "list_conversations"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/inbox/conversations/{conversation_id}",
+    "source": "backend/app/api/v1/email.py:1321",
+    "handler": "get_conversation"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/inbox/conversations/{conversation_id}/reply",
+    "source": "backend/app/api/v1/email.py:1405",
+    "handler": "reply"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/inbox/conversations/{conversation_id}/read",
+    "source": "backend/app/api/v1/email.py:1528",
+    "handler": "mark_read"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/inbox/conversations/{conversation_id}/status",
+    "source": "backend/app/api/v1/email.py:1551",
+    "handler": "set_status"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/inbox/unread-count",
+    "source": "backend/app/api/v1/email.py:1579",
+    "handler": "unread_count"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/suppression",
+    "source": "backend/app/api/v1/email.py:1607",
+    "handler": "list_suppression"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/suppression",
+    "source": "backend/app/api/v1/email.py:1646",
+    "handler": "add_suppression"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/email/suppression/{entry_id}",
+    "source": "backend/app/api/v1/email.py:1669",
+    "handler": "remove_suppression"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/events",
+    "source": "backend/app/api/v1/email.py:1689",
+    "handler": "events"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/unsubscribe",
+    "source": "backend/app/api/v1/email.py:1769",
+    "handler": "unsubscribe_page"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/email/unsubscribe",
+    "source": "backend/app/api/v1/email.py:1796",
+    "handler": "unsubscribe_post"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/accounts/{account_id}/deliverability",
+    "source": "backend/app/api/v1/email.py:1842",
+    "handler": "deliverability"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/messages/{message_id}/events",
+    "source": "backend/app/api/v1/email.py:2016",
+    "handler": "message_events"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/email/contacts/{contact_id}/engagement",
+    "source": "backend/app/api/v1/email.py:2071",
+    "handler": "contact_engagement"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/followups/",
+    "source": "backend/app/api/v1/followups.py:79",
+    "handler": "list_followups"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/followups",
+    "source": "backend/app/api/v1/followups.py:79",
+    "handler": "list_followups"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/followups/",
+    "source": "backend/app/api/v1/followups.py:154",
+    "handler": "create_followup"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/followups/{followup_id}",
+    "source": "backend/app/api/v1/followups.py:213",
+    "handler": "delete_followup"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/followups/{followup_id}/send-now",
+    "source": "backend/app/api/v1/followups.py:248",
+    "handler": "send_followup_now"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/followups/{followup_id}/skip",
+    "source": "backend/app/api/v1/followups.py:273",
+    "handler": "skip_followup"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/followups/{followup_id}/reschedule",
+    "source": "backend/app/api/v1/followups.py:305",
+    "handler": "reschedule_followup"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/guide",
+    "source": "backend/app/api/v1/guide.py:27",
+    "handler": "guide"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/guide/",
+    "source": "backend/app/api/v1/guide.py:27",
+    "handler": "guide"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/guide",
+    "source": "backend/app/api/v1/guide.py:27",
+    "handler": "guide"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/guide/summary",
+    "source": "backend/app/api/v1/guide.py:36",
+    "handler": "guide_summary"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/inbox/conversations",
+    "source": "backend/app/api/v1/inbox.py:34",
+    "handler": "list_conversations"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/inbox/campaign-filters",
+    "source": "backend/app/api/v1/inbox.py:182",
+    "handler": "campaign_filters"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/inbox/conversations/{conversation_id}",
+    "source": "backend/app/api/v1/inbox.py:237",
+    "handler": "get_conversation"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/inbox/conversations/{conversation_id}/templates/{template_id}/preview",
+    "source": "backend/app/api/v1/inbox.py:262",
+    "handler": "preview_reply_template"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/inbox/conversations/{conversation_id}/reply",
+    "source": "backend/app/api/v1/inbox.py:298",
+    "handler": "send_reply"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/inbox/conversations/{conversation_id}/mark-interested",
+    "source": "backend/app/api/v1/inbox.py:393",
+    "handler": "mark_interested"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/inbox/conversations/{conversation_id}/mark-not-interested",
+    "source": "backend/app/api/v1/inbox.py:397",
+    "handler": "mark_not_interested"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/inbox/conversations/{conversation_id}/mark-close",
+    "source": "backend/app/api/v1/inbox.py:401",
+    "handler": "close_conversation"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/inbox/conversations/{conversation_id}/mark-opportunity",
+    "source": "backend/app/api/v1/inbox.py:405",
+    "handler": "mark_opportunity"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/inbox/conversations/{conversation_id}/status",
+    "source": "backend/app/api/v1/inbox.py:414",
+    "handler": "set_conversation_status"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/inbox/conversations/{conversation_id}/mark-unread",
+    "source": "backend/app/api/v1/inbox.py:426",
+    "handler": "mark_unread"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/inbox/conversations/{conversation_id}/stop-sequence",
+    "source": "backend/app/api/v1/inbox.py:435",
+    "handler": "stop_seq"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/inbox/conversations/{conversation_id}/resume-sequence",
+    "source": "backend/app/api/v1/inbox.py:444",
+    "handler": "resume_seq"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/inbox/device-info",
+    "source": "backend/app/api/v1/inbox.py:503",
+    "handler": "get_device_info"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/inbox/register-webhook",
+    "source": "backend/app/api/v1/inbox.py:527",
+    "handler": "register_webhook"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/inbox/sync-full",
+    "source": "backend/app/api/v1/inbox.py:544",
+    "handler": "sync_full_inbox"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/inbox/poll-debug",
+    "source": "backend/app/api/v1/inbox.py:700",
+    "handler": "poll_debug"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/inbox/poll-now",
+    "source": "backend/app/api/v1/inbox.py:768",
+    "handler": "poll_now"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/inbox/messages/{message_id}/feedback",
+    "source": "backend/app/api/v1/inbox.py:786",
+    "handler": "message_feedback"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/inbox/conversations/{conversation_id}/{mark}",
+    "source": "backend/app/api/v1/inbox.py:851",
+    "handler": "unknown_conversation_action"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/invoices/settings",
+    "source": "backend/app/api/v1/invoices.py:292",
+    "handler": "read_settings"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/invoices/settings",
+    "source": "backend/app/api/v1/invoices.py:298",
+    "handler": "write_settings"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/invoices/settings/test",
+    "source": "backend/app/api/v1/invoices.py:308",
+    "handler": "test_paystack"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/invoices/currencies",
+    "source": "backend/app/api/v1/invoices.py:333",
+    "handler": "list_currencies"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/invoices/analytics",
+    "source": "backend/app/api/v1/invoices.py:351",
+    "handler": "analytics"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/invoices/payments",
+    "source": "backend/app/api/v1/invoices.py:464",
+    "handler": "all_payments"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/invoices/paystack/webhook",
+    "source": "backend/app/api/v1/invoices.py:537",
+    "handler": "paystack_webhook"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/invoices/public/{token}",
+    "source": "backend/app/api/v1/invoices.py:644",
+    "handler": "public_invoice"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/invoices/public/{token}/pay",
+    "source": "backend/app/api/v1/invoices.py:658",
+    "handler": "public_pay"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/invoices/public/{token}/verify",
+    "source": "backend/app/api/v1/invoices.py:725",
+    "handler": "public_verify"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/invoices",
+    "source": "backend/app/api/v1/invoices.py:779",
+    "handler": "list_invoices"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/invoices",
+    "source": "backend/app/api/v1/invoices.py:851",
+    "handler": "create_invoice"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/invoices/links",
+    "source": "backend/app/api/v1/invoices.py:946",
+    "handler": "create_payment_link"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/invoices/links",
+    "source": "backend/app/api/v1/invoices.py:1015",
+    "handler": "list_payment_links"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/invoices/{invoice_id}",
+    "source": "backend/app/api/v1/invoices.py:1086",
+    "handler": "get_invoice"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/invoices/{invoice_id}",
+    "source": "backend/app/api/v1/invoices.py:1096",
+    "handler": "update_invoice"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/invoices/{invoice_id}",
+    "source": "backend/app/api/v1/invoices.py:1203",
+    "handler": "delete_invoice"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/invoices/{invoice_id}/duplicate",
+    "source": "backend/app/api/v1/invoices.py:1216",
+    "handler": "duplicate_invoice"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/invoices/{invoice_id}/send",
+    "source": "backend/app/api/v1/invoices.py:1275",
+    "handler": "send_invoice"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/invoices/{invoice_id}/remind",
+    "source": "backend/app/api/v1/invoices.py:1288",
+    "handler": "remind_invoice"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/invoices/{invoice_id}/void",
+    "source": "backend/app/api/v1/invoices.py:1323",
+    "handler": "void_invoice"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/invoices/{invoice_id}/pay",
+    "source": "backend/app/api/v1/invoices.py:1338",
+    "handler": "pay_invoice"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/invoices/{invoice_id}/payments",
+    "source": "backend/app/api/v1/invoices.py:1409",
+    "handler": "record_manual_payment"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/invoices/{invoice_id}/payments",
+    "source": "backend/app/api/v1/invoices.py:1460",
+    "handler": "list_payments"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/invoices/{invoice_id}/events",
+    "source": "backend/app/api/v1/invoices.py:1470",
+    "handler": "list_events"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/invoices/{invoice_id}/rotate-link",
+    "source": "backend/app/api/v1/invoices.py:1489",
+    "handler": "rotate_public_link"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/lists/",
+    "source": "backend/app/api/v1/lists.py:77",
+    "handler": "list_lists"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/lists",
+    "source": "backend/app/api/v1/lists.py:77",
+    "handler": "list_lists"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/lists/",
+    "source": "backend/app/api/v1/lists.py:172",
+    "handler": "create_list"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/lists/{list_id}",
+    "source": "backend/app/api/v1/lists.py:194",
+    "handler": "update_list"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/lists/{list_id}",
+    "source": "backend/app/api/v1/lists.py:213",
+    "handler": "delete_list"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/lists/{list_id}/contacts",
+    "source": "backend/app/api/v1/lists.py:263",
+    "handler": "get_list_contacts"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/lists/{list_id}/contacts",
+    "source": "backend/app/api/v1/lists.py:315",
+    "handler": "add_contacts_to_list"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/lists/{list_id}/contacts/add-all",
+    "source": "backend/app/api/v1/lists.py:387",
+    "handler": "add_all_matching_contacts"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/lists/{list_id}/contacts/remove",
+    "source": "backend/app/api/v1/lists.py:417",
+    "handler": "remove_contacts_from_list"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/lists/{list_id}/contacts/delete",
+    "source": "backend/app/api/v1/lists.py:464",
+    "handler": "delete_contacts_from_list_permanently"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/lists/{list_id}/clean",
+    "source": "backend/app/api/v1/lists.py:521",
+    "handler": "clean_list"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/lists/{list_id}/validate-emails",
+    "source": "backend/app/api/v1/lists.py:547",
+    "handler": "validate_list_emails"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/lists/{list_id}/stats",
+    "source": "backend/app/api/v1/lists.py:619",
+    "handler": "get_list_stats"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/mail/overview",
+    "source": "backend/app/api/v1/mail.py:67",
+    "handler": "overview"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/mail/messages",
+    "source": "backend/app/api/v1/mail.py:80",
+    "handler": "all_messages"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/mail/messages/{mailbox_id}/{provider_message_id}",
+    "source": "backend/app/api/v1/mail.py:99",
+    "handler": "one_message"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/mail/messages/{mailbox_id}/{provider_message_id}/flags",
+    "source": "backend/app/api/v1/mail.py:117",
+    "handler": "set_flags"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/mail/messages/{mailbox_id}/{provider_message_id}/move",
+    "source": "backend/app/api/v1/mail.py:137",
+    "handler": "move_message"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/mail/messages/{mailbox_id}/{provider_message_id}/delete",
+    "source": "backend/app/api/v1/mail.py:155",
+    "handler": "delete_message"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/mail/messages/{mailbox_id}/{provider_message_id}/reply",
+    "source": "backend/app/api/v1/mail.py:170",
+    "handler": "reply_to_message"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/mail/refresh",
+    "source": "backend/app/api/v1/mail.py:194",
+    "handler": "refresh"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/mailbox/report",
+    "source": "backend/app/api/v1/mailbox.py:271",
+    "handler": "reply_routing_report"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/mailbox",
+    "source": "backend/app/api/v1/mailbox.py:282",
+    "handler": "list_mailboxes"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/mailbox/",
+    "source": "backend/app/api/v1/mailbox.py:282",
+    "handler": "list_mailboxes"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/mailbox",
+    "source": "backend/app/api/v1/mailbox.py:282",
+    "handler": "list_mailboxes"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/mailbox/google/start",
+    "source": "backend/app/api/v1/mailbox.py:304",
+    "handler": "google_start"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/mailbox/google/callback",
+    "source": "backend/app/api/v1/mailbox.py:343",
+    "handler": "google_callback"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/mailbox",
+    "source": "backend/app/api/v1/mailbox.py:463",
+    "handler": "connect_mailbox"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/mailbox/",
+    "source": "backend/app/api/v1/mailbox.py:463",
+    "handler": "connect_mailbox"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/mailbox/{mailbox_id}",
+    "source": "backend/app/api/v1/mailbox.py:526",
+    "handler": "read_mailbox"
+  },
+  {
+    "method": "PATCH",
+    "path": "/api/v1/mailbox/{mailbox_id}",
+    "source": "backend/app/api/v1/mailbox.py:536",
+    "handler": "patch_mailbox"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/mailbox/{mailbox_id}",
+    "source": "backend/app/api/v1/mailbox.py:559",
+    "handler": "disconnect_mailbox"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/mailbox/{mailbox_id}/check",
+    "source": "backend/app/api/v1/mailbox.py:581",
+    "handler": "check_mailbox"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/mailbox/{mailbox_id}/sync",
+    "source": "backend/app/api/v1/mailbox.py:594",
+    "handler": "sync_mailbox_now"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/mailbox/{mailbox_id}/filters",
+    "source": "backend/app/api/v1/mailbox.py:607",
+    "handler": "manage_filters"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/mailbox/{mailbox_id}/test-send",
+    "source": "backend/app/api/v1/mailbox.py:641",
+    "handler": "test_send"
+  },
+  {
+    "method": "POST",
+    "path": "/mcp",
+    "source": "backend/app/api/v1/mcp.py:300",
+    "handler": "mcp_endpoint"
+  },
+  {
+    "method": "POST",
+    "path": "/mcp/",
+    "source": "backend/app/api/v1/mcp.py:300",
+    "handler": "mcp_endpoint"
+  },
+  {
+    "method": "GET",
+    "path": "/mcp",
+    "source": "backend/app/api/v1/mcp.py:307",
+    "handler": "mcp_stream"
+  },
+  {
+    "method": "GET",
+    "path": "/mcp/",
+    "source": "backend/app/api/v1/mcp.py:307",
+    "handler": "mcp_stream"
+  },
+  {
+    "method": "DELETE",
+    "path": "/mcp",
+    "source": "backend/app/api/v1/mcp.py:313",
+    "handler": "mcp_teardown"
+  },
+  {
+    "method": "DELETE",
+    "path": "/mcp/",
+    "source": "backend/app/api/v1/mcp.py:313",
+    "handler": "mcp_teardown"
+  },
+  {
+    "method": "GET",
+    "path": "/mcp/health",
+    "source": "backend/app/api/v1/mcp.py:319",
+    "handler": "mcp_protocol_health"
+  },
+  {
+    "method": "POST",
+    "path": "/connectors/{key}/mcp",
+    "source": "backend/app/api/v1/mcp.py:338",
+    "handler": "connector_endpoint"
+  },
+  {
+    "method": "GET",
+    "path": "/connectors/{key}/mcp",
+    "source": "backend/app/api/v1/mcp.py:348",
+    "handler": "connector_stream"
+  },
+  {
+    "method": "DELETE",
+    "path": "/connectors/{key}/mcp",
+    "source": "backend/app/api/v1/mcp.py:353",
+    "handler": "connector_teardown"
+  },
+  {
+    "method": "GET",
+    "path": "/.well-known/oauth-protected-resource",
+    "source": "backend/app/api/v1/mcp.py:378",
+    "handler": "protected_resource_metadata"
+  },
+  {
+    "method": "GET",
+    "path": "/.well-known/oauth-protected-resource/{path:path}",
+    "source": "backend/app/api/v1/mcp.py:378",
+    "handler": "protected_resource_metadata"
+  },
+  {
+    "method": "GET",
+    "path": "/.well-known/oauth-authorization-server",
+    "source": "backend/app/api/v1/mcp.py:403",
+    "handler": "authorization_server_metadata"
+  },
+  {
+    "method": "GET",
+    "path": "/.well-known/oauth-authorization-server/{path:path}",
+    "source": "backend/app/api/v1/mcp.py:403",
+    "handler": "authorization_server_metadata"
+  },
+  {
+    "method": "GET",
+    "path": "/.well-known/openid-configuration",
+    "source": "backend/app/api/v1/mcp.py:403",
+    "handler": "authorization_server_metadata"
+  },
+  {
+    "method": "GET",
+    "path": "/.well-known/openid-configuration/{path:path}",
+    "source": "backend/app/api/v1/mcp.py:403",
+    "handler": "authorization_server_metadata"
+  },
+  {
+    "method": "POST",
+    "path": "/oauth/register",
+    "source": "backend/app/api/v1/mcp.py:429",
+    "handler": "register"
+  },
+  {
+    "method": "POST",
+    "path": "/connectors/{key}/oauth/register",
+    "source": "backend/app/api/v1/mcp.py:429",
+    "handler": "register"
+  },
+  {
+    "method": "GET",
+    "path": "/oauth/register/{client_id}",
+    "source": "backend/app/api/v1/mcp.py:453",
+    "handler": "read_registration"
+  },
+  {
+    "method": "GET",
+    "path": "/connectors/{key}/oauth/register/{client_id}",
+    "source": "backend/app/api/v1/mcp.py:453",
+    "handler": "read_registration"
+  },
+  {
+    "method": "GET",
+    "path": "/oauth/authorize",
+    "source": "backend/app/api/v1/mcp.py:660",
+    "handler": "authorize_get"
+  },
+  {
+    "method": "GET",
+    "path": "/connectors/{key}/oauth/authorize",
+    "source": "backend/app/api/v1/mcp.py:660",
+    "handler": "authorize_get"
+  },
+  {
+    "method": "POST",
+    "path": "/oauth/authorize",
+    "source": "backend/app/api/v1/mcp.py:667",
+    "handler": "authorize_post"
+  },
+  {
+    "method": "POST",
+    "path": "/connectors/{key}/oauth/authorize",
+    "source": "backend/app/api/v1/mcp.py:667",
+    "handler": "authorize_post"
+  },
+  {
+    "method": "GET",
+    "path": "/oauth/approved",
+    "source": "backend/app/api/v1/mcp.py:673",
+    "handler": "approved_page"
+  },
+  {
+    "method": "POST",
+    "path": "/oauth/token",
+    "source": "backend/app/api/v1/mcp.py:921",
+    "handler": "token_endpoint"
+  },
+  {
+    "method": "POST",
+    "path": "/connectors/{key}/oauth/token",
+    "source": "backend/app/api/v1/mcp.py:921",
+    "handler": "token_endpoint"
+  },
+  {
+    "method": "POST",
+    "path": "/oauth/revoke",
+    "source": "backend/app/api/v1/mcp.py:931",
+    "handler": "revoke_endpoint"
+  },
+  {
+    "method": "POST",
+    "path": "/connectors/{key}/oauth/revoke",
+    "source": "backend/app/api/v1/mcp.py:931",
+    "handler": "revoke_endpoint"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/mcp/tokens",
+    "source": "backend/app/api/v1/mcp.py:964",
+    "handler": "list_tokens"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/mcp/tokens",
+    "source": "backend/app/api/v1/mcp.py:971",
+    "handler": "create_token"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/mcp/tokens/{token_id}",
+    "source": "backend/app/api/v1/mcp.py:1000",
+    "handler": "revoke_token"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/mcp/activity",
+    "source": "backend/app/api/v1/mcp.py:1013",
+    "handler": "activity"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/mcp/connectors",
+    "source": "backend/app/api/v1/mcp.py:1041",
+    "handler": "list_connectors"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/mcp/bridge",
+    "source": "backend/app/api/v1/mcp.py:1113",
+    "handler": "download_bridge"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/mcp/connectors/{key}",
+    "source": "backend/app/api/v1/mcp.py:1134",
+    "handler": "update_connector"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/mcp/clients",
+    "source": "backend/app/api/v1/mcp.py:1153",
+    "handler": "list_clients"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/mcp/clients/{client_pk}",
+    "source": "backend/app/api/v1/mcp.py:1188",
+    "handler": "remove_client"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/mcp/connectors/{key}/revoke",
+    "source": "backend/app/api/v1/mcp.py:1202",
+    "handler": "revoke_connector"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/mcp/connectors/{key}/test",
+    "source": "backend/app/api/v1/mcp.py:1223",
+    "handler": "test_connector"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/mcp/endpoints",
+    "source": "backend/app/api/v1/mcp.py:1248",
+    "handler": "connector_endpoints"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/mcp/execution-health",
+    "source": "backend/app/api/v1/mcp.py:1271",
+    "handler": "get_mcp_execution_health"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/notifications/",
+    "source": "backend/app/api/v1/notifications.py:33",
+    "handler": "list_notifications"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/notifications",
+    "source": "backend/app/api/v1/notifications.py:33",
+    "handler": "list_notifications"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/notifications/unread-count",
+    "source": "backend/app/api/v1/notifications.py:55",
+    "handler": "unread_count"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/notifications/{event_id}/read",
+    "source": "backend/app/api/v1/notifications.py:67",
+    "handler": "mark_read"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/notifications/read-all",
+    "source": "backend/app/api/v1/notifications.py:80",
+    "handler": "mark_all_read"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/notifications/push/vapid-key",
+    "source": "backend/app/api/v1/notifications.py:105",
+    "handler": "vapid_key"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/notifications/push/subscribe",
+    "source": "backend/app/api/v1/notifications.py:116",
+    "handler": "subscribe"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/notifications/push/unsubscribe",
+    "source": "backend/app/api/v1/notifications.py:144",
+    "handler": "unsubscribe"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/notifications/push/subscriptions",
+    "source": "backend/app/api/v1/notifications.py:156",
+    "handler": "list_subscriptions"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/notifications/push/test",
+    "source": "backend/app/api/v1/notifications.py:168",
+    "handler": "test_push"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/overview/campaigns",
+    "source": "backend/app/api/v1/overview.py:358",
+    "handler": "campaign_overview"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/overview/campaigns/{campaign_id}",
+    "source": "backend/app/api/v1/overview.py:478",
+    "handler": "campaign_detail"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/overview/metrics",
+    "source": "backend/app/api/v1/overview.py:574",
+    "handler": "unified_metrics"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/send/",
+    "source": "backend/app/api/v1/send.py:37",
+    "handler": "send_sms_now"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/send/validate",
+    "source": "backend/app/api/v1/send.py:264",
+    "handler": "validate_recipients"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/send/scheduled",
+    "source": "backend/app/api/v1/send.py:319",
+    "handler": "get_scheduled"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/send/history",
+    "source": "backend/app/api/v1/send.py:374",
+    "handler": "get_history"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/send/scheduled/{sid}/cancel",
+    "source": "backend/app/api/v1/send.py:440",
+    "handler": "cancel_scheduled"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/send/scheduled/{sid}/retry",
+    "source": "backend/app/api/v1/send.py:452",
+    "handler": "retry_scheduled"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/send/messages/{mid}/retry",
+    "source": "backend/app/api/v1/send.py:468",
+    "handler": "retry_message"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/sequences/",
+    "source": "backend/app/api/v1/sequences.py:69",
+    "handler": "list_sequences"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/sequences",
+    "source": "backend/app/api/v1/sequences.py:69",
+    "handler": "list_sequences"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/sequences/{sequence_id}",
+    "source": "backend/app/api/v1/sequences.py:104",
+    "handler": "get_sequence"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/sequences/",
+    "source": "backend/app/api/v1/sequences.py:119",
+    "handler": "create_sequence"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/sequences/{sequence_id}",
+    "source": "backend/app/api/v1/sequences.py:163",
+    "handler": "update_sequence"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/sequences/{sequence_id}",
+    "source": "backend/app/api/v1/sequences.py:243",
+    "handler": "delete_sequence"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/settings/access",
+    "source": "backend/app/api/v1/settings.py:22",
+    "handler": "get_access"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/settings/access",
+    "source": "backend/app/api/v1/settings.py:28",
+    "handler": "put_access"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/settings/gateway",
+    "source": "backend/app/api/v1/settings.py:45",
+    "handler": "get_gw"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/settings/gateway/sim",
+    "source": "backend/app/api/v1/settings.py:67",
+    "handler": "set_sim"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/settings/gateway/test",
+    "source": "backend/app/api/v1/settings.py:72",
+    "handler": "test_gw"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/settings/gateway/register-webhook",
+    "source": "backend/app/api/v1/settings.py:78",
+    "handler": "reg_wh"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/settings/gateway/webhooks",
+    "source": "backend/app/api/v1/settings.py:111",
+    "handler": "list_wh"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/settings/gateway/webhooks/{webhook_id}",
+    "source": "backend/app/api/v1/settings.py:142",
+    "handler": "del_wh"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/settings/notifications",
+    "source": "backend/app/api/v1/settings.py:151",
+    "handler": "get_notifs"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/settings/notifications/muted-senders",
+    "source": "backend/app/api/v1/settings.py:158",
+    "handler": "get_muted_senders"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/settings/notifications/muted-senders",
+    "source": "backend/app/api/v1/settings.py:165",
+    "handler": "put_muted_senders"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/settings/notifications/{provider}",
+    "source": "backend/app/api/v1/settings.py:172",
+    "handler": "put_notif"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/settings/notifications/{provider}/test",
+    "source": "backend/app/api/v1/settings.py:184",
+    "handler": "test_notif"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/settings/compliance",
+    "source": "backend/app/api/v1/settings.py:196",
+    "handler": "get_comp"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/settings/compliance",
+    "source": "backend/app/api/v1/settings.py:200",
+    "handler": "put_comp"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/settings/callgate",
+    "source": "backend/app/api/v1/settings.py:213",
+    "handler": "get_callgate"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/settings/callgate",
+    "source": "backend/app/api/v1/settings.py:226",
+    "handler": "put_callgate"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/settings/callgate/test",
+    "source": "backend/app/api/v1/settings.py:240",
+    "handler": "test_callgate"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/settings/callgate/webhooks",
+    "source": "backend/app/api/v1/settings.py:248",
+    "handler": "get_callgate_webhooks"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/settings/callgate/register-webhook",
+    "source": "backend/app/api/v1/settings.py:258",
+    "handler": "reg_callgate_wh"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/settings/callgate/webhooks/{webhook_id}",
+    "source": "backend/app/api/v1/settings.py:287",
+    "handler": "del_callgate_wh"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/settings/google-oauth",
+    "source": "backend/app/api/v1/settings.py:314",
+    "handler": "get_google_oauth"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/settings/google-oauth",
+    "source": "backend/app/api/v1/settings.py:357",
+    "handler": "put_google_oauth"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/settings/gateway/phones",
+    "source": "backend/app/api/v1/settings.py:451",
+    "handler": "list_gateway_phones"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/settings/gateway/phones",
+    "source": "backend/app/api/v1/settings.py:466",
+    "handler": "add_gateway_phone"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/settings/gateway/phones/{phone_id}",
+    "source": "backend/app/api/v1/settings.py:481",
+    "handler": "edit_gateway_phone"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/settings/gateway/phones/{phone_id}",
+    "source": "backend/app/api/v1/settings.py:501",
+    "handler": "remove_gateway_phone"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/settings/gateway/phones/{phone_id}/test",
+    "source": "backend/app/api/v1/settings.py:518",
+    "handler": "test_gateway_phone"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/settings/gateway/phones/{phone_id}/register-webhook",
+    "source": "backend/app/api/v1/settings.py:538",
+    "handler": "register_gateway_phone_webhook"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/settings/gateway/routing",
+    "source": "backend/app/api/v1/settings.py:558",
+    "handler": "update_gateway_routing"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/settings/appearance",
+    "source": "backend/app/api/v1/settings.py:606",
+    "handler": "get_appearance"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/settings/appearance",
+    "source": "backend/app/api/v1/settings.py:633",
+    "handler": "put_appearance"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/system/health",
+    "source": "backend/app/api/v1/system.py:47",
+    "handler": "system_health"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/system/errors",
+    "source": "backend/app/api/v1/system.py:291",
+    "handler": "read_errors"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/templates/",
+    "source": "backend/app/api/v1/templates.py:95",
+    "handler": "list_templates"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/templates",
+    "source": "backend/app/api/v1/templates.py:95",
+    "handler": "list_templates"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/templates/categories",
+    "source": "backend/app/api/v1/templates.py:126",
+    "handler": "list_categories"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/templates/preview",
+    "source": "backend/app/api/v1/templates.py:141",
+    "handler": "preview_template"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/templates/{template_id}",
+    "source": "backend/app/api/v1/templates.py:201",
+    "handler": "get_template"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/templates/",
+    "source": "backend/app/api/v1/templates.py:215",
+    "handler": "create_template"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/templates/{template_id}",
+    "source": "backend/app/api/v1/templates.py:262",
+    "handler": "update_template"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/templates/{template_id}",
+    "source": "backend/app/api/v1/templates.py:306",
+    "handler": "delete_template"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/templates/{template_id}/duplicate",
+    "source": "backend/app/api/v1/templates.py:321",
+    "handler": "duplicate_template"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/templates/{template_id}/to-email",
+    "source": "backend/app/api/v1/templates.py:353",
+    "handler": "convert_to_email"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/validator/status",
+    "source": "backend/app/api/v1/validator.py:83",
+    "handler": "status"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/validator/self-test",
+    "source": "backend/app/api/v1/validator.py:105",
+    "handler": "self_test"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/validator/selection",
+    "source": "backend/app/api/v1/validator.py:143",
+    "handler": "selection"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/validator/jobs",
+    "source": "backend/app/api/v1/validator.py:159",
+    "handler": "create_job"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/validator/jobs",
+    "source": "backend/app/api/v1/validator.py:186",
+    "handler": "list_jobs"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/validator/jobs/{job_id}",
+    "source": "backend/app/api/v1/validator.py:199",
+    "handler": "get_job"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/validator/jobs/{job_id}/cancel",
+    "source": "backend/app/api/v1/validator.py:211",
+    "handler": "cancel_job"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/validator/batch",
+    "source": "backend/app/api/v1/validator.py:281",
+    "handler": "batch"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/variables/",
+    "source": "backend/app/api/v1/variables.py:33",
+    "handler": "list_variables"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/variables",
+    "source": "backend/app/api/v1/variables.py:33",
+    "handler": "list_variables"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/variables/sync",
+    "source": "backend/app/api/v1/variables.py:76",
+    "handler": "sync_variables"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/variables/",
+    "source": "backend/app/api/v1/variables.py:85",
+    "handler": "create_variable"
+  },
+  {
+    "method": "PUT",
+    "path": "/api/v1/variables/{variable_id}",
+    "source": "backend/app/api/v1/variables.py:123",
+    "handler": "update_variable"
+  },
+  {
+    "method": "DELETE",
+    "path": "/api/v1/variables/{variable_id}",
+    "source": "backend/app/api/v1/variables.py:163",
+    "handler": "delete_variable"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/variables/preview",
+    "source": "backend/app/api/v1/variables.py:186",
+    "handler": "preview_message"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/variables/contact/{contact_id}/profile",
+    "source": "backend/app/api/v1/variables.py:204",
+    "handler": "contact_profile"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/webhooks/smsgateway/phone/{phone_id}",
+    "source": "backend/app/api/v1/webhooks.py:217",
+    "handler": "smsgateway_phone_webhook"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/webhooks/smsgateway",
+    "source": "backend/app/api/v1/webhooks.py:228",
+    "handler": "smsgateway_webhook"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/webhooks/smsgateway",
+    "source": "backend/app/api/v1/webhooks.py:404",
+    "handler": "webhook_get"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/webhooks/callgate",
+    "source": "backend/app/api/v1/webhooks.py:431",
+    "handler": "callgate_webhook"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/webhooks/callgate",
+    "source": "backend/app/api/v1/webhooks.py:566",
+    "handler": "callgate_webhook_get"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/webhooks/smsgate/inbound",
+    "source": "backend/app/api/v1/webhooks.py:570",
+    "handler": "legacy"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/webhooks/brevo",
+    "source": "backend/app/api/v1/webhooks.py:628",
+    "handler": "brevo_webhook"
+  },
+  {
+    "method": "POST",
+    "path": "/api/v1/webhooks/brevo/{account_id}",
+    "source": "backend/app/api/v1/webhooks.py:628",
+    "handler": "brevo_webhook"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/webhooks/logs",
+    "source": "backend/app/api/v1/webhooks.py:708",
+    "handler": "logs"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/health",
+    "source": "backend/app/main.py:1402",
+    "handler": "health"
+  },
+  {
+    "method": "GET",
+    "path": "/api/v1/health/db",
+    "source": "backend/app/main.py:1413",
+    "handler": "health_db"
+  },
+  {
+    "method": "GET",
+    "path": "/manifest.json",
+    "source": "backend/app/main.py:1520",
+    "handler": "m"
+  },
+  {
+    "method": "GET",
+    "path": "/sw.js",
+    "source": "backend/app/main.py:1538",
+    "handler": "sw"
+  },
+  {
+    "method": "GET",
+    "path": "/icon-192.png",
+    "source": "backend/app/main.py:1540",
+    "handler": "i1"
+  },
+  {
+    "method": "GET",
+    "path": "/icon-512.png",
+    "source": "backend/app/main.py:1542",
+    "handler": "i2"
+  },
+  {
+    "method": "GET",
+    "path": "/icon-maskable-192.png",
+    "source": "backend/app/main.py:1544",
+    "handler": "im1"
+  },
+  {
+    "method": "GET",
+    "path": "/icon-maskable-512.png",
+    "source": "backend/app/main.py:1546",
+    "handler": "im2"
+  },
+  {
+    "method": "GET",
+    "path": "/apple-touch-icon.png",
+    "source": "backend/app/main.py:1548",
+    "handler": "apple_icon"
+  },
+  {
+    "method": "GET",
+    "path": "/favicon.svg",
+    "source": "backend/app/main.py:1550",
+    "handler": "fv"
+  },
+  {
+    "method": "GET",
+    "path": "/{fp:path}",
+    "source": "backend/app/main.py:1557",
+    "handler": "spa"
+  },
+  {
+    "method": "GET",
+    "path": "/{fp:path}",
+    "source": "backend/app/main.py:1563",
+    "handler": "spa"
+  }
+]
